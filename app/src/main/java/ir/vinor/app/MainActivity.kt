@@ -1,251 +1,216 @@
 package ir.vinor.app
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.NavHostFragment
-import androidx.navigation.ui.setupWithNavController
 import ir.vinor.app.databinding.ActivityMainBinding
 
 /**
- * MainActivity با Bottom Navigation - 5 تب همکار اکسپرس:
- * وینور، پورسانت، روتین، من (هماهنگ با منوی سایت)
+ * نسخه کاملا WebView:
+ * - تمام ناوبری توسط وب‌سایت انجام می‌شود
+ * - هیچ BottomNavigation/Fragment نیتیو استفاده نمی‌شود
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var webView: WebView
     private var lastBackPressTime: Long = 0
-    private val backPressThreshold = 2000 // 2 seconds
-    private var currentMenuItems: List<MenuManager.MenuItem> = emptyList()
+    private val backPressThreshold = 2000L
+    private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // اجباری کردن تم تاریک در تمام اپلیکیشن
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupNavigation()
+        webView = binding.webView
+        setupRetryButton()
         setupBackPressHandler()
-        loadMenuFromAPI()
-        
-        // Connection Test - لاگ برای تست
-        Log.d("MainActivity", "App started - Connection Test")
+        setupWebView()
+        loadEntryUrl()
     }
 
-    private fun setupNavigation() {
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.navHostFragment) as NavHostFragment
-        val navController = navHostFragment.navController
+    private fun setupRetryButton() {
+        binding.retryButton.setOnClickListener { loadEntryUrl() }
+    }
 
-        // اتصال Bottom Navigation به NavController
-        binding.bottomNavigation.setupWithNavController(navController)
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView() {
+        val settings = webView.settings
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.databaseEnabled = true
+        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        settings.loadWithOverviewMode = true
+        settings.useWideViewPort = true
+        settings.setSupportZoom(false)
+        settings.builtInZoomControls = false
+        settings.displayZoomControls = false
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        settings.allowFileAccess = false
+        settings.allowContentAccess = false
+        settings.allowFileAccessFromFileURLs = false
+        settings.allowUniversalAccessFromFileURLs = false
+        settings.userAgentString = settings.userAgentString + " VinorApp/WebViewOnly"
 
-        // لاگ تغییر تب و به‌روزرسانی URL از منوی API
-        navController.addOnDestinationChangedListener { _, destination, _ ->
-            Log.d("MainActivity", "Tab changed to: ${destination.label}")
-            updateFragmentUrlFromMenu(destination.id)
-            logCurrentTab()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            settings.forceDark = WebSettings.FORCE_DARK_ON
         }
-    }
 
-    /**
-     * بارگذاری منو از API سایت
-     */
-    private fun loadMenuFromAPI() {
-        MenuManager.fetchMenu(
-            scope = lifecycleScope,
-            onSuccess = { menuItems ->
-                currentMenuItems = menuItems
-                updateBottomNavigationMenu(menuItems)
-                updateFragmentUrls(menuItems)
-                Log.d("MainActivity", "Menu loaded: ${menuItems.size} items")
-            },
-            onError = { error ->
-                Log.e("MainActivity", "Error loading menu: $error")
-                // استفاده از منوی پیش‌فرض
-                val defaultMenu = MenuManager.getDefaultMenu()
-                currentMenuItems = defaultMenu
-                updateBottomNavigationMenu(defaultMenu)
-                updateFragmentUrls(defaultMenu)
-            }
-        )
-    }
-    
-    /**
-     * به‌روزرسانی URLهای Fragmentها بر اساس منوی API
-     */
-    private fun updateFragmentUrls(menuItems: List<MenuManager.MenuItem>) {
-        // ذخیره mapping برای استفاده بعدی
-        menuItems.forEach { menuItem ->
-            val fullUrl = if (menuItem.url.startsWith("http")) {
-                menuItem.url
-            } else {
-                "https://vinor.ir${menuItem.url}"
-            }
-            Log.d("MainActivity", "Menu item: ${menuItem.key} -> $fullUrl (Fragment ID: ${menuItem.fragmentId})")
-        }
-        
-        // به‌روزرسانی Fragment فعلی
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-        val currentDestinationId = navHostFragment?.navController?.currentDestination?.id
-        if (currentDestinationId != null) {
-            updateFragmentUrlFromMenu(currentDestinationId)
-        }
-    }
-    
-    /**
-     * به‌روزرسانی URL Fragment بر اساس منوی API
-     */
-    private fun updateFragmentUrlFromMenu(fragmentId: Int) {
-        val menuItem = currentMenuItems.find { it.fragmentId == fragmentId }
-        if (menuItem != null) {
-            val navHostFragment = supportFragmentManager
-                .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-            val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
-            
-            if (currentFragment is BaseWebViewFragment) {
-                val fullUrl = if (menuItem.url.startsWith("http")) {
-                    menuItem.url
-                } else {
-                    "https://vinor.ir${menuItem.url}"
-                }
-                val currentUrl = currentFragment.getCurrentUrl()
-                
-                // برای Dashboard: اگر در همان تب هستیم و URL یکسان است، refresh کن
-                if (fragmentId == R.id.dashboardFragment && currentFragment is DashboardFragment) {
-                    val isSameUrl = currentUrl != null && (
-                        currentUrl == fullUrl || 
-                        currentUrl.contains("/express/partner/dashboard")
-                    )
-                    if (isSameUrl) {
-                        // اگر در همان تب و همان URL هستیم، refresh کن
-                        Log.d("MainActivity", "Dashboard tab selected - refreshing")
-                        currentFragment.reloadWithUrl(fullUrl)
-                    } else {
-                        // اگر URL متفاوت است، load کن
-                        currentFragment.reloadWithUrl(fullUrl)
-                    }
-                } else {
-                    // برای سایر تب‌ها: فقط اگر URL متفاوت است، reload کن
-                    if (currentUrl != fullUrl) {
-                        currentFragment.reloadWithUrl(fullUrl)
-                    }
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                val url = request?.url?.toString() ?: return false
+                return when {
+                    // لینک‌های داخلی vinor داخل WebView باز می‌مانند.
+                    isVinorDomain(url) -> false
+                    // دانلود APK و لینک‌های خارجی به مرورگر سیستم سپرده می‌شوند.
+                    else -> openExternal(url)
                 }
             }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                showLoader()
+                hideOffline()
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                hideLoader()
+            }
+        }
+
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                binding.progressBar.progress = newProgress
+                binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
+            }
         }
     }
 
-    /**
-     * به‌روزرسانی منوی Bottom Navigation
-     */
-    private fun updateBottomNavigationMenu(menuItems: List<MenuManager.MenuItem>) {
-        val menu = binding.bottomNavigation.menu
-        menu.clear()
-
-        menuItems.forEachIndexed { index, item ->
-            val menuItem = menu.add(0, item.fragmentId, index, item.label)
-            val iconRes = MenuManager.getIconDrawable(item.icon)
-            menuItem.icon = getDrawable(iconRes) ?: getDrawable(R.drawable.ic_home)
+    private fun loadEntryUrl() {
+        if (!isOnline()) {
+            showOffline()
+            return
         }
+        hideOffline()
+        webView.loadUrl(extractStartUrl(intent?.dataString))
+    }
 
-        // اتصال مجدد به NavController
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-        navHostFragment?.navController?.let { navController ->
-            binding.bottomNavigation.setupWithNavController(navController)
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        webView.loadUrl(extractStartUrl(intent.dataString))
+    }
+
+    private fun extractStartUrl(deepLinkUrl: String?): String {
+        if (deepLinkUrl.isNullOrBlank()) return defaultUrl
+        return if (isVinorDomain(deepLinkUrl)) deepLinkUrl else defaultUrl
+    }
+
+    private fun isVinorDomain(url: String): Boolean {
+        return runCatching {
+            val uri = Uri.parse(url)
+            val host = uri.host?.lowercase() ?: return false
+            host == "vinor.ir" || host.endsWith(".vinor.ir")
+        }.getOrDefault(false)
+    }
+
+    private fun openExternal(url: String): Boolean {
+        return try {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+            true
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Unable to open external url: $url", e)
+            false
         }
+    }
+
+    private fun isOnline(): Boolean {
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    private fun showLoader() {
+        binding.loaderContainer.visibility = View.VISIBLE
+        binding.skeletonView.visibility = View.VISIBLE
+    }
+
+    private fun hideLoader() {
+        binding.loaderContainer.visibility = View.GONE
+        binding.skeletonView.visibility = View.GONE
+    }
+
+    private fun showOffline() {
+        binding.offlineContainer.visibility = View.VISIBLE
+        webView.visibility = View.GONE
+    }
+
+    private fun hideOffline() {
+        binding.offlineContainer.visibility = View.GONE
+        webView.visibility = View.VISIBLE
     }
 
     private fun setupBackPressHandler() {
-        // Back handling هوشمند
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val navHostFragment = supportFragmentManager
-                    .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-                val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
-
-                when {
-                    // اگر Fragment یک BaseWebViewFragment است و WebView history دارد
-                    currentFragment is BaseWebViewFragment && currentFragment.canGoBackInWebView() -> {
-                        currentFragment.goBackInWebView()
-                        Log.d("MainActivity", "WebView goBack")
-                    }
-                    
-                    // اگر در ریشه تب هستیم (نه خانه) => به خانه برگرد
-                    currentFragment is BaseWebViewFragment && 
-                    currentFragment.isAtRoot() -> {
-                        val homeFragmentId = currentMenuItems.firstOrNull()?.fragmentId ?: R.id.dashboardFragment
-                        if (navHostFragment?.navController?.currentDestination?.id != homeFragmentId) {
-                            navHostFragment?.navController?.navigate(homeFragmentId)
-                            Log.d("MainActivity", "Navigated to Home tab")
-                        } else {
-                            handleExitConfirmation()
-                        }
-                    }
-                    
-                    // اگر در خانه و ریشه هستیم => Confirm خروج
-                    else -> {
-                        val homeFragmentId = currentMenuItems.firstOrNull()?.fragmentId ?: R.id.dashboardFragment
-                        if (navHostFragment?.navController?.currentDestination?.id == homeFragmentId) {
-                            handleExitConfirmation()
-                        } else {
-                            isEnabled = false
-                            onBackPressedDispatcher.onBackPressed()
-                            isEnabled = true
-                        }
-                    }
+                if (::webView.isInitialized && webView.canGoBack()) {
+                    webView.goBack()
+                    return
+                }
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressTime < backPressThreshold) {
+                    finish()
+                } else {
+                    lastBackPressTime = now
+                    Toast.makeText(
+                        this@MainActivity,
+                        "برای خروج دوباره دکمه بازگشت را فشار دهید",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
         onBackPressedDispatcher.addCallback(this, callback)
     }
 
-    /** نمایش/عدم‌نمایش منوی Bottom Navigation نیتیو (مثلاً در صفحه جزئیات فایل). */
-    fun setBottomNavVisible(visible: Boolean) {
-        binding.bottomNavigation.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE
+    // برای سازگاری با کدهای قدیمی فراخوانی‌کننده از BaseWebViewFragment.
+    fun setBottomNavVisible(visible: Boolean) = Unit
+
+    override fun onPause() {
+        super.onPause()
+        if (::webView.isInitialized) webView.onPause()
     }
 
-    private fun handleExitConfirmation() {
-        val currentTime = System.currentTimeMillis()
-        
-        if (currentTime - lastBackPressTime < backPressThreshold) {
-            // خروج از اپ
-            finish()
-        } else {
-            // نمایش پیام
-            lastBackPressTime = currentTime
-            Toast.makeText(
-                this,
-                "برای خروج دوباره دکمه بازگشت را فشار دهید",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+    override fun onResume() {
+        super.onResume()
+        if (::webView.isInitialized) webView.onResume()
     }
 
-    /**
-     * لاگ برای Connection Test - نمایش URL فعلی هر تب
-     */
-    private fun logCurrentTab() {
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-        val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
-        
-        if (currentFragment is BaseWebViewFragment) {
-            Log.d("MainActivity", "Current Tab: ${currentFragment.fragmentTag}")
-            Log.d("MainActivity", "Target URL: ${currentFragment.targetUrl}")
-            val currentUrl = try {
-                currentFragment.getCurrentUrl() ?: "Not loaded"
-            } catch (e: Exception) {
-                "Error getting URL: ${e.message}"
-            }
-            Log.d("MainActivity", "Current WebView URL: $currentUrl")
-        }
+    override fun onDestroy() {
+        if (::webView.isInitialized) webView.destroy()
+        super.onDestroy()
     }
 }
