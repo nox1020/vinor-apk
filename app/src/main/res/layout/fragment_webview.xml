@@ -38,7 +38,9 @@
 
     </FrameLayout>
 
-    <include layout="@layout/offline_fullscreen_overlay" />
+    <include
+        android:id="@+id/offlineOverlay"
+        layout="@layout/offline_fullscreen_overlay" />
 
 </FrameLayout>
 

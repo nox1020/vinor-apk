@@ -61,7 +61,7 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     private fun setupRetryButton() {
-        binding.retryButton.setOnClickListener {
+        binding.offlineOverlay.retryButton.setOnClickListener {
             retryLoad()
         }
     }
@@ -312,7 +312,7 @@ abstract class BaseWebViewFragment : Fragment() {
     private fun showOffline() {
         hideLoader()
         binding.progressBar.visibility = View.GONE
-        binding.offlineContainer.visibility = View.VISIBLE
+        binding.offlineOverlay.offlineContainer.visibility = View.VISIBLE
         binding.webView.visibility = View.GONE
     }
 
@@ -320,7 +320,7 @@ abstract class BaseWebViewFragment : Fragment() {
      * مخفی کردن صفحه Offline
      */
     private fun hideOffline() {
-        binding.offlineContainer.visibility = View.GONE
+        binding.offlineOverlay.offlineContainer.visibility = View.GONE
         binding.webView.visibility = View.VISIBLE
     }
 

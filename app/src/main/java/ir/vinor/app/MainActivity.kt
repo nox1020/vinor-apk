@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRetryButton() {
-        binding.retryButton.setOnClickListener { loadEntryUrl() }
+        binding.offlineOverlay.retryButton.setOnClickListener { loadEntryUrl() }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -214,12 +214,12 @@ class MainActivity : AppCompatActivity() {
     private fun showOffline() {
         hideLoader()
         binding.progressBar.visibility = View.GONE
-        binding.offlineContainer.visibility = View.VISIBLE
+        binding.offlineOverlay.offlineContainer.visibility = View.VISIBLE
         webView.visibility = View.GONE
     }
 
     private fun hideOffline() {
-        binding.offlineContainer.visibility = View.GONE
+        binding.offlineOverlay.offlineContainer.visibility = View.GONE
         webView.visibility = View.VISIBLE
     }
 
