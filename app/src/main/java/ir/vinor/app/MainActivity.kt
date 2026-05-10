@@ -55,7 +55,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRetryButton() {
-        binding.offlineOverlay.retryButton.setOnClickListener { loadEntryUrl() }
+        binding.offlineOverlay.retryButton.setOnClickListener {
+            if (::webView.isInitialized) webView.removeCallbacks(revealAfterLoadRunnable)
+            loadEntryUrl()
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -204,7 +207,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadEntryUrl() {
         if (!isOnline()) {
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         hideOffline()
@@ -215,7 +218,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (!isOnline()) {
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         hideOffline()
@@ -263,16 +266,26 @@ class MainActivity : AppCompatActivity() {
         binding.skeletonView.root.visibility = View.GONE
     }
 
-    private fun showOffline() {
+    private fun showOfflineOverlayOnly() {
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
         }
         hideLoader()
         binding.progressBar.visibility = View.GONE
+        val overlay = binding.offlineOverlay.root
+        overlay.visibility = View.VISIBLE
+        overlay.bringToFront()
+    }
+
+    private fun showOffline() {
         if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
+            webView.visibility = View.GONE
             VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
+        hideLoader()
+        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
@@ -287,11 +300,11 @@ class MainActivity : AppCompatActivity() {
         if (!::webView.isInitialized) return
         if (mainFrameLoadFailed) {
             mainFrameLoadFailed = false
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         if (!isOnline()) {
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         val curUrl = webView.url
@@ -300,6 +313,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(curUrl)) {
+            if (!isOnline()) showOfflineOverlayOnly()
             return
         }
         hideLoader()
@@ -367,7 +381,7 @@ class MainActivity : AppCompatActivity() {
         connectivityCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onLost(network: Network) {
                 runOnUiThread {
-                    if (!isOnline()) showOffline()
+                    if (!isOnline()) showOfflineOverlayOnly()
                 }
             }
         }

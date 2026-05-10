@@ -69,6 +69,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     private fun setupRetryButton() {
         binding.offlineOverlay.retryButton.setOnClickListener {
+            if (::webView.isInitialized) webView.removeCallbacks(revealAfterLoadRunnable)
             retryLoad()
         }
     }
@@ -276,7 +277,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     private fun loadUrl() {
         if (!isOnline()) {
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         hideOffline()
@@ -304,7 +305,7 @@ abstract class BaseWebViewFragment : Fragment() {
         dynamicUrl = url
         if (::webView.isInitialized) {
             if (!isOnline()) {
-                showOffline()
+                showOfflineOverlayOnly()
                 return
             }
             hideOffline()
@@ -342,18 +343,32 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     /**
-     * نمایش صفحه Offline
+     * فقط اورلی «تلاش مجدد» و مخفی‌کردن WebView؛ بدون loadData روی WebView.
+     * تا با هر بار Retry در حالت قطع نت، زنجیرهٔ onPageFinished دوباره اورلی را به‌هم نزند.
      */
-    private fun showOffline() {
+    private fun showOfflineOverlayOnly() {
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             binding.webView.visibility = View.GONE
         }
         hideLoader()
         binding.progressBar.visibility = View.GONE
+        val overlay = binding.offlineOverlay.root
+        overlay.visibility = View.VISIBLE
+        overlay.bringToFront()
+    }
+
+    /**
+     * نمایش صفحه Offline + پاک‌سازی محتوای خطادار WebView
+     */
+    private fun showOffline() {
         if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
+            binding.webView.visibility = View.GONE
             VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
+        hideLoader()
+        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
@@ -372,11 +387,11 @@ abstract class BaseWebViewFragment : Fragment() {
         if (view == null || !::webView.isInitialized) return
         if (mainFrameLoadFailed) {
             mainFrameLoadFailed = false
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         if (!isOnline()) {
-            showOffline()
+            showOfflineOverlayOnly()
             return
         }
         val curUrl = webView.url
@@ -385,6 +400,7 @@ abstract class BaseWebViewFragment : Fragment() {
             return
         }
         if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(curUrl)) {
+            if (!isOnline()) showOfflineOverlayOnly()
             return
         }
         hideLoader()
@@ -688,7 +704,7 @@ abstract class BaseWebViewFragment : Fragment() {
             override fun onLost(network: Network) {
                 view?.post {
                     if (!isAdded) return@post
-                    if (!isOnline()) showOffline()
+                    if (!isOnline()) showOfflineOverlayOnly()
                 }
             }
         }
