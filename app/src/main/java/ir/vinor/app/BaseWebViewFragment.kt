@@ -267,7 +267,7 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     private fun showLoader() {
         binding.loaderContainer.visibility = View.VISIBLE
-        binding.skeletonView.visibility = View.VISIBLE
+        binding.skeletonView.root.visibility = View.VISIBLE
     }
 
     /**
@@ -275,7 +275,7 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     private fun hideLoader() {
         binding.loaderContainer.visibility = View.GONE
-        binding.skeletonView.visibility = View.GONE
+        binding.skeletonView.root.visibility = View.GONE
     }
 
     /**

@@ -155,12 +155,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLoader() {
         binding.loaderContainer.visibility = View.VISIBLE
-        binding.skeletonView.visibility = View.VISIBLE
+        binding.skeletonView.root.visibility = View.VISIBLE
     }
 
     private fun hideLoader() {
         binding.loaderContainer.visibility = View.GONE
-        binding.skeletonView.visibility = View.GONE
+        binding.skeletonView.root.visibility = View.GONE
     }
 
     private fun showOffline() {
