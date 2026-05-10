@@ -93,8 +93,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                showLoader()
+                if (isAuxiliaryNavigationUrl(url)) return
+                if (!isOnline()) {
+                    showOffline()
+                    return
+                }
                 hideOffline()
+                showLoader()
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -214,13 +219,27 @@ class MainActivity : AppCompatActivity() {
     private fun showOffline() {
         hideLoader()
         binding.progressBar.visibility = View.GONE
-        binding.offlineOverlay.offlineContainer.visibility = View.VISIBLE
+        if (::webView.isInitialized) {
+            try {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+            } catch (_: Exception) {
+            }
+        }
+        val overlay = binding.offlineOverlay.root
+        overlay.visibility = View.VISIBLE
+        overlay.bringToFront()
         webView.visibility = View.GONE
     }
 
     private fun hideOffline() {
-        binding.offlineOverlay.offlineContainer.visibility = View.GONE
+        binding.offlineOverlay.root.visibility = View.GONE
         webView.visibility = View.VISIBLE
+    }
+
+    private fun isAuxiliaryNavigationUrl(url: String?): Boolean {
+        val u = url?.trim()?.lowercase() ?: return false
+        return u == "about:blank" || u.startsWith("about:blank#")
     }
 
     private fun setupBackPressHandler() {

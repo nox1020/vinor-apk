@@ -131,13 +131,19 @@ abstract class BaseWebViewFragment : Fragment() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                showLoader()
-                hideOffline()
+                if (isAuxiliaryNavigationUrl(url)) return
+
                 canGoBack = view?.canGoBack() == true
                 Log.d(fragmentTag, "Page started: $url")
 
-                // برای جلوگیری از دیده شدن لحظه‌ای فوتر وب در داشبورد و صفحه آموزش
-                // اسکریپت مخفی‌سازی را از همین ابتدا اجرا کن
+                /* اگر بلافاصله hideOffline شود، WebView صفحهٔ خطای سیستمی (متن انگلیسی offline) را نشان می‌دهد */
+                if (!isOnline()) {
+                    showOffline()
+                    return
+                }
+                hideOffline()
+                showLoader()
+
                 val urlStr = url ?: ""
                 if (urlStr.contains("/express/partner/dashboard") ||
                     urlStr.contains("/express/partner/training") ||
@@ -312,7 +318,16 @@ abstract class BaseWebViewFragment : Fragment() {
     private fun showOffline() {
         hideLoader()
         binding.progressBar.visibility = View.GONE
-        binding.offlineOverlay.offlineContainer.visibility = View.VISIBLE
+        if (::webView.isInitialized) {
+            try {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+            } catch (_: Exception) {
+            }
+        }
+        val overlay = binding.offlineOverlay.root
+        overlay.visibility = View.VISIBLE
+        overlay.bringToFront()
         binding.webView.visibility = View.GONE
     }
 
@@ -320,8 +335,14 @@ abstract class BaseWebViewFragment : Fragment() {
      * مخفی کردن صفحه Offline
      */
     private fun hideOffline() {
-        binding.offlineOverlay.offlineContainer.visibility = View.GONE
+        binding.offlineOverlay.root.visibility = View.GONE
         binding.webView.visibility = View.VISIBLE
+    }
+
+    /** رد شدن از به‌روزرسانی UI برای about:blank بعد از پاک کردن خطای WebView */
+    private fun isAuxiliaryNavigationUrl(url: String?): Boolean {
+        val u = url?.trim()?.lowercase() ?: return false
+        return u == "about:blank" || u.startsWith("about:blank#")
     }
 
     /**
