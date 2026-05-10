@@ -16,6 +16,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.os.Build
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -101,6 +102,11 @@ abstract class BaseWebViewFragment : Fragment() {
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
 
+                if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                    showOffline()
+                    return true
+                }
+
                 // امکان محدود کردن تب به یک URL (مثلاً فقط صفحه وینور)
                 shouldOverrideUrlLoadingForFragment(url)?.let { override ->
                     if (override) {
@@ -129,9 +135,34 @@ abstract class BaseWebViewFragment : Fragment() {
                 return false
             }
 
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): WebResourceResponse? {
+                if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
+                    return VinorWebViewErrorShield.silentHtmlResponse()
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            @Suppress("DEPRECATION")
+            @Deprecated("نسخه قدیمی API برای دستگاه‌های قدیمی‌تر از N")
+            override fun shouldInterceptRequest(view: WebView?, url: String?): WebResourceResponse? {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                    if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                        return VinorWebViewErrorShield.silentHtmlResponse()
+                    }
+                }
+                return super.shouldInterceptRequest(view, url)
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                if (isAuxiliaryNavigationUrl(url)) return
+                if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                    showOffline()
+                    return
+                }
+                if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
 
                 canGoBack = view?.canGoBack() == true
                 Log.d(fragmentTag, "Page started: $url")
@@ -185,11 +216,13 @@ abstract class BaseWebViewFragment : Fragment() {
                 request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
-                super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
                     Log.w(fragmentTag, "Main frame load error: ${error?.errorCode} ${error?.description}")
+                    VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
+                    return
                 }
+                super.onReceivedError(view, request, error)
             }
 
             @Suppress("DEPRECATION")
@@ -202,8 +235,8 @@ abstract class BaseWebViewFragment : Fragment() {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                     return
                 }
-                super.onReceivedError(view, errorCode, description, failingUrl)
                 Log.w(fragmentTag, "Main frame load error (legacy): $errorCode $description")
+                VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                 showOffline()
             }
 
@@ -221,6 +254,7 @@ abstract class BaseWebViewFragment : Fragment() {
                 }
                 if (code == 408 || code == 429 || code in 500..599) {
                     Log.w(fragmentTag, "HTTP $code — showing offline overlay")
+                    VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
                 }
             }
@@ -316,19 +350,17 @@ abstract class BaseWebViewFragment : Fragment() {
      * نمایش صفحه Offline
      */
     private fun showOffline() {
+        if (::webView.isInitialized) {
+            binding.webView.visibility = View.GONE
+        }
         hideLoader()
         binding.progressBar.visibility = View.GONE
         if (::webView.isInitialized) {
-            try {
-                webView.stopLoading()
-                webView.loadUrl("about:blank")
-            } catch (_: Exception) {
-            }
+            VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
-        binding.webView.visibility = View.GONE
     }
 
     /**
@@ -337,12 +369,6 @@ abstract class BaseWebViewFragment : Fragment() {
     private fun hideOffline() {
         binding.offlineOverlay.root.visibility = View.GONE
         binding.webView.visibility = View.VISIBLE
-    }
-
-    /** رد شدن از به‌روزرسانی UI برای about:blank بعد از پاک کردن خطای WebView */
-    private fun isAuxiliaryNavigationUrl(url: String?): Boolean {
-        val u = url?.trim()?.lowercase() ?: return false
-        return u == "about:blank" || u.startsWith("about:blank#")
     }
 
     /**

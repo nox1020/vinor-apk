@@ -7,6 +7,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -83,6 +84,10 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
+                if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                    showOffline()
+                    return true
+                }
                 return when {
                     // لینک‌های داخلی vinor داخل WebView باز می‌مانند.
                     isVinorDomain(url) -> false
@@ -91,9 +96,34 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): WebResourceResponse? {
+                if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
+                    return VinorWebViewErrorShield.silentHtmlResponse()
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            @Suppress("DEPRECATION")
+            @Deprecated("API قدیمی برای زیر نسخه M")
+            override fun shouldInterceptRequest(view: WebView?, url: String?): WebResourceResponse? {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                        return VinorWebViewErrorShield.silentHtmlResponse()
+                    }
+                }
+                return super.shouldInterceptRequest(view, url)
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                if (isAuxiliaryNavigationUrl(url)) return
+                if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                    showOffline()
+                    return
+                }
+                if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
                 if (!isOnline()) {
                     showOffline()
                     return
@@ -113,11 +143,13 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
-                super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
                     Log.w("MainActivity", "Main frame error: ${error?.errorCode} ${error?.description}")
+                    VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
+                    return
                 }
+                super.onReceivedError(view, request, error)
             }
 
             @Suppress("DEPRECATION")
@@ -128,8 +160,8 @@ class MainActivity : AppCompatActivity() {
                 failingUrl: String?
             ) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) return
-                super.onReceivedError(view, errorCode, description, failingUrl)
                 Log.w("MainActivity", "Main frame error (legacy): $errorCode $description")
+                VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                 showOffline()
             }
 
@@ -142,7 +174,10 @@ class MainActivity : AppCompatActivity() {
                 if (request?.isForMainFrame != true) return
                 val code = errorResponse?.statusCode ?: return
                 if (code == 404) return
-                if (code == 408 || code == 429 || code in 500..599) showOffline()
+                if (code == 408 || code == 429 || code in 500..599) {
+                    VinorWebViewErrorShield.clearToSilentPlaceholder(view)
+                    showOffline()
+                }
             }
         }
 
@@ -217,29 +252,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOffline() {
+        if (::webView.isInitialized) {
+            webView.visibility = View.GONE
+        }
         hideLoader()
         binding.progressBar.visibility = View.GONE
         if (::webView.isInitialized) {
-            try {
-                webView.stopLoading()
-                webView.loadUrl("about:blank")
-            } catch (_: Exception) {
-            }
+            VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
-        webView.visibility = View.GONE
     }
 
     private fun hideOffline() {
         binding.offlineOverlay.root.visibility = View.GONE
         webView.visibility = View.VISIBLE
-    }
-
-    private fun isAuxiliaryNavigationUrl(url: String?): Boolean {
-        val u = url?.trim()?.lowercase() ?: return false
-        return u == "about:blank" || u.startsWith("about:blank#")
     }
 
     private fun setupBackPressHandler() {
