@@ -38,52 +38,7 @@
 
     </FrameLayout>
 
-    <!-- Offline Container -->
-    <LinearLayout
-        android:id="@+id/offlineContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp"
-        android:background="@color/vinor_offline_bg"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@drawable/ic_v_green"
-            android:contentDescription="Offline"
-            android:layout_marginBottom="24dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="اتصال به اینترنت برقرار نیست"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/vinor_offline_text_primary"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="لطفاً اتصال اینترنت خود را بررسی کنید"
-            android:textSize="14sp"
-            android:textColor="@color/vinor_offline_text_secondary"
-            android:layout_marginBottom="24dp" />
-
-        <Button
-            android:id="@+id/retryButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="تلاش مجدد"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#16a34a"
-            android:paddingHorizontal="32dp"
-            android:paddingVertical="12dp" />
-
-    </LinearLayout>
+    <include layout="@layout/offline_fullscreen_overlay" />
 
 </FrameLayout>
 

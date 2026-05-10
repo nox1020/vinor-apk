@@ -3,13 +3,17 @@ package ir.vinor.app
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -28,6 +32,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var webView: WebView
+    private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
     private var lastBackPressTime: Long = 0
     private val backPressThreshold = 2000L
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
@@ -96,6 +101,44 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 hideLoader()
             }
+
+            @SuppressLint("NewApi")
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    Log.w("MainActivity", "Main frame error: ${error?.errorCode} ${error?.description}")
+                    showOffline()
+                }
+            }
+
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(
+                view: WebView?,
+                errorCode: Int,
+                description: String?,
+                failingUrl: String?
+            ) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) return
+                super.onReceivedError(view, errorCode, description, failingUrl)
+                Log.w("MainActivity", "Main frame error (legacy): $errorCode $description")
+                showOffline()
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                errorResponse: WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request?.isForMainFrame != true) return
+                val code = errorResponse?.statusCode ?: return
+                if (code == 404) return
+                if (code == 408 || code == 429 || code in 500..599) showOffline()
+            }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -119,6 +162,11 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (!isOnline()) {
+            showOffline()
+            return
+        }
+        hideOffline()
         webView.loadUrl(extractStartUrl(intent.dataString))
     }
 
@@ -164,6 +212,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOffline() {
+        hideLoader()
+        binding.progressBar.visibility = View.GONE
         binding.offlineContainer.visibility = View.VISIBLE
         webView.visibility = View.GONE
     }
@@ -199,6 +249,16 @@ class MainActivity : AppCompatActivity() {
     // برای سازگاری با کدهای قدیمی فراخوانی‌کننده از BaseWebViewFragment.
     fun setBottomNavVisible(visible: Boolean) = Unit
 
+    override fun onStart() {
+        super.onStart()
+        registerConnectivityLostCallback()
+    }
+
+    override fun onStop() {
+        unregisterConnectivityLostCallback()
+        super.onStop()
+    }
+
     override fun onPause() {
         super.onPause()
         if (::webView.isInitialized) webView.onPause()
@@ -212,5 +272,32 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         if (::webView.isInitialized) webView.destroy()
         super.onDestroy()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerConnectivityLostCallback() {
+        if (connectivityCallback != null) return
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivityCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onLost(network: Network) {
+                runOnUiThread {
+                    if (!isOnline()) showOffline()
+                }
+            }
+        }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        cm.registerNetworkCallback(request, connectivityCallback!!)
+    }
+
+    private fun unregisterConnectivityLostCallback() {
+        val cb = connectivityCallback ?: return
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        try {
+            cm.unregisterNetworkCallback(cb)
+        } catch (_: Exception) {
+        }
+        connectivityCallback = null
     }
 }

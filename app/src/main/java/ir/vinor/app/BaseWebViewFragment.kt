@@ -1,14 +1,19 @@
 package ir.vinor.app
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -37,6 +42,7 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     private var canGoBack = false
+    private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -167,17 +173,32 @@ abstract class BaseWebViewFragment : Fragment() {
                 enableDarkMode()
             }
 
+            @SuppressLint("NewApi")
             override fun onReceivedError(
                 view: WebView?,
                 request: WebResourceRequest?,
-                error: android.webkit.WebResourceError?
+                error: WebResourceError?
             ) {
                 super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
-                    if (!isOnline()) {
-                        showOffline()
-                    }
+                    Log.w(fragmentTag, "Main frame load error: ${error?.errorCode} ${error?.description}")
+                    showOffline()
                 }
+            }
+
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(
+                view: WebView?,
+                errorCode: Int,
+                description: String?,
+                failingUrl: String?
+            ) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    return
+                }
+                super.onReceivedError(view, errorCode, description, failingUrl)
+                Log.w(fragmentTag, "Main frame load error (legacy): $errorCode $description")
+                showOffline()
             }
 
             override fun onReceivedHttpError(
@@ -186,8 +207,15 @@ abstract class BaseWebViewFragment : Fragment() {
                 errorResponse: WebResourceResponse?
             ) {
                 super.onReceivedHttpError(view, request, errorResponse)
-                if (request?.isForMainFrame == true && errorResponse?.statusCode == 404) {
+                if (request?.isForMainFrame != true) return
+                val code = errorResponse?.statusCode ?: return
+                if (code == 404) {
                     Log.w(fragmentTag, "404 error for: ${request.url}")
+                    return
+                }
+                if (code == 408 || code == 429 || code in 500..599) {
+                    Log.w(fragmentTag, "HTTP $code — showing offline overlay")
+                    showOffline()
                 }
             }
         }
@@ -282,6 +310,8 @@ abstract class BaseWebViewFragment : Fragment() {
      * نمایش صفحه Offline
      */
     private fun showOffline() {
+        hideLoader()
+        binding.progressBar.visibility = View.GONE
         binding.offlineContainer.visibility = View.VISIBLE
         binding.webView.visibility = View.GONE
     }
@@ -542,6 +572,16 @@ abstract class BaseWebViewFragment : Fragment() {
                cleanCurrent.startsWith(cleanTarget + "/")
     }
 
+    override fun onStart() {
+        super.onStart()
+        registerConnectivityLostCallback()
+    }
+
+    override fun onStop() {
+        unregisterConnectivityLostCallback()
+        super.onStop()
+    }
+
     override fun onPause() {
         super.onPause()
         if (::webView.isInitialized) {
@@ -554,6 +594,36 @@ abstract class BaseWebViewFragment : Fragment() {
         if (::webView.isInitialized) {
             webView.onResume()
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerConnectivityLostCallback() {
+        if (connectivityCallback != null) return
+        val cm =
+            requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivityCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onLost(network: Network) {
+                view?.post {
+                    if (!isAdded) return@post
+                    if (!isOnline()) showOffline()
+                }
+            }
+        }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        cm.registerNetworkCallback(request, connectivityCallback!!)
+    }
+
+    private fun unregisterConnectivityLostCallback() {
+        val cb = connectivityCallback ?: return
+        val ctx = context ?: return
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        try {
+            cm.unregisterNetworkCallback(cb)
+        } catch (_: Exception) {
+        }
+        connectivityCallback = null
     }
 
     override fun onDestroyView() {

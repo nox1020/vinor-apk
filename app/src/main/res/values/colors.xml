@@ -10,5 +10,7 @@
     <color name="vinor_offline_bg">#111827</color>
     <color name="vinor_offline_text_primary">#F9FAFB</color>
     <color name="vinor_offline_text_secondary">#9CA3AF</color>
+    <color name="vinor_offline_card_bg">#1F2937</color>
+    <color name="vinor_offline_btn">#16a34a</color>
 </resources>
 

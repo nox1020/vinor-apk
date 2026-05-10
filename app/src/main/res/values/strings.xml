@@ -5,5 +5,10 @@
     <string name="preloader_retry">تلاش مجدد</string>
     <string name="preloader_no_internet">اتصال اینترنت برقرار نیست</string>
     <string name="loading_message">در حال بارگذاری…</string>
+    <string name="offline_title">ارتباط برقرار نشد</string>
+    <string name="offline_message">اینترنت قطع است یا خیلی کند است و صفحه کامل نشد. اتصال داده یا وای‌فای را بررسی کنید و دوباره تلاش کنید.</string>
+    <string name="offline_retry">تلاش مجدد</string>
+    <string name="offline_footer_hint">اگر آنتن ضعیف است، چند ثانیه صبر کنید و دوباره بزنید.</string>
+    <string name="offline_icon_cd">بدون اتصال</string>
 </resources>
 
