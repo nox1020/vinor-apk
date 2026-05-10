@@ -44,6 +44,8 @@ def releaseStorePassword = trimOrNull(ksProps.getProperty("storePassword") ?: ks
 def releaseKeyAlias = trimOrNull(ksProps.getProperty("keyAlias", "vinor_release")) ?: "vinor_release"
 def releaseKeyPassword = trimOrNull(ksProps.getProperty("keyPassword") ?: ksProps.getProperty("RELEASE_KEY_PASSWORD"))
 
+// برای نصب دستی روی گوشی فقط APK خروجی assembleRelease را کپی کنید.
+// فایل .aab (bundleRelease) برای پلی‌استور است؛ باز کردن آن روی گوشی معمولاً خطای «تجزیه بسته» می‌دهد.
 android {
     namespace "ir.vinor.app"
     compileSdk 34

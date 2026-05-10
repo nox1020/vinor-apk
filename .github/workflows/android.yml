@@ -301,6 +301,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # فایل .aab با باز کردن در گوشی نصب نمی‌شود و خطای «مشکلی در تجزیه بسته» می‌دهد؛ فقط APK را برای سایدلود استفاده کنید.
+      - name: Sideload hint (APK vs AAB)
+        run: |
+          {
+            echo "## Android sideload — APK vs AAB"
+            echo ""
+            echo "| Artifact | Install by opening on phone? |"
+            echo "|----------|--------------------------------|"
+            echo "| **vinor-direct-apk** (\`.apk\`) | Yes — use this for direct install |"
+            echo "| **vinor-release-aab** (\`.aab\`) | **No** — Play Console only; opening it on device often shows *Problem parsing the package* |"
+            echo ""
+            echo "### فارسی"
+            echo "برای نصب دستی، حتماً آرتیفکت **vinor-direct-apk** (پسوند **apk**) را بگیرید. فایل **aab** شبیه اپ نیست و قابل نصب مستقیم روی گوشی نیست."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: (Optional) Rename AAB to include version
         continue-on-error: true
         shell: bash
