@@ -271,17 +271,24 @@ class ProfileFragment : Fragment() {
                     .post(okhttp3.RequestBody.create(null, ByteArray(0)))
                     .addHeader("Cookie", cookieHeader())
                     .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
+                val ok = withContext(Dispatchers.IO) {
+                    client.newCall(req).execute().use { it.isSuccessful }
+                }
                 withContext(Dispatchers.Main) {
                     if (_binding == null) return@withContext
-                    if (resp.isSuccessful) {
-                        android.webkit.CookieManager.getInstance().removeAllCookies {
-                            android.webkit.CookieManager.getInstance().flush()
-                        }
-                        context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
-                        loadData()
-                    } else {
+                    if (!ok) {
                         context?.let { Toast.makeText(it, "خطا در خروج", Toast.LENGTH_SHORT).show() }
+                        return@withContext
+                    }
+                    /* removeAllCookies ناهمزمان است؛ loadData فقط بعد از flush تا درخواست بعدی بدون کوکی قدیمی باشد */
+                    val cm = CookieManager.getInstance()
+                    cm.removeAllCookies { _ ->
+                        cm.flush()
+                        view?.post {
+                            if (_binding == null) return@post
+                            context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
+                            loadData()
+                        }
                     }
                 }
             } catch (e: Exception) {

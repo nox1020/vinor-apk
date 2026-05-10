@@ -18,40 +18,11 @@
         android:background="@color/vinor_bg_dark"
         android:visibility="visible">
 
-        <!-- Skeleton View (Placeholder) -->
-        <LinearLayout
+        <include
             android:id="@+id/skeletonView"
+            layout="@layout/partner_native_skeleton"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <!-- Header Skeleton -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:background="@color/vinor_skeleton_bg"
-                android:layout_marginBottom="16dp" />
-
-            <!-- Content Skeleton -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="120dp"
-                android:background="@color/vinor_skeleton_bg"
-                android:layout_marginBottom="16dp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="120dp"
-                android:background="@color/vinor_skeleton_bg"
-                android:layout_marginBottom="16dp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="120dp"
-                android:background="@color/vinor_skeleton_bg" />
-
-        </LinearLayout>
+            android:layout_height="match_parent" />
 
         <!-- Progress Bar -->
         <ProgressBar
