@@ -197,7 +197,7 @@ abstract class BaseWebViewFragment : Fragment() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d(fragmentTag, "Page finished (defer reveal): $url")
-                if (_binding == null || !::webView.isInitialized) return
+                if (view == null || !::webView.isInitialized) return
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
             }
@@ -369,7 +369,7 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     private fun finishSuccessfulPageLoadIfClean() {
-        if (_binding == null || !::webView.isInitialized) return
+        if (view == null || !::webView.isInitialized) return
         if (mainFrameLoadFailed) {
             mainFrameLoadFailed = false
             showOffline()
