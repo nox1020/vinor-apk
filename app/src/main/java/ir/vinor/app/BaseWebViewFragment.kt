@@ -45,6 +45,12 @@ abstract class BaseWebViewFragment : Fragment() {
     private var canGoBack = false
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
 
+    /** اگر onPageFinished زودتر از onReceivedError برود، بدون این پرچم لودر برداشته می‌شود و خطای Chromium دیده می‌شود. */
+    private var mainFrameLoadFailed = false
+
+    private val revealAfterLoadDelayMs = 120L
+    private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -158,12 +164,16 @@ abstract class BaseWebViewFragment : Fragment() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (::webView.isInitialized) {
+                    webView.removeCallbacks(revealAfterLoadRunnable)
+                }
                 if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
                     showOffline()
                     return
                 }
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
 
+                mainFrameLoadFailed = false
                 canGoBack = view?.canGoBack() == true
                 Log.d(fragmentTag, "Page started: $url")
 
@@ -186,28 +196,10 @@ abstract class BaseWebViewFragment : Fragment() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                hideLoader()
-                canGoBack = view?.canGoBack() == true
-                Log.d(fragmentTag, "Page finished: $url")
-
-                val urlStr = url ?: ""
-                val isFileDetail =
-                    urlStr.contains("/express/partner/lands/") ||
-                    urlStr.contains("/express/partner/land/")
-
-                // فقط BottomNavigation نیتیو در صفحهٔ جزئیات فایل پنهان شود
-                (activity as? MainActivity)?.setBottomNavVisible(!isFileDetail)
-
-                // در داشبورد، صفحه آموزش و صفحات ورود، منوی فوتر وب (bottomNavMenu) مخفی شود
-                if (urlStr.contains("/express/partner/dashboard") ||
-                    urlStr.contains("/express/partner/training") ||
-                    urlStr.contains("/express/partner/login") ||
-                    urlStr.contains("/express/partner/verify")) {
-                    hideFooterMenu()
-                }
-
-                // فعال کردن تم تاریک در صفحه وب
-                enableDarkMode()
+                Log.d(fragmentTag, "Page finished (defer reveal): $url")
+                if (_binding == null || !::webView.isInitialized) return
+                webView.removeCallbacks(revealAfterLoadRunnable)
+                webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
             }
 
             @SuppressLint("NewApi")
@@ -217,6 +209,7 @@ abstract class BaseWebViewFragment : Fragment() {
                 error: WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
+                    mainFrameLoadFailed = true
                     Log.w(fragmentTag, "Main frame load error: ${error?.errorCode} ${error?.description}")
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
@@ -236,6 +229,7 @@ abstract class BaseWebViewFragment : Fragment() {
                     return
                 }
                 Log.w(fragmentTag, "Main frame load error (legacy): $errorCode $description")
+                mainFrameLoadFailed = true
                 VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                 showOffline()
             }
@@ -254,6 +248,7 @@ abstract class BaseWebViewFragment : Fragment() {
                 }
                 if (code == 408 || code == 429 || code in 500..599) {
                     Log.w(fragmentTag, "HTTP $code — showing offline overlay")
+                    mainFrameLoadFailed = true
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
                 }
@@ -351,6 +346,7 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     private fun showOffline() {
         if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
             binding.webView.visibility = View.GONE
         }
         hideLoader()
@@ -368,7 +364,47 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     private fun hideOffline() {
         binding.offlineOverlay.root.visibility = View.GONE
+        /* تا زمان موفقیت واقعی لود INVISIBLE تا صفحهٔ خطای Chromium («offline») حتی یک فریم دیده نشود */
+        binding.webView.visibility = View.INVISIBLE
+    }
+
+    private fun finishSuccessfulPageLoadIfClean() {
+        if (_binding == null || !::webView.isInitialized) return
+        if (mainFrameLoadFailed) {
+            mainFrameLoadFailed = false
+            showOffline()
+            return
+        }
+        if (!isOnline()) {
+            showOffline()
+            return
+        }
+        val curUrl = webView.url
+        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(curUrl)) {
+            showOffline()
+            return
+        }
+        if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(curUrl)) {
+            return
+        }
+        hideLoader()
         binding.webView.visibility = View.VISIBLE
+        canGoBack = webView.canGoBack()
+        Log.d(fragmentTag, "Page revealed OK: $curUrl")
+
+        val urlStr = curUrl ?: ""
+        val isFileDetail =
+            urlStr.contains("/express/partner/lands/") ||
+                urlStr.contains("/express/partner/land/")
+        (activity as? MainActivity)?.setBottomNavVisible(!isFileDetail)
+
+        if (urlStr.contains("/express/partner/dashboard") ||
+            urlStr.contains("/express/partner/training") ||
+            urlStr.contains("/express/partner/login") ||
+            urlStr.contains("/express/partner/verify")) {
+            hideFooterMenu()
+        }
+        enableDarkMode()
     }
 
     /**
@@ -675,6 +711,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     override fun onDestroyView() {
         if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
             webView.destroy()
         }
         super.onDestroyView()

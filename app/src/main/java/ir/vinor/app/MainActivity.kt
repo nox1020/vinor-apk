@@ -34,6 +34,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var webView: WebView
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
+    private var mainFrameLoadFailed = false
+    private val revealAfterLoadDelayMs = 120L
+    private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
     private var lastBackPressTime: Long = 0
     private val backPressThreshold = 2000L
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
@@ -119,6 +122,9 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (::webView.isInitialized) {
+                    webView.removeCallbacks(revealAfterLoadRunnable)
+                }
                 if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
                     showOffline()
                     return
@@ -128,13 +134,16 @@ class MainActivity : AppCompatActivity() {
                     showOffline()
                     return
                 }
+                mainFrameLoadFailed = false
                 hideOffline()
                 showLoader()
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                hideLoader()
+                if (!::webView.isInitialized) return
+                webView.removeCallbacks(revealAfterLoadRunnable)
+                webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
             }
 
             @SuppressLint("NewApi")
@@ -144,6 +153,7 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
+                    mainFrameLoadFailed = true
                     Log.w("MainActivity", "Main frame error: ${error?.errorCode} ${error?.description}")
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
@@ -161,6 +171,7 @@ class MainActivity : AppCompatActivity() {
             ) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) return
                 Log.w("MainActivity", "Main frame error (legacy): $errorCode $description")
+                mainFrameLoadFailed = true
                 VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                 showOffline()
             }
@@ -175,6 +186,7 @@ class MainActivity : AppCompatActivity() {
                 val code = errorResponse?.statusCode ?: return
                 if (code == 404) return
                 if (code == 408 || code == 429 || code in 500..599) {
+                    mainFrameLoadFailed = true
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOffline()
                 }
@@ -253,6 +265,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showOffline() {
         if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
         }
         hideLoader()
@@ -267,6 +280,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideOffline() {
         binding.offlineOverlay.root.visibility = View.GONE
+        webView.visibility = View.INVISIBLE
+    }
+
+    private fun finishSuccessfulPageLoadIfClean() {
+        if (!::webView.isInitialized) return
+        if (mainFrameLoadFailed) {
+            mainFrameLoadFailed = false
+            showOffline()
+            return
+        }
+        if (!isOnline()) {
+            showOffline()
+            return
+        }
+        val curUrl = webView.url
+        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(curUrl)) {
+            showOffline()
+            return
+        }
+        if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(curUrl)) {
+            return
+        }
+        hideLoader()
         webView.visibility = View.VISIBLE
     }
 
@@ -317,7 +353,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        if (::webView.isInitialized) webView.destroy()
+        if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
+            webView.destroy()
+        }
         super.onDestroy()
     }
 
