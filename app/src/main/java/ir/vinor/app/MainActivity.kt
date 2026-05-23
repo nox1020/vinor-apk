@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var webView: WebView
+    private lateinit var webViewFileChooser: VinorWebViewFileChooser
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
     private var mainFrameLoadFailed = false
     private val revealAfterLoadDelayMs = 120L
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         webView = binding.webView
+        webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
@@ -74,10 +76,7 @@ class MainActivity : AppCompatActivity() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        settings.allowFileAccess = false
-        settings.allowContentAccess = false
-        settings.allowFileAccessFromFileURLs = false
-        settings.allowUniversalAccessFromFileURLs = false
+        VinorWebViewFileChooser.configureWebViewSettings(settings)
         val appVersion = try {
             packageManager.getPackageInfo(packageName, 0).versionName?.trim().orEmpty()
         } catch (_: Exception) {
@@ -202,12 +201,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                binding.progressBar.progress = newProgress
-                binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
-            }
+        webView.webChromeClient = webViewFileChooser.createChromeClient { newProgress ->
+            binding.progressBar.progress = newProgress
+            binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
         }
     }
 

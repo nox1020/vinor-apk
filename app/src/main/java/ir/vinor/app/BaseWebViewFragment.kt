@@ -47,6 +47,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     /** اگر onPageFinished زودتر از onReceivedError برود، بدون این پرچم لودر برداشته می‌شود و خطای Chromium دیده می‌شود. */
     private var mainFrameLoadFailed = false
+    private var webViewFileChooser: VinorWebViewFileChooser? = null
 
     private val revealAfterLoadDelayMs = 120L
     private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
@@ -62,6 +63,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupWebView()
         setupRetryButton()
         loadUrl()
@@ -90,10 +92,7 @@ abstract class BaseWebViewFragment : Fragment() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        settings.allowFileAccess = false
-        settings.allowContentAccess = false
-        settings.allowFileAccessFromFileURLs = false
-        settings.allowUniversalAccessFromFileURLs = false
+        VinorWebViewFileChooser.configureWebViewSettings(settings)
         val appVersion = try {
             requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName?.trim().orEmpty()
         } catch (_: Exception) {
@@ -262,18 +261,11 @@ abstract class BaseWebViewFragment : Fragment() {
             }
         }
 
-        // WebChromeClient برای progress bar
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                binding.progressBar.progress = newProgress
-                if (newProgress == 100) {
-                    binding.progressBar.visibility = View.GONE
-                } else {
-                    binding.progressBar.visibility = View.VISIBLE
-                }
-            }
-        }
+        val fileChooser = webViewFileChooser
+        webView.webChromeClient = fileChooser?.createChromeClient { newProgress ->
+            binding.progressBar.progress = newProgress
+            binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
+        } ?: WebChromeClient()
     }
 
     /**
