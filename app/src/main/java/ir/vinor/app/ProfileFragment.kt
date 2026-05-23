@@ -74,6 +74,12 @@ class ProfileFragment : Fragment() {
 
     private fun cookieHeader(): String = CookieManager.getInstance().getCookie(BASE) ?: ""
 
+    private fun appVersionName(): String = try {
+        requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName?.trim().orEmpty()
+    } catch (_: Exception) {
+        ""
+    }
+
     private fun loadData() {
         if (_binding == null) return
         binding.profileProgress.visibility = View.VISIBLE
@@ -87,6 +93,7 @@ class ProfileFragment : Fragment() {
                     .url("$BASE$PROFILE_DATA")
                     .addHeader("Cookie", cookieHeader())
                     .addHeader("Accept", "application/json")
+                    .addHeader("X-Vinor-App-Version", appVersionName())
                     .build()
                 val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
                 if (!resp.isSuccessful) {
@@ -106,13 +113,19 @@ class ProfileFragment : Fragment() {
                     if (mePhone.isEmpty()) {
                         showGuest()
                     } else {
+                        val apkUrl = obj.optString("android_apk_url", "").trim()
+                        val apkVersion = obj.optString("android_apk_version", "").trim()
+                        val showUpdate = obj.optBoolean("show_app_update", false) ||
+                            (apkUrl.isNotEmpty() && apkVersion.isNotEmpty() &&
+                                ApkVersionUtils.isServerNewer(apkVersion, appVersionName()))
                         bindProfile(
                             mePhone = mePhone,
                             meName = obj.optString("me_name", "همکار وینور"),
                             avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() },
                             isApproved = obj.optBoolean("is_approved", false),
-                            androidApkUrl = obj.optString("android_apk_url", "").trim(),
-                            androidApkVersion = obj.optString("android_apk_version", "").trim()
+                            showAppUpdate = showUpdate,
+                            androidApkUrl = if (showUpdate) apkUrl else "",
+                            androidApkVersion = if (showUpdate) apkVersion else ""
                         )
                     }
                 }
@@ -150,6 +163,7 @@ class ProfileFragment : Fragment() {
         meName: String,
         avatarUrl: String?,
         isApproved: Boolean,
+        showAppUpdate: Boolean,
         androidApkUrl: String,
         androidApkVersion: String
     ) {
@@ -196,12 +210,14 @@ class ProfileFragment : Fragment() {
             links.add(Triple("درخواست همکاری", "برای تبدیل به همکار اکسپرس درخواست دهید", "$BASE/express/partner/apply/step1"))
         }
         links.add(Triple("یادداشت‌ها", "یادداشت‌های خصوصی", "notes_native"))
-        val appUpdateSub = when {
-            androidApkUrl.isNotEmpty() && androidApkVersion.isNotEmpty() -> "نسخه جدید برای دانلود آماده است"
-            androidApkVersion.isNotEmpty() -> "آخرین نسخه: $androidApkVersion"
-            else -> "نسخه جدید در حال حاضر موجود نیست"
+        if (showAppUpdate && androidApkUrl.isNotEmpty()) {
+            val appUpdateSub = if (androidApkVersion.isNotEmpty()) {
+                "نسخه جدید برای دانلود آماده است (نسخه $androidApkVersion)"
+            } else {
+                "نسخه جدید برای دانلود آماده است"
+            }
+            links.add(Triple("بروزرسانی اپلیکیشن", appUpdateSub, androidApkUrl))
         }
-        links.add(Triple("بروزرسانی اپلیکیشن", appUpdateSub, androidApkUrl.ifEmpty { "" }))
         links.add(Triple("فروشنده‌های برتر", "رتبه‌بندی همکاران", "$BASE/express/partner/top-sellers"))
         links.add(Triple("راهنما", "راهنمای استفاده از پلتفرم", "$BASE/express/partner/help"))
         links.add(Triple("تماس با پشتیبانی", "راهنمایی و پشتیبانی", "$BASE/express/partner/support"))

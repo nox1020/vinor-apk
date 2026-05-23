@@ -78,7 +78,13 @@ class MainActivity : AppCompatActivity() {
         settings.allowContentAccess = false
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
-        settings.userAgentString = settings.userAgentString + " VinorApp/WebViewOnly"
+        val appVersion = try {
+            packageManager.getPackageInfo(packageName, 0).versionName?.trim().orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+        settings.userAgentString = settings.userAgentString + " VinorApp/WebViewOnly" +
+            if (appVersion.isNotEmpty()) "/$appVersion" else ""
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             settings.forceDark = WebSettings.FORCE_DARK_ON

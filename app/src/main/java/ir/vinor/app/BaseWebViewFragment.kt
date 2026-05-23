@@ -94,7 +94,13 @@ abstract class BaseWebViewFragment : Fragment() {
         settings.allowContentAccess = false
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
-        settings.userAgentString = settings.userAgentString + " VinorApp/Android"
+        val appVersion = try {
+            requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName?.trim().orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+        settings.userAgentString = settings.userAgentString + " VinorApp/Android" +
+            if (appVersion.isNotEmpty()) "/$appVersion" else ""
         
         // پشتیبانی از تم تاریک در WebView
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
