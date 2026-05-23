@@ -75,7 +75,7 @@ class VinorWebViewFileChooser {
             override fun onShowFileChooser(
                 webView: WebView?,
                 callback: ValueCallback<Array<Uri>>?,
-                params: FileChooserParams?,
+                params: WebChromeClient.FileChooserParams?,
             ): Boolean {
                 return showFileChooser(callback, params)
             }
@@ -84,7 +84,7 @@ class VinorWebViewFileChooser {
 
     private fun showFileChooser(
         callback: ValueCallback<Array<Uri>>?,
-        params: FileChooserParams?,
+        params: WebChromeClient.FileChooserParams?,
     ): Boolean {
         val activity = hostActivity() ?: run {
             callback?.onReceiveValue(null)
@@ -137,8 +137,8 @@ class VinorWebViewFileChooser {
         }
     }
 
-    private fun buildPickIntent(params: FileChooserParams?): Intent {
-        params?.createIntent()?.let { return it }
+    private fun buildPickIntent(params: WebChromeClient.FileChooserParams?): Intent {
+        params?.createIntent()?.let { return@buildPickIntent it }
         val accept = params?.acceptTypes?.firstOrNull { it.isNotBlank() }
         return Intent(Intent.ACTION_GET_CONTENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -146,7 +146,7 @@ class VinorWebViewFileChooser {
                 !accept.isNullOrBlank() -> accept
                 else -> "*/*"
             }
-            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params?.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params?.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE)
         }
     }
 
