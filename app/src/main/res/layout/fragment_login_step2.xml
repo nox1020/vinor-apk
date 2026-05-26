@@ -58,6 +58,7 @@
                 android:layout_height="48dp"
                 android:background="@null"
                 android:hint="کد ۵ رقمی"
+                android:importantForAutofill="yes"
                 android:inputType="number"
                 android:imeOptions="actionDone"
                 android:maxLength="5"

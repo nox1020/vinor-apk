@@ -5,7 +5,10 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentLoginStep2Binding
@@ -21,12 +24,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import android.webkit.CookieManager
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.delay
 import android.os.Handler
 import android.os.Looper
 
 /**
- * ورود نیتیو - مرحله ۲: وارد کردن کد OTP و تأیید.
+ * ورود نیتیو - مرحله ۲: کد OTP + خواندن خودکار از پیامک.
  */
 class LoginStep2Fragment : Fragment() {
 
@@ -40,11 +42,32 @@ class LoginStep2Fragment : Fragment() {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
+    private var phone: String = ""
+    private var otpFilled = false
+    private var smsRetrieverReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
+    private var incomingSmsReceiver: OtpSmsAutoFill.IncomingSmsReceiver? = null
+
+    private val smsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        val ok = OtpSmsAutoFill.requiredPermissions().all { grants[it] == true }
+        if (ok) {
+            onSmsPermissionGranted()
+        } else {
+            if (isAdded) {
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.login_sms_permission_denied),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "LoginStep2"
         private const val BASE = "https://vinor.ir"
         private const val API_VERIFY = "/express/partner/api/verify"
-        private const val API_LOGIN_REQUEST = "/express/partner/api/login-request"
         private const val API_OTP_RESEND = "/express/partner/otp/resend"
         private const val RESEND_COOLDOWN_SEC = 60
     }
@@ -56,12 +79,12 @@ class LoginStep2Fragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val phone = arguments?.getString("phone")?.trim() ?: ""
+        phone = arguments?.getString("phone")?.trim() ?: ""
         if (phone.length != 11 || !phone.startsWith("09")) {
             findNavController().navigateUp()
             return
         }
-        binding.loginStep2PhoneLabel.text = "کد ۵ رقمی ارسال‌شده به $phone را وارد کنید"
+        binding.loginStep2PhoneLabel.text = getString(R.string.login_otp_sent_to, phone)
         startResendCountdown()
 
         binding.loginStep2Back.setOnClickListener { findNavController().navigateUp() }
@@ -69,18 +92,91 @@ class LoginStep2Fragment : Fragment() {
         binding.loginStep2Resend.isEnabled = false
         binding.loginStep2Resend.setOnClickListener { resendCode(phone) }
         binding.loginStep2Code.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
-                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
+            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_GO) {
                 submitCode(phone)
                 true
             } else false
         }
+        binding.loginStep2Code.doAfterTextChanged {
+            if ((it?.length ?: 0) >= 5 && !otpFilled) {
+                // کاربر دستی هم می‌تواند وارد کند
+            }
+        }
+
+        setupSmsAutoFill()
+    }
+
+    private fun setupSmsAutoFill() {
+        val ctx = requireContext()
+        if (OtpSmsAutoFill.hasSmsPermission(ctx)) {
+            onSmsPermissionGranted()
+        } else {
+            smsPermissionLauncher.launch(OtpSmsAutoFill.requiredPermissions())
+        }
+    }
+
+    private fun onSmsPermissionGranted() {
+        val ctx = requireContext().applicationContext
+        registerSmsReceivers()
+        OtpSmsAutoFill.startSmsRetriever(ctx)
+
+        scope.launch(Dispatchers.IO) {
+            val code = OtpSmsAutoFill.readRecentOtpFromInbox(ctx)
+            if (!code.isNullOrEmpty()) {
+                withContext(Dispatchers.Main) {
+                    applyOtpCode(code, autoSubmit = true)
+                }
+            }
+        }
+    }
+
+    private fun registerSmsReceivers() {
+        val ctx = requireContext().applicationContext
+        unregisterSmsReceivers()
+        smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver { code ->
+            activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
+        }
+        incomingSmsReceiver = OtpSmsAutoFill.IncomingSmsReceiver { code ->
+            activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
+        }
+        OtpSmsAutoFill.registerReceivers(
+            ctx,
+            smsRetrieverReceiver!!,
+            incomingSmsReceiver!!,
+        )
+    }
+
+    private fun unregisterSmsReceivers() {
+        val ctx = context?.applicationContext ?: return
+        val receivers = listOfNotNull(smsRetrieverReceiver, incomingSmsReceiver)
+        if (receivers.isNotEmpty()) {
+            OtpSmsAutoFill.unregisterReceivers(ctx, *receivers.toTypedArray())
+        }
+        smsRetrieverReceiver = null
+        incomingSmsReceiver = null
+    }
+
+    private fun applyOtpCode(code: String, autoSubmit: Boolean) {
+        if (_binding == null || !isAdded || otpFilled) return
+        val digits = code.filter { it.isDigit() }.take(5)
+        if (digits.length != 5) return
+        otpFilled = true
+        binding.loginStep2Code.setText(digits)
+        binding.loginStep2Code.setSelection(digits.length)
+        if (autoSubmit) {
+            if (isAdded) {
+                Toast.makeText(requireContext(), getString(R.string.login_otp_auto_filled), Toast.LENGTH_SHORT).show()
+            }
+            submitCode(phone)
+        }
     }
 
     override fun onDestroyView() {
+        unregisterSmsReceivers()
         resendCountdownJob?.let { handler.removeCallbacks(it) }
         resendCountdownJob = null
         job.cancel()
+        otpFilled = false
         super.onDestroyView()
         _binding = null
     }
@@ -92,13 +188,14 @@ class LoginStep2Fragment : Fragment() {
         val code = raw.filter { it.isDigit() }.take(5)
         binding.loginStep2Error.visibility = View.GONE
         if (code.length < 5) {
-            binding.loginStep2Error.text = "لطفاً کد ۵ رقمی را کامل وارد کنید."
+            binding.loginStep2Error.text = getString(R.string.login_otp_incomplete)
             binding.loginStep2Error.visibility = View.VISIBLE
+            otpFilled = false
             return
         }
         val cookie = cookieHeader()
         if (cookie.isBlank()) {
-            binding.loginStep2Error.text = "نشست منقضی شده. لطفاً به مرحله قبل برگردید و دوباره درخواست کد دهید."
+            binding.loginStep2Error.text = getString(R.string.login_session_expired)
             binding.loginStep2Error.visibility = View.VISIBLE
             Log.w(TAG, "verify: no session cookie")
             return
@@ -128,7 +225,14 @@ class LoginStep2Fragment : Fragment() {
                     binding.loginStep2Submit.isEnabled = true
                     if (_binding == null) return@withContext
                     if (success) {
-                        if (isAdded) Toast.makeText(requireContext(), "ورود با موفقیت انجام شد.", Toast.LENGTH_SHORT).show()
+                        unregisterSmsReceivers()
+                        if (isAdded) {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.login_success),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                         val nav = findNavController()
                         try {
                             nav.popBackStack(R.id.loginStep2Fragment, true)
@@ -138,7 +242,9 @@ class LoginStep2Fragment : Fragment() {
                             nav.popBackStack()
                         }
                     } else {
-                        binding.loginStep2Error.text = obj?.optString("error", "کد تأیید نادرست است.")
+                        otpFilled = false
+                        binding.loginStep2Error.text =
+                            obj?.optString("error", getString(R.string.login_otp_wrong))
                         binding.loginStep2Error.visibility = View.VISIBLE
                     }
                 }
@@ -147,8 +253,9 @@ class LoginStep2Fragment : Fragment() {
                 withContext(Dispatchers.Main) {
                     binding.loginStep2Progress.visibility = View.GONE
                     binding.loginStep2Submit.isEnabled = true
+                    otpFilled = false
                     if (_binding != null) {
-                        binding.loginStep2Error.text = "خطا در ارتباط. دوباره تلاش کنید."
+                        binding.loginStep2Error.text = getString(R.string.login_network_error)
                         binding.loginStep2Error.visibility = View.VISIBLE
                     }
                 }
@@ -166,11 +273,11 @@ class LoginStep2Fragment : Fragment() {
         fun updateUi() {
             if (_binding == null) return
             if (secLeft <= 0) {
-                binding.loginStep2Timer.text = "هنوز کد را دریافت نکردید؟"
+                binding.loginStep2Timer.text = getString(R.string.login_resend_prompt)
                 binding.loginStep2Resend.isEnabled = true
                 return
             }
-            binding.loginStep2Timer.text = "ارسال مجدد کد تا %d ثانیه دیگر".format(secLeft)
+            binding.loginStep2Timer.text = getString(R.string.login_resend_countdown, secLeft)
             secLeft--
             resendCountdownJob = Runnable { updateUi() }
             handler.postDelayed(resendCountdownJob!!, 1000L)
@@ -179,19 +286,27 @@ class LoginStep2Fragment : Fragment() {
     }
 
     private var resendCooldownUntil = 0L
+
     private fun resendCode(phone: String) {
         if (phone.length != 11) return
         val now = System.currentTimeMillis()
         if (now < resendCooldownUntil) {
             val sec = ((resendCooldownUntil - now) / 1000).toInt()
             if (_binding != null && isAdded) {
-                Toast.makeText(requireContext(), "لطفاً %d ثانیه صبر کنید.".format(sec), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.login_resend_wait, sec),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
             return
         }
+        otpFilled = false
+        binding.loginStep2Code.setText("")
         binding.loginStep2Error.visibility = View.GONE
         binding.loginStep2Resend.isEnabled = false
         resendCooldownUntil = now + RESEND_COOLDOWN_SEC * 1000L
+        OtpSmsAutoFill.startSmsRetriever(requireContext().applicationContext)
         scope.launch {
             try {
                 val json = JSONObject().put("phone", phone).toString()
@@ -207,7 +322,8 @@ class LoginStep2Fragment : Fragment() {
                 val body = resp.body?.string() ?: ""
                 val obj = try { JSONObject(body) } catch (_: Exception) { null }
                 val ok = obj?.optBoolean("ok", false) == true
-                val msg = obj?.optString("message", null) ?: obj?.optString("error", if (ok) "کد تأیید مجدد ارسال شد." else "خطا در ارسال مجدد.")
+                val msg = obj?.optString("message", null)
+                    ?: obj?.optString("error", if (ok) getString(R.string.login_resend_ok) else getString(R.string.login_resend_fail))
                 withContext(Dispatchers.Main) {
                     if (_binding != null && isAdded) {
                         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
@@ -219,7 +335,13 @@ class LoginStep2Fragment : Fragment() {
                 withContext(Dispatchers.Main) {
                     if (_binding != null) {
                         binding.loginStep2Resend.isEnabled = true
-                        if (isAdded) Toast.makeText(requireContext(), "خطا در ارتباط. دوباره تلاش کنید.", Toast.LENGTH_SHORT).show()
+                        if (isAdded) {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.login_network_error),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     }
                 }
             }
@@ -232,6 +354,7 @@ class LoginStep2Fragment : Fragment() {
                 CookieManager.getInstance().setCookie(BASE, value)
             }
             CookieManager.getInstance().flush()
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+        }
     }
 }

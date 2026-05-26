@@ -11,5 +11,19 @@
     <string name="offline_retry">تلاش مجدد</string>
     <string name="offline_footer_hint">اگر آنتن ضعیف است، چند ثانیه صبر کنید و دوباره بزنید.</string>
     <string name="offline_icon_cd">بدون اتصال</string>
+
+    <string name="login_otp_sent_to">کد ۵ رقمی ارسال‌شده به %1$s را وارد کنید</string>
+    <string name="login_otp_incomplete">لطفاً کد ۵ رقمی را کامل وارد کنید.</string>
+    <string name="login_otp_wrong">کد تأیید نادرست است.</string>
+    <string name="login_session_expired">نشست منقضی شده. به مرحله قبل برگردید و دوباره کد بگیرید.</string>
+    <string name="login_network_error">خطا در ارتباط. دوباره تلاش کنید.</string>
+    <string name="login_success">ورود با موفقیت انجام شد.</string>
+    <string name="login_resend_prompt">هنوز کد را دریافت نکردید؟</string>
+    <string name="login_resend_countdown">ارسال مجدد کد تا %1$d ثانیه دیگر</string>
+    <string name="login_resend_wait">لطفاً %1$d ثانیه صبر کنید.</string>
+    <string name="login_resend_ok">کد تأیید مجدد ارسال شد.</string>
+    <string name="login_resend_fail">خطا در ارسال مجدد.</string>
+    <string name="login_sms_permission_denied">بدون دسترسی پیامک، خواندن خودکار کد ممکن نیست؛ کد را دستی وارد کنید.</string>
+    <string name="login_otp_auto_filled">کد از پیامک خوانده شد.</string>
 </resources>
 
