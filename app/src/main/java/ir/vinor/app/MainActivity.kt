@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.lifecycle.lifecycle
 import ir.vinor.app.databinding.ActivityMainBinding
 
 /**
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private var lastBackPressTime: Long = 0
     private val backPressThreshold = 2000L
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
+    private lateinit var otpSmsHelper: WebLoginOtpSmsHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -49,6 +51,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         webView = binding.webView
+        otpSmsHelper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
+        lifecycle.addObserver(otpSmsHelper)
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
         setupBackPressHandler()
@@ -99,12 +103,11 @@ class MainActivity : AppCompatActivity() {
                     showOffline()
                     return true
                 }
-                return when {
-                    // لینک‌های داخلی vinor داخل WebView باز می‌مانند.
-                    isVinorDomain(url) -> false
-                    // دانلود APK و لینک‌های خارجی به مرورگر سیستم سپرده می‌شوند.
-                    else -> openExternal(url)
+                if (isVinorDomain(url)) {
+                    notifyOtpPageIfNeeded(url)
+                    return false
                 }
+                return openExternal(url)
             }
 
             override fun shouldInterceptRequest(
@@ -150,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 if (!::webView.isInitialized) return
+                notifyOtpPageIfNeeded(url ?: webView.url)
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
             }
@@ -230,6 +234,12 @@ class MainActivity : AppCompatActivity() {
     private fun extractStartUrl(deepLinkUrl: String?): String {
         if (deepLinkUrl.isNullOrBlank()) return defaultUrl
         return if (isVinorDomain(deepLinkUrl)) deepLinkUrl else defaultUrl
+    }
+
+    private fun notifyOtpPageIfNeeded(url: String?) {
+        if (::otpSmsHelper.isInitialized) {
+            otpSmsHelper.onUrlChanged(url)
+        }
     }
 
     private fun isVinorDomain(url: String): Boolean {

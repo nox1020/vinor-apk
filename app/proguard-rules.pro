@@ -3,4 +3,7 @@
 # in ${sdk.dir}/tools/proguard/proguard-android.txt
 
 # Keep WebView-related classes if needed in future.
+-keep class ir.vinor.app.OtpSmsAutoFill { *; }
+-keep class ir.vinor.app.OtpSmsAutoFill$* { *; }
+-keep class ir.vinor.app.WebLoginOtpSmsHelper { *; }
 

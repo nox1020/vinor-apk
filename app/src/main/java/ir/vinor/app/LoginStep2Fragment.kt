@@ -158,7 +158,7 @@ class LoginStep2Fragment : Fragment() {
 
     private fun applyOtpCode(code: String, autoSubmit: Boolean) {
         if (_binding == null || !isAdded || otpFilled) return
-        val digits = code.filter { it.isDigit() }.take(5)
+        val digits = OtpSmsAutoFill.normalizeOtpDigits(code)
         if (digits.length != 5) return
         otpFilled = true
         binding.loginStep2Code.setText(digits)
@@ -185,7 +185,7 @@ class LoginStep2Fragment : Fragment() {
 
     private fun submitCode(phone: String) {
         val raw = binding.loginStep2Code.text?.toString()?.trim() ?: ""
-        val code = raw.filter { it.isDigit() }.take(5)
+        val code = OtpSmsAutoFill.normalizeOtpDigits(raw)
         binding.loginStep2Error.visibility = View.GONE
         if (code.length < 5) {
             binding.loginStep2Error.text = getString(R.string.login_otp_incomplete)
