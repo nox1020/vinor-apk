@@ -36,12 +36,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webViewFileChooser: VinorWebViewFileChooser
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
     private var mainFrameLoadFailed = false
-    private val revealAfterLoadDelayMs = 120L
     private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
     private var lastBackPressTime: Long = 0
     private val backPressThreshold = 2000L
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
-    private lateinit var otpSmsHelper: WebLoginOtpSmsHelper
+    private var otpSmsHelper: WebLoginOtpSmsHelper? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -49,14 +48,18 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        webView = binding.webView
-        otpSmsHelper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
-        lifecycle.addObserver(otpSmsHelper)
+        webView = WebViewProvider.attach(this, binding.webViewContainer)
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
         loadEntryUrl()
+
+        binding.root.post {
+            val helper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
+            otpSmsHelper = helper
+            lifecycle.addObserver(helper)
+        }
     }
 
     private fun setupRetryButton() {
@@ -72,7 +75,7 @@ class MainActivity : AppCompatActivity() {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
         settings.setSupportZoom(false)
@@ -140,6 +143,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
+                if (url?.startsWith("about:") == true) return
                 if (!isOnline()) {
                     showOffline()
                     return
@@ -154,7 +158,18 @@ class MainActivity : AppCompatActivity() {
                 if (!::webView.isInitialized) return
                 notifyOtpPageIfNeeded(url ?: webView.url)
                 webView.removeCallbacks(revealAfterLoadRunnable)
-                webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
+                webView.post(revealAfterLoadRunnable)
+            }
+
+            @SuppressLint("NewApi")
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                super.onPageCommitVisible(view, url)
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+                if (!::webView.isInitialized) return
+                if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
+                if (url?.startsWith("about:") == true) return
+                webView.removeCallbacks(revealAfterLoadRunnable)
+                webView.post(revealAfterLoadRunnable)
             }
 
             @SuppressLint("NewApi")
@@ -236,9 +251,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun notifyOtpPageIfNeeded(url: String?) {
-        if (::otpSmsHelper.isInitialized) {
-            otpSmsHelper.onUrlChanged(url)
-        }
+        otpSmsHelper?.onUrlChanged(url)
     }
 
     private fun isVinorDomain(url: String): Boolean {
@@ -380,7 +393,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
-            webView.destroy()
+            (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         }
         super.onDestroy()
     }

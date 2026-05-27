@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:background="@color/vinor_bg_dark">
 
-    <WebView
-        android:id="@+id/webView"
+    <FrameLayout
+        android:id="@+id/webViewContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

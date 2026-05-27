@@ -10,7 +10,6 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
-import androidx.webkit.WebViewCompat
 
 object WebViewProvider {
     @Volatile
@@ -50,7 +49,7 @@ object WebViewProvider {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
+                cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
                 loadsImagesAutomatically = true
                 mediaPlaybackRequiresUserGesture = false
                 useWideViewPort = true
@@ -76,12 +75,8 @@ object WebViewProvider {
     }
 
     private fun warmupInstance(context: Context, webView: WebView) {
-        // Start Safe Browsing if available
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.START_SAFE_BROWSING)) {
-            WebViewCompat.startSafeBrowsing(context) { /* ignore result */ }
-        }
-        // Preload a lightweight page to warm Chromium
-        runCatching { webView.loadUrl("https://vinor.ir") }
+        // فقط راه‌اندازی موتور Chromium — بدون درخواست شبکه که با loadUrl داشبورد تداخل کند
+        runCatching { webView.loadUrl("about:blank") }
     }
 }
 
