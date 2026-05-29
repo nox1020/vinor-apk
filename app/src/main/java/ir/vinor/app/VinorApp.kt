@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import android.app.Application
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
