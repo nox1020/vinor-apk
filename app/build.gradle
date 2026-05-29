@@ -48,12 +48,12 @@ def releaseKeyPassword = trimOrNull(ksProps.getProperty("keyPassword") ?: ksProp
 // فایل .aab (bundleRelease) برای پلی‌استور است؛ باز کردن آن روی گوشی معمولاً خطای «تجزیه بسته» می‌دهد.
 android {
     namespace "ir.vinor.app"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "ir.vinor.app"
         minSdk 21
-        targetSdk 34
+        targetSdk 35
         versionName readVersionName()
         // Keep versionCode monotonic in CI using GITHUB_RUN_NUMBER
         def baseCode = computeVersionCode(versionName)

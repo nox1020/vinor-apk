@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -45,24 +44,6 @@ class LoginStep2Fragment : Fragment() {
     private var phone: String = ""
     private var otpFilled = false
     private var smsRetrieverReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
-    private var incomingSmsReceiver: OtpSmsAutoFill.IncomingSmsReceiver? = null
-
-    private val smsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        val ok = OtpSmsAutoFill.requiredPermissions().all { grants[it] == true }
-        if (ok) {
-            onSmsPermissionGranted()
-        } else {
-            if (isAdded) {
-                Toast.makeText(
-                    requireContext(),
-                    getString(R.string.login_sms_permission_denied),
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-        }
-    }
 
     companion object {
         private const val TAG = "LoginStep2"
@@ -107,53 +88,27 @@ class LoginStep2Fragment : Fragment() {
     }
 
     private fun setupSmsAutoFill() {
-        val ctx = requireContext()
-        if (OtpSmsAutoFill.hasSmsPermission(ctx)) {
-            onSmsPermissionGranted()
-        } else {
-            smsPermissionLauncher.launch(OtpSmsAutoFill.requiredPermissions())
-        }
-    }
-
-    private fun onSmsPermissionGranted() {
         val ctx = requireContext().applicationContext
-        registerSmsReceivers()
+        registerSmsReceiver()
         OtpSmsAutoFill.startSmsRetriever(ctx)
-
-        scope.launch(Dispatchers.IO) {
-            val code = OtpSmsAutoFill.readRecentOtpFromInbox(ctx)
-            if (!code.isNullOrEmpty()) {
-                withContext(Dispatchers.Main) {
-                    applyOtpCode(code, autoSubmit = true)
-                }
-            }
-        }
     }
 
-    private fun registerSmsReceivers() {
-        val ctx = requireContext().applicationContext
-        unregisterSmsReceivers()
+    private fun registerSmsReceiver() {
+        unregisterSmsReceiver()
         smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver { code ->
             activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
         }
-        incomingSmsReceiver = OtpSmsAutoFill.IncomingSmsReceiver { code ->
-            activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
-        }
-        OtpSmsAutoFill.registerReceivers(
-            ctx,
+        OtpSmsAutoFill.registerSmsRetrieverReceiver(
+            requireContext(),
             smsRetrieverReceiver!!,
-            incomingSmsReceiver!!,
         )
     }
 
-    private fun unregisterSmsReceivers() {
-        val ctx = context?.applicationContext ?: return
-        val receivers = listOfNotNull(smsRetrieverReceiver, incomingSmsReceiver)
-        if (receivers.isNotEmpty()) {
-            OtpSmsAutoFill.unregisterReceivers(ctx, *receivers.toTypedArray())
+    private fun unregisterSmsReceiver() {
+        smsRetrieverReceiver?.let {
+            context?.let { c -> OtpSmsAutoFill.unregisterReceiver(c, it) }
         }
         smsRetrieverReceiver = null
-        incomingSmsReceiver = null
     }
 
     private fun applyOtpCode(code: String, autoSubmit: Boolean) {
@@ -172,7 +127,7 @@ class LoginStep2Fragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        unregisterSmsReceivers()
+        unregisterSmsReceiver()
         resendCountdownJob?.let { handler.removeCallbacks(it) }
         resendCountdownJob = null
         job.cancel()

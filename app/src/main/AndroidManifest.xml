@@ -10,10 +10,9 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <!-- خواندن خودکار کد OTP ورود -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- OTP: فقط SMS Retriever (Google Play Services) — بدون READ_SMS/RECEIVE_SMS -->
 
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:name=".VinorApp"
         android:allowBackup="true"

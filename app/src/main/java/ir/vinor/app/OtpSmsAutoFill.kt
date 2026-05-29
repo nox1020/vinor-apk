@@ -1,22 +1,18 @@
 package ir.vinor.app
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
-import android.database.Cursor
 import android.os.Build
-import android.provider.Telephony
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.google.android.gms.auth.api.phone.SmsRetriever
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Status
 
 /**
- * خواندن خودکار کد OTP از پیامک — RECEIVE_SMS + READ_SMS و SMS Retriever.
+ * خواندن خودکار OTP با SMS Retriever (بدون مجوز READ_SMS/RECEIVE_SMS در مانیفست).
+ * این روش باعث هشدار «برنامه دارای مشکل» در نصب سایدلود نمی‌شود.
  */
 object OtpSmsAutoFill {
 
@@ -30,18 +26,6 @@ object OtpSmsAutoFill {
         Regex("""(?:^|[^\d۰-۹٠-٩])([0-9۰-۹٠-٩]{5})(?:[^\d۰-۹٠-٩]|$)"""),
     )
 
-    fun requiredPermissions(): Array<String> = arrayOf(
-        Manifest.permission.RECEIVE_SMS,
-        Manifest.permission.READ_SMS,
-    )
-
-    fun hasSmsPermission(context: Context): Boolean {
-        return requiredPermissions().all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    /** ارقام فارسی/عربی → لاتین؛ فقط ۵ رقم اول. */
     fun normalizeOtpDigits(raw: String?): String {
         if (raw.isNullOrBlank()) return ""
         val sb = StringBuilder()
@@ -73,32 +57,6 @@ object OtpSmsAutoFill {
         return fallback.takeIf { it.length == 5 }
     }
 
-    fun readRecentOtpFromInbox(context: Context, maxAgeMs: Long = 180_000L): String? {
-        if (!hasSmsPermission(context)) return null
-        val since = System.currentTimeMillis() - maxAgeMs
-        val uri = Telephony.Sms.Inbox.CONTENT_URI
-        val projection = arrayOf(Telephony.Sms.BODY, Telephony.Sms.DATE)
-        val sort = "${Telephony.Sms.DATE} DESC"
-        var cursor: Cursor? = null
-        try {
-            cursor = context.contentResolver.query(uri, projection, null, null, sort)
-            if (cursor == null) return null
-            var checked = 0
-            while (cursor.moveToNext() && checked < 12) {
-                checked++
-                val date = cursor.getLong(1)
-                if (date < since) break
-                val body = cursor.getString(0)
-                extractOtp(body)?.let { return it }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "inbox read failed", e)
-        } finally {
-            cursor?.close()
-        }
-        return null
-    }
-
     fun startSmsRetriever(context: Context) {
         try {
             val task = SmsRetriever.getClient(context).startSmsRetriever()
@@ -125,70 +83,29 @@ object OtpSmsAutoFill {
         }
     }
 
-    class IncomingSmsReceiver(private val onCode: (String) -> Unit) : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
-            try {
-                val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                val body = parts.joinToString("") { it.displayMessageBody.orEmpty() }
-                extractOtp(body)?.let(onCode)
-            } catch (e: Exception) {
-                Log.w(TAG, "SMS_RECEIVED parse error", e)
-            }
-        }
-    }
-
-    fun registerReceivers(
-        context: Context,
-        smsRetrieverReceiver: BroadcastReceiver,
-        incomingSmsReceiver: BroadcastReceiver,
-    ) {
-        val retrieverFilter = IntentFilter(SmsRetriever.SMS_RETRIEVED_ACTION)
-        val incomingFilter = IntentFilter(Telephony.Sms.Intents.SMS_RECEIVED_ACTION).apply {
-            priority = IntentFilter.SYSTEM_HIGH_PRIORITY
-        }
+    fun registerSmsRetrieverReceiver(context: Context, receiver: BroadcastReceiver) {
+        val filter = IntentFilter(SmsRetriever.SMS_RETRIEVED_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(
-                smsRetrieverReceiver,
-                retrieverFilter,
+                receiver,
+                filter,
                 SmsRetriever.SEND_PERMISSION,
                 null,
                 Context.RECEIVER_EXPORTED,
             )
-            context.registerReceiver(
-                incomingSmsReceiver,
-                incomingFilter,
-                Context.RECEIVER_NOT_EXPORTED,
-            )
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(
-                smsRetrieverReceiver,
-                retrieverFilter,
-                SmsRetriever.SEND_PERMISSION,
-                null,
-            )
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(incomingSmsReceiver, incomingFilter)
+            context.registerReceiver(receiver, filter, SmsRetriever.SEND_PERMISSION, null)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(
-                smsRetrieverReceiver,
-                retrieverFilter,
-                SmsRetriever.SEND_PERMISSION,
-                null,
-            )
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(incomingSmsReceiver, incomingFilter)
+            context.registerReceiver(receiver, filter, SmsRetriever.SEND_PERMISSION, null)
         }
     }
 
-    fun unregisterReceivers(context: Context, vararg receivers: BroadcastReceiver) {
-        receivers.forEach { receiver ->
-            try {
-                context.unregisterReceiver(receiver)
-            } catch (_: Exception) {
-            }
+    fun unregisterReceiver(context: Context, receiver: BroadcastReceiver) {
+        try {
+            context.unregisterReceiver(receiver)
+        } catch (_: Exception) {
         }
     }
 }
