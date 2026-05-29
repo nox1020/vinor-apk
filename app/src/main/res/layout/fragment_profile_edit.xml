@@ -50,6 +50,81 @@
             android:layout_marginBottom="16dp"
             android:visibility="gone" />
 
+        <!-- آواتار -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:id="@+id/profileEditAvatarTrigger"
+                android:layout_width="112dp"
+                android:layout_height="112dp"
+                android:background="@drawable/bg_avatar_circle"
+                android:clickable="true"
+                android:contentDescription="تغییر عکس پروفایل"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/profileEditAvatar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    android:contentDescription="" />
+
+                <TextView
+                    android:id="@+id/profileEditInitials"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textColor="#6B7280"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+
+                <FrameLayout
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|start"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:background="@drawable/bg_avatar_camera_badge">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="📷"
+                        android:textSize="16sp" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/profileEditAvatarUploading"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#80000000"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center" />
+                </FrameLayout>
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:maxWidth="280dp"
+                android:text="برای تغییر عکس پروفایل، روی تصویر ضربه بزنید"
+                android:textColor="#6B7280"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <!-- معرفی -->
         <FrameLayout
             android:layout_width="match_parent"
