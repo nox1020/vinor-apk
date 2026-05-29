@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private val backPressThreshold = 2000L
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
     private var otpSmsHelper: WebLoginOtpSmsHelper? = null
+    private var speechBridge: VinorSpeechBridge? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -50,6 +51,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         webView = WebViewProvider.attach(this, binding.webViewContainer)
+        speechBridge = VinorSpeechBridge(this) { if (::webView.isInitialized) webView else null }.also {
+            webView.addJavascriptInterface(it, VinorSpeechBridge.JS_INTERFACE_NAME)
+        }
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
         setupBackPressHandler()
@@ -392,6 +396,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        speechBridge?.destroy()
+        speechBridge = null
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)

@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -29,9 +30,11 @@ class VinorWebViewFileChooser {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraOutputUri: Uri? = null
     private var pendingChooserIntent: Intent? = null
+    private var pendingPermissionRequest: PermissionRequest? = null
 
     private lateinit var chooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var audioPermissionLauncher: ActivityResultLauncher<String>
 
     constructor(activity: ComponentActivity) : this({ activity })
 
@@ -50,6 +53,17 @@ class VinorWebViewFileChooser {
         permissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { launchPendingChooser() }
+        audioPermissionLauncher = activity.registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            val req = pendingPermissionRequest
+            pendingPermissionRequest = null
+            if (granted && req != null) {
+                req.grant(req.resources)
+            } else {
+                req?.deny()
+            }
+        }
     }
 
     fun register(fragment: Fragment) {
@@ -61,6 +75,17 @@ class VinorWebViewFileChooser {
         permissionLauncher = fragment.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { launchPendingChooser() }
+        audioPermissionLauncher = fragment.registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            val req = pendingPermissionRequest
+            pendingPermissionRequest = null
+            if (granted && req != null) {
+                req.grant(req.resources)
+            } else {
+                req?.deny()
+            }
+        }
     }
 
     fun createChromeClient(
@@ -79,7 +104,33 @@ class VinorWebViewFileChooser {
             ): Boolean {
                 return showFileChooser(callback, params)
             }
+
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                handlePermissionRequest(request)
+            }
         }
+    }
+
+    private fun handlePermissionRequest(request: PermissionRequest?) {
+        if (request == null) return
+        val activity = hostActivity()
+        if (activity == null) {
+            request.deny()
+            return
+        }
+        val needsAudio = request.resources.any {
+            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+        }
+        if (needsAudio && !hasRecordAudioPermission(activity)) {
+            pendingPermissionRequest = request
+            if (::audioPermissionLauncher.isInitialized) {
+                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                request.deny()
+            }
+            return
+        }
+        request.grant(request.resources)
     }
 
     private fun showFileChooser(
@@ -212,6 +263,13 @@ class VinorWebViewFileChooser {
         return ContextCompat.checkSelfPermission(
             activity,
             Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasRecordAudioPermission(activity: Activity): Boolean {
+        return ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
