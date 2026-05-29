@@ -18,8 +18,8 @@
         android:visibility="visible">
 
         <include
-            android:id="@+id/skeletonView"
-            layout="@layout/partner_native_skeleton"
+            android:id="@+id/splashView"
+            layout="@layout/splash_screen"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 

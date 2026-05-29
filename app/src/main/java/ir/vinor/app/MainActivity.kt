@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import ir.vinor.app.databinding.ActivityMainBinding
 
 /**
@@ -42,9 +43,12 @@ class MainActivity : AppCompatActivity() {
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
     private var otpSmsHelper: WebLoginOtpSmsHelper? = null
     private var speechBridge: VinorSpeechBridge? = null
+    private var keepSystemSplash = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { keepSystemSplash }
         super.onCreate(savedInstanceState)
         SystemUi.apply(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -287,15 +291,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLoader() {
         binding.loaderContainer.visibility = View.VISIBLE
-        binding.skeletonView.root.visibility = View.VISIBLE
+        binding.splashView.root.visibility = View.VISIBLE
     }
 
     private fun hideLoader() {
         binding.loaderContainer.visibility = View.GONE
-        binding.skeletonView.root.visibility = View.GONE
+        binding.splashView.root.visibility = View.GONE
+    }
+
+    private fun dismissSystemSplash() {
+        keepSystemSplash = false
     }
 
     private fun showOfflineOverlayOnly() {
+        dismissSystemSplash()
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
@@ -308,6 +317,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOffline() {
+        dismissSystemSplash()
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
@@ -346,6 +356,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         hideLoader()
+        dismissSystemSplash()
         webView.visibility = View.VISIBLE
     }
 
