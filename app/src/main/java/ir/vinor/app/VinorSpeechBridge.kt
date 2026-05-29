@@ -156,8 +156,9 @@ class VinorSpeechBridge(
             .replace("\\", "\\\\")
             .replace("'", "\\'")
             .replace("\n", " ")
-        webViewProvider()?.post {
-            it.evaluateJavascript(
+        val webView = webViewProvider() ?: return
+        webView.post {
+            webView.evaluateJavascript(
                 "window.__vinorVoiceNativeEvent && window.__vinorVoiceNativeEvent('$safeType','$safePayload');",
                 null,
             )
