@@ -180,7 +180,7 @@ class LoginStep2Fragment : Fragment() {
                     binding.loginStep2Submit.isEnabled = true
                     if (_binding == null) return@withContext
                     if (success) {
-                        unregisterSmsReceivers()
+                        unregisterSmsReceiver()
                         if (isAdded) {
                             Toast.makeText(
                                 requireContext(),
