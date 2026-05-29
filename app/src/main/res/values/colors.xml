@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#000000</color>
+    <color name="ic_launcher_background">#00000000</color>
     <color name="vinor_bg_light">#030712</color>
     <color name="vinor_bg_dark">#030712</color>
     <color name="vinor_pwa_bg">#030712</color>
