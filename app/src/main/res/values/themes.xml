@@ -10,16 +10,16 @@
         <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
     </style>
 
-    <!-- Splash سیستمی — قبل از onCreate رسم می‌شود (سریع‌ترین فریم اول) -->
+    <!-- Splash — هماهنگ با express-partner.webmanifest (background #030712 + icon-192) -->
     <style name="Theme.Vinor.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/vinor_bg_dark</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_v_green</item>
+        <item name="windowSplashScreenBackground">@color/vinor_pwa_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_pwa_logo</item>
         <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.Vinor</item>
         <item name="android:windowBackground">@drawable/splash_background</item>
-        <item name="android:statusBarColor">@color/vinor_bg_dark</item>
-        <item name="android:navigationBarColor">@color/vinor_bg_dark</item>
+        <item name="android:statusBarColor">@color/vinor_pwa_bg</item>
+        <item name="android:navigationBarColor">@color/vinor_pwa_bg</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
     </style>

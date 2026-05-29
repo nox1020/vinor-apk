@@ -12,7 +12,7 @@ import java.io.ByteArrayInputStream
 object VinorWebViewErrorShield {
 
     private const val SILENT_HTML =
-        """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#111827;height:100%;overflow:hidden}</style></head><body></body></html>"""
+        """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#030712;height:100%;overflow:hidden}</style></head><body></body></html>"""
 
     private val silentHtmlBytes = SILENT_HTML.toByteArray(Charsets.UTF_8)
 

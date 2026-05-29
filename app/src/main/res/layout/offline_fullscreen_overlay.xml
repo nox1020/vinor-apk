@@ -51,21 +51,14 @@
                     android:paddingEnd="26dp"
                     android:paddingBottom="32dp">
 
-                    <FrameLayout
-                        android:layout_width="108dp"
-                        android:layout_height="108dp"
-                        android:background="@drawable/bg_offline_icon_circle"
-                        android:padding="18dp">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:alpha="0.95"
-                            android:contentDescription="@string/offline_icon_cd"
-                            android:importantForAccessibility="yes"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_v_green" />
-                    </FrameLayout>
+                    <ImageView
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:alpha="0.98"
+                        android:contentDescription="@string/offline_icon_cd"
+                        android:importantForAccessibility="yes"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_pwa_logo" />
 
                     <TextView
                         android:layout_width="match_parent"

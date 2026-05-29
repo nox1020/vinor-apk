@@ -9,7 +9,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 /** جلوگیری از رفتن محتوا زیر نوار وضعیت (ساعت/باتری/آنتن) و نوار ناوبری. */
 object SystemUi {
 
-    private const val BAR_COLOR = "#111827"
+    private const val BAR_COLOR = "#030712"
 
     fun apply(activity: AppCompatActivity) {
         val window = activity.window

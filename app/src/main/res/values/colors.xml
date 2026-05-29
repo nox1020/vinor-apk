@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#111827</color>
-    <color name="vinor_bg_light">#111827</color>
-    <color name="vinor_bg_dark">#111827</color>
+    <color name="ic_launcher_background">#000000</color>
+    <color name="vinor_bg_light">#030712</color>
+    <color name="vinor_bg_dark">#030712</color>
+    <color name="vinor_pwa_bg">#030712</color>
     <color name="vinor_primary_red">#E53935</color>
     <color name="vinor_text_dark">#F9FAFB</color>
     <color name="vinor_text_muted">#9CA3AF</color>
     <color name="vinor_skeleton_bg">#374151</color>
-    <color name="vinor_offline_bg">#111827</color>
+    <color name="vinor_offline_bg">#030712</color>
     <color name="vinor_offline_text_primary">#F9FAFB</color>
     <color name="vinor_offline_text_secondary">#9CA3AF</color>
     <color name="vinor_offline_card_bg">#1F2937</color>

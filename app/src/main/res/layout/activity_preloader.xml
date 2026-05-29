@@ -8,9 +8,10 @@
 
     <ImageView
         android:id="@+id/logo"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:src="@drawable/ic_v_green"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:src="@drawable/ic_pwa_logo"
+        android:scaleType="fitCenter"
         android:contentDescription="@string/app_name"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
