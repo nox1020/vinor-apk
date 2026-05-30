@@ -46,6 +46,10 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var notifyBridge: VinorNotifyBridge? = null
     private var keepSystemSplash = true
+    private var pendingInitialReveal = true
+    private var partnerAppReady = false
+    private val shellRevealFallbackMs = 12_000L
+    private val shellRevealFallbackRunnable = Runnable { onPartnerAppReady() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -67,6 +71,10 @@ class MainActivity : AppCompatActivity() {
                 webView.addJavascriptInterface(bridge, VinorNotifyBridge.JS_INTERFACE_NAME)
             }
         }
+        webView.addJavascriptInterface(
+            VinorShellBridge { onPartnerAppReady() },
+            VinorShellBridge.JS_INTERFACE_NAME
+        )
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
         setupBackPressHandler()
@@ -162,6 +170,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
                 if (url?.startsWith("about:") == true) return
+                if (pendingInitialReveal) {
+                    partnerAppReady = false
+                    cancelShellRevealFallback()
+                }
                 if (!isOnline()) {
                     showOffline()
                     return
@@ -176,6 +188,7 @@ class MainActivity : AppCompatActivity() {
                 if (!::webView.isInitialized) return
                 notifyOtpPageIfNeeded(url ?: webView.url)
                 webView.removeCallbacks(revealAfterLoadRunnable)
+                probePartnerShellReady()
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -187,6 +200,7 @@ class MainActivity : AppCompatActivity() {
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
                 if (url?.startsWith("about:") == true) return
                 webView.removeCallbacks(revealAfterLoadRunnable)
+                probePartnerShellReady()
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -243,7 +257,56 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isExpressPartnerUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        return url.contains("/express/partner")
+    }
+
+    fun onPartnerAppReady() {
+        runOnUiThread {
+            partnerAppReady = true
+            cancelShellRevealFallback()
+            if (::webView.isInitialized) {
+                webView.removeCallbacks(revealAfterLoadRunnable)
+                webView.post(revealAfterLoadRunnable)
+            }
+        }
+    }
+
+    private fun scheduleShellRevealFallback() {
+        if (!::webView.isInitialized) return
+        webView.removeCallbacks(shellRevealFallbackRunnable)
+        webView.postDelayed(shellRevealFallbackRunnable, shellRevealFallbackMs)
+    }
+
+    private fun cancelShellRevealFallback() {
+        if (::webView.isInitialized) {
+            webView.removeCallbacks(shellRevealFallbackRunnable)
+        }
+    }
+
+    private fun probePartnerShellReady() {
+        if (!::webView.isInitialized || !pendingInitialReveal) return
+        webView.evaluateJavascript(
+            """
+            (function () {
+              try {
+                if (!/VinorApp\//i.test(navigator.userAgent || '')) return;
+                if (!window.VinorNativeShell || typeof VinorNativeShell.onAppReady !== 'function') return;
+                var sk = document.getElementById('vinorPartnerSkeletonRoot');
+                if (!sk) { VinorNativeShell.onAppReady(); return; }
+                if (sk.getAttribute('data-vinor-sk-dismissed') === '1') VinorNativeShell.onAppReady();
+              } catch (_) {}
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
     private fun loadEntryUrl() {
+        pendingInitialReveal = true
+        partnerAppReady = false
+        cancelShellRevealFallback()
         if (!isOnline()) {
             showOfflineOverlayOnly()
             return
@@ -264,6 +327,9 @@ class MainActivity : AppCompatActivity() {
             showOfflineOverlayOnly()
             return
         }
+        pendingInitialReveal = true
+        partnerAppReady = false
+        cancelShellRevealFallback()
         hideOffline()
         webView.loadUrl(extractStartUrl(intent.dataString))
     }
@@ -319,6 +385,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showOfflineOverlayOnly() {
         dismissSystemSplash()
+        pendingInitialReveal = false
+        cancelShellRevealFallback()
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
@@ -332,6 +400,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showOffline() {
         dismissSystemSplash()
+        pendingInitialReveal = false
+        cancelShellRevealFallback()
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.visibility = View.GONE
@@ -368,6 +438,15 @@ class MainActivity : AppCompatActivity() {
         if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(curUrl)) {
             if (!isOnline()) showOfflineOverlayOnly()
             return
+        }
+        if (pendingInitialReveal && isExpressPartnerUrl(curUrl) && !partnerAppReady) {
+            scheduleShellRevealFallback()
+            probePartnerShellReady()
+            return
+        }
+        if (pendingInitialReveal) {
+            pendingInitialReveal = false
+            cancelShellRevealFallback()
         }
         hideLoader()
         dismissSystemSplash()
@@ -429,6 +508,7 @@ class MainActivity : AppCompatActivity() {
         notifyBridge = null
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
+            webView.removeCallbacks(shellRevealFallbackRunnable)
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)
         }
         super.onDestroy()
