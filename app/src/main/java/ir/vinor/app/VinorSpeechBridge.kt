@@ -23,6 +23,7 @@ class VinorSpeechBridge(
 ) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var pendingStart = false
+    private var sessionFinished = false
 
     private val audioPermissionLauncher = activity.registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -80,6 +81,7 @@ class VinorSpeechBridge(
     }
 
     private fun startListeningInternal() {
+        sessionFinished = false
         try {
             speechRecognizer?.destroy()
         } catch (_: Exception) {
@@ -99,6 +101,8 @@ class VinorSpeechBridge(
                 override fun onEndOfSpeech() {}
 
                 override fun onError(error: Int) {
+                    if (sessionFinished) return
+                    sessionFinished = true
                     val code = when (error) {
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "not-allowed"
                         SpeechRecognizer.ERROR_NO_MATCH -> "no-speech"
@@ -109,17 +113,18 @@ class VinorSpeechBridge(
                 }
 
                 override fun onResults(results: Bundle?) {
+                    if (sessionFinished) return
+                    sessionFinished = true
                     val text = results
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull()
                         ?.trim()
                         .orEmpty()
                     if (text.isNotEmpty()) {
-                        notifyWeb("result", text)
+                        notifyWeb("complete", text)
                     } else {
                         notifyWeb("error", "no-speech")
                     }
-                    notifyWeb("end", "")
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {

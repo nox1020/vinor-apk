@@ -43,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
     private var otpSmsHelper: WebLoginOtpSmsHelper? = null
     private var speechBridge: VinorSpeechBridge? = null
+    private var notifyHelper: VinorNotifyHelper? = null
+    private var notifyBridge: VinorNotifyBridge? = null
     private var keepSystemSplash = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +59,13 @@ class MainActivity : AppCompatActivity() {
         webView = WebViewProvider.attach(this, binding.webViewContainer)
         speechBridge = VinorSpeechBridge(this) { if (::webView.isInitialized) webView else null }.also {
             webView.addJavascriptInterface(it, VinorSpeechBridge.JS_INTERFACE_NAME)
+        }
+        notifyHelper = VinorNotifyHelper(this) { if (::webView.isInitialized) webView else null }.also { helper ->
+            helper.attach(this)
+            helper.handleOpenIntent(intent)
+            notifyBridge = VinorNotifyBridge(helper).also { bridge ->
+                webView.addJavascriptInterface(bridge, VinorNotifyBridge.JS_INTERFACE_NAME)
+            }
         }
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         setupRetryButton()
@@ -246,6 +255,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        notifyHelper?.handleOpenIntent(intent)
         if (!isOnline()) {
             showOfflineOverlayOnly()
             return
@@ -409,6 +419,9 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         speechBridge?.destroy()
         speechBridge = null
+        notifyHelper?.destroy()
+        notifyHelper = null
+        notifyBridge = null
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)

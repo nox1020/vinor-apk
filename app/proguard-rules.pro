@@ -8,4 +8,6 @@
 -keep class ir.vinor.app.OtpSmsAutoFill$* { *; }
 -keep class ir.vinor.app.WebLoginOtpSmsHelper { *; }
 -keep class ir.vinor.app.VinorSpeechBridge { *; }
+-keep class ir.vinor.app.VinorNotifyBridge { *; }
+-keep class ir.vinor.app.VinorNotifyHelper { *; }
 
