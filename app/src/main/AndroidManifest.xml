@@ -39,7 +39,19 @@
                 <data android:scheme="https" android:host="vinor.ir" />
                 <data android:scheme="http" android:host="vinor.ir" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="OPEN_NOTIFICATIONS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name=".VinorFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

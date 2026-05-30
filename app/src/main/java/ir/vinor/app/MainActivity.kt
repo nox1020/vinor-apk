@@ -255,7 +255,11 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val isNotifyIntent = intent.getBooleanExtra(VinorNotifyHelper.EXTRA_OPEN_NOTIFICATIONS, false)
+            || intent.action == VinorNotificationTray.ACTION_OPEN
+            || !intent.getStringExtra(VinorNotificationTray.EXTRA_URL).isNullOrBlank()
         notifyHelper?.handleOpenIntent(intent)
+        if (isNotifyIntent) return
         if (!isOnline()) {
             showOfflineOverlayOnly()
             return
@@ -414,6 +418,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::webView.isInitialized) webView.onResume()
+        VinorFcmRegistrar.requestTokenAndRegister(this)
     }
 
     override fun onDestroy() {

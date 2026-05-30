@@ -17,5 +17,6 @@ class VinorApp : Application() {
         Handler(Looper.getMainLooper()).post {
             runCatching { WebViewProvider.prewarm(this) }
         }
+        runCatching { VinorFcmRegistrar.start(this) }
     }
 }

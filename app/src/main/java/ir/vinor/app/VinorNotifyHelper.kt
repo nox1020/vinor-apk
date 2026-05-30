@@ -1,16 +1,12 @@
 package ir.vinor.app
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import android.webkit.CookieManager
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -109,10 +105,26 @@ class VinorNotifyHelper(
     }
 
     fun handleOpenIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true) {
-            openNotificationsPage()
-            intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS)
-        }
+        if (intent == null) return
+        val urlExtra = intent.getStringExtra(VinorNotificationTray.EXTRA_URL)?.trim().orEmpty()
+        val openNotifications = intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false)
+            || intent.action == VinorNotificationTray.ACTION_OPEN
+            || urlExtra.isNotEmpty()
+        if (!openNotifications) return
+
+        val target = VinorNotificationTray.normalizeUrl(
+            urlExtra.ifBlank { "/express/partner/notifications" }
+        )
+        webViewProvider()?.loadUrl(target)
+            ?: activity.startActivity(
+                Intent(activity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
+                    putExtra(VinorNotificationTray.EXTRA_URL, target)
+                }
+            )
+        intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS)
+        intent.removeExtra(VinorNotificationTray.EXTRA_URL)
     }
 
     private fun startPolling() {
@@ -225,45 +237,17 @@ class VinorNotifyHelper(
     }
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = activity.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val ch = NotificationChannel(
-            CHANNEL_ID,
-            "اعلان‌های وینور",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "اعلان‌های پنل همکاری وینور"
-        }
-        nm.createNotificationChannel(ch)
+        VinorNotificationTray.ensureChannel(activity)
     }
 
     private fun showTrayNotification(title: String, body: String) {
         if (!canPostNotifications()) return
-        val intent = Intent(activity, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
-        }
-        val pi = PendingIntent.getActivity(
-            activity,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        VinorNotificationTray.show(
+            context = activity,
+            title = title,
+            body = body,
+            url = "/express/partner/notifications",
         )
-        val notif = NotificationCompat.Builder(activity, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setAutoCancel(true)
-            .setContentIntent(pi)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        try {
-            NotificationManagerCompat.from(activity).notify(NOTIF_ID, notif)
-        } catch (e: SecurityException) {
-            Log.w(TAG, "notify blocked", e)
-        }
     }
 }
 

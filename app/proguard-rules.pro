@@ -10,4 +10,7 @@
 -keep class ir.vinor.app.VinorSpeechBridge { *; }
 -keep class ir.vinor.app.VinorNotifyBridge { *; }
 -keep class ir.vinor.app.VinorNotifyHelper { *; }
+-keep class ir.vinor.app.VinorFcmService { *; }
+-keep class ir.vinor.app.VinorFirebaseAutoConfig { *; }
+-keep class com.google.firebase.** { *; }
 
