@@ -14,7 +14,7 @@
         android:id="@+id/loaderContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/transparent"
+        android:background="@drawable/splash_bg"
         android:visibility="visible">
 
         <include

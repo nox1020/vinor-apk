@@ -2,15 +2,61 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="@drawable/splash_bg">
 
-    <ImageView
-        android:layout_width="96dp"
-        android:layout_height="96dp"
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="280dp"
+        android:layout_gravity="top|center_horizontal"
+        android:background="@drawable/splash_glow"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:contentDescription="@string/app_name"
-        android:importantForAccessibility="no"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_pwa_logo" />
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:layout_width="136dp"
+            android:layout_height="136dp"
+            android:importantForAccessibility="noHideDescendants">
+
+            <View
+                android:layout_width="132dp"
+                android:layout_height="132dp"
+                android:layout_gravity="center"
+                android:background="@drawable/splash_logo_ring"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/app_name"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/vinor_splash_mark" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:letterSpacing="0.03"
+            android:text="@string/splash_brand_title"
+            android:textColor="#F8FAFC"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/splash_brand_subtitle"
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+    </LinearLayout>
 
 </FrameLayout>

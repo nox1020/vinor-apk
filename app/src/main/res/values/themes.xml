@@ -10,17 +10,18 @@
         <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
     </style>
 
-    <!-- Splash — پس‌زمینه شفاف + لوگوی PWA -->
+    <!-- Splash — پس‌زمینه تیره + لوگوی وکتور تیز -->
     <style name="Theme.Vinor.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@android:color/transparent</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_pwa_logo</item>
-        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="windowSplashScreenBackground">@color/vinor_bg_dark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/vinor_splash_mark</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/vinor_bg_dark</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.Vinor</item>
         <item name="android:windowBackground">@drawable/splash_background</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@color/vinor_bg_dark</item>
+        <item name="android:navigationBarColor">@color/vinor_bg_dark</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
     </style>
 </resources>
