@@ -10,7 +10,7 @@ import androidx.core.view.isVisible
 /**
  * UI حالت آفلاین: بازخورد لمسی، حالت «در حال بررسی»، بازنشانی دکمه.
  */
-class VinorOfflineUi(container: View) {
+class VinorOfflineUi(private val container: View) {
 
     private val tapArea: View = container.findViewById(R.id.offlineTapArea)
     private val retryButton: MaterialButton = container.findViewById(R.id.retryButton)
