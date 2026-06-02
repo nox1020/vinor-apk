@@ -5,47 +5,49 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Lightweight entry screen focused on fastest first frame and immediate feedback.
- * - No animations or delays
- * - Checks connectivity, pre-warms WebView after first frame, then hands off
  */
 class PreloaderActivity : AppCompatActivity() {
 
     private lateinit var progress: ProgressBar
     private lateinit var statusText: TextView
-    private lateinit var retry: Button
+    private lateinit var retry: MaterialButton
+    private lateinit var content: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // اجباری کردن تم تاریک در تمام اپلیکیشن
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_preloader)
 
         progress = findViewById(R.id.progress)
         statusText = findViewById(R.id.statusText)
         retry = findViewById(R.id.retryButton)
+        content = findViewById(R.id.preloaderContent)
 
-        retry.setOnClickListener {
-            retry.isVisible = false
-            statusText.text = getString(R.string.preloader_connecting)
+        val retryAction = {
+            VinorTapFeedback.perform(retry)
+            setChecking(true)
             startFlow()
         }
+        retry.setOnClickListener { retryAction() }
+        content.setOnClickListener {
+            if (retry.isVisible) retryAction()
+        }
 
-        // Kick off work after first frame to avoid blocking first draw
         window.decorView.post { startFlow() }
     }
 
@@ -62,7 +64,6 @@ class PreloaderActivity : AppCompatActivity() {
     }
 
     private suspend fun prewarmWebView() {
-        // WebView creation must run on main; keep minimal and avoid extra allocations
         withContext(Dispatchers.Main) {
             runCatching { WebViewProvider.prewarm(this@PreloaderActivity) }
         }
@@ -71,14 +72,33 @@ class PreloaderActivity : AppCompatActivity() {
     private fun goToMain() {
         if (isFinishing || isDestroyed) return
         startActivity(Intent(this, MainActivity::class.java))
-        overridePendingTransition(0, 0) // avoid visual flash
+        overridePendingTransition(0, 0)
         finish()
     }
 
     private fun showNoInternet() {
-        progress.visibility = View.GONE
+        setChecking(false)
+        progress.isVisible = false
         retry.isVisible = true
-        statusText.text = getString(R.string.preloader_no_internet)
+        statusText.text = getString(R.string.offline_title)
+    }
+
+    private fun setChecking(checking: Boolean) {
+        retry.isEnabled = !checking
+        progress.isVisible = checking
+        if (checking) {
+            retry.isVisible = true
+            retry.text = getString(R.string.offline_checking)
+            statusText.text = getString(R.string.offline_checking)
+            return
+        }
+        if (retry.isVisible) {
+            retry.text = getString(R.string.offline_retry)
+            statusText.text = getString(R.string.offline_title)
+            return
+        }
+        statusText.text = getString(R.string.preloader_connecting)
+        progress.isVisible = true
     }
 
     private fun isOnline(): Boolean {
@@ -97,6 +117,3 @@ class PreloaderActivity : AppCompatActivity() {
         }
     }
 }
-
-
-

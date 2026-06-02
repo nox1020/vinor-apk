@@ -30,6 +30,7 @@ import ir.vinor.app.databinding.FragmentWebviewBinding
 abstract class BaseWebViewFragment : Fragment() {
 
     protected lateinit var binding: FragmentWebviewBinding
+    private lateinit var offlineUi: VinorOfflineUi
     protected lateinit var webView: WebView
     abstract val targetUrl: String
     abstract val fragmentTag: String // برای لاگ
@@ -70,8 +71,14 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     private fun setupRetryButton() {
-        binding.offlineOverlay.retryButton.setOnClickListener {
+        offlineUi = VinorOfflineUi(binding.offlineOverlay.root)
+        offlineUi.bindRetry {
             if (::webView.isInitialized) webView.removeCallbacks(revealAfterLoadRunnable)
+            if (!isOnline()) {
+                binding.offlineOverlay.root.postDelayed({ offlineUi.setChecking(false) }, 480L)
+                showOfflineOverlayOnly()
+                return@bindRetry
+            }
             retryLoad()
         }
     }
@@ -354,6 +361,7 @@ abstract class BaseWebViewFragment : Fragment() {
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     /**
@@ -370,6 +378,7 @@ abstract class BaseWebViewFragment : Fragment() {
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     /**
@@ -379,6 +388,7 @@ abstract class BaseWebViewFragment : Fragment() {
         binding.offlineOverlay.root.visibility = View.GONE
         /* تا زمان موفقیت واقعی لود INVISIBLE تا صفحهٔ خطای Chromium («offline») حتی یک فریم دیده نشود */
         binding.webView.visibility = View.INVISIBLE
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     private fun finishSuccessfulPageLoadIfClean() {

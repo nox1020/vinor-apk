@@ -33,6 +33,7 @@ import ir.vinor.app.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var offlineUi: VinorOfflineUi
     private lateinit var webView: WebView
     private lateinit var webViewFileChooser: VinorWebViewFileChooser
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
@@ -89,8 +90,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRetryButton() {
-        binding.offlineOverlay.retryButton.setOnClickListener {
+        offlineUi = VinorOfflineUi(binding.offlineOverlay.root)
+        offlineUi.bindRetry {
             if (::webView.isInitialized) webView.removeCallbacks(revealAfterLoadRunnable)
+            if (!isOnline()) {
+                binding.offlineOverlay.root.postDelayed({ offlineUi.setChecking(false) }, 480L)
+                showOfflineOverlayOnly()
+                return@bindRetry
+            }
             loadEntryUrl()
         }
     }
@@ -396,6 +403,7 @@ class MainActivity : AppCompatActivity() {
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     private fun showOffline() {
@@ -412,11 +420,13 @@ class MainActivity : AppCompatActivity() {
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     private fun hideOffline() {
         binding.offlineOverlay.root.visibility = View.GONE
         webView.visibility = View.INVISIBLE
+        if (::offlineUi.isInitialized) offlineUi.reset()
     }
 
     private fun finishSuccessfulPageLoadIfClean() {

@@ -7,11 +7,10 @@
     <string name="preloader_retry">تلاش مجدد</string>
     <string name="preloader_no_internet">اتصال اینترنت برقرار نیست</string>
     <string name="loading_message">در حال بارگذاری…</string>
-    <string name="offline_title">بدون اتصال اینترنت</string>
-    <string name="offline_message">ارتباط با سرور برقرار نشد؛ اینترنت قطع است یا خیلی کند است و صفحه کامل بارگذاری نشده است.</string>
-    <string name="offline_hint_strip">وای‌فای یا دادهٔ همراه را روشن کنید و دوباره «تلاش مجدد» را بزنید.</string>
-    <string name="offline_retry">تلاش مجدد</string>
-    <string name="offline_footer_hint">اگر آنتن ضعیف است، چند ثانیه صبر کنید و دوباره بزنید.</string>
+    <string name="offline_title">اتصال اینترنت برقرار نیست</string>
+    <string name="offline_message">اینترنت را روشن کنید و دوباره بزنید</string>
+    <string name="offline_retry">بررسی مجدد</string>
+    <string name="offline_checking">در حال بررسی…</string>
     <string name="offline_icon_cd">بدون اتصال</string>
 
     <string name="login_otp_sent_to">کد ۵ رقمی ارسال‌شده به %1$s را وارد کنید</string>
