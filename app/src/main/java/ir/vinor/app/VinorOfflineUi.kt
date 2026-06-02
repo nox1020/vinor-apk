@@ -4,7 +4,7 @@ import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.ProgressBar
-import com.google.android.material.button.MaterialButton
+import androidx.appcompat.widget.AppCompatButton
 import androidx.core.view.isVisible
 
 /**
@@ -13,7 +13,7 @@ import androidx.core.view.isVisible
 class VinorOfflineUi(private val container: View) {
 
     private val tapArea: View = container.findViewById(R.id.offlineTapArea)
-    private val retryButton: MaterialButton = container.findViewById(R.id.retryButton)
+    private val retryButton: AppCompatButton = container.findViewById(R.id.retryButton)
     private val retryProgress: ProgressBar = container.findViewById(R.id.retryProgress)
 
     fun reset() {

@@ -1,6 +1,10 @@
 # R8 / ProGuard — نسخه Release وینور (WebView + FCM + SMS Retriever)
 
--keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, JavascriptInterface
+
+# کلاس‌های اپ (جلوگیری از کرش پس از minify)
+-keep class ir.vinor.app.** { *; }
+-keepclassmembers class ir.vinor.app.** { *; }
 
 # پل‌های JavaScript در WebView
 -keepclassmembers class * {
@@ -20,8 +24,10 @@
 -keep class ir.vinor.app.VinorNotifyHelper { *; }
 -keep class ir.vinor.app.VinorFcmService { *; }
 -keep class ir.vinor.app.VinorFirebaseAutoConfig { *; }
--keep class com.google.firebase.messaging.FirebaseMessagingService { *; }
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
 -dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
 
 # Kotlin / Coroutines
 -keep class kotlin.Metadata { *; }

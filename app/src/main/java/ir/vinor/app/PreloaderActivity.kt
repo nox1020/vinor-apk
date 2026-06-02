@@ -12,7 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.button.MaterialButton
+import androidx.appcompat.widget.AppCompatButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,7 +24,7 @@ class PreloaderActivity : AppCompatActivity() {
 
     private lateinit var progress: ProgressBar
     private lateinit var statusText: TextView
-    private lateinit var retry: MaterialButton
+    private lateinit var retry: AppCompatButton
     private lateinit var content: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
