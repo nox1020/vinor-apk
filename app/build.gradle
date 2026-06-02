@@ -67,6 +67,10 @@ android {
         def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")
         def ciCode = (ciRunStr != null && ciRunStr.isInteger()) ? ciRunStr.toInteger() : null
         versionCode ciCode != null ? Math.max(baseCode, ciCode) : baseCode
+        // APK انتشار: فقط ABIهای رایج موبایل (کاهش حجم؛ x86 فقط در debug emulator)
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
     }
 
     signingConfigs {
@@ -80,21 +84,49 @@ android {
     }
 
     buildTypes {
-        direct {
-            initWith release
-            signingConfig signingConfigs.vinor
-            debuggable false
-        }
         release {
             signingConfig signingConfigs.vinor
             minifyEnabled true
             shrinkResources true
             debuggable false
+            jniDebuggable false
+            renderscriptDebuggable false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+        direct {
+            initWith release
+            signingConfig signingConfigs.vinor
+            debuggable false
         }
         debug {
             minifyEnabled false
-            // keep same applicationId to avoid conflicts across variants
+            shrinkResources false
+            debuggable true
+            // همان applicationId برای جلوگیری از تداخل نصب هم‌زمان
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += [
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/*.kotlin_module",
+            ]
+        }
+    }
+
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
         }
     }
 
