@@ -9,7 +9,6 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
@@ -24,10 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.Calendar
@@ -56,6 +53,8 @@ class RoutineFragment : Fragment() {
     private var monthSteps: Map<String, Int> = emptyMap()
     private var stepsDetail: List<String> = emptyList()
     private var todayStr: String = ""
+    private var refreshRunnable: Runnable? = null
+    private val refreshIntervalMs = 12_000L
 
     private val progressColors = intArrayOf(
         0xFF4B5563.toInt(),  // 0 خاکستری
@@ -76,7 +75,6 @@ class RoutineFragment : Fragment() {
         private const val BASE = "https://vinor.ir"
         private const val ROUTINE_DATA = "/express/partner/routine/data"
         private const val ROUTINE_STEPS_DETAIL = "/express/partner/routine/steps/detail"
-        private const val ROUTINE_STEPS = "/express/partner/routine/steps"
         private val PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
     }
 
@@ -92,7 +90,7 @@ class RoutineFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         todayStr = todayDateString()
-        setupSteps()
+        setupStepsReadOnly()
         setupCalendarNav()
         loadTodayDetail()
         loadMonthData()
@@ -100,6 +98,7 @@ class RoutineFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        stopAutoRefresh()
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -148,22 +147,13 @@ class RoutineFragment : Fragment() {
         }
     }
 
-    private fun setupSteps() {
-        binding.step1Chip.setOnClickListener {
-            binding.step1.isChecked = !binding.step1.isChecked
-            updateStepChipsAndProgress()
-            saveSteps()
-        }
-        binding.step2Chip.setOnClickListener {
-            binding.step2.isChecked = !binding.step2.isChecked
-            updateStepChipsAndProgress()
-            saveSteps()
-        }
-        binding.step3Chip.setOnClickListener {
-            binding.step3.isChecked = !binding.step3.isChecked
-            updateStepChipsAndProgress()
-            saveSteps()
-        }
+    private fun setupStepsReadOnly() {
+        binding.step1Chip.isClickable = false
+        binding.step2Chip.isClickable = false
+        binding.step3Chip.isClickable = false
+        binding.step1.isEnabled = false
+        binding.step2.isEnabled = false
+        binding.step3.isEnabled = false
         updateStepChipsAndProgress()
     }
 
@@ -171,46 +161,22 @@ class RoutineFragment : Fragment() {
         bar.progressTintList = android.content.res.ColorStateList.valueOf(color)
     }
 
-    private fun saveSteps() {
-        if (_binding == null) return
-        val detail = mutableListOf<String>()
-        if (binding.step1.isChecked) detail.add("1")
-        if (binding.step2.isChecked) detail.add("2")
-        if (binding.step3.isChecked) detail.add("3")
-        scope.launch {
-            try {
-                val json = JSONObject()
-                    .put("date", todayStr)
-                    .put("detail", org.json.JSONArray(detail))
-                    .put("count", detail.size)
-                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val req = Request.Builder()
-                    .url("$BASE$ROUTINE_STEPS")
-                    .post(body)
-                    .addHeader("Cookie", cookieHeader())
-                    .addHeader("Content-Type", "application/json")
-                    .build()
-                withContext(Dispatchers.IO) { client.newCall(req).execute() }.use { resp ->
-                    if (resp.isSuccessful) {
-                        withContext(Dispatchers.Main) {
-                            if (_binding != null) {
-                                setStatus("پیشرفت ثبت شد.")
-                                loadMonthData()
-                            }
-                        }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            context?.let { Toast.makeText(it, "خطا در ذخیره", Toast.LENGTH_SHORT).show() }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "saveSteps error", e)
-                withContext(Dispatchers.Main) {
-                    if (_binding != null) context?.let { Toast.makeText(it, "خطا در ارتباط", Toast.LENGTH_SHORT).show() }
-                }
-            }
+    private fun startAutoRefresh() {
+        stopAutoRefresh()
+        val r = Runnable {
+            if (_binding == null) return@Runnable
+            loadTodayDetail()
+            loadMonthData()
+            refreshRunnable?.let { binding.root.postDelayed(it, refreshIntervalMs) }
         }
+        refreshRunnable = r
+        binding.root.postDelayed(r, refreshIntervalMs)
+    }
+
+    private fun stopAutoRefresh() {
+        val r = refreshRunnable ?: return
+        refreshRunnable = null
+        _binding?.root?.removeCallbacks(r)
     }
 
     private fun loadTodayDetail() {
@@ -392,5 +358,13 @@ class RoutineFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         todayStr = todayDateString()
+        loadTodayDetail()
+        loadMonthData()
+        startAutoRefresh()
+    }
+
+    override fun onPause() {
+        stopAutoRefresh()
+        super.onPause()
     }
 }

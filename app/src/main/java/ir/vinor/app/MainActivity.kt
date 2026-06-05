@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -193,6 +194,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 if (!::webView.isInitialized) return
+                VinorLandDetailVolume.syncVolumeControlStream(
+                    this@MainActivity,
+                    url ?: webView.url
+                )
                 notifyOtpPageIfNeeded(url ?: webView.url)
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 probePartnerShellReady()
@@ -506,8 +511,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::webView.isInitialized) webView.onResume()
+        if (::webView.isInitialized) {
+            webView.onResume()
+            VinorLandDetailVolume.syncVolumeControlStream(this, webView.url)
+        }
         VinorFcmRegistrar.requestTokenAndRegister(this)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (::webView.isInitialized && event.action == KeyEvent.ACTION_DOWN) {
+            VinorLandDetailVolume.onVolumeKeyDown(this, webView, event.keyCode)
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onDestroy() {
