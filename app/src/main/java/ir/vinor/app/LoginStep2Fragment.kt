@@ -88,16 +88,23 @@ class LoginStep2Fragment : Fragment() {
     }
 
     private fun setupSmsAutoFill() {
-        val ctx = requireContext().applicationContext
         registerSmsReceiver()
-        OtpSmsAutoFill.startSmsRetriever(ctx)
+        OtpSmsAutoFill.startSmsRetriever(requireContext())
+        activity?.let { OtpSmsAutoFill.startSmsUserConsent(it) }
     }
 
     private fun registerSmsReceiver() {
         unregisterSmsReceiver()
-        smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver { code ->
-            activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
-        }
+        smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver(
+            onCode = { code ->
+                activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
+            },
+            onTimeout = {
+                activity?.runOnUiThread {
+                    OtpSmsAutoFill.startSmsUserConsent(requireActivity())
+                }
+            },
+        )
         OtpSmsAutoFill.registerSmsRetrieverReceiver(
             requireContext(),
             smsRetrieverReceiver!!,

@@ -78,15 +78,16 @@ class MainActivity : AppCompatActivity() {
             VinorShellBridge.JS_INTERFACE_NAME
         )
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
+        val otpHelper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
+        otpSmsHelper = otpHelper
+        lifecycle.addObserver(otpHelper)
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
         loadEntryUrl()
 
         binding.root.post {
-            val helper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
-            otpSmsHelper = helper
-            lifecycle.addObserver(helper)
+            notifyOtpPageIfNeeded(webView.url)
         }
     }
 
