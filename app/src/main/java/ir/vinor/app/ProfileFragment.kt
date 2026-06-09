@@ -304,6 +304,11 @@ class ProfileFragment : Fragment() {
                             if (_binding == null) return@post
                             context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
                             loadData()
+                            try {
+                                findNavController().navigate(R.id.dashboardFragment)
+                            } catch (_: Exception) {
+                                openUrl("$BASE/express/partner/dashboard")
+                            }
                         }
                     }
                 }
