@@ -19,6 +19,7 @@
 -keep class ir.vinor.app.OtpSmsAutoFill { *; }
 -keep class ir.vinor.app.OtpSmsAutoFill$* { *; }
 -keep class ir.vinor.app.WebLoginOtpSmsHelper { *; }
+-keep class ir.vinor.app.VinorOtpBridge { *; }
 
 # اعلان و FCM
 -keep class ir.vinor.app.VinorNotifyHelper { *; }

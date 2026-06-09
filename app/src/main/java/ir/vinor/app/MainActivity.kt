@@ -80,6 +80,10 @@ class MainActivity : AppCompatActivity() {
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         val otpHelper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
         otpSmsHelper = otpHelper
+        webView.addJavascriptInterface(
+            VinorOtpBridge(this) { otpSmsHelper },
+            "VinorOtpBridge",
+        )
         lifecycle.addObserver(otpHelper)
         setupRetryButton()
         setupBackPressHandler()
@@ -354,6 +358,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun notifyOtpPageIfNeeded(url: String?) {
         otpSmsHelper?.onUrlChanged(url)
+        otpSmsHelper?.onPageContentReady()
     }
 
     private fun isVinorDomain(url: String): Boolean {

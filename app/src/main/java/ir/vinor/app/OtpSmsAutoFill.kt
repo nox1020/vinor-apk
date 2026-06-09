@@ -30,10 +30,10 @@ object OtpSmsAutoFill {
     private val PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
     private val ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩"
 
-    /** اولویت: `<#> CODE` سپس `@vinor.ir #CODE` سپس «کد ورود». */
+    /** اولویت: `<#> CODE` سپس `@vinor.ir #CODE` یا `@vinor.ir CODE`. */
     private val OTP_PATTERNS = listOf(
-        Regex("""<#>\s*#?([0-9۰-۹٠-٩]{5})\b"""),
-        Regex("""@vinor\.ir\s*#([0-9۰-۹٠-٩]{5})\b""", RegexOption.IGNORE_CASE),
+        Regex("""<#>\s*#?([0-9۰-۹٠-٩]{5})"""),
+        Regex("""@vinor\.ir\s*#?([0-9۰-۹٠-٩]{5})""", RegexOption.IGNORE_CASE),
         Regex(
             """(?:کد\s*ورود)[^\d۰-۹٠-٩]{0,60}([0-9۰-۹٠-٩]{5})""",
             RegexOption.IGNORE_CASE,
