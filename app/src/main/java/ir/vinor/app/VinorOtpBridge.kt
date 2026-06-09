@@ -3,7 +3,9 @@ package ir.vinor.app
 import android.webkit.JavascriptInterface
 import androidx.appcompat.app.AppCompatActivity
 
-/** پل JS برای soft-nav (pushState) — WebView onPageFinished برای OTP کافی نیست. */
+/**
+ * پل JS ↔ OTP native (soft-nav + restart Retriever هنگام ارسال/دریافت OTP).
+ */
 class VinorOtpBridge(
     private val activity: AppCompatActivity,
     private val helperProvider: () -> WebLoginOtpSmsHelper?,
@@ -14,6 +16,21 @@ class VinorOtpBridge(
             val helper = helperProvider() ?: return@runOnUiThread
             helper.onUrlChanged(url)
             helper.onPageContentReady()
+        }
+    }
+
+    /** صفحه OTP یا بعد از درخواست کد — Retriever را دوباره فعال کن. */
+    @JavascriptInterface
+    fun restartRetriever() {
+        activity.runOnUiThread {
+            helperProvider()?.restartSmsRetriever()
+        }
+    }
+
+    @JavascriptInterface
+    fun onOtpPageReady() {
+        activity.runOnUiThread {
+            helperProvider()?.onOtpPageReady()
         }
     }
 }

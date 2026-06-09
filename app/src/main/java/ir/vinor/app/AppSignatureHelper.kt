@@ -9,13 +9,12 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
 /**
- * هش ۱۱ کاراکتری SMS Retriever — خط پنجم قالب sms.ir (بعد از @vinor.ir #CODE).
+ * هش ۱۱ کاراکتری — خط آخر قالب sms.ir.
  *
  * ```
- * کد ورود شما : (آن را در اختیار هیچ کس نگذارید)
- * https://vinor.ir
- * <#> 38415
- * @vinor.ir #38415
+ * کد تایید:
+ * <#> 36423
+ * @vinor.ir #36423
  * YOUR_11_CHAR_HASH
  * ```
  */

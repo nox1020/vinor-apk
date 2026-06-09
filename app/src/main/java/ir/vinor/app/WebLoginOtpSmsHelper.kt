@@ -1,13 +1,17 @@
 package ir.vinor.app
 
+import android.content.Intent
+import android.util.Log
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * خواندن OTP از پیامک هنگام ورود در WebView — SMS Retriever + inject با retry/pending.
+ * OTP در WebView — Retriever (خاموش اگر فرمت OK) + User Consent (قالب «کد تایید:»).
  */
 class WebLoginOtpSmsHelper(
     private val activity: AppCompatActivity,
@@ -19,9 +23,20 @@ class WebLoginOtpSmsHelper(
     private var pendingCode: String? = null
     private var smsRetrieverReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
     private var retrieverRetries = 0
-    private var urlHookInstalled = false
     private var injectPollCount = 0
     private val injectPollRunnable = Runnable { pollPendingInject() }
+
+    private val consentLauncher: ActivityResultLauncher<Intent> =
+        activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            OtpSmsAutoFill.handleConsentResult(
+                OtpSmsAutoFill.SMS_CONSENT_REQUEST_CODE,
+                result.resultCode,
+                result.data,
+            ) { code -> activity.runOnUiThread { deliverCode(code) } }
+            if (listening) {
+                OtpSmsAutoFill.startSmsUserConsent(activity)
+            }
+        }
 
     init {
         AppSignatureHelper.logHashesForSmsTemplate(activity.applicationContext)
@@ -29,7 +44,8 @@ class WebLoginOtpSmsHelper(
 
     override fun onStart(owner: LifecycleOwner) {
         if (listening) {
-            OtpSmsAutoFill.startSmsRetriever(activity.applicationContext)
+            registerReceiverIfNeeded()
+            startBothListeners()
             pendingCode?.let { tryInject(it, fromPoll = false) }
         }
     }
@@ -41,14 +57,27 @@ class WebLoginOtpSmsHelper(
     fun onUrlChanged(url: String?) {
         if (isLoginFlowUrl(url)) {
             ensureListening()
-        } else {
+        } else if (!isLoginFlowUrl(url)) {
             stopListening()
         }
     }
 
-    /** بعد از onPageFinished یا soft-nav (pushState). */
     fun onPageContentReady() {
         if (!listening) return
+        pendingCode?.let { tryInject(it, fromPoll = false) }
+    }
+
+    fun restartSmsRetriever() {
+        ensureListening()
+        retrieverRetries = 0
+        registerReceiverIfNeeded()
+        startBothListeners()
+        Log.i(TAG, "OTP SMS listeners restarted")
+    }
+
+    fun onOtpPageReady() {
+        restartSmsRetriever()
+        installUrlChangeHook()
         pendingCode?.let { tryInject(it, fromPoll = false) }
     }
 
@@ -61,61 +90,58 @@ class WebLoginOtpSmsHelper(
     }
 
     private fun ensureListening() {
-        if (listening) {
-            OtpSmsAutoFill.startSmsRetriever(activity.applicationContext)
-            installUrlChangeHook()
-            return
-        }
         listening = true
-        lastInjectedCode = null
-        retrieverRetries = 0
-        registerReceiver()
-        OtpSmsAutoFill.startSmsRetriever(activity.applicationContext)
+        registerReceiverIfNeeded()
         installUrlChangeHook()
-    }
-
-    private fun installUrlChangeHook() {
-        if (urlHookInstalled) return
-        val wv = webViewProvider() ?: return
-        urlHookInstalled = true
-        wv.post {
-            wv.evaluateJavascript(URL_CHANGE_HOOK_JS, null)
+        if (lastInjectedCode == null && pendingCode == null) {
+            retrieverRetries = 0
         }
+        startBothListeners()
     }
 
-    private fun registerReceiver() {
-        unregisterReceiver()
-        val appCtx = activity.applicationContext
+    private fun startBothListeners() {
+        OtpSmsAutoFill.startSmsRetriever(activity)
+        OtpSmsAutoFill.startSmsUserConsent(activity)
+    }
+
+    private fun registerReceiverIfNeeded() {
+        if (smsRetrieverReceiver != null) return
         smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver(
             onCode = { code -> activity.runOnUiThread { deliverCode(code) } },
+            onConsentRequired = { consentIntent ->
+                activity.runOnUiThread {
+                    try {
+                        consentLauncher.launch(consentIntent)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Consent launch failed", e)
+                    }
+                }
+            },
             onTimeout = {
                 activity.runOnUiThread {
                     if (!listening) return@runOnUiThread
                     if (retrieverRetries < MAX_RETRIEVER_RETRIES) {
                         retrieverRetries++
-                        android.util.Log.d(TAG, "SmsRetriever retry $retrieverRetries")
-                        OtpSmsAutoFill.startSmsRetriever(activity.applicationContext)
-                    } else {
-                        android.util.Log.w(
-                            TAG,
-                            "SmsRetriever exhausted — check SMS ≤140 bytes and HASH line",
-                        )
+                        startBothListeners()
                     }
                 }
             },
         )
-        OtpSmsAutoFill.registerSmsRetrieverReceiver(appCtx, smsRetrieverReceiver!!)
+        OtpSmsAutoFill.registerSmsRetrieverReceiver(activity, smsRetrieverReceiver!!)
+    }
+
+    private fun installUrlChangeHook() {
+        val wv = webViewProvider() ?: return
+        wv.post { wv.evaluateJavascript(URL_CHANGE_HOOK_JS, null) }
     }
 
     private fun unregisterReceiver() {
-        smsRetrieverReceiver?.let {
-            OtpSmsAutoFill.unregisterReceiver(activity.applicationContext, it)
-        }
+        smsRetrieverReceiver?.let { OtpSmsAutoFill.unregisterReceiver(activity, it) }
         smsRetrieverReceiver = null
     }
 
     private fun stopListening() {
-        if (!listening) return
+        if (!listening && smsRetrieverReceiver == null) return
         listening = false
         lastInjectedCode = null
         pendingCode = null
@@ -129,7 +155,7 @@ class WebLoginOtpSmsHelper(
         val code = OtpSmsAutoFill.normalizeOtpDigits(raw)
         if (code.length != 5) return
         if (code == lastInjectedCode) return
-        android.util.Log.i(TAG, "OTP received from SMS Retriever")
+        Log.i(TAG, "OTP received")
         pendingCode = code
         tryInject(code, fromPoll = false)
         Toast.makeText(
@@ -156,10 +182,7 @@ class WebLoginOtpSmsHelper(
 
     private fun scheduleInjectPoll() {
         if (!listening || pendingCode == null) return
-        if (injectPollCount >= MAX_INJECT_POLLS) {
-            android.util.Log.w(TAG, "OTP inject polls exhausted — otpInput not ready?")
-            return
-        }
+        if (injectPollCount >= MAX_INJECT_POLLS) return
         cancelInjectPoll()
         webViewProvider()?.postDelayed(injectPollRunnable, INJECT_POLL_MS)
     }
@@ -167,8 +190,7 @@ class WebLoginOtpSmsHelper(
     private fun pollPendingInject() {
         if (!listening) return
         injectPollCount++
-        val code = pendingCode ?: return
-        tryInject(code, fromPoll = true)
+        pendingCode?.let { tryInject(it, fromPoll = true) }
     }
 
     private fun cancelInjectPoll() {
@@ -217,11 +239,11 @@ class WebLoginOtpSmsHelper(
 
     companion object {
         private const val TAG = "WebLoginOtpSms"
-        private const val MAX_RETRIEVER_RETRIES = 8
-        private const val MAX_INJECT_RETRIES = 8
-        private const val MAX_INJECT_POLLS = 120
-        private const val INJECT_RETRY_MS = 350L
-        private const val INJECT_POLL_MS = 500L
+        private const val MAX_RETRIEVER_RETRIES = 6
+        private const val MAX_INJECT_RETRIES = 12
+        private const val MAX_INJECT_POLLS = 180
+        private const val INJECT_RETRY_MS = 300L
+        private const val INJECT_POLL_MS = 400L
 
         private val URL_CHANGE_HOOK_JS = """
             (function(){
@@ -229,8 +251,11 @@ class WebLoginOtpSmsHelper(
               window.__vinorOtpUrlHook = 1;
               function notify(){
                 try {
-                  if (typeof VinorOtpBridge !== 'undefined' && VinorOtpBridge.onUrlChanged) {
-                    VinorOtpBridge.onUrlChanged(String(location.href || ''));
+                  if (typeof VinorOtpBridge !== 'undefined') {
+                    if (VinorOtpBridge.onUrlChanged) VinorOtpBridge.onUrlChanged(String(location.href || ''));
+                    if (/\/login\/otp/i.test(location.pathname || '') && VinorOtpBridge.onOtpPageReady) {
+                      VinorOtpBridge.onOtpPageReady();
+                    }
                   }
                 } catch (_) {}
               }
@@ -239,6 +264,7 @@ class WebLoginOtpSmsHelper(
               history.pushState = function(){ push.apply(history, arguments); notify(); };
               history.replaceState = function(){ replace.apply(history, arguments); notify(); };
               window.addEventListener('popstate', notify);
+              notify();
             })();
         """.trimIndent()
     }

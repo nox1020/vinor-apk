@@ -280,7 +280,13 @@ jobs:
             echo "SMS_RETRIEVER_HASH = \"$HASH\""
             echo '```'
             echo ""
-            echo "sms.ir template last line (5th line): \`HASH\` parameter → this value."
+            echo "sms.ir OTP template:"
+            echo '```'
+            echo "کد تایید:"
+            echo "<#> #CODE#"
+            echo "@vinor.ir ##CODE#"
+            echo "#HASH#"
+            echo '```'
             echo ""
             echo "| Field | Value |"
             echo "|-------|-------|"
