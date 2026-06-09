@@ -90,7 +90,6 @@ class LoginStep2Fragment : Fragment() {
     private fun setupSmsAutoFill() {
         registerSmsReceiver()
         OtpSmsAutoFill.startSmsRetriever(requireContext())
-        activity?.let { OtpSmsAutoFill.startSmsUserConsent(it) }
     }
 
     private fun registerSmsReceiver() {
@@ -101,7 +100,7 @@ class LoginStep2Fragment : Fragment() {
             },
             onTimeout = {
                 activity?.runOnUiThread {
-                    OtpSmsAutoFill.startSmsUserConsent(requireActivity())
+                    OtpSmsAutoFill.startSmsRetriever(requireContext())
                 }
             },
         )

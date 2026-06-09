@@ -1,6 +1,5 @@
 package ir.vinor.app
 
-import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,34 +11,33 @@ import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Status
 
 /**
- * خواندن خودکار OTP — SMS Retriever + User Consent (بدون READ_SMS).
+ * خواندن خودکار OTP با SMS Retriever — بدون READ_SMS و بدون دیالوگ User Consent.
  *
- * قالب پیامک وینور:
+ * قالب پیامک sms.ir (نمونه با CODE=38415):
  * ```
  * کد ورود شما : (آن را در اختیار هیچ کس نگذارید)
  * https://vinor.ir
  * <#> 38415
- * @vinor.ir #38415   ← یا هش ۱۱ کاراکتری امضای اپ (ترجیحی برای Retriever)
+ * @vinor.ir #38415
+ * HASH11CHARS
  * ```
+ * خط آخر هش ۱۱ کاراکتری امضای release است (برای Retriever؛ در پنل sms.ir متغیر HASH).
  */
 object OtpSmsAutoFill {
 
     private const val TAG = "OtpSmsAutoFill"
-    const val SMS_CONSENT_REQUEST_CODE = 7429
 
     private val PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
     private val ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩"
 
-    /** اولویت: خط `<#>`، سپس `@vinor.ir #`، سپس «کد ورود»، در نهایت هر ۵ رقم مجزا. */
+    /** اولویت: `<#> CODE` سپس `@vinor.ir #CODE` سپس «کد ورود». */
     private val OTP_PATTERNS = listOf(
-        Regex("""<#>\s*([0-9۰-۹٠-٩]{5})"""),
-        Regex("""@vinor\.ir\s*#([0-9۰-۹٠-٩]{5})""", RegexOption.IGNORE_CASE),
+        Regex("""<#>\s*#?([0-9۰-۹٠-٩]{5})\b"""),
+        Regex("""@vinor\.ir\s*#([0-9۰-۹٠-٩]{5})\b""", RegexOption.IGNORE_CASE),
         Regex(
-            """(?:کد\s*ورود|کد\s*تأ?یید|verify|code|vinor|وینور)[^\d۰-۹٠-٩]{0,40}([0-9۰-۹٠-٩]{5})""",
+            """(?:کد\s*ورود)[^\d۰-۹٠-٩]{0,60}([0-9۰-۹٠-٩]{5})""",
             RegexOption.IGNORE_CASE,
         ),
-        Regex("""(?m)^([0-9۰-۹٠-٩]{5})\s*$"""),
-        Regex("""(?:^|[^\d۰-۹٠-٩])([0-9۰-۹٠-٩]{5})(?:[^\d۰-۹٠-٩]|$)"""),
     )
 
     fun normalizeOtpDigits(raw: String?): String {
@@ -82,24 +80,8 @@ object OtpSmsAutoFill {
         }
     }
 
-    fun startSmsUserConsent(activity: Activity, senderPhone: String? = null) {
-        try {
-            SmsRetriever.getClient(activity).startSmsUserConsent(senderPhone)
-                .addOnSuccessListener { Log.d(TAG, "SmsUserConsent started") }
-                .addOnFailureListener { e -> Log.w(TAG, "SmsUserConsent start failed", e) }
-        } catch (e: Exception) {
-            Log.w(TAG, "SmsUserConsent unavailable", e)
-        }
-    }
-
-    /**
-     * @param onCode کد ۵ رقمی استخراج‌شده
-     * @param onConsentRequired Intent تأیید کاربر برای خواندن پیامک (User Consent)
-     * @param onTimeout پایان ۵ دقیقهٔ Retriever — برای راه‌اندازی مجدد یا Consent
-     */
     class SmsRetrieverReceiver(
         private val onCode: (String) -> Unit,
-        private val onConsentRequired: ((Intent) -> Unit)? = null,
         private val onTimeout: (() -> Unit)? = null,
     ) : BroadcastReceiver() {
 
@@ -110,19 +92,14 @@ object OtpSmsAutoFill {
             val status = extras.get(SmsRetriever.EXTRA_STATUS) as? Status ?: return
             when (status.statusCode) {
                 CommonStatusCodes.SUCCESS -> {
-                    val consentIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        extras.getParcelable(SmsRetriever.EXTRA_CONSENT_INTENT, Intent::class.java)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        extras.getParcelable(SmsRetriever.EXTRA_CONSENT_INTENT)
-                    }
-                    if (consentIntent != null) {
-                        onConsentRequired?.invoke(consentIntent)
+                    val message = extras.getString(SmsRetriever.EXTRA_SMS_MESSAGE).orEmpty()
+                    if (message.isEmpty()) {
+                        Log.w(TAG, "SMS empty — check HASH line in sms.ir template")
                         return
                     }
-                    val message = extras.getString(SmsRetriever.EXTRA_SMS_MESSAGE).orEmpty()
                     Log.d(TAG, "SMS retrieved (${message.length} chars)")
                     extractOtp(message)?.let(onCode)
+                        ?: Log.w(TAG, "OTP not found; expected <#> ##### or @vinor.ir ######")
                 }
                 CommonStatusCodes.TIMEOUT -> {
                     Log.d(TAG, "SmsRetriever timeout")
@@ -130,23 +107,6 @@ object OtpSmsAutoFill {
                 }
             }
         }
-    }
-
-    fun handleConsentResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?,
-        onCode: (String) -> Unit,
-    ): Boolean {
-        if (requestCode != SMS_CONSENT_REQUEST_CODE) return false
-        if (resultCode != Activity.RESULT_OK || data == null) {
-            Log.d(TAG, "SmsUserConsent declined or empty")
-            return true
-        }
-        val message = data.getStringExtra(SmsRetriever.EXTRA_SMS_MESSAGE).orEmpty()
-        Log.d(TAG, "SMS via consent (${message.length} chars)")
-        extractOtp(message)?.let(onCode)
-        return true
     }
 
     fun registerSmsRetrieverReceiver(context: Context, receiver: BroadcastReceiver) {

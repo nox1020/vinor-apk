@@ -255,6 +255,41 @@ jobs:
           > key.properties
           echo "Created key.properties for runtime."
 
+      - name: SMS Retriever hash (for sms.ir OTP auto-fill)
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ env.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ env.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CERT_DER="app/keystore/release-signing-cert.der"
+          keytool -exportcert \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -keystore app/keystore/vinor-release.jks \
+            -storetype JKS \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -file "$CERT_DER"
+          HASH="$(python3 scripts/sms_retriever_hash.py "$CERT_DER")"
+          echo "SMS_RETRIEVER_HASH=$HASH"
+          {
+            echo "## SMS Retriever hash (OTP auto-fill in APK)"
+            echo ""
+            echo "Copy this into \`api_keys.py\` on the server:"
+            echo ""
+            echo '```'
+            echo "SMS_RETRIEVER_HASH = \"$HASH\""
+            echo '```'
+            echo ""
+            echo "sms.ir template last line (5th line): \`HASH\` parameter → this value."
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Package | \`ir.vinor.app\` |"
+            echo "| Keystore alias | \`$ANDROID_KEY_ALIAS\` |"
+            echo "| Hash (11 chars) | \`$HASH\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$CERT_DER"
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 

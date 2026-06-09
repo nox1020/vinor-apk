@@ -1,18 +1,13 @@
 package ir.vinor.app
 
-import android.app.Activity
-import android.content.Intent
 import android.webkit.WebView
 import android.widget.Toast
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * خواندن OTP از پیامک هنگام ورود در WebView.
- * SMS Retriever + User Consent (fallback) — بدون مجوز READ_SMS.
+ * خواندن OTP از پیامک هنگام ورود در WebView — فقط SMS Retriever (بدون دیالوگ مجوز).
  */
 class WebLoginOtpSmsHelper(
     private val activity: AppCompatActivity,
@@ -23,14 +18,6 @@ class WebLoginOtpSmsHelper(
     private var lastInjectedCode: String? = null
     private var smsRetrieverReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
     private var retrieverRetries = 0
-    private val consentLauncher: ActivityResultLauncher<Intent> =
-        activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            OtpSmsAutoFill.handleConsentResult(
-                OtpSmsAutoFill.SMS_CONSENT_REQUEST_CODE,
-                result.resultCode,
-                result.data,
-            ) { code -> activity.runOnUiThread { deliverCode(code) } }
-        }
 
     init {
         AppSignatureHelper.logHashesForSmsTemplate(activity.applicationContext)
@@ -48,7 +35,6 @@ class WebLoginOtpSmsHelper(
         }
     }
 
-    /** از مرحلهٔ شماره تا OTP — پیامک ممکن است قبل از لود کامل صفحهٔ OTP برسد. */
     private fun isLoginFlowUrl(url: String?): Boolean {
         if (url.isNullOrBlank()) return false
         val path = runCatching {
@@ -59,29 +45,20 @@ class WebLoginOtpSmsHelper(
 
     private fun ensureListening() {
         if (listening) {
-            restartRetrieverIfNeeded()
+            OtpSmsAutoFill.startSmsRetriever(activity)
             return
         }
         listening = true
         lastInjectedCode = null
         retrieverRetries = 0
         registerReceiver()
-        startBothRetrievers()
+        OtpSmsAutoFill.startSmsRetriever(activity)
     }
 
     private fun registerReceiver() {
         unregisterReceiver()
         smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver(
             onCode = { code -> activity.runOnUiThread { deliverCode(code) } },
-            onConsentRequired = { consentIntent ->
-                activity.runOnUiThread {
-                    try {
-                        consentLauncher.launch(consentIntent)
-                    } catch (e: Exception) {
-                        android.util.Log.w(TAG, "SmsUserConsent launch failed", e)
-                    }
-                }
-            },
             onTimeout = {
                 activity.runOnUiThread {
                     if (!listening) return@runOnUiThread
@@ -89,23 +66,11 @@ class WebLoginOtpSmsHelper(
                         retrieverRetries++
                         android.util.Log.d(TAG, "SmsRetriever retry $retrieverRetries")
                         OtpSmsAutoFill.startSmsRetriever(activity)
-                    } else {
-                        android.util.Log.d(TAG, "SmsRetriever exhausted — starting User Consent")
-                        OtpSmsAutoFill.startSmsUserConsent(activity)
                     }
                 }
             },
         )
         OtpSmsAutoFill.registerSmsRetrieverReceiver(activity, smsRetrieverReceiver!!)
-    }
-
-    private fun startBothRetrievers() {
-        OtpSmsAutoFill.startSmsRetriever(activity)
-        OtpSmsAutoFill.startSmsUserConsent(activity)
-    }
-
-    private fun restartRetrieverIfNeeded() {
-        OtpSmsAutoFill.startSmsRetriever(activity)
     }
 
     private fun unregisterReceiver() {
@@ -174,7 +139,7 @@ class WebLoginOtpSmsHelper(
 
     companion object {
         private const val TAG = "WebLoginOtpSms"
-        private const val MAX_RETRIEVER_RETRIES = 2
+        private const val MAX_RETRIEVER_RETRIES = 5
         private const val MAX_INJECT_RETRIES = 15
         private const val INJECT_RETRY_MS = 400L
     }
