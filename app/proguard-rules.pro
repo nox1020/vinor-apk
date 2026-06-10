@@ -13,6 +13,7 @@
 -keep class ir.vinor.app.VinorShellBridge { *; }
 -keep class ir.vinor.app.VinorSpeechBridge { *; }
 -keep class ir.vinor.app.VinorNotifyBridge { *; }
+-keep class ir.vinor.app.VinorDownloadBridge { *; }
 
 # SMS Retriever (ورود OTP بدون مجوز READ_SMS)
 -keep class com.google.android.gms.auth.api.phone.** { *; }

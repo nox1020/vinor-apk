@@ -77,6 +77,10 @@ class MainActivity : AppCompatActivity() {
             VinorShellBridge { onPartnerAppReady() },
             VinorShellBridge.JS_INTERFACE_NAME
         )
+        webView.addJavascriptInterface(
+            VinorDownloadBridge(this),
+            VinorDownloadBridge.JS_INTERFACE_NAME
+        )
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
         val otpHelper = WebLoginOtpSmsHelper(this) { if (::webView.isInitialized) webView else null }
         otpSmsHelper = otpHelper
@@ -266,6 +270,11 @@ class MainActivity : AppCompatActivity() {
                     showOffline()
                 }
             }
+        }
+
+        webView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, null)
+            VinorDownloadBridge.enqueueDownload(this, url, filename, showToast = true)
         }
 
         webView.webChromeClient = webViewFileChooser.createChromeClient { newProgress ->

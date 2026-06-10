@@ -269,6 +269,10 @@ abstract class BaseWebViewFragment : Fragment() {
         }
 
         val fileChooser = webViewFileChooser
+        webView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, null)
+            VinorDownloadBridge.enqueueDownload(requireContext(), url, filename, showToast = true)
+        }
         webView.webChromeClient = fileChooser?.createChromeClient { newProgress ->
             binding.progressBar.progress = newProgress
             binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
