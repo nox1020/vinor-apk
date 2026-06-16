@@ -78,6 +78,10 @@ class MainActivity : AppCompatActivity() {
             VinorShellBridge.JS_INTERFACE_NAME
         )
         webView.addJavascriptInterface(
+            VinorAppUpdateBridge(this) { if (::webView.isInitialized) webView else null },
+            VinorAppUpdateBridge.JS_INTERFACE_NAME
+        )
+        webView.addJavascriptInterface(
             VinorDownloadBridge(this),
             VinorDownloadBridge.JS_INTERFACE_NAME
         )
@@ -210,6 +214,7 @@ class MainActivity : AppCompatActivity() {
                 notifyOtpPageIfNeeded(url ?: webView.url)
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 probePartnerShellReady()
+                VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -295,6 +300,7 @@ class MainActivity : AppCompatActivity() {
             if (::webView.isInitialized) {
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 webView.post(revealAfterLoadRunnable)
+                VinorAppUpdateChecker.check(this, webView)
             }
         }
     }
@@ -529,6 +535,7 @@ class MainActivity : AppCompatActivity() {
         if (::webView.isInitialized) {
             webView.onResume()
             VinorLandDetailVolume.syncVolumeControlStream(this, webView.url)
+            VinorAppUpdateChecker.check(this, webView)
         }
         VinorFcmRegistrar.requestTokenAndRegister(this)
     }
