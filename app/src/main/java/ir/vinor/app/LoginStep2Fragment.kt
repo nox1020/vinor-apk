@@ -187,12 +187,20 @@ class LoginStep2Fragment : Fragment() {
                     if (_binding == null) return@withContext
                     if (success) {
                         unregisterSmsReceiver()
+                        val redirect = VinorPartnerUrls.resolvePostLoginUrl(
+                            obj?.optString("redirect")?.takeIf { it.isNotBlank() }
+                        )
                         if (isAdded) {
                             Toast.makeText(
                                 requireContext(),
                                 getString(R.string.login_success),
                                 Toast.LENGTH_SHORT,
                             ).show()
+                        }
+                        val host = activity
+                        if (host is MainActivity) {
+                            host.openPartnerUrl(redirect, clearHistory = true)
+                            return@withContext
                         }
                         val nav = findNavController()
                         try {

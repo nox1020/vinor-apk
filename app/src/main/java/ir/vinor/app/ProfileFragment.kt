@@ -307,7 +307,7 @@ class ProfileFragment : Fragment() {
                             try {
                                 findNavController().navigate(R.id.dashboardFragment)
                             } catch (_: Exception) {
-                                openUrl("$BASE/express/partner/dashboard")
+                                openUrl(VinorPartnerUrls.ENTRY)
                             }
                         }
                     }

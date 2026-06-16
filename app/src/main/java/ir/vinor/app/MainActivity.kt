@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
     private var lastBackPressTime: Long = 0
     private val backPressThreshold = 2000L
-    private val defaultUrl = "https://vinor.ir/express/partner/dashboard"
+    private val defaultUrl = VinorPartnerUrls.ENTRY
     private var otpSmsHelper: WebLoginOtpSmsHelper? = null
     private var speechBridge: VinorSpeechBridge? = null
     private var notifyHelper: VinorNotifyHelper? = null
@@ -368,7 +368,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractStartUrl(deepLinkUrl: String?): String {
         if (deepLinkUrl.isNullOrBlank()) return defaultUrl
-        return if (isVinorDomain(deepLinkUrl)) deepLinkUrl else defaultUrl
+        return if (isVinorDomain(deepLinkUrl)) {
+            VinorPartnerUrls.normalizeEntryUrl(deepLinkUrl)
+        } else {
+            defaultUrl
+        }
+    }
+
+    /** بارگذاری URL پنل — پس از ورود یا deep link. */
+    fun openPartnerUrl(url: String, clearHistory: Boolean = false) {
+        if (!::webView.isInitialized) return
+        pendingInitialReveal = true
+        partnerAppReady = false
+        cancelShellRevealFallback()
+        if (!isOnline()) {
+            showOfflineOverlayOnly()
+            return
+        }
+        hideOffline()
+        val target = VinorPartnerUrls.normalizeEntryUrl(url)
+        webView.loadUrl(target)
+        if (clearHistory) {
+            webView.post { webView.clearHistory() }
+        }
     }
 
     private fun notifyOtpPageIfNeeded(url: String?) {

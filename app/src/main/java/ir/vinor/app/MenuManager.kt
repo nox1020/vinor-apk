@@ -16,6 +16,7 @@ object MenuManager {
     
     private const val MENU_API_URL = "https://vinor.ir/api/menu"
     private const val TAG = "MenuManager"
+    private const val BASE = VinorPartnerUrls.BASE
     
     /**
      * ساختار منوی آیتم
@@ -142,10 +143,10 @@ object MenuManager {
      */
     fun getDefaultMenu(): List<MenuItem> {
         return listOf(
-            MenuItem("dashboard", "https://vinor.ir/express/partner/dashboard", "fa-home", "وینور", R.id.dashboardFragment),
-            MenuItem("commissions", "https://vinor.ir/express/partner/commissions", "fa-chart-line", "پورسانت", R.id.commissionsFragment),
-            MenuItem("routine", "https://vinor.ir/express/partner/routine", "fa-list-check", "روتین", R.id.routineFragment),
-            MenuItem("profile", "https://vinor.ir/express/partner/profile", "fa-user", "من", R.id.profileFragment)
+            MenuItem("dashboard", VinorPartnerUrls.ENTRY, "fa-home", "وینور", R.id.dashboardFragment),
+            MenuItem("commissions", VinorPartnerUrls.COMMISSIONS, "fa-chart-line", "پورسانت", R.id.commissionsFragment),
+            MenuItem("routine", "$BASE/express/partner/routine", "fa-list-check", "روتین", R.id.routineFragment),
+            MenuItem("profile", "$BASE/express/partner/profile", "fa-user", "من", R.id.profileFragment)
         )
     }
 }

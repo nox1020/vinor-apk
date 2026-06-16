@@ -7,7 +7,7 @@ package ir.vinor.app
  */
 class DashboardFragment : BaseWebViewFragment() {
 
-    override val targetUrl: String = "https://vinor.ir/express/partner/dashboard"
+    override val targetUrl: String = VinorPartnerUrls.ENTRY
     override val fragmentTag: String = "DashboardFragment"
 
     /** همیشه فقط همین صفحه وینور لود شود (بدون جایگزینی با منو). */
