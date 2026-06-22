@@ -75,8 +75,7 @@ object WebViewProvider {
     }
 
     private fun warmupInstance(context: Context, webView: WebView) {
-        // فقط راه‌اندازی موتور Chromium — بدون درخواست شبکه که با loadUrl داشبورد تداخل کند
-        runCatching { webView.loadUrl("about:blank") }
+        // فقط موتور Chromium را گرم کن — loadUrl صفحهٔ قبلی را پاک می‌کند
     }
 }
 
