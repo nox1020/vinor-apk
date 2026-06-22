@@ -51,13 +51,15 @@ class MainActivity : AppCompatActivity() {
     private var pendingInitialReveal = true
     private var partnerAppReady = false
     private var degradedOffline = false
-    /** حداقل یک‌بار محتوای وب با موفقیت نمایش داده شده */
-    private var contentRevealedOnce = false
+    private var webViewStateRestored = false
     private val shellRevealFallbackMs = 12_000L
     private val shellRevealFallbackRunnable = Runnable { onPartnerAppReady() }
-    private val webStatePrefs by lazy {
-        getSharedPreferences("vinor_web_state", MODE_PRIVATE)
-    }
+
+    private fun canKeepCurrentWebContent(): Boolean =
+        ::webView.isInitialized && (
+            VinorWebOfflineSession.webViewHasBrowsablePage(webView) ||
+                VinorWebOfflineSession.isContentRevealed(this)
+            )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -80,7 +82,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         webView.addJavascriptInterface(
-            VinorShellBridge { onPartnerAppReady() },
+            VinorShellBridge(
+                onReady = { onPartnerAppReady() },
+                onLogout = { onPartnerLoggedOut() }
+            ),
             VinorShellBridge.JS_INTERFACE_NAME
         )
         webView.addJavascriptInterface(
@@ -106,12 +111,94 @@ class MainActivity : AppCompatActivity() {
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
-        contentRevealedOnce = webStatePrefs.getBoolean(PREF_CONTENT_REVEALED, false)
-        loadEntryUrl()
+        savedInstanceState?.let { bundle ->
+            webViewStateRestored = webView.restoreState(bundle) != null
+        }
+        bootstrapWebContent()
 
         binding.root.post {
             notifyOtpPageIfNeeded(webView.url)
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (::webView.isInitialized) {
+            webView.saveState(outState)
+        }
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun onPartnerLoggedOut() {
+        runOnUiThread {
+            VinorWebOfflineSession.clear(this)
+            degradedOffline = false
+            pendingInitialReveal = true
+            partnerAppReady = false
+        }
+    }
+
+    /**
+     * بارگذاری اولیه: در آفلاین هرگز صفحهٔ زندهٔ WebView را بی‌دلیل reload نکن.
+     */
+    private fun bootstrapWebContent() {
+        applyWebCacheMode()
+        syncConnectivityToWeb()
+
+        if (isOnline()) {
+            if (webViewStateRestored && VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+                revealExistingWebContent()
+                webView.post { loadEntryUrl(forceReload = true) }
+                return
+            }
+            loadEntryUrl()
+            return
+        }
+
+        degradedOffline = true
+
+        if (webViewStateRestored && VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+            revealExistingWebContent()
+            return
+        }
+
+        if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+            revealExistingWebContent()
+            return
+        }
+
+        val lastUrl = VinorWebOfflineSession.lastPartnerUrl(this)
+        if (!lastUrl.isNullOrBlank() && VinorWebOfflineSession.isContentRevealed(this)) {
+            beginOfflineLoad(lastUrl)
+            return
+        }
+
+        loadEntryUrl()
+    }
+
+    private fun revealExistingWebContent() {
+        degradedOffline = !isOnline()
+        pendingInitialReveal = false
+        partnerAppReady = true
+        cancelShellRevealFallback()
+        binding.offlineOverlay.root.visibility = View.GONE
+        hideLoader()
+        dismissSystemSplash()
+        binding.progressBar.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+        VinorWebOfflineSession.markSuccess(this, webView.url)
+        syncConnectivityToWeb()
+    }
+
+    private fun beginOfflineLoad(url: String) {
+        degradedOffline = true
+        pendingInitialReveal = true
+        partnerAppReady = false
+        cancelShellRevealFallback()
+        hideOffline()
+        webView.visibility = View.INVISIBLE
+        showLoader()
+        syncConnectivityToWeb()
+        webView.loadUrl(url)
     }
 
     private fun setupRetryButton() {
@@ -121,11 +208,14 @@ class MainActivity : AppCompatActivity() {
             applyWebCacheMode()
             if (!isOnline()) {
                 degradedOffline = true
-                hideOffline()
-                webView.visibility = View.INVISIBLE
-                showLoader()
-                syncConnectivityToWeb()
-                loadEntryUrl()
+                val lastUrl = VinorWebOfflineSession.lastPartnerUrl(this)
+                if (!lastUrl.isNullOrBlank()) {
+                    beginOfflineLoad(lastUrl)
+                } else if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+                    revealExistingWebContent()
+                } else {
+                    loadEntryUrl()
+                }
                 binding.offlineOverlay.root.postDelayed({ offlineUi.setChecking(false) }, 480L)
                 return@bindRetry
             }
@@ -167,7 +257,11 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
                 if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
-                    showOfflineHard()
+                    if (!isOnline() && canKeepCurrentWebContent()) {
+                        enterDegradedOffline()
+                    } else {
+                        showOfflineHard()
+                    }
                     return true
                 }
                 if (isVinorDomain(url)) {
@@ -181,14 +275,10 @@ class MainActivity : AppCompatActivity() {
                 view: WebView?,
                 request: WebResourceRequest?
             ): WebResourceResponse? {
+                if (!isOnline() && canKeepCurrentWebContent()) {
+                    return super.shouldInterceptRequest(view, request)
+                }
                 if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
-                    if (!isOnline() && contentRevealedOnce) {
-                        view?.post {
-                            if (view.canGoBack()) view.goBack()
-                            enterDegradedOffline()
-                        }
-                        return VinorWebViewErrorShield.silentHtmlResponse()
-                    }
                     return VinorWebViewErrorShield.silentHtmlResponse()
                 }
                 return super.shouldInterceptRequest(view, request)
@@ -211,7 +301,11 @@ class MainActivity : AppCompatActivity() {
                     webView.removeCallbacks(revealAfterLoadRunnable)
                 }
                 if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
-                    showOfflineHard()
+                    if (!isOnline() && canKeepCurrentWebContent()) {
+                        enterDegradedOffline()
+                    } else {
+                        showOfflineHard()
+                    }
                     return
                 }
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
@@ -272,15 +366,7 @@ class MainActivity : AppCompatActivity() {
                 if (request?.isForMainFrame == true) {
                     mainFrameLoadFailed = true
                     Log.w("MainActivity", "Main frame error: ${error?.errorCode} ${error?.description}")
-                    if (!isOnline()) {
-                        if (contentRevealedOnce || hasRenderableCachedPage()) {
-                            if (::webView.isInitialized && webView.canGoBack()) {
-                                webView.goBack()
-                            }
-                            enterDegradedOffline()
-                        }
-                        return
-                    }
+                    if (!isOnline()) return
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOfflineHard()
                     return
@@ -298,15 +384,7 @@ class MainActivity : AppCompatActivity() {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) return
                 Log.w("MainActivity", "Main frame error (legacy): $errorCode $description")
                 mainFrameLoadFailed = true
-                if (!isOnline()) {
-                    if (contentRevealedOnce || hasRenderableCachedPage()) {
-                        if (::webView.isInitialized && webView.canGoBack()) {
-                            webView.goBack()
-                        }
-                        enterDegradedOffline()
-                    }
-                    return
-                }
+                if (!isOnline()) return
                 VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                 showOfflineHard()
             }
@@ -387,18 +465,25 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun loadEntryUrl() {
+    private fun loadEntryUrl(forceReload: Boolean = false) {
+        if (!forceReload && !isOnline()) {
+            if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+                revealExistingWebContent()
+                return
+            }
+            val lastUrl = VinorWebOfflineSession.lastPartnerUrl(this)
+            if (!lastUrl.isNullOrBlank() && VinorWebOfflineSession.isContentRevealed(this)) {
+                beginOfflineLoad(lastUrl)
+                return
+            }
+        }
         pendingInitialReveal = true
         partnerAppReady = false
         cancelShellRevealFallback()
         applyWebCacheMode()
         if (!isOnline()) {
             degradedOffline = true
-            hideOffline()
-            webView.visibility = View.INVISIBLE
-            showLoader()
-            syncConnectivityToWeb()
-            webView.loadUrl(extractStartUrl(intent?.dataString))
+            beginOfflineLoad(extractStartUrl(intent?.dataString))
             return
         }
         degradedOffline = false
@@ -414,17 +499,13 @@ class MainActivity : AppCompatActivity() {
             || !intent.getStringExtra(VinorNotificationTray.EXTRA_URL).isNullOrBlank()
         notifyHelper?.handleOpenIntent(intent)
         if (isNotifyIntent) return
-        applyWebCacheMode()
+        val target = extractStartUrl(intent.dataString)
         if (!isOnline()) {
-            degradedOffline = true
-            hideOffline()
-            pendingInitialReveal = true
-            partnerAppReady = false
-            cancelShellRevealFallback()
-            webView.visibility = View.INVISIBLE
-            showLoader()
-            syncConnectivityToWeb()
-            webView.loadUrl(extractStartUrl(intent.dataString))
+            if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+                revealExistingWebContent()
+                return
+            }
+            beginOfflineLoad(target)
             return
         }
         degradedOffline = false
@@ -432,7 +513,7 @@ class MainActivity : AppCompatActivity() {
         partnerAppReady = false
         cancelShellRevealFallback()
         hideOffline()
-        webView.loadUrl(extractStartUrl(intent.dataString))
+        webView.loadUrl(target)
     }
 
     private fun extractStartUrl(deepLinkUrl: String?): String {
@@ -447,26 +528,20 @@ class MainActivity : AppCompatActivity() {
     /** بارگذاری URL پنل — پس از ورود یا deep link. */
     fun openPartnerUrl(url: String, clearHistory: Boolean = false) {
         if (!::webView.isInitialized) return
-        pendingInitialReveal = true
-        partnerAppReady = false
-        cancelShellRevealFallback()
+        val target = VinorPartnerUrls.normalizeEntryUrl(url)
         applyWebCacheMode()
         if (!isOnline()) {
-            degradedOffline = true
-            hideOffline()
-            webView.visibility = View.INVISIBLE
-            showLoader()
-            syncConnectivityToWeb()
-            val target = VinorPartnerUrls.normalizeEntryUrl(url)
-            webView.loadUrl(target)
+            beginOfflineLoad(target)
             if (clearHistory) {
                 webView.post { webView.clearHistory() }
             }
             return
         }
         degradedOffline = false
+        pendingInitialReveal = true
+        partnerAppReady = false
+        cancelShellRevealFallback()
         hideOffline()
-        val target = VinorPartnerUrls.normalizeEntryUrl(url)
         webView.loadUrl(target)
         if (clearHistory) {
             webView.post { webView.clearHistory() }
@@ -518,43 +593,18 @@ class MainActivity : AppCompatActivity() {
         keepSystemSplash = false
     }
 
-    private fun markContentRevealed() {
-        if (contentRevealedOnce) return
-        contentRevealedOnce = true
-        webStatePrefs.edit().putBoolean(PREF_CONTENT_REVEALED, true).apply()
-    }
-
     private fun applyWebCacheMode() {
         if (!::webView.isInitialized) return
         webView.settings.cacheMode = if (isOnline()) {
-            WebSettings.LOAD_CACHE_ELSE_NETWORK
+            WebSettings.LOAD_DEFAULT
         } else {
-            WebSettings.LOAD_CACHE_ONLY
+            WebSettings.LOAD_CACHE_ELSE_NETWORK
         }
     }
 
     private fun syncConnectivityToWeb() {
         if (!::webView.isInitialized) return
         VinorConnectivityBridge.syncToWeb(webView, isOnline())
-    }
-
-    private fun hasRenderableCachedPage(): Boolean {
-        if (!::webView.isInitialized) return false
-        if (contentRevealedOnce || degradedOffline) return true
-        val url = webView.url ?: return false
-        if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return false
-        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) return false
-        if (url.startsWith("about:")) return false
-        if (!isExpressPartnerUrl(url) && !isVinorDomain(url)) return false
-        return !pendingInitialReveal || partnerAppReady || webView.canGoBack()
-    }
-
-    private fun isLikelyCachedPartnerPage(url: String?): Boolean {
-        if (url.isNullOrBlank()) return false
-        if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return false
-        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) return false
-        if (url.startsWith("about:")) return false
-        return isExpressPartnerUrl(url) || isVinorDomain(url)
     }
 
     private fun enterDegradedOffline() {
@@ -565,10 +615,8 @@ class MainActivity : AppCompatActivity() {
         binding.offlineOverlay.root.visibility = View.GONE
         if (::webView.isInitialized) {
             webView.removeCallbacks(revealAfterLoadRunnable)
-            if (contentRevealedOnce || isLikelyCachedPartnerPage(webView.url)) {
-                markContentRevealed()
-                webView.visibility = View.VISIBLE
-            }
+            webView.visibility = View.VISIBLE
+            VinorWebOfflineSession.markSuccess(this, webView.url)
         }
         hideLoader()
         dismissSystemSplash()
@@ -582,7 +630,7 @@ class MainActivity : AppCompatActivity() {
         syncConnectivityToWeb()
         if (binding.offlineOverlay.root.visibility == View.VISIBLE) {
             degradedOffline = false
-            loadEntryUrl()
+            loadEntryUrl(forceReload = true)
             return
         }
         degradedOffline = false
@@ -590,7 +638,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onConnectivityLost() {
         applyWebCacheMode()
-        if (contentRevealedOnce || hasRenderableCachedPage()) {
+        if (canKeepCurrentWebContent()) {
             enterDegradedOffline()
             return
         }
@@ -614,7 +662,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOfflineHard() {
-        if (hasRenderableCachedPage()) {
+        if (canKeepCurrentWebContent()) {
             enterDegradedOffline()
             return
         }
@@ -646,12 +694,11 @@ class MainActivity : AppCompatActivity() {
         val curUrl = webView.url
         if (mainFrameLoadFailed) {
             mainFrameLoadFailed = false
-            if (!isOnline() && isLikelyCachedPartnerPage(curUrl)) {
+            if (!isOnline() && VinorWebOfflineSession.isPartnerBrowsableUrl(curUrl)) {
                 enterDegradedOffline()
-                markContentRevealed()
                 return
             }
-            if (contentRevealedOnce || hasRenderableCachedPage()) {
+            if (canKeepCurrentWebContent()) {
                 enterDegradedOffline()
                 return
             }
@@ -659,7 +706,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (VinorWebViewErrorShield.looksLikeChromeErrorPage(curUrl)) {
-            if (contentRevealedOnce) {
+            if (canKeepCurrentWebContent()) {
                 enterDegradedOffline()
                 return
             }
@@ -689,7 +736,7 @@ class MainActivity : AppCompatActivity() {
         hideLoader()
         dismissSystemSplash()
         webView.visibility = View.VISIBLE
-        markContentRevealed()
+        VinorWebOfflineSession.markSuccess(this, curUrl)
     }
 
     private fun setupBackPressHandler() {
@@ -741,10 +788,8 @@ class MainActivity : AppCompatActivity() {
             VinorAppUpdateChecker.check(this, webView)
             applyWebCacheMode()
             syncConnectivityToWeb()
-            if (!isOnline()) {
-                if (contentRevealedOnce || hasRenderableCachedPage()) {
-                    enterDegradedOffline()
-                }
+            if (!isOnline() && canKeepCurrentWebContent()) {
+                enterDegradedOffline()
             }
         }
         VinorFcmRegistrar.requestTokenAndRegister(this)
@@ -812,9 +857,5 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {
         }
         connectivityCallback = null
-    }
-
-    companion object {
-        private const val PREF_CONTENT_REVEALED = "content_revealed_once"
     }
 }
