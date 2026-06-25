@@ -20,6 +20,12 @@ class VinorFcmService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        // وقتی WebView باز است، بج فوتر وب کافی است — از نوتیف تکراری سینی جلوگیری می‌شود
+        if (VinorAppForeground.isInForeground) {
+            Log.d(TAG, "skip tray notification — app in foreground")
+            return
+        }
+
         val title = message.notification?.title
             ?: message.data["title"]
             ?: "اعلان جدید"

@@ -59,9 +59,8 @@ object WebViewProvider {
                 allowContentAccess = true
                 allowFileAccess = false
                 textZoom = 100
-                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 setSupportMultipleWindows(false)
-                runCatching { javaClass.getMethod("setAppCacheEnabled", Boolean::class.java).invoke(this, true) }
             }
             if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) {
                 WebSettingsCompat.setOffscreenPreRaster(settings, true)

@@ -111,7 +111,7 @@ object VinorFcmRegistrar {
                     .addHeader("Cookie", cookie)
                     .addHeader("Accept", "application/json")
                     .addHeader("X-Requested-With", "XMLHttpRequest")
-                    .addHeader("User-Agent", "VinorApp/WebViewOnly${if (version.isNotEmpty()) "/$version" else ""}")
+                    .addHeader("User-Agent", VinorUserAgent.appSuffix(context))
                     .build()
 
                 client.newCall(req).execute().use { resp ->

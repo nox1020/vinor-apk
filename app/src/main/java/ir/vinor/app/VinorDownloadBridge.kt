@@ -62,7 +62,7 @@ class VinorDownloadBridge(
                     setAllowedOverMetered(true)
                     setAllowedOverRoaming(true)
                     setMimeType(guessMimeType(absUrl, safeName))
-                    addRequestHeader("User-Agent", "VinorApp/Android")
+                    addRequestHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
                     CookieManager.getInstance().getCookie(absUrl)?.takeIf { it.isNotBlank() }?.let { cookie ->
                         addRequestHeader("Cookie", cookie)
                     }

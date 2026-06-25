@@ -27,8 +27,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * اعلان‌های همکار در APK WebView:
- * - polling سبک با کوکی سشن WebView (بدون FCM)
- * - نوتیفیکیشن سینی سیستم وقتی unread افزایش یابد
+ * - polling سبک با کوکی سشن برای همگام‌سازی baseline با بج فوتر وب
+ * - نوتیف سینی سیستم فقط از FCM وقتی اپ در پس‌زمینه است
  */
 class VinorNotifyHelper(
     private val activity: MainActivity,
@@ -40,8 +40,6 @@ class VinorNotifyHelper(
         const val EXTRA_OPEN_NOTIFICATIONS = "vinor_open_notifications"
         private const val BASE = "https://vinor.ir"
         private const val API_UNREAD = "/express/partner/api/notifications/unread-count"
-        private const val API_LIST = "/express/partner/api/notifications"
-        private const val CHANNEL_ID = "vinor_express_partner"
         private const val NOTIF_ID = 1001
         private const val POLL_MS = 30_000L
     }
@@ -151,15 +149,8 @@ class VinorNotifyHelper(
         }
         val unread = fetchUnread(cookie) ?: return
         if (lastUnread >= 0 && unread > lastUnread) {
-            if (canPostNotifications()) {
-                val preview = fetchLatestUnreadPreview(cookie)
-                showTrayNotification(
-                    preview?.first ?: "اعلان جدید",
-                    preview?.second ?: "پیام جدید در وینور اکسپرس"
-                )
-            } else {
-                requestPermissionIfNeeded()
-            }
+            // اپ باز است — بج فوتر وب به‌روز می‌شود؛ سینی فقط از FCM در پس‌زمینه
+            requestPermissionIfNeeded()
         }
         if (unread == 0) {
             NotificationManagerCompat.from(activity).cancel(NOTIF_ID)
@@ -180,6 +171,7 @@ class VinorNotifyHelper(
                 .addHeader("Cookie", cookie)
                 .addHeader("Accept", "application/json")
                 .addHeader("X-Requested-With", "XMLHttpRequest")
+                .addHeader("User-Agent", VinorUserAgent.forHttpRequest(activity))
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (resp.code == 401) {
@@ -198,56 +190,8 @@ class VinorNotifyHelper(
         }
     }
 
-    private suspend fun fetchLatestUnreadPreview(cookie: String): Pair<String, String>? =
-        withContext(Dispatchers.IO) {
-            try {
-                val req = Request.Builder()
-                    .url("$BASE$API_LIST")
-                    .addHeader("Cookie", cookie)
-                    .addHeader("Accept", "application/json")
-                    .addHeader("X-Requested-With", "XMLHttpRequest")
-                    .build()
-                client.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) return@withContext null
-                    val obj = JSONObject(resp.body?.string().orEmpty())
-                    val arr = obj.optJSONArray("notifications") ?: return@withContext null
-                    for (i in 0 until arr.length()) {
-                        val n = arr.optJSONObject(i) ?: continue
-                        if (n.optBoolean("is_read", true)) continue
-                        val title = n.optString("title").ifBlank { "اعلان جدید" }
-                        val body = n.optString("body").ifBlank { "پیام جدید در وینور اکسپرس" }
-                        return@withContext title to body
-                    }
-                    null
-                }
-            } catch (e: Exception) {
-                Log.d(TAG, "list preview failed", e)
-                null
-            }
-        }
-
-    private fun canPostNotifications(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return NotificationManagerCompat.from(activity).areNotificationsEnabled()
-        }
-        return ContextCompat.checkSelfPermission(
-            activity,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
     private fun ensureChannel() {
         VinorNotificationTray.ensureChannel(activity)
-    }
-
-    private fun showTrayNotification(title: String, body: String) {
-        if (!canPostNotifications()) return
-        VinorNotificationTray.show(
-            context = activity,
-            title = title,
-            body = body,
-            url = "/express/partner/notifications",
-        )
     }
 }
 

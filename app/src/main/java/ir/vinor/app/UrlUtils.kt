@@ -27,19 +27,21 @@ object UrlUtils {
 
     fun isVinorDomain(url: String): Boolean {
         return try {
-            val uri = URI(url)
-            val host = (uri.host ?: "").lowercase(Locale.US).removePrefix("www.")
-            host == VINOR_HOST
+            val host = normalizeHost(URI(url).host ?: return false)
+            host == VINOR_HOST || host.endsWith(".vinor.ir")
         } catch (_: Exception) {
             false
         }
     }
 
+    private fun normalizeHost(host: String): String =
+        host.lowercase(Locale.US).removePrefix("www.")
+
     fun isHomePage(url: String): Boolean {
         return try {
             val uri = URI(url)
-            val host = (uri.host ?: "").lowercase(Locale.US).removePrefix("www.")
-            if (host != VINOR_HOST) return false
+            val host = normalizeHost(uri.host ?: return false)
+            if (host != VINOR_HOST && !host.endsWith(".vinor.ir")) return false
             val path = (uri.path ?: "").removeSuffix("/")
             val normPath = if (path.isEmpty()) "/" else path
             HOME_PATHS.contains(normPath)

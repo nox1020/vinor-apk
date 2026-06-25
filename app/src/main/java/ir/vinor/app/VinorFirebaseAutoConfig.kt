@@ -49,7 +49,7 @@ object VinorFirebaseAutoConfig {
             if (initWithJson(context, cached)) return true
         }
 
-        fetchRemoteConfig()?.let { remote ->
+        fetchRemoteConfig(context)?.let { remote ->
             if (initWithJson(context, remote)) {
                 writeCache(context, remote)
                 return true
@@ -100,13 +100,13 @@ object VinorFirebaseAutoConfig {
         }
     }
 
-    private fun fetchRemoteConfig(): JSONObject? {
+    private fun fetchRemoteConfig(context: Context): JSONObject? {
         return runCatching {
             val req = Request.Builder()
                 .url("$BASE$API_MOBILE_CONFIG")
                 .get()
                 .addHeader("Accept", "application/json")
-                .addHeader("User-Agent", "VinorApp/WebViewOnly")
+                .addHeader("User-Agent", VinorUserAgent.appSuffix(context))
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null

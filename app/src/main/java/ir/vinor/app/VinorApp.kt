@@ -8,6 +8,7 @@ class VinorApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        VinorAppForeground.install()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             runCatching { WebView.setDataDirectorySuffix("vinor") }
         }
