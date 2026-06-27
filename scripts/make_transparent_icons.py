@@ -12,14 +12,37 @@ RES = ROOT / "app" / "src" / "main" / "res"
 
 
 def to_transparent(path: Path) -> Image.Image:
+    """Remove edge-connected black background; keep inner logo mark."""
+    from collections import deque
+
     img = Image.open(path).convert("RGBA")
     px = img.load()
     w, h = img.size
+    threshold = 10
+
+    def is_outer_bg(x: int, y: int) -> bool:
+        r, g, b, a = px[x, y]
+        return a > 0 and r < threshold and g < threshold and b < threshold
+
+    q: deque[tuple[int, int]] = deque()
+    seen: set[tuple[int, int]] = set()
+    for x in range(w):
+        for y in (0, h - 1):
+            if is_outer_bg(x, y):
+                seen.add((x, y))
+                q.append((x, y))
     for y in range(h):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            if r < 24 and g < 24 and b < 24:
-                px[x, y] = (r, g, b, 0)
+        for x in (0, w - 1):
+            if is_outer_bg(x, y) and (x, y) not in seen:
+                seen.add((x, y))
+                q.append((x, y))
+    while q:
+        x, y = q.popleft()
+        px[x, y] = (0, 0, 0, 0)
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and is_outer_bg(nx, ny):
+                seen.add((nx, ny))
+                q.append((nx, ny))
     return img
 
 
