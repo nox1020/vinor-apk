@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="120dp"
-    android:height="120dp"
-    android:viewportWidth="120"
-    android:viewportHeight="120">
-    <path
-        android:fillColor="#102820"
-        android:pathData="M33,4 H87 A29,29 0 0 1 116,33 V87 A29,29 0 0 1 87,116 H33 A29,29 0 0 1 4,87 V33 A29,29 0 0 1 33,4 Z" />
-    <path
-        android:fillColor="#34d399"
-        android:pathData="M33,4 H87 A29,29 0 0 1 116,33 V87 A29,29 0 0 1 87,116 H33 A29,29 0 0 1 4,87 V33 A29,29 0 0 1 33,4 Z M36,7 H84 A26,26 0 0 1 110,33 V84 A26,26 0 0 1 84,110 H36 A26,26 0 0 1 10,84 V33 A26,26 0 0 1 36,7 Z"
-        android:fillType="evenOdd" />
-    <path
-        android:fillColor="#8014532d"
-        android:pathData="M4,33 C4,33 28,8 60,8 C92,8 116,33 116,33 V60 C90,28 30,28 4,60 Z" />
-    <path
-        android:fillColor="#34d399"
-        android:pathData="M36,38 L56,86 L64,86 L84,38 L74,38 L60,74 L46,38 Z" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_pwa_logo"
+    android:gravity="center" />
