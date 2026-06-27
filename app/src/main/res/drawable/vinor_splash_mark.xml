@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_pwa_logo"
-    android:gravity="center" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M8,26 C8,14 14,8 26,8 H94 C106,8 112,14 112,26 V94 C112,106 106,112 94,112 H26 C14,112 8,106 8,94 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,34 L44,34 L60,88 L76,34 L90,34 L68,90 L52,90 Z" />
+</vector>
