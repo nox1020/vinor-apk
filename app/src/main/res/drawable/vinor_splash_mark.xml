@@ -1,10 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="120dp"
-    android:height="120dp"
-    android:viewportWidth="120"
-    android:viewportHeight="120">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M24,28 L42,28 L60,88 L78,28 L96,28 L72,100 L48,100 Z" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_pwa_logo"
+    android:gravity="center" />
