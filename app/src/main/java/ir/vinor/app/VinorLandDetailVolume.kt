@@ -52,4 +52,25 @@ object VinorLandDetailVolume {
         )
         return false
     }
+
+    /** پس از soft-nav یا onResume WebView — گالری را دوباره فعال کن */
+    fun kickGallery(webView: WebView) {
+        if (!isLandDetailUrl(webView.url)) return
+        webView.evaluateJavascript(
+            """
+            (function () {
+              try {
+                if (typeof window.vinorLandDetailGalleryKick === 'function') {
+                  window.vinorLandDetailGalleryKick();
+                  return;
+                }
+                if (typeof window.vinorLandDetailTeardown === 'function') {
+                  document.dispatchEvent(new CustomEvent('vinor:express-page-swap'));
+                }
+              } catch (_) {}
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
 }

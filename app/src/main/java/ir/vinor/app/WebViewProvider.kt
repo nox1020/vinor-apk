@@ -46,21 +46,11 @@ object WebViewProvider {
         return WebView(ctx).apply {
             setBackgroundColor(Color.TRANSPARENT)
             with(settings) {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
+                VinorWebViewSettings.apply(
+                    this,
+                    userAgentSuffix = ""
+                )
                 cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
-                loadsImagesAutomatically = true
-                mediaPlaybackRequiresUserGesture = false
-                useWideViewPort = true
-                loadWithOverviewMode = true
-                builtInZoomControls = false
-                displayZoomControls = false
-                allowContentAccess = true
-                allowFileAccess = false
-                textZoom = 100
-                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                setSupportMultipleWindows(false)
             }
             if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) {
                 WebSettingsCompat.setOffscreenPreRaster(settings, true)

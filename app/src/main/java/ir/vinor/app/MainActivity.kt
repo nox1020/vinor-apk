@@ -263,24 +263,19 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
-        settings.loadWithOverviewMode = true
-        settings.useWideViewPort = true
-        settings.setSupportZoom(false)
-        settings.builtInZoomControls = false
-        settings.displayZoomControls = false
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        VinorWebViewFileChooser.configureWebViewSettings(settings)
         val appVersion = try {
             packageManager.getPackageInfo(packageName, 0).versionName?.trim().orEmpty()
         } catch (_: Exception) {
             ""
         }
-        settings.userAgentString = settings.userAgentString + " VinorApp/WebViewOnly" +
-            if (appVersion.isNotEmpty()) "/$appVersion" else ""
+        VinorWebViewSettings.apply(
+            settings,
+            userAgentSuffix = " VinorApp/WebViewOnly" +
+                if (appVersion.isNotEmpty()) "/$appVersion" else ""
+        )
+        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+        VinorWebViewFileChooser.configureWebViewSettings(settings)
+        VinorWebViewSettings.configureCookies(webView)
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             settings.forceDark = WebSettings.FORCE_DARK_ON
@@ -372,6 +367,7 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity,
                     url ?: webView.url
                 )
+                VinorLandDetailVolume.kickGallery(webView)
                 notifyOtpPageIfNeeded(url ?: webView.url)
                 if (!isOnline() && pendingInitialReveal && isExpressPartnerUrl(url ?: webView.url)) {
                     partnerAppReady = true
@@ -390,6 +386,7 @@ class MainActivity : AppCompatActivity() {
                 if (!::webView.isInitialized) return
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
                 if (url?.startsWith("about:") == true) return
+                VinorLandDetailVolume.kickGallery(webView)
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 probePartnerShellReady()
                 webView.post(revealAfterLoadRunnable)
@@ -857,6 +854,7 @@ class MainActivity : AppCompatActivity() {
         if (::webView.isInitialized) {
             webView.onResume()
             VinorLandDetailVolume.syncVolumeControlStream(this, webView.url)
+            VinorLandDetailVolume.kickGallery(webView)
             VinorAppUpdateChecker.check(this, webView)
             applyWebCacheMode()
             syncConnectivityToWeb()
