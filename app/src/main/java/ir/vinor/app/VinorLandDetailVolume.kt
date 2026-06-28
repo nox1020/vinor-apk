@@ -53,13 +53,16 @@ object VinorLandDetailVolume {
         return false
     }
 
-    /** پس از soft-nav یا onResume WebView — گالری را دوباره فعال کن */
-    fun kickGallery(webView: WebView) {
+    /** پس از soft-nav یا onResume WebView — گالری و دکمه‌های پایین را دوباره فعال کن */
+    fun kickLandDetail(webView: WebView) {
         if (!isLandDetailUrl(webView.url)) return
         webView.evaluateJavascript(
             """
             (function () {
               try {
+                if (typeof window.vinorLandDetailActionsKick === 'function') {
+                  window.vinorLandDetailActionsKick();
+                }
                 if (typeof window.vinorLandDetailGalleryKick === 'function') {
                   window.vinorLandDetailGalleryKick();
                   return;
@@ -73,4 +76,7 @@ object VinorLandDetailVolume {
             null
         )
     }
+
+    /** @deprecated از kickLandDetail استفاده کنید */
+    fun kickGallery(webView: WebView) = kickLandDetail(webView)
 }

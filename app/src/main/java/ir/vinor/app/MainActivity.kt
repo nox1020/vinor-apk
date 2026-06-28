@@ -296,6 +296,9 @@ class MainActivity : AppCompatActivity() {
                     }
                     return true
                 }
+                if (url.startsWith("tel:") || url.startsWith("mailto:")) {
+                    return openExternal(url)
+                }
                 if (isVinorDomain(url)) {
                     notifyOtpPageIfNeeded(url)
                     return false
