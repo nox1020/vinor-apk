@@ -97,7 +97,10 @@ class LoginStep1Fragment : Fragment() {
 
         scope.launch {
             try {
-                val json = JSONObject().put("phone", phone).toString()
+                val json = JSONObject()
+                    .put("phone", phone)
+                    .put("accept_legal", true)
+                    .toString()
                 val req = Request.Builder()
                     .url("$BASE$API_LOGIN_REQUEST")
                     .post(json.toRequestBody("application/json; charset=utf-8".toMediaType()))

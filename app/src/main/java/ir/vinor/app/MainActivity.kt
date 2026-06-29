@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -147,6 +148,14 @@ class MainActivity : AppCompatActivity() {
             degradedOffline = false
             pendingInitialReveal = true
             partnerAppReady = false
+            try {
+                val cm = CookieManager.getInstance()
+                cm.removeAllCookies { _ ->
+                    cm.flush()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "cookie clear on logout failed", e)
+            }
         }
     }
 
