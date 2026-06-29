@@ -940,4 +940,8 @@ class MainActivity : AppCompatActivity() {
         }
         connectivityCallback = null
     }
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
 }
