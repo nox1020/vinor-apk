@@ -90,7 +90,7 @@ abstract class BaseWebViewFragment : Fragment() {
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.databaseEnabled = true
+        settings.databaseEnabled = false
         // setAppCacheEnabled deprecated و حذف شده - از cacheMode استفاده می‌کنیم
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.loadWithOverviewMode = true

@@ -5,7 +5,8 @@ import android.webkit.WebView
 
 /**
  * وضعیت آفلاین وب در APK: آخرین URL موفق + پرچم «قبلاً محتوا دیده شده».
- * صفحات پنل no-store هستند؛ تکیه بر WebView زنده + SW runtime cache.
+ * HTML پنل no-store است؛ کش آفلاین: SW runtime (VinorApp) + WebView زنده.
+ * چرخهٔ عمر کش: [VinorWebCacheManager]
  */
 object VinorWebOfflineSession {
 

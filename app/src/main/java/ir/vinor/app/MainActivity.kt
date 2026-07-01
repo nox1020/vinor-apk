@@ -123,6 +123,9 @@ class MainActivity : AppCompatActivity() {
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
+        if (::webView.isInitialized) {
+            VinorWebCacheManager.onAppStart(this, webView)
+        }
         userHasActiveSession = VinorWebOfflineSession.isContentRevealed(this)
         savedInstanceState?.let { bundle ->
             webViewStateRestored = webView.restoreState(bundle) != null
@@ -143,7 +146,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun onPartnerLoggedOut() {
         runOnUiThread {
-            VinorWebOfflineSession.clear(this)
             userHasActiveSession = false
             degradedOffline = false
             pendingInitialReveal = true
@@ -155,6 +157,11 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "cookie clear on logout failed", e)
+            }
+            if (::webView.isInitialized) {
+                VinorWebCacheManager.onLogout(this, webView)
+            } else {
+                VinorWebOfflineSession.clear(this)
             }
         }
     }
@@ -818,6 +825,9 @@ class MainActivity : AppCompatActivity() {
         webView.visibility = View.VISIBLE
         userHasActiveSession = true
         VinorWebOfflineSession.markSuccess(this, curUrl)
+        if (isOnline() && isExpressPartnerUrl(curUrl)) {
+            VinorWebCacheManager.warmupPartnerCaches(webView)
+        }
     }
 
     private fun setupBackPressHandler() {

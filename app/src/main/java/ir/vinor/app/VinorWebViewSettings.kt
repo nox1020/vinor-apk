@@ -10,7 +10,7 @@ object VinorWebViewSettings {
     fun apply(settings: WebSettings, userAgentSuffix: String) {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.databaseEnabled = true
+        settings.databaseEnabled = false
         settings.loadsImagesAutomatically = true
         settings.blockNetworkImage = false
         settings.mediaPlaybackRequiresUserGesture = false
