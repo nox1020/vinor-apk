@@ -5,12 +5,17 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 object VinorNotificationTray {
     const val CHANNEL_ID = "vinor_express_partner"
+    private const val TAG = "VinorNotifyTray"
     const val DEFAULT_NOTIF_ID = 1001
     const val ACTION_OPEN = "OPEN_NOTIFICATIONS"
     const val EXTRA_URL = "url"
@@ -62,8 +67,16 @@ object VinorNotificationTray {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .build()
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.w(TAG, "POST_NOTIFICATIONS not granted — tray notification skipped")
+                return
+            }
             NotificationManagerCompat.from(context).notify(notificationId, notif)
-        } catch (_: SecurityException) {
+        } catch (se: SecurityException) {
+            Log.w(TAG, "notify failed — permission denied", se)
         }
     }
 

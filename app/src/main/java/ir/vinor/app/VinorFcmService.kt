@@ -1,8 +1,6 @@
 package ir.vinor.app
 
-import android.content.Context
 import android.util.Log
-import android.webkit.CookieManager
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -20,12 +18,6 @@ class VinorFcmService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // وقتی WebView باز است، بج فوتر وب کافی است — از نوتیف تکراری سینی جلوگیری می‌شود
-        if (VinorAppForeground.isInForeground) {
-            Log.d(TAG, "skip tray notification — app in foreground")
-            return
-        }
-
         val title = message.notification?.title
             ?: message.data["title"]
             ?: "اعلان جدید"
@@ -34,7 +26,13 @@ class VinorFcmService : FirebaseMessagingService() {
             ?: "پیام جدید در وینور اکسپرس"
         val url = message.data["url"]
 
-        // foreground: خودمان نشان می‌دهیم. background/killed با notification payload خود اندروید نشان می‌دهد.
+        // وقتی WebView باز است، بج فوتر وب کافی است — از نوتیف تکراری سینی جلوگیری می‌شود
+        if (VinorAppForeground.isInForeground) {
+            Log.d(TAG, "skip tray notification — app in foreground")
+            return
+        }
+
+        Log.d(TAG, "show tray notification title=$title")
         VinorNotificationTray.show(
             context = applicationContext,
             title = title,

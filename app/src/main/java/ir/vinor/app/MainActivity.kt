@@ -88,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         }
         notifyHelper = VinorNotifyHelper(this) { if (::webView.isInitialized) webView else null }.also { helper ->
             helper.attach(this)
+            helper.requestPermissionIfNeeded()
             helper.handleOpenIntent(intent)
             notifyBridge = VinorNotifyBridge(helper).also { bridge ->
                 webView.addJavascriptInterface(bridge, VinorNotifyBridge.JS_INTERFACE_NAME)

@@ -36,6 +36,14 @@
         android:theme="@style/Theme.Vinor"
         tools:targetApi="31">
 
+        <!-- FCM: نمایش نوتیف وقتی اپ بسته/پس‌زمینه است (بدون onMessageReceived) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="vinor_express_partner" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
