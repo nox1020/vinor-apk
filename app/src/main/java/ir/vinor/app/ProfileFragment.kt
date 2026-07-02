@@ -296,6 +296,7 @@ class ProfileFragment : Fragment() {
                         context?.let { Toast.makeText(it, "خطا در خروج", Toast.LENGTH_SHORT).show() }
                         return@withContext
                     }
+                    VinorFcmRegistrar.unregisterCurrentToken(requireContext())
                     /* removeAllCookies ناهمزمان است؛ loadData فقط بعد از flush تا درخواست بعدی بدون کوکی قدیمی باشد */
                     val cm = CookieManager.getInstance()
                     cm.removeAllCookies { _ ->

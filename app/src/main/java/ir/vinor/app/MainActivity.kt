@@ -147,6 +147,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onPartnerLoggedOut() {
         runOnUiThread {
+            VinorFcmRegistrar.unregisterCurrentToken(this)
             userHasActiveSession = false
             degradedOffline = false
             pendingInitialReveal = true

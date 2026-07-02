@@ -187,6 +187,7 @@ class LoginStep2Fragment : Fragment() {
                     if (_binding == null) return@withContext
                     if (success) {
                         unregisterSmsReceiver()
+                        VinorFcmRegistrar.registerAfterLogin(requireContext())
                         val redirect = VinorPartnerUrls.resolvePostLoginUrl(
                             obj?.optString("redirect")?.takeIf { it.isNotBlank() }
                         )
