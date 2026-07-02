@@ -60,6 +60,7 @@ class VinorNotifyHelper(
     }
 
     override fun onStart(owner: LifecycleOwner) {
+        ensureNotificationPermission()
         startPolling()
     }
 
@@ -79,18 +80,24 @@ class VinorNotifyHelper(
 
     fun requestPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (permissionRequested) return
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
             == PackageManager.PERMISSION_GRANTED
         ) {
+            permissionRequested = false
             return
         }
+        if (permissionRequested) return
         permissionRequested = true
         ActivityCompat.requestPermissions(
             activity,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            REQ_POST_NOTIFICATIONS
+            REQ_POST_NOTIFICATIONS,
         )
+    }
+
+    /** بعد از لاگین یا هر بار که اپ باز می‌شود — تا مجوز داده شود */
+    fun ensureNotificationPermission() {
+        requestPermissionIfNeeded()
     }
 
     fun openNotificationsPage() {

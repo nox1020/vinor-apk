@@ -1,17 +1,17 @@
 package ir.vinor.app
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
 object VinorNotificationTray {
     const val CHANNEL_ID = "vinor_express_partner"
@@ -23,16 +23,28 @@ object VinorNotificationTray {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        val existing = nm.getNotificationChannel(CHANNEL_ID)
+        if (existing != null && existing.importance >= NotificationManager.IMPORTANCE_HIGH) return
         val ch = NotificationChannel(
             CHANNEL_ID,
             "اعلان‌های وینور",
-            NotificationManager.IMPORTANCE_HIGH
+            NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "اعلان‌های پنل همکاری وینور"
+            description = "اعلان‌های پنل همکاری وینور در نوار اعلان گوشی"
             enableVibration(true)
+            enableLights(true)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setShowBadge(true)
         }
         nm.createNotificationChannel(ch)
+    }
+
+    fun hasPostPermission(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun show(
@@ -43,6 +55,11 @@ object VinorNotificationTray {
         notificationId: Int = DEFAULT_NOTIF_ID,
     ) {
         ensureChannel(context)
+        if (!hasPostPermission(context)) {
+            Log.w(TAG, "POST_NOTIFICATIONS not granted — tray notification skipped")
+            return
+        }
+
         val targetUrl = normalizeUrl(url)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -54,10 +71,10 @@ object VinorNotificationTray {
             context,
             notificationId,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_notify)
             .setContentTitle(title.ifBlank { "اعلان جدید" })
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -65,16 +82,12 @@ object VinorNotificationTray {
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                Log.w(TAG, "POST_NOTIFICATIONS not granted — tray notification skipped")
-                return
-            }
             NotificationManagerCompat.from(context).notify(notificationId, notif)
+            Log.d(TAG, "tray notification shown id=$notificationId")
         } catch (se: SecurityException) {
             Log.w(TAG, "notify failed — permission denied", se)
         }
