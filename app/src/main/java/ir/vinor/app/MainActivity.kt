@@ -250,7 +250,7 @@ class MainActivity : AppCompatActivity() {
         showLoader()
         syncConnectivityToWeb()
         scheduleOfflineRevealTimeout()
-        webView.loadUrl(url)
+        webView.loadUrl(url, VinorUserAgent.webViewLoadHeaders(this))
     }
 
     private fun setupRetryButton() {
@@ -552,7 +552,7 @@ class MainActivity : AppCompatActivity() {
         }
         degradedOffline = false
         hideOffline()
-        webView.loadUrl(extractStartUrl(intent?.dataString))
+        webView.loadUrl(extractStartUrl(intent?.dataString), VinorUserAgent.webViewLoadHeaders(this))
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -577,7 +577,7 @@ class MainActivity : AppCompatActivity() {
         partnerAppReady = false
         cancelShellRevealFallback()
         hideOffline()
-        webView.loadUrl(target)
+        webView.loadUrl(target, VinorUserAgent.webViewLoadHeaders(this))
     }
 
     private fun extractStartUrl(deepLinkUrl: String?): String {
@@ -606,7 +606,7 @@ class MainActivity : AppCompatActivity() {
         partnerAppReady = false
         cancelShellRevealFallback()
         hideOffline()
-        webView.loadUrl(target)
+        webView.loadUrl(target, VinorUserAgent.webViewLoadHeaders(this))
         if (clearHistory) {
             webView.post { webView.clearHistory() }
         }
