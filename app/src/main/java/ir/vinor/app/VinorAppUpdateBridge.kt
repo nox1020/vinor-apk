@@ -4,7 +4,7 @@ import android.content.Context
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 
-/** پل JS — درخواست بررسی نسخه از سمت وب */
+/** پل JS — بررسی نسخه، دانلود خودکار و نصب APK */
 class VinorAppUpdateBridge(
     private val context: Context,
     private val webViewProvider: () -> WebView?,
@@ -28,4 +28,23 @@ class VinorAppUpdateBridge(
             .put("url", state.url)
             .toString()
     }
+
+    @JavascriptInterface
+    fun getDownloadState(): String =
+        VinorApkUpdateInstaller.stateJson(context.applicationContext)
+
+    @JavascriptInterface
+    fun ensureDownload(url: String, version: String) {
+        val webView = webViewProvider()
+        VinorApkUpdateInstaller.ensureDownload(
+            context.applicationContext,
+            url,
+            version,
+            webView,
+        )
+    }
+
+    @JavascriptInterface
+    fun installUpdate(): Boolean =
+        VinorApkUpdateInstaller.install(context.applicationContext)
 }

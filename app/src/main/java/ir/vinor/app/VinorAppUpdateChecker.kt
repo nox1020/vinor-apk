@@ -68,7 +68,11 @@ object VinorAppUpdateChecker {
     /** بررسی از سرور؛ در صورت خطای شبکه وضعیت قبلی حفظ می‌شود. */
     fun check(context: Context, webView: WebView? = null) {
         if (!checking.compareAndSet(false, true)) {
-            webView?.let { applyToWebView(it, readCached(context)) }
+            val cached = readCached(context)
+            webView?.let { applyToWebView(it, cached) }
+            if (cached.show) {
+                VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+            }
             return
         }
         scope.launch {
@@ -86,6 +90,9 @@ object VinorAppUpdateChecker {
                 }
                 persist(context, state)
                 webView?.let { applyToWebView(it, state) }
+                if (state.show) {
+                    VinorApkUpdateInstaller.ensureDownload(context, state.url, state.version, webView)
+                }
             } finally {
                 checking.set(false)
             }
@@ -156,6 +163,15 @@ object VinorAppUpdateChecker {
     }
 
     fun syncCachedToWebView(context: Context, webView: WebView) {
-        applyToWebView(webView, readCached(context))
+        val cached = readCached(context)
+        applyToWebView(webView, cached)
+        if (cached.show) {
+            VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+        } else {
+            val dl = VinorApkUpdateInstaller.readState(context)
+            if (dl.status != VinorApkUpdateInstaller.Status.IDLE) {
+                VinorApkUpdateInstaller.notifyWebView(webView, dl)
+            }
+        }
     }
 }
