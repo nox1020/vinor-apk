@@ -200,6 +200,7 @@ class LoginStep2Fragment : Fragment() {
                         }
                         val host = activity
                         if (host is MainActivity) {
+                            host.requestNotificationPermission()
                             host.openPartnerUrl(redirect, clearHistory = true)
                             return@withContext
                         }

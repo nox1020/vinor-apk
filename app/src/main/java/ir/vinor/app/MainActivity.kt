@@ -614,6 +614,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** درخواست مجوز نوتیف — بعد از لاگین یا از تنظیمات */
+    fun requestNotificationPermission() {
+        notifyHelper?.requestPermissionIfNeeded()
+    }
+
     private fun notifyOtpPageIfNeeded(url: String?) {
         otpSmsHelper?.onUrlChanged(url)
         otpSmsHelper?.onPageContentReady()

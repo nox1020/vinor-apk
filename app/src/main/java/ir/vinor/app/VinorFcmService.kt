@@ -4,7 +4,7 @@ import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
-/** دریافت FCM وقتی اپ بسته/پس‌زمینه است — نوتیف سینی سیستم */
+/** دریافت FCM — نمایش در سینی سیستم از طریق VinorNotificationTray */
 class VinorFcmService : FirebaseMessagingService() {
 
     companion object {
@@ -26,13 +26,13 @@ class VinorFcmService : FirebaseMessagingService() {
             ?: "پیام جدید در وینور اکسپرس"
         val url = message.data["url"]
 
-        // وقتی WebView باز است، بج فوتر وب کافی است — از نوتیف تکراری سینی جلوگیری می‌شود
-        if (VinorAppForeground.isInForeground) {
-            Log.d(TAG, "skip tray notification — app in foreground")
+        Log.d(TAG, "FCM received title=$title foreground=${VinorAppForeground.isInForeground}")
+
+        if (!VinorNotificationTray.hasPostPermission(applicationContext)) {
+            Log.w(TAG, "POST_NOTIFICATIONS denied — enable in Settings > Apps > Vinor > Notifications")
             return
         }
 
-        Log.d(TAG, "show tray notification title=$title")
         VinorNotificationTray.show(
             context = applicationContext,
             title = title,

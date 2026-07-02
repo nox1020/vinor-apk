@@ -36,7 +36,7 @@
         android:theme="@style/Theme.Vinor"
         tools:targetApi="31">
 
-        <!-- FCM: نمایش نوتیف وقتی اپ بسته/پس‌زمینه است (بدون onMessageReceived) -->
+        <!-- FCM: VinorFcmService.onMessageReceived → VinorNotificationTray -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_notify" />
