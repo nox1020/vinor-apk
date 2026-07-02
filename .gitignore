@@ -16,3 +16,5 @@ app/keystore/*.keystore
 app/keystore/*.p12
 app/keystore/*.pem
 app/keystore/*.pkcs12
+app/google-services.json
+app/firebase-service-account.json
