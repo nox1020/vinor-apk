@@ -24,7 +24,11 @@ object VinorNotificationTray {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         val existing = nm.getNotificationChannel(CHANNEL_ID)
-        if (existing != null && existing.importance >= NotificationManager.IMPORTANCE_HIGH) return
+        if (existing != null) {
+            if (existing.importance >= NotificationManager.IMPORTANCE_HIGH) return
+            // اندروید اجازهٔ تغییر importance نمی‌دهد — کانال قدیمی با اهمیت پایین حذف می‌شود
+            nm.deleteNotificationChannel(CHANNEL_ID)
+        }
         val ch = NotificationChannel(
             CHANNEL_ID,
             "اعلان‌های وینور",
@@ -47,6 +51,11 @@ object VinorNotificationTray {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun canNotify(context: Context): Boolean {
+        if (!hasPostPermission(context)) return false
+        return NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
     fun show(
         context: Context,
         title: String,
@@ -55,8 +64,8 @@ object VinorNotificationTray {
         notificationId: Int = DEFAULT_NOTIF_ID,
     ) {
         ensureChannel(context)
-        if (!hasPostPermission(context)) {
-            Log.w(TAG, "POST_NOTIFICATIONS not granted — tray notification skipped")
+        if (!canNotify(context)) {
+            Log.w(TAG, "notifications disabled — enable in Settings > Apps > Vinor > Notifications")
             return
         }
 

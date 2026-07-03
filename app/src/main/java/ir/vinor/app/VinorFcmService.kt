@@ -28,8 +28,14 @@ class VinorFcmService : FirebaseMessagingService() {
 
         Log.d(TAG, "FCM received title=$title foreground=${VinorAppForeground.isInForeground}")
 
-        if (!VinorNotificationTray.hasPostPermission(applicationContext)) {
-            Log.w(TAG, "POST_NOTIFICATIONS denied — enable in Settings > Apps > Vinor > Notifications")
+        // وقتی اپ پس‌زمینه/بسته است، بلوک notification سرور خودش در سینی نمایش می‌دهد
+        if (!VinorAppForeground.isInForeground && message.notification != null) {
+            Log.d(TAG, "background + notification payload — system tray handles display")
+            return
+        }
+
+        if (!VinorNotificationTray.canNotify(applicationContext)) {
+            Log.w(TAG, "notifications disabled — enable in Settings > Apps > Vinor > Notifications")
             return
         }
 

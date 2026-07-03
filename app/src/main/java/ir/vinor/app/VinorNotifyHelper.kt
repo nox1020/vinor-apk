@@ -53,6 +53,7 @@ class VinorNotifyHelper(
     private var pollJob: Job? = null
     private var lastUnread = -1
     private var permissionRequested = false
+    private var pendingOpenUrl: String? = null
 
     fun attach(lifecycleOwner: LifecycleOwner) {
         ensureChannel()
@@ -109,7 +110,7 @@ class VinorNotifyHelper(
             )
     }
 
-    fun handleOpenIntent(intent: Intent?) {
+    fun handleOpenIntent(intent: Intent?, immediate: Boolean = true) {
         if (intent == null) return
         val urlExtra = intent.getStringExtra(VinorNotificationTray.EXTRA_URL)?.trim().orEmpty()
         val openNotifications = intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false)
@@ -120,16 +121,26 @@ class VinorNotifyHelper(
         val target = VinorNotificationTray.normalizeUrl(
             urlExtra.ifBlank { "/express/partner/notifications" }
         )
-        webViewProvider()?.loadUrl(target)
-            ?: activity.startActivity(
-                Intent(activity, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
-                    putExtra(VinorNotificationTray.EXTRA_URL, target)
-                }
-            )
+        pendingOpenUrl = target
+        if (immediate) {
+            webViewProvider()?.loadUrl(target)
+                ?: activity.startActivity(
+                    Intent(activity, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
+                        putExtra(VinorNotificationTray.EXTRA_URL, target)
+                    }
+                )
+            pendingOpenUrl = null
+        }
         intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS)
         intent.removeExtra(VinorNotificationTray.EXTRA_URL)
+    }
+
+    fun consumePendingOpenUrl(): String? {
+        val url = pendingOpenUrl
+        pendingOpenUrl = null
+        return url
     }
 
     private fun startPolling() {
