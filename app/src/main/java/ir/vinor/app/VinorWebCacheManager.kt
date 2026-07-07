@@ -16,6 +16,7 @@ object VinorWebCacheManager {
     private const val TAG = "VinorWebCache"
     private const val PREFS = "vinor_web_cache"
     private const val KEY_VERSION_CODE = "last_version_code"
+    private const val KEY_PURGE_PENDING = "purge_pending"
 
     private val WARMUP_URLS = listOf(
         "/express/partner/login",
@@ -38,16 +39,23 @@ object VinorWebCacheManager {
     }
 
     /** پس از ساخت WebView — پاک‌سازی کش کهنه پس از آپدیت APK */
-    fun onAppStart(context: Context, webView: WebView?) {
+    fun onAppStart(context: Context, webView: WebView?, isOnline: Boolean) {
         val current = versionCode(context)
-        val stored = prefs(context).getInt(KEY_VERSION_CODE, -1)
+        val pref = prefs(context)
+        val stored = pref.getInt(KEY_VERSION_CODE, -1)
+        var shouldPurge = pref.getBoolean(KEY_PURGE_PENDING, false)
         if (stored >= 0 && stored != current) {
-            Log.i(TAG, "APK upgraded $stored -> $current; purging stale web caches")
+            shouldPurge = true
+            pref.edit().putBoolean(KEY_PURGE_PENDING, true).apply()
+        }
+        if (shouldPurge && isOnline) {
+            Log.i(TAG, "purging stale web caches after online confirmation")
             purgeHttpDiskCache(webView)
             clearServiceWorkerCaches(webView, includePrecache = false)
+            pref.edit().putBoolean(KEY_PURGE_PENDING, false).apply()
         }
         if (stored != current) {
-            prefs(context).edit().putInt(KEY_VERSION_CODE, current).apply()
+            pref.edit().putInt(KEY_VERSION_CODE, current).apply()
         }
     }
 

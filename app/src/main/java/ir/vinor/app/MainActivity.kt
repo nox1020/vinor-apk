@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         setupBackPressHandler()
         setupWebView()
         if (::webView.isInitialized) {
-            VinorWebCacheManager.onAppStart(this, webView)
+            VinorWebCacheManager.onAppStart(this, webView, isOnline())
         }
         userHasActiveSession = VinorWebOfflineSession.isContentRevealed(this)
         savedInstanceState?.let { bundle ->
