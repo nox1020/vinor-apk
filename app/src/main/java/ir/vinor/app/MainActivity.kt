@@ -26,6 +26,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import ir.vinor.app.databinding.ActivityMainBinding
+import org.json.JSONArray
 
 /**
  * نسخه کاملا WebView:
@@ -336,6 +337,13 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): WebResourceResponse? {
                 if (!isOnline()) {
+                    if (request?.isForMainFrame == true) {
+                        val reqUrl = request.url?.toString()
+                        if (isExpressPartnerUrl(reqUrl)) {
+                            val local = VinorOfflinePageStore.asHtmlResponse(this@MainActivity, reqUrl)
+                            if (local != null) return local
+                        }
+                    }
                     return super.shouldInterceptRequest(view, request)
                 }
                 if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
@@ -404,6 +412,7 @@ class MainActivity : AppCompatActivity() {
                 probePartnerShellReady()
                 VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
                 syncConnectivityToWeb()
+                cacheCurrentPageSnapshot(url ?: webView.url)
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -536,6 +545,27 @@ class MainActivity : AppCompatActivity() {
             """.trimIndent(),
             null
         )
+    }
+
+    private fun cacheCurrentPageSnapshot(url: String?) {
+        val target = (url ?: "").trim()
+        if (!VinorWebOfflineSession.isPartnerBrowsableUrl(target)) return
+        webView.evaluateJavascript(
+            "(function(){try{return document.documentElement.outerHTML || '';}catch(_){return '';}})();"
+        ) { raw ->
+            val decoded = decodeJsStringResult(raw)
+            if (!decoded.isNullOrBlank()) {
+                VinorOfflinePageStore.save(this, target, decoded)
+            }
+        }
+    }
+
+    private fun decodeJsStringResult(raw: String?): String? {
+        val src = raw?.trim().orEmpty()
+        if (src.isEmpty() || src == "null" || src == "undefined") return null
+        return runCatching {
+            JSONArray("[$src]").optString(0, "")
+        }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
     private fun loadEntryUrl(forceReload: Boolean = false) {
