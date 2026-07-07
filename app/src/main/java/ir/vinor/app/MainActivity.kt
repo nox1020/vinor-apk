@@ -265,7 +265,19 @@ class MainActivity : AppCompatActivity() {
         if (renderOfflineSnapshot(url)) {
             return
         }
-        webView.loadUrl(url, VinorUserAgent.webViewLoadHeaders(this))
+        val lastUrl = VinorWebOfflineSession.lastPartnerUrl(this)
+        if (!lastUrl.isNullOrBlank() && lastUrl != url && renderOfflineSnapshot(lastUrl)) {
+            return
+        }
+        if (renderLatestOfflineSnapshot()) {
+            return
+        }
+        // در حالت آفلاینِ بدون snapshot، loadUrl شبکه‌ای باعث chrome-error می‌شود.
+        // به‌جای آن UI آفلاین خود اپ نمایش داده شود.
+        showOfflineOverlayOnly()
+        hideLoader()
+        dismissSystemSplash()
+        return
     }
 
     private fun setupRetryButton() {
@@ -588,6 +600,13 @@ class MainActivity : AppCompatActivity() {
         val target = (url ?: "").trim()
         val html = VinorOfflinePageStore.read(this, target) ?: return false
         val base = if (target.isNotBlank()) target else VinorPartnerUrls.ENTRY
+        webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
+        return true
+    }
+
+    private fun renderLatestOfflineSnapshot(): Boolean {
+        val html = VinorOfflinePageStore.readLatest(this) ?: return false
+        val base = VinorWebOfflineSession.lastPartnerUrl(this) ?: VinorPartnerUrls.ENTRY
         webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
         return true
     }

@@ -67,5 +67,15 @@ object VinorOfflinePageStore {
             ByteArrayInputStream(html.toByteArray(Charsets.UTF_8))
         )
     }
+
+    fun readLatest(context: Context): String? {
+        return runCatching {
+            val latest = dir(context)
+                .listFiles { f -> f.name.endsWith(".html") }
+                ?.maxByOrNull { it.lastModified() }
+                ?: return@runCatching null
+            latest.readText(Charsets.UTF_8).takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
 }
 
