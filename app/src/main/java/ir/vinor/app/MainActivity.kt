@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     /** کاربر حداقل یک‌بار محتوای پنل را روی صفحه دیده — در آفلاین هرگز overlay تمام‌صفحه نشان نده */
     private var userHasActiveSession = false
     private var webViewStateRestored = false
+    private var offlineAssetWarmupDone = false
     private val offlineRevealTimeoutMs = 4_500L
     private val offlineRevealTimeoutRunnable = Runnable {
         if (!isOnline() && ::webView.isInitialized && binding.offlineOverlay.root.visibility != View.VISIBLE) {
@@ -163,6 +164,7 @@ class MainActivity : AppCompatActivity() {
             }
             if (::webView.isInitialized) {
                 VinorWebCacheManager.onLogout(this, webView)
+                VinorOfflineAssetStore.clear(this)
             } else {
                 VinorWebOfflineSession.clear(this)
             }
@@ -340,14 +342,22 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): WebResourceResponse? {
                 if (!isOnline()) {
+                    val reqUrl = request?.url?.toString()
                     if (request?.isForMainFrame == true) {
-                        val reqUrl = request.url?.toString()
                         if (isExpressPartnerUrl(reqUrl)) {
                             val local = VinorOfflinePageStore.asHtmlResponse(this@MainActivity, reqUrl)
                             if (local != null) return local
                         }
                     }
+                    if (isPartnerCacheableResource(reqUrl)) {
+                        val asset = VinorOfflineAssetStore.asResponse(this@MainActivity, reqUrl)
+                        if (asset != null) return asset
+                    }
                     return super.shouldInterceptRequest(view, request)
+                }
+                val reqUrl = request?.url?.toString()
+                if (isPartnerCacheableResource(reqUrl)) {
+                    VinorOfflineAssetStore.cacheAsync(this@MainActivity, reqUrl)
                 }
                 if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
                     return VinorWebViewErrorShield.silentHtmlResponse()
@@ -416,6 +426,10 @@ class MainActivity : AppCompatActivity() {
                 VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
                 syncConnectivityToWeb()
                 cacheCurrentPageSnapshot(url ?: webView.url)
+                if (isOnline() && !offlineAssetWarmupDone) {
+                    offlineAssetWarmupDone = true
+                    VinorOfflineAssetStore.prewarmDefaults(this@MainActivity)
+                }
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -506,6 +520,13 @@ class MainActivity : AppCompatActivity() {
     private fun isExpressPartnerUrl(url: String?): Boolean {
         if (url.isNullOrBlank()) return false
         return url.contains("/express/partner")
+    }
+
+    private fun isPartnerCacheableResource(url: String?): Boolean {
+        val u = (url ?: "").trim()
+        if (u.isEmpty()) return false
+        if (!isVinorDomain(u)) return false
+        return u.contains("/static/") || u.contains("/uploads/")
     }
 
     fun onPartnerAppReady() {
