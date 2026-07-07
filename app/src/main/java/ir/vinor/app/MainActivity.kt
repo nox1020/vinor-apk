@@ -260,6 +260,9 @@ class MainActivity : AppCompatActivity() {
         showLoader()
         syncConnectivityToWeb()
         scheduleOfflineRevealTimeout()
+        if (renderOfflineSnapshot(url)) {
+            return
+        }
         webView.loadUrl(url, VinorUserAgent.webViewLoadHeaders(this))
     }
 
@@ -560,6 +563,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun renderOfflineSnapshot(url: String?): Boolean {
+        val target = (url ?: "").trim()
+        val html = VinorOfflinePageStore.read(this, target) ?: return false
+        val base = if (target.isNotBlank()) target else VinorPartnerUrls.ENTRY
+        webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
+        return true
+    }
+
     private fun decodeJsStringResult(raw: String?): String? {
         val src = raw?.trim().orEmpty()
         if (src.isEmpty() || src == "null" || src == "undefined") return null
@@ -572,6 +583,11 @@ class MainActivity : AppCompatActivity() {
         if (!forceReload && !isOnline()) {
             if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
                 revealExistingWebContent()
+                return
+            }
+            val target = extractStartUrl(intent?.dataString)
+            if (!VinorOfflinePageStore.read(this, target).isNullOrBlank()) {
+                beginOfflineLoad(target)
                 return
             }
             val lastUrl = VinorWebOfflineSession.lastPartnerUrl(this)
@@ -912,7 +928,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        if (::webView.isInitialized) webView.onPause()
+        if (::webView.isInitialized) {
+            cacheCurrentPageSnapshot(webView.url)
+            webView.onPause()
+        }
     }
 
     override fun onResume() {

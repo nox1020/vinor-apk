@@ -31,6 +31,13 @@ object VinorOfflinePageStore {
         if (!VinorWebOfflineSession.isPartnerBrowsableUrl(u)) return
         runCatching {
             pageFile(context, u).writeText(h, Charsets.UTF_8)
+            val noQuery = runCatching {
+                val uri = URI(u)
+                URI(uri.scheme, uri.authority, uri.path, null, null).toString()
+            }.getOrNull().orEmpty()
+            if (noQuery.isNotBlank() && noQuery != u) {
+                pageFile(context, noQuery).writeText(h, Charsets.UTF_8)
+            }
         }
     }
 
