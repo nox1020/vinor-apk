@@ -126,6 +126,11 @@ abstract class BaseWebViewFragment : Fragment() {
                     return true
                 }
 
+                // تماس / ایمیل / پیامک — مستقیم با Intent سیستم (نه داخل WebView)
+                if (openExternalAppUrl(url)) {
+                    return true
+                }
+
                 // امکان محدود کردن تب به یک URL (مثلاً فقط صفحه وینور)
                 shouldOverrideUrlLoadingForFragment(url)?.let { override ->
                     if (override) {
@@ -302,6 +307,34 @@ abstract class BaseWebViewFragment : Fragment() {
      * @return true = در مرورگر باز شود، false = در WebView لود شود، null = رفتار پیش‌فرض
      */
     protected open fun shouldOverrideUrlLoadingForFragment(url: String): Boolean? = null
+
+    /** tel / mailto / sms را با اپ سیستم باز می‌کند. */
+    protected fun openExternalAppUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        if (!lower.startsWith("tel:") &&
+            !lower.startsWith("mailto:") &&
+            !lower.startsWith("sms:") &&
+            !lower.startsWith("smsto:")
+        ) {
+            return false
+        }
+        return try {
+            val uri = android.net.Uri.parse(url)
+            val intent = when {
+                lower.startsWith("tel:") ->
+                    android.content.Intent(android.content.Intent.ACTION_DIAL, uri)
+                lower.startsWith("mailto:") ->
+                    android.content.Intent(android.content.Intent.ACTION_SENDTO, uri)
+                else ->
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+            }
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(fragmentTag, "Unable to open external app url: $url", e)
+            false
+        }
+    }
 
     /** برای استفاده در فرزندان: آیا WebView مقداردهی شده است. */
     protected fun isWebViewInitialized(): Boolean = ::webView.isInitialized

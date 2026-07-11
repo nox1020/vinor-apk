@@ -339,7 +339,9 @@ class MainActivity : AppCompatActivity() {
                     }
                     return true
                 }
-                if (url.startsWith("tel:") || url.startsWith("mailto:")) {
+                if (url.startsWith("tel:") || url.startsWith("mailto:") ||
+                    url.startsWith("sms:") || url.startsWith("smsto:")
+                ) {
                     return openExternal(url)
                 }
                 if (isVinorDomain(url)) {
@@ -727,7 +729,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun openExternal(url: String): Boolean {
         return try {
-            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+            val uri = Uri.parse(url)
+            val lower = url.lowercase()
+            val intent = when {
+                lower.startsWith("tel:") ->
+                    android.content.Intent(android.content.Intent.ACTION_DIAL, uri)
+                lower.startsWith("mailto:") ->
+                    android.content.Intent(android.content.Intent.ACTION_SENDTO, uri)
+                else ->
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+            }
+            startActivity(intent)
             true
         } catch (e: Exception) {
             Log.e("MainActivity", "Unable to open external url: $url", e)
