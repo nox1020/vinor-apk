@@ -185,7 +185,28 @@ tasks.register("checkDirectConstraints") {
         if (!releaseKeyAlias) throw new GradleException("keyAlias missing")
     }
 }
+
+// Android App Links: regenerate assetlinks.json from release keystore (or signed APK fallback)
+tasks.register("generateAssetLinks", Exec) {
+    group = "publishing"
+    description = "Generate Digital Asset Links JSON from release signing cert"
+    workingDir rootDir
+    def py = new File(rootDir, "scripts/generate_assetlinks.py")
+    onlyIf { py.exists() }
+    // Prefer python3 (Linux CI), then python (Windows)
+    def pythonCmd = System.getenv("PYTHON") ?: (
+        org.gradle.internal.os.OperatingSystem.current().isWindows() ? "python" : "python3"
+    )
+    commandLine pythonCmd, py.absolutePath
+}
+
 tasks.matching { it.name in ["preReleaseBuild", "preDirectBuild"] }.configureEach {
     dependsOn("checkDirectConstraints")
+    dependsOn("generateAssetLinks")
+}
+
+// Also refresh assetlinks before assembling release artifacts
+tasks.matching { it.name in ["assembleRelease", "assembleDirect", "bundleRelease"] }.configureEach {
+    dependsOn("generateAssetLinks")
 }
 

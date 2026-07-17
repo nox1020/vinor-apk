@@ -1,83 +1,41 @@
-# Android App Links — Vinor
+# Android App Links — Vinor (Production)
 
-## هدف
+## وضعیت فعلی
 
-با باز کردن هر لینک `https://vinor.ir/...` یا `https://www.vinor.ir/...`:
+- SHA-256 Release از APK امضاشده استخراج و در `assetlinks.json` قرار گرفت.
+- Buildهای `assembleRelease` / `assembleDirect` / `bundleRelease` به‌صورت خودکار
+  `scripts/generate_assetlinks.ps1` را اجرا می‌کنند و فایل را به‌روز می‌کنند.
+- Backend مسیر `GET /.well-known/assetlinks.json` را با **200** و
+  `Content-Type: application/json` بدون Redirect/Auth سرو می‌کند.
 
-- اگر اپ نصب باشد → مستقیماً اپ باز شود (بدون دیالوگ مرورگر، پس از تأیید Digital Asset Links).
-- اگر اپ نصب نباشد → همان لینک در مرورگر نمایش داده شود.
-
-## ۱) قرار دادن `assetlinks.json` روی سرور
-
-فایل باید دقیقاً از این آدرس‌ها با HTTP 200 و `Content-Type: application/json` سرو شود:
-
-- https://vinor.ir/.well-known/assetlinks.json
-- https://www.vinor.ir/.well-known/assetlinks.json  (در صورت استفاده از www)
-
-مسیر پیشنهادی در ریپوی وب:
+## Fingerprint فعلی
 
 ```
-app/static/.well-known/assetlinks.json
+DF:36:AD:92:F5:DC:41:67:CA:A6:C8:4C:CC:3B:19:82:A4:67:0D:F9:AC:84:E1:61:E0:53:9C:18:66:78:B4:38
 ```
 
-در پروژه Vinor یک route برای سرو این فایل اضافه شده است.
+منبع: `vinor/app/data/uploads/apk/vinor_*.apk` (در نبود keystore محلی).
 
-### پر کردن SHA-256
-
-1. APK/AAB امضاشدهٔ release را نصب کنید.
-2. لاگ‌کت را فیلتر کنید: `VinorAppLinksCerts`
-3. خط SHA-256 را کپی کنید (فرمت `AA:BB:CC:...`).
-4. مقدار `REPLACE_WITH_RELEASE_SHA256_FINGERPRINT` را در `assetlinks.json` جایگزین کنید.
-
-یا با keytool:
-
-```bash
-keytool -list -v -keystore path/to/vinor-release.jks -alias vinor_release
-```
-
-خط `SHA256:` را بدون فاصلهٔ اضافه در JSON بگذارید.
-
-اسکریپت کمکی (از ریشهٔ پوشه apk):
+## تولید خودکار
 
 ```powershell
+# از ریشه apk:
 .\scripts\generate_assetlinks.ps1
+# یا:
+.\gradlew.bat generateAssetLinks
+.\gradlew.bat assembleRelease   # قبل از build، assetlinks را refresh می‌کند
 ```
 
-## ۲) تأیید نصب لینک‌ها روی دستگاه
+اولویت منبع fingerprint:
+1. Release keystore از `key.properties` (اگر موجود و رمز واقعی باشد)
+2. آخرین APK امضاشده در `app/build/outputs` یا `../vinor/app/data/uploads/apk`
+
+## تأیید روی دستگاه
 
 ```bash
-adb shell pm get-app-links ir.vinor.app
 adb shell pm verify-app-links --re-verify ir.vinor.app
+adb shell pm get-app-links ir.vinor.app
+adb shell am start -a android.intent.action.VIEW -d "https://vinor.ir/property/TEST" ir.vinor.app
 ```
 
-وضعیت مطلوب: `vinor.ir` و `www.vinor.ir` → `verified`.
-
-تست دستی:
-
-```bash
-adb shell am start -a android.intent.action.VIEW -d "https://vinor.ir/property/TESTCODE" ir.vinor.app
-```
-
-## ۳) مسیرهای پشتیبانی‌شده در اپ
-
-| لینک | رفتار |
-|------|--------|
-| `/property/{id}` | جزئیات فایل (`/express/partner/lands/{id}`) — نیاز به ورود |
-| `/express/{code}` | کارت عمومی اکسپرس — بدون ورود |
-| `/express/partner/...` | صفحات پنل — در صورت نیاز ورود سپس بازگشت به لینک |
-| ناشناخته | صفحه اصلی پنل (`/express/partner/`) |
-
-## ۴) جریان ورود
-
-اگر مسیر `requiresAuth` باشد و کوکی جلسه نباشد:
-
-1. لینک مقصد در `DeepLinkPendingStore` ذخیره می‌شود.
-2. صفحه `/express/partner/login?next=...` باز می‌شود.
-3. پس از ورود موفق، همان لینک اولیه باز می‌شود.
-
-## ۵) Manifest
-
-`MainActivity` با `android:autoVerify="true"` برای:
-
-- `https://vinor.ir/*`
-- `https://www.vinor.ir/*`
+وضعیت مطلوب: hostهای `vinor.ir` / `www.vinor.ir` → `verified`.
