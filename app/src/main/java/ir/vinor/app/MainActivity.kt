@@ -133,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         savedInstanceState?.let { bundle ->
             webViewStateRestored = webView.restoreState(bundle) != null
         }
+        VinorAppLinksCerts.logForAssetLinks(this)
         bootstrapWebContent()
 
         binding.root.post {
@@ -444,6 +445,7 @@ class MainActivity : AppCompatActivity() {
                     offlineAssetWarmupDone = true
                     VinorOfflineAssetStore.prewarmDefaults(this@MainActivity)
                 }
+                maybeResumePendingDeepLinkAfterAuth(url ?: webView.url)
                 webView.post(revealAfterLoadRunnable)
             }
 
@@ -547,6 +549,7 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             partnerAppReady = true
             cancelShellRevealFallback()
+            maybeResumePendingDeepLinkAfterAuth(if (::webView.isInitialized) webView.url else null)
             if (::webView.isInitialized) {
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 webView.post(revealAfterLoadRunnable)
@@ -627,7 +630,7 @@ class MainActivity : AppCompatActivity() {
                 revealExistingWebContent()
                 return
             }
-            val target = extractStartUrl(intent?.dataString)
+            val target = resolveDeepLinkLoadUrl(intent?.dataString)
             if (!VinorOfflinePageStore.read(this, target).isNullOrBlank()) {
                 beginOfflineLoad(target)
                 return
@@ -644,12 +647,12 @@ class MainActivity : AppCompatActivity() {
         applyWebCacheMode()
         if (!isOnline()) {
             degradedOffline = true
-            beginOfflineLoad(extractStartUrl(intent?.dataString))
+            beginOfflineLoad(resolveDeepLinkLoadUrl(intent?.dataString))
             return
         }
         degradedOffline = false
         hideOffline()
-        webView.loadUrl(extractStartUrl(intent?.dataString), VinorUserAgent.webViewLoadHeaders(this))
+        webView.loadUrl(resolveDeepLinkLoadUrl(intent?.dataString), VinorUserAgent.webViewLoadHeaders(this))
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -660,7 +663,7 @@ class MainActivity : AppCompatActivity() {
             || !intent.getStringExtra(VinorNotificationTray.EXTRA_URL).isNullOrBlank()
         notifyHelper?.handleOpenIntent(intent)
         if (isNotifyIntent) return
-        val target = extractStartUrl(intent.dataString)
+        val target = resolveDeepLinkLoadUrl(intent.dataString)
         if (!isOnline()) {
             if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
                 revealExistingWebContent()
@@ -677,13 +680,38 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(target, VinorUserAgent.webViewLoadHeaders(this))
     }
 
-    private fun extractStartUrl(deepLinkUrl: String?): String {
-        if (deepLinkUrl.isNullOrBlank()) return defaultUrl
-        return if (isVinorDomain(deepLinkUrl)) {
-            VinorPartnerUrls.normalizeEntryUrl(deepLinkUrl)
-        } else {
-            defaultUrl
+    /**
+     * Deep Link → [DeepLinkRouter]؛ در صورت نیاز به لاگین، صفحه ورود + نگهداری لینک اولیه.
+     */
+    private fun resolveDeepLinkLoadUrl(deepLinkUrl: String?): String {
+        if (deepLinkUrl.isNullOrBlank()) {
+            Log.i(TAG, "deeplink: empty → default entry")
+            return defaultUrl
         }
+        val route = DeepLinkRouter.resolve(deepLinkUrl)
+        if (route.requiresAuth && !DeepLinkPendingStore.hasPartnerSessionCookie(this)) {
+            DeepLinkPendingStore.save(this, route.targetUrl)
+            val login = DeepLinkRouter.loginUrlFor(route.targetUrl)
+            Log.i(TAG, "deeplink: auth required → login then ${route.targetUrl}")
+            return login
+        }
+        return route.targetUrl
+    }
+
+    /** پس از ورود موفق، لینک معلق را باز کن (یک‌بار). */
+    private fun maybeResumePendingDeepLinkAfterAuth(currentUrl: String?) {
+        val pending = DeepLinkPendingStore.peek(this) ?: return
+        if (!DeepLinkPendingStore.hasPartnerSessionCookie(this)) return
+        val cur = (currentUrl ?: "").lowercase()
+        if (cur.contains("/express/partner/login")) return
+        // اگر همین حالا روی مقصد معلق هستیم، فقط پاک کن
+        if (cur.contains(pending.lowercase().removePrefix("https://vinor.ir").removePrefix("https://www.vinor.ir"))) {
+            DeepLinkPendingStore.clear(this)
+            return
+        }
+        val target = DeepLinkPendingStore.consume(this) ?: return
+        Log.i(TAG, "deeplink: resume after login → $target")
+        openPartnerUrl(target)
     }
 
     /** بارگذاری URL پنل — پس از ورود یا deep link. */

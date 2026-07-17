@@ -48,18 +48,26 @@
             android:name=".MainActivity"
             android:exported="true"
             android:hardwareAccelerated="true"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Vinor.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- DeepLink: فقط HTTPS (هم‌راستا با usesCleartextTraffic=false) -->
+            <!-- Android App Links: https://vinor.ir/* و https://www.vinor.ir/* -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="vinor.ir" />
+                <data
+                    android:scheme="https"
+                    android:host="vinor.ir"
+                    android:pathPrefix="/" />
+                <data
+                    android:scheme="https"
+                    android:host="www.vinor.ir"
+                    android:pathPrefix="/" />
             </intent-filter>
             <intent-filter>
                 <action android:name="OPEN_NOTIFICATIONS" />
