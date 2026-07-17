@@ -37,6 +37,14 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun profileShortPath_mapsToPartnerProfile() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/profile")
+        assertEquals(DeepLinkRouter.DestinationType.PROFILE, r.type)
+        assertTrue(r.requiresAuth)
+        assertTrue(r.targetUrl.contains("/express/partner/profile"))
+    }
+
+    @Test
     fun loginUrl_encodesNext() {
         val login = DeepLinkRouter.loginUrlFor("https://vinor.ir/express/partner/lands/A1")
         assertTrue(login.startsWith("https://vinor.ir/express/partner/login?next="))

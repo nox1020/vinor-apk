@@ -96,6 +96,14 @@ object DeepLinkRouter {
                     )
                 }
             }
+            path == "/profile" || path.startsWith("/profile/") ->
+                Route(
+                    type = DestinationType.PROFILE,
+                    targetUrl = "https://$HOST/express/partner/profile${querySuffix(uri)}",
+                    requiresAuth = true,
+                    originalUri = raw,
+                    logLabel = "profile_short",
+                )
             path == "/express/partner/profile" || path.startsWith("/express/partner/profile/") ->
                 Route(
                     type = DestinationType.PROFILE,
