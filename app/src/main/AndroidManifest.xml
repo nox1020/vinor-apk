@@ -25,6 +25,17 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <!-- دیده شدن نصب‌گر بسته برای fallback FileProvider / resolve -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".VinorApp"
         android:allowBackup="false"
@@ -101,6 +112,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/vinor_file_paths" />
         </provider>
+
+        <receiver
+            android:name=".ApkInstallResultReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

@@ -46,5 +46,5 @@ class VinorAppUpdateBridge(
 
     @JavascriptInterface
     fun installUpdate(): Boolean =
-        VinorApkUpdateInstaller.install(context.applicationContext)
+        VinorApkUpdateInstaller.install(context)
 }

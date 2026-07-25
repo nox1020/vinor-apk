@@ -1,8 +1,10 @@
 package ir.vinor.app
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -212,7 +214,7 @@ object VinorApkUpdateInstaller {
                     return false
                 }
                 val ct = response.header("Content-Type").orEmpty().lowercase()
-                if (ct.contains("text/html") || ct.contains("text/plain") || ct.contains("application/json")) {
+                if (ct.contains("text/html") || ct.contains("application/json")) {
                     Log.w(TAG, "Unexpected Content-Type=$ct for $absUrl")
                     return false
                 }
@@ -241,12 +243,13 @@ object VinorApkUpdateInstaller {
         }
     }
 
-    /** باز کردن نصب‌گر سیستم برای APK دانلودشده. */
+    /** باز کردن نصب‌گر سیستم برای APK دانلودشده (PackageInstaller — قابل‌اعتمادتر از FileProvider). */
     fun install(context: Context): Boolean {
-        val state = readState(context)
+        val appCtx = context.applicationContext
+        val state = readState(appCtx)
         if (state.status != Status.READY || state.version.isBlank()) {
             if (state.url.isNotBlank() && state.version.isNotBlank()) {
-                ensureDownload(context, state.url, state.version)
+                ensureDownload(appCtx, state.url, state.version)
                 toast(context, "در حال آماده‌سازی فایل نصب…")
             } else {
                 toast(context, "فایل نصب آماده نیست")
@@ -254,44 +257,99 @@ object VinorApkUpdateInstaller {
             return false
         }
 
-        val file = apkFileForVersion(context, state.version)
+        val file = apkFileForVersion(appCtx, state.version)
         if (!isValidApkFile(file)) {
             file.delete()
-            persistState(context, DownloadState(Status.IDLE, state.version, state.url))
+            persistState(appCtx, DownloadState(Status.IDLE, state.version, state.url))
             if (state.url.isNotBlank()) {
-                ensureDownload(context, state.url, state.version)
+                ensureDownload(appCtx, state.url, state.version)
             }
             toast(context, "فایل نصب نامعتبر بود؛ دوباره دانلود می‌شود")
             return false
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val pm = context.packageManager
+            val pm = appCtx.packageManager
             if (!pm.canRequestPackageInstalls()) {
                 openUnknownSourcesSettings(context)
                 return false
             }
         }
 
-        return try {
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file,
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // کپی چندمگابایتی روی thread پل JS نباشد
+        scope.launch(Dispatchers.IO) {
+            try {
+                commitPackageInstallerSession(appCtx, file)
+            } catch (e: Exception) {
+                Log.e(TAG, "PackageInstaller failed — fallback", e)
+                withContext(Dispatchers.Main) {
+                    try {
+                        installViaFileProvider(context, file)
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "install fallback failed", e2)
+                        if (state.url.isNotBlank()) {
+                            VinorDownloadBridge.enqueueDownload(
+                                appCtx,
+                                state.url,
+                                VinorDownloadBridge.apkDownloadFilename(state.url, state.version),
+                                showToast = true,
+                            )
+                            toast(context, "از اعلان دانلود، فایل را نصب کنید")
+                        } else {
+                            toast(context, "خطا در باز کردن نصب‌گر")
+                        }
+                    }
+                }
             }
-            grantUriToInstallers(context, intent, uri)
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "install failed", e)
-            toast(context, "خطا در باز کردن نصب‌گر")
-            false
         }
+        return true
+    }
+
+    private fun commitPackageInstallerSession(context: Context, apkFile: File): Boolean {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
+        }
+        val sessionId = installer.createSession(params)
+        installer.openSession(sessionId).use { session ->
+            apkFile.inputStream().use { input ->
+                session.openWrite("vinor-update.apk", 0, apkFile.length()).use { out ->
+                    input.copyTo(out, DEFAULT_BUFFER_SIZE)
+                    session.fsync(out)
+                }
+            }
+            val callback = Intent(context, ApkInstallResultReceiver::class.java).apply {
+                action = ApkInstallResultReceiver.ACTION
+                setPackage(context.packageName)
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_MUTABLE
+                } else {
+                    0
+                }
+            val pending = PendingIntent.getBroadcast(context, sessionId, callback, flags)
+            session.commit(pending.intentSender)
+        }
+        Log.i(TAG, "PackageInstaller session committed id=$sessionId size=${apkFile.length()}")
+        return true
+    }
+
+    private fun installViaFileProvider(context: Context, file: File): Boolean {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        grantUriToInstallers(context, intent, uri)
+        context.startActivity(intent)
+        return true
     }
 
     private fun grantUriToInstallers(context: Context, intent: Intent, uri: Uri) {
