@@ -138,6 +138,8 @@ class VinorDownloadBridge(
         private fun guessMimeType(url: String, filename: String?): String? {
             val lower = (filename ?: url).lowercase(Locale.US)
             return when {
+                lower.endsWith(".apk") || lower.contains("/d") ->
+                    "application/vnd.android.package-archive"
                 lower.endsWith(".mp4") -> "video/mp4"
                 lower.endsWith(".webm") -> "video/webm"
                 lower.endsWith(".png") -> "image/png"

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <files-path name="apk_updates" path="apk-updates/" />
     <cache-path name="camera_cache" path="camera/" />
     <cache-path name="cache" path="." />
 </paths>
