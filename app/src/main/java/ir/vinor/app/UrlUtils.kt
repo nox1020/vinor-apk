@@ -34,6 +34,39 @@ object UrlUtils {
         }
     }
 
+    /**
+     * لینک کوتاه دانلود APK (`/d`) یا فایل `.apk` روی دامنه وینور —
+     * نباید با App Links داخل اپ «باز» شود؛ باید دانلود شود.
+     */
+    fun isApkDownloadUrl(url: String): Boolean {
+        val raw = url.trim()
+        if (raw.isEmpty()) return false
+        return try {
+            val uri = if ("://" in raw || raw.startsWith("/")) {
+                URI(if (raw.startsWith("/")) "https://$VINOR_HOST$raw" else raw)
+            } else {
+                URI(raw)
+            }
+            val host = normalizeHost(uri.host ?: return looksLikeApkPath(raw))
+            if (host != VINOR_HOST && !host.endsWith(".vinor.ir")) {
+                return raw.lowercase(Locale.US).endsWith(".apk")
+            }
+            looksLikeApkPath(uri.path ?: "")
+        } catch (_: Exception) {
+            looksLikeApkPath(raw)
+        }
+    }
+
+    private fun looksLikeApkPath(pathOrUrl: String): Boolean {
+        val p = pathOrUrl.trim().lowercase(Locale.US)
+        if (p.isEmpty()) return false
+        val pathOnly = p.substringBefore('?').substringBefore('#')
+        if (pathOnly == "/d" || pathOnly.endsWith("/d")) return true
+        if (pathOnly.endsWith(".apk")) return true
+        if (pathOnly.contains("/uploads/apk/")) return true
+        return false
+    }
+
     private fun normalizeHost(host: String): String =
         host.lowercase(Locale.US).removePrefix("www.")
 

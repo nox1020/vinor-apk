@@ -345,6 +345,15 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     return openExternal(url)
                 }
+                if (UrlUtils.isApkDownloadUrl(url)) {
+                    VinorDownloadBridge.enqueueDownload(
+                        this@MainActivity,
+                        url,
+                        "vinor.apk",
+                        showToast = true,
+                    )
+                    return true
+                }
                 if (isVinorDomain(url)) {
                     notifyOtpPageIfNeeded(url)
                     return false
@@ -645,6 +654,12 @@ class MainActivity : AppCompatActivity() {
         partnerAppReady = false
         cancelShellRevealFallback()
         applyWebCacheMode()
+        if (consumeApkDownloadDeepLink(intent?.dataString)) {
+            degradedOffline = false
+            hideOffline()
+            webView.loadUrl(defaultUrl, VinorUserAgent.webViewLoadHeaders(this))
+            return
+        }
         if (!isOnline()) {
             degradedOffline = true
             beginOfflineLoad(resolveDeepLinkLoadUrl(intent?.dataString))
@@ -663,6 +678,23 @@ class MainActivity : AppCompatActivity() {
             || !intent.getStringExtra(VinorNotificationTray.EXTRA_URL).isNullOrBlank()
         notifyHelper?.handleOpenIntent(intent)
         if (isNotifyIntent) return
+        if (consumeApkDownloadDeepLink(intent.dataString)) {
+            if (!isOnline()) {
+                if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
+                    revealExistingWebContent()
+                    return
+                }
+                beginOfflineLoad(defaultUrl)
+                return
+            }
+            degradedOffline = false
+            pendingInitialReveal = true
+            partnerAppReady = false
+            cancelShellRevealFallback()
+            hideOffline()
+            webView.loadUrl(defaultUrl, VinorUserAgent.webViewLoadHeaders(this))
+            return
+        }
         val target = resolveDeepLinkLoadUrl(intent.dataString)
         if (!isOnline()) {
             if (VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
@@ -683,9 +715,24 @@ class MainActivity : AppCompatActivity() {
     /**
      * Deep Link → [DeepLinkRouter]؛ در صورت نیاز به لاگین، صفحه ورود + نگهداری لینک اولیه.
      */
+    private fun consumeApkDownloadDeepLink(deepLinkUrl: String?): Boolean {
+        if (deepLinkUrl.isNullOrBlank()) return false
+        val isApk = UrlUtils.isApkDownloadUrl(deepLinkUrl) ||
+            DeepLinkRouter.resolve(deepLinkUrl).type == DeepLinkRouter.DestinationType.APK_DOWNLOAD
+        if (!isApk) return false
+        VinorDownloadBridge.enqueueDownload(this, deepLinkUrl, "vinor.apk", showToast = true)
+        return true
+    }
+
     private fun resolveDeepLinkLoadUrl(deepLinkUrl: String?): String {
         if (deepLinkUrl.isNullOrBlank()) {
             Log.i(TAG, "deeplink: empty → default entry")
+            return defaultUrl
+        }
+        if (UrlUtils.isApkDownloadUrl(deepLinkUrl) ||
+            DeepLinkRouter.resolve(deepLinkUrl).type == DeepLinkRouter.DestinationType.APK_DOWNLOAD
+        ) {
+            Log.i(TAG, "deeplink: apk download → default entry")
             return defaultUrl
         }
         val route = DeepLinkRouter.resolve(deepLinkUrl)

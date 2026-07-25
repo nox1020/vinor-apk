@@ -27,6 +27,7 @@ object DeepLinkRouter {
         PUBLIC_HOME,
         SEARCH,
         EXPRESS_PUBLIC,
+        APK_DOWNLOAD,
         UNKNOWN_FALLBACK,
     }
 
@@ -64,6 +65,14 @@ object DeepLinkRouter {
         }
         val path = normalizePath(uri.path)
         val route = when {
+            isApkDownloadPath(path) ->
+                Route(
+                    type = DestinationType.APK_DOWNLOAD,
+                    targetUrl = "https://$HOST/d",
+                    requiresAuth = false,
+                    originalUri = raw,
+                    logLabel = "apk_download",
+                )
             path.matches(Regex("^/property/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
                 val id = Regex("^/property/([^/]+)$", RegexOption.IGNORE_CASE)
                     .find(path)!!.groupValues[1]
@@ -205,6 +214,14 @@ object DeepLinkRouter {
         if (p.isEmpty()) return "/"
         val noSlash = if (p.length > 1 && p.endsWith("/")) p.dropLast(1) else p
         return if (noSlash.startsWith("/")) noSlash else "/$noSlash"
+    }
+
+    private fun isApkDownloadPath(path: String): Boolean {
+        val p = path.lowercase(Locale.US)
+        if (p == "/d") return true
+        if (p.endsWith(".apk")) return true
+        if (p.startsWith("/uploads/apk/")) return true
+        return false
     }
 
     private fun querySuffix(uri: URI): String {

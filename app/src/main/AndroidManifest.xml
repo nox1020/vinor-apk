@@ -55,19 +55,27 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Android App Links: https://vinor.ir/* و https://www.vinor.ir/* -->
+            <!-- Android App Links: مسیرهای محصول — نه /d (دانلود APK) تا با اپ تداخل نکند -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="vinor.ir"
-                    android:pathPrefix="/" />
-                <data
-                    android:scheme="https"
-                    android:host="www.vinor.ir"
-                    android:pathPrefix="/" />
+                <data android:scheme="https" android:host="vinor.ir" android:path="/" />
+                <data android:scheme="https" android:host="vinor.ir" android:path="/home" />
+                <data android:scheme="https" android:host="vinor.ir" android:path="/search" />
+                <data android:scheme="https" android:host="vinor.ir" android:pathPrefix="/express" />
+                <data android:scheme="https" android:host="vinor.ir" android:pathPrefix="/property" />
+                <data android:scheme="https" android:host="vinor.ir" android:pathPrefix="/profile" />
+                <data android:scheme="https" android:host="vinor.ir" android:pathPrefix="/public" />
+                <data android:scheme="https" android:host="vinor.ir" android:pathPrefix="/r" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:path="/" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:path="/home" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:path="/search" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:pathPrefix="/express" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:pathPrefix="/property" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:pathPrefix="/profile" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:pathPrefix="/public" />
+                <data android:scheme="https" android:host="www.vinor.ir" android:pathPrefix="/r" />
             </intent-filter>
             <intent-filter>
                 <action android:name="OPEN_NOTIFICATIONS" />

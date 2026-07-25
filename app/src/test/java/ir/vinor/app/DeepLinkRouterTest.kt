@@ -45,6 +45,19 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun apkShortLink_isApkDownload() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/d")
+        assertEquals(DeepLinkRouter.DestinationType.APK_DOWNLOAD, r.type)
+        assertFalse(r.requiresAuth)
+    }
+
+    @Test
+    fun apkUploadPath_isApkDownload() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/uploads/apk/vinor_1.0.70.apk")
+        assertEquals(DeepLinkRouter.DestinationType.APK_DOWNLOAD, r.type)
+    }
+
+    @Test
     fun loginUrl_encodesNext() {
         val login = DeepLinkRouter.loginUrlFor("https://vinor.ir/express/partner/lands/A1")
         assertTrue(login.startsWith("https://vinor.ir/express/partner/login?next="))

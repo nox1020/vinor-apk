@@ -7,6 +7,8 @@
   `scripts/generate_assetlinks.ps1` را اجرا می‌کنند و فایل را به‌روز می‌کنند.
 - Backend مسیر `GET /.well-known/assetlinks.json` را با **200** و
   `Content-Type: application/json` بدون Redirect/Auth سرو می‌کند.
+- App Links فقط مسیرهای محصول (`/express`, `/property`, `/profile`, …) را claim می‌کند —
+  **نه** `/d` و فایل‌های APK، تا لینک دانلود با اپ تداخل نداشته باشد.
 
 ## Fingerprint فعلی
 

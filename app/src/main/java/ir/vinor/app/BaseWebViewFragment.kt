@@ -144,15 +144,19 @@ abstract class BaseWebViewFragment : Fragment() {
                     return false
                 }
 
-                // اگر لینک دانلود APK است، با مرورگر/مدیر دانلود سیستم باز شود
+                // لینک دانلود APK (/d یا .apk) — DownloadManager؛ نه باز شدن دوباره با App Links
                 try {
-                    if (url.lowercase().endsWith(".apk")) {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        startActivity(intent)
+                    if (UrlUtils.isApkDownloadUrl(url)) {
+                        VinorDownloadBridge.enqueueDownload(
+                            requireContext(),
+                            url,
+                            "vinor.apk",
+                            showToast = true,
+                        )
                         return true
                     }
                 } catch (e: Exception) {
-                    Log.e(fragmentTag, "Error opening APK link: $url", e)
+                    Log.e(fragmentTag, "Error downloading APK link: $url", e)
                 }
 
                 // در همهٔ موارد (به‌جز APK)، لینک‌ها داخل همین WebView لود شوند
