@@ -112,6 +112,22 @@ class VinorDownloadBridge(
             return cleaned.ifBlank { "vinor_download" }
         }
 
+        /** نام فایل دانلود APK — vinor-1.0.253.apk */
+        fun apkDownloadFilename(url: String, version: String? = null): String {
+            val ver = version?.trim().orEmpty()
+            if (ver.isNotEmpty()) {
+                val safe = ver.replace(Regex("[^A-Za-z0-9._\\-]"), "")
+                if (safe.isNotEmpty()) return sanitizeFilename("vinor-$safe.apk")
+            }
+            val last = Uri.parse(url).lastPathSegment?.trim().orEmpty()
+            if (last.endsWith(".apk", ignoreCase = true) &&
+                last.startsWith("vinor", ignoreCase = true)
+            ) {
+                return sanitizeFilename(last)
+            }
+            return "vinor.apk"
+        }
+
         private fun guessFilename(url: String): String {
             val parsed = Uri.parse(url)
             val last = parsed.lastPathSegment?.takeIf { it.isNotBlank() }

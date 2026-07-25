@@ -147,10 +147,11 @@ abstract class BaseWebViewFragment : Fragment() {
                 // لینک دانلود APK (/d یا .apk) — DownloadManager؛ نه باز شدن دوباره با App Links
                 try {
                     if (UrlUtils.isApkDownloadUrl(url)) {
+                        val ver = VinorAppUpdateChecker.readCached(requireContext()).version
                         VinorDownloadBridge.enqueueDownload(
                             requireContext(),
                             url,
-                            "vinor.apk",
+                            VinorDownloadBridge.apkDownloadFilename(url, ver),
                             showToast = true,
                         )
                         return true

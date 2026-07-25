@@ -346,10 +346,11 @@ class MainActivity : AppCompatActivity() {
                     return openExternal(url)
                 }
                 if (UrlUtils.isApkDownloadUrl(url)) {
+                    val ver = VinorAppUpdateChecker.readCached(this@MainActivity).version
                     VinorDownloadBridge.enqueueDownload(
                         this@MainActivity,
                         url,
-                        "vinor.apk",
+                        VinorDownloadBridge.apkDownloadFilename(url, ver),
                         showToast = true,
                     )
                     return true
@@ -720,7 +721,15 @@ class MainActivity : AppCompatActivity() {
         val isApk = UrlUtils.isApkDownloadUrl(deepLinkUrl) ||
             DeepLinkRouter.resolve(deepLinkUrl).type == DeepLinkRouter.DestinationType.APK_DOWNLOAD
         if (!isApk) return false
-        VinorDownloadBridge.enqueueDownload(this, deepLinkUrl, "vinor.apk", showToast = true)
+        VinorDownloadBridge.enqueueDownload(
+            this,
+            deepLinkUrl,
+            VinorDownloadBridge.apkDownloadFilename(
+                deepLinkUrl,
+                VinorAppUpdateChecker.readCached(this).version,
+            ),
+            showToast = true,
+        )
         return true
     }
 
