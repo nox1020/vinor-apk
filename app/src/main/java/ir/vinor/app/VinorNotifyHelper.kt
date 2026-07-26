@@ -41,7 +41,7 @@ class VinorNotifyHelper(
         private const val BASE = "https://vinor.ir"
         private const val API_UNREAD = "/express/partner/api/notifications/unread-count"
         private const val NOTIF_ID = 1001
-        private const val POLL_MS = 30_000L
+        private const val POLL_MS = 90_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

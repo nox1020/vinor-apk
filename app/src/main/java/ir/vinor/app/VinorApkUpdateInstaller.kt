@@ -76,7 +76,7 @@ object VinorApkUpdateInstaller {
         val url = p.getString(KEY_URL, "").orEmpty()
         val file = if (version.isNotEmpty()) apkFileForVersion(context, version) else null
         val resolved = when {
-            status == Status.READY && (file == null || !isValidApkFile(file)) -> {
+            status == Status.READY && (file == null || !VinorApkTrust.isTrustedUpdateApk(context, file)) -> {
                 file?.delete()
                 DownloadState(Status.IDLE, version = version, url = url)
             }
@@ -145,10 +145,11 @@ object VinorApkUpdateInstaller {
     fun ensureDownload(context: Context, url: String, version: String, webView: WebView? = null) {
         val absUrl = VinorDownloadBridge.resolveAbsoluteUrl(url) ?: return
         val ver = version.trim()
-        if (ver.isEmpty() || !UrlUtils.isVinorDomain(absUrl)) return
+        if (ver.isEmpty() || !UrlUtils.isTrustedVinorHttps(absUrl)) return
+        if (!UrlUtils.isApkDownloadUrl(absUrl)) return
 
         val existing = apkFileForVersion(context, ver)
-        if (isValidApkFile(existing)) {
+        if (VinorApkTrust.isTrustedUpdateApk(context, existing)) {
             persistState(context, DownloadState(Status.READY, ver, absUrl))
             webView?.let { notifyWebView(it, readState(context)) }
             return
@@ -231,11 +232,16 @@ object VinorApkUpdateInstaller {
                 tmp.delete()
                 return false
             }
+            if (!VinorApkTrust.isTrustedUpdateApk(context, tmp)) {
+                Log.w(TAG, "Downloaded APK failed package/signature trust check")
+                tmp.delete()
+                return false
+            }
             if (target.exists()) target.delete()
-            if (tmp.renameTo(target)) return isValidApkFile(target)
+            if (tmp.renameTo(target)) return VinorApkTrust.isTrustedUpdateApk(context, target)
             tmp.copyTo(target, overwrite = true)
             tmp.delete()
-            return isValidApkFile(target)
+            return VinorApkTrust.isTrustedUpdateApk(context, target)
         } catch (e: Exception) {
             Log.e(TAG, "downloadApk error: $absUrl", e)
             tmp.delete()
@@ -258,7 +264,7 @@ object VinorApkUpdateInstaller {
         }
 
         val file = apkFileForVersion(appCtx, state.version)
-        if (!isValidApkFile(file)) {
+        if (!VinorApkTrust.isTrustedUpdateApk(appCtx, file)) {
             file.delete()
             persistState(appCtx, DownloadState(Status.IDLE, state.version, state.url))
             if (state.url.isNotBlank()) {

@@ -30,8 +30,12 @@ object VinorAppUpdateChecker {
         "$BASE/api/app/version",
     )
 
+    private const val MIN_CHECK_INTERVAL_MS = 15 * 60 * 1000L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val checking = AtomicBoolean(false)
+    @Volatile
+    private var lastCheckAtMs: Long = 0L
 
     data class UpdateState(
         val show: Boolean,
@@ -66,7 +70,16 @@ object VinorAppUpdateChecker {
     }
 
     /** بررسی از سرور؛ در صورت خطای شبکه وضعیت قبلی حفظ می‌شود. */
-    fun check(context: Context, webView: WebView? = null) {
+    fun check(context: Context, webView: WebView? = null, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && lastCheckAtMs > 0L && now - lastCheckAtMs < MIN_CHECK_INTERVAL_MS) {
+            val cached = readCached(context)
+            webView?.let { applyToWebView(it, cached) }
+            if (cached.show) {
+                VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+            }
+            return
+        }
         if (!checking.compareAndSet(false, true)) {
             val cached = readCached(context)
             webView?.let { applyToWebView(it, cached) }
@@ -75,6 +88,7 @@ object VinorAppUpdateChecker {
             }
             return
         }
+        lastCheckAtMs = now
         scope.launch {
             try {
                 val clientV = appVersionName(context)
@@ -120,10 +134,13 @@ object VinorAppUpdateChecker {
                 val json = JSONObject(body)
                 if (!json.optBoolean("success", false)) continue
                 val serverV = json.optString("android_apk_version", "").trim()
-                val apkUrl = json.optString("android_apk_url", "").trim()
+                val apkUrlRaw = json.optString("android_apk_url", "").trim()
+                val apkUrl = VinorDownloadBridge.resolveAbsoluteUrl(apkUrlRaw).orEmpty()
                 return if (
                     serverV.isNotEmpty() &&
                     apkUrl.isNotEmpty() &&
+                    UrlUtils.isTrustedVinorHttps(apkUrl) &&
+                    UrlUtils.isApkDownloadUrl(apkUrl) &&
                     ApkVersionUtils.isServerNewer(serverV, clientV)
                 ) {
                     UpdateState(show = true, version = serverV, url = apkUrl)

@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
             VinorAppUpdateBridge.JS_INTERFACE_NAME
         )
         webView.addJavascriptInterface(
-            VinorDownloadBridge(this),
+            VinorDownloadBridge(this) { if (::webView.isInitialized) webView else null },
             VinorDownloadBridge.JS_INTERFACE_NAME
         )
         webViewFileChooser = VinorWebViewFileChooser(this).also { it.register(this) }
@@ -317,7 +317,7 @@ class MainActivity : AppCompatActivity() {
             userAgentSuffix = " VinorApp/WebViewOnly" +
                 if (appVersion.isNotEmpty()) "/$appVersion" else ""
         )
-        settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+        applyWebCacheMode()
         VinorWebViewFileChooser.configureWebViewSettings(settings)
         VinorWebViewSettings.configureCookies(webView)
 
@@ -1103,6 +1103,7 @@ class MainActivity : AppCompatActivity() {
             webView.removeCallbacks(revealAfterLoadRunnable)
             webView.removeCallbacks(shellRevealFallbackRunnable)
             webView.removeCallbacks(offlineRevealTimeoutRunnable)
+            WebViewProvider.detach(this)
         }
         super.onDestroy()
     }

@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.MutableContextWrapper
 import android.graphics.Color
-import android.os.Build
 import android.view.ViewGroup
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -36,6 +35,25 @@ object WebViewProvider {
         return webView
     }
 
+    /**
+     * Detach from Activity to avoid leaking Activity via MutableContextWrapper.
+     * Keeps the WebView instance warm for next attach.
+     */
+    fun detach(activity: Activity) {
+        val webView = cachedWebView ?: return
+        try {
+            (webView.parent as? ViewGroup)?.removeView(webView)
+        } catch (_: Exception) {
+        }
+        val ctxWrapper = webView.context as? MutableContextWrapper ?: return
+        try {
+            ctxWrapper.baseContext = activity.applicationContext
+        } catch (_: Exception) {
+        }
+    }
+
+    fun peek(): WebView? = cachedWebView
+
     private fun obtain(context: Context): WebView {
         prewarm(context)
         return cachedWebView ?: createWebView(context.applicationContext).also { cachedWebView = it }
@@ -50,7 +68,8 @@ object WebViewProvider {
                     this,
                     userAgentSuffix = ""
                 )
-                cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+                // Online-first; MainActivity flips to CACHE_ELSE_NETWORK when offline
+                cacheMode = WebSettings.LOAD_DEFAULT
             }
             if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) {
                 WebSettingsCompat.setOffscreenPreRaster(settings, true)
@@ -58,6 +77,7 @@ object WebViewProvider {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, true)
             } else if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                @Suppress("DEPRECATION")
                 WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_ON)
             }
         }
@@ -67,5 +87,3 @@ object WebViewProvider {
         // فقط موتور Chromium را گرم کن — loadUrl صفحهٔ قبلی را پاک می‌کند
     }
 }
-
-

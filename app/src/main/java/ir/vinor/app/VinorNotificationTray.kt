@@ -102,10 +102,6 @@ object VinorNotificationTray {
         }
     }
 
-    fun normalizeUrl(raw: String?): String {
-        val trimmed = raw?.trim().orEmpty()
-        if (trimmed.isEmpty()) return "https://vinor.ir/express/partner/notifications"
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed
-        return "https://vinor.ir${if (trimmed.startsWith("/")) trimmed else "/$trimmed"}"
-    }
+    fun normalizeUrl(raw: String?): String =
+        UrlUtils.sanitizeVinorHttpsUrl(raw)
 }

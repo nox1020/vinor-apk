@@ -16,7 +16,8 @@ class VinorAppUpdateBridge(
     @JavascriptInterface
     fun refresh() {
         val webView = webViewProvider()
-        VinorAppUpdateChecker.check(context.applicationContext, webView)
+        if (!VinorBridgeGate.isTrustedPage(webView)) return
+        VinorAppUpdateChecker.check(context.applicationContext, webView, force = true)
     }
 
     @JavascriptInterface
@@ -36,6 +37,7 @@ class VinorAppUpdateBridge(
     @JavascriptInterface
     fun ensureDownload(url: String, version: String) {
         val webView = webViewProvider()
+        if (!VinorBridgeGate.isTrustedPage(webView)) return
         VinorApkUpdateInstaller.ensureDownload(
             context.applicationContext,
             url,
@@ -45,6 +47,8 @@ class VinorAppUpdateBridge(
     }
 
     @JavascriptInterface
-    fun installUpdate(): Boolean =
-        VinorApkUpdateInstaller.install(context)
+    fun installUpdate(): Boolean {
+        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return false
+        return VinorApkUpdateInstaller.install(context)
+    }
 }

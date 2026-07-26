@@ -32,7 +32,8 @@ object VinorWebViewSettings {
     fun configureCookies(webView: WebView) {
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(webView, true)
+            // First-party session only — reduces cross-site tracking / bridge abuse surface
+            setAcceptThirdPartyCookies(webView, false)
         }
     }
 }

@@ -7,12 +7,13 @@ import java.util.Locale
 object UrlUtils {
     private const val VINOR_HOST = "vinor.ir"
     private val HOME_PATHS = setOf("", "/", "/home", "/search", "/profile")
+    private const val DEFAULT_PARTNER_NOTIF = "https://vinor.ir/express/partner/notifications"
 
     fun normalize(url: String): String {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return ""
         return try {
-            var uri = URI(trimmed)
+            val uri = URI(trimmed)
             // Force https and drop fragments/queries
             val scheme = "https"
             var host = uri.host ?: ""
@@ -32,6 +33,35 @@ object UrlUtils {
         } catch (_: Exception) {
             false
         }
+    }
+
+    /** فقط https روی دامنه وینور — برای loadUrl از اعلان/Intent. */
+    fun isTrustedVinorHttps(url: String): Boolean {
+        val raw = url.trim()
+        if (raw.isEmpty()) return false
+        if (!raw.startsWith("https://", ignoreCase = true)) return false
+        return isVinorDomain(raw)
+    }
+
+    /**
+     * مسیر نسبی یا URL کامل را به https وینور تبدیل می‌کند؛
+     * هر چیز غیرمجاز → [fallback].
+     */
+    fun sanitizeVinorHttpsUrl(
+        raw: String?,
+        fallback: String = DEFAULT_PARTNER_NOTIF,
+    ): String {
+        val trimmed = raw?.trim().orEmpty()
+        if (trimmed.isEmpty()) return fallback
+        val candidate = when {
+            trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+            trimmed.startsWith("http://", ignoreCase = true) ->
+                "https://" + trimmed.substring(7)
+            trimmed.startsWith("//") -> "https:$trimmed"
+            trimmed.startsWith("/") -> "https://$VINOR_HOST$trimmed"
+            else -> "https://$VINOR_HOST/$trimmed"
+        }
+        return if (isTrustedVinorHttps(candidate)) candidate else fallback
     }
 
     /**
@@ -54,6 +84,30 @@ object UrlUtils {
             looksLikeApkPath(uri.path ?: "")
         } catch (_: Exception) {
             looksLikeApkPath(raw)
+        }
+    }
+
+    /**
+     * مسیرهای امن برای DownloadManager با کوکی نشست:
+     * رسانه / استاتیک / APK — نه endpointهای API حساس.
+     */
+    fun isSafePublicDownloadUrl(url: String): Boolean {
+        if (!isTrustedVinorHttps(url)) return false
+        return try {
+            val path = (URI(url).path ?: "").lowercase(Locale.US)
+            when {
+                looksLikeApkPath(path) -> true
+                path.startsWith("/uploads/") -> true
+                path.startsWith("/static/") -> true
+                path.startsWith("/media/") -> true
+                path.endsWith(".mp4") || path.endsWith(".webm") ||
+                    path.endsWith(".jpg") || path.endsWith(".jpeg") ||
+                    path.endsWith(".png") || path.endsWith(".webp") ||
+                    path.endsWith(".gif") || path.endsWith(".pdf") -> true
+                else -> false
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -83,4 +137,3 @@ object UrlUtils {
         }
     }
 }
-

@@ -8,6 +8,7 @@ import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
+import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import java.util.Locale
@@ -17,6 +18,7 @@ import java.util.Locale
  */
 class VinorDownloadBridge(
     private val activity: ComponentActivity,
+    private val webViewProvider: () -> WebView? = { WebViewProvider.peek() },
 ) {
     @JavascriptInterface
     fun isNativeAvailable(): Boolean = true
@@ -24,6 +26,10 @@ class VinorDownloadBridge(
     @JavascriptInterface
     fun downloadUrl(url: String, filename: String) {
         activity.runOnUiThread {
+            if (!VinorBridgeGate.isTrustedPage(webViewProvider())) {
+                Log.w(TAG, "downloadUrl blocked — untrusted page")
+                return@runOnUiThread
+            }
             enqueueDownload(activity, url, filename, showToast = false)
         }
     }
@@ -48,8 +54,8 @@ class VinorDownloadBridge(
                 return -1L
             }
 
-            if (!UrlUtils.isVinorDomain(absUrl)) {
-                Log.w(TAG, "Blocked non-vinor download: $absUrl")
+            if (!UrlUtils.isSafePublicDownloadUrl(absUrl)) {
+                Log.w(TAG, "Blocked unsafe download: $absUrl")
                 return -1L
             }
 
@@ -63,6 +69,7 @@ class VinorDownloadBridge(
                     setAllowedOverRoaming(true)
                     setMimeType(guessMimeType(absUrl, safeName))
                     addRequestHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+                    // Cookie only for allowlisted public media/APK paths
                     CookieManager.getInstance().getCookie(absUrl)?.takeIf { it.isNotBlank() }?.let { cookie ->
                         addRequestHeader("Cookie", cookie)
                     }
@@ -90,18 +97,15 @@ class VinorDownloadBridge(
         fun resolveAbsoluteUrl(url: String): String? {
             val trimmed = url.trim()
             if (trimmed.isEmpty()) return null
-            if (trimmed.startsWith("https://", ignoreCase = true) ||
-                trimmed.startsWith("http://", ignoreCase = true)
-            ) {
-                return trimmed
+            val absolute = when {
+                trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+                trimmed.startsWith("http://", ignoreCase = true) ->
+                    "https://" + trimmed.substring(7)
+                trimmed.startsWith("//") -> "https:$trimmed"
+                trimmed.startsWith("/") -> "https://vinor.ir$trimmed"
+                else -> "https://vinor.ir/$trimmed"
             }
-            if (trimmed.startsWith("//")) {
-                return "https:$trimmed"
-            }
-            if (trimmed.startsWith("/")) {
-                return "https://vinor.ir$trimmed"
-            }
-            return "https://vinor.ir/$trimmed"
+            return if (UrlUtils.isTrustedVinorHttps(absolute)) absolute else null
         }
 
         fun sanitizeFilename(name: String): String {
@@ -146,6 +150,7 @@ class VinorDownloadBridge(
                 lower.endsWith(".webp") -> "image/webp"
                 lower.endsWith(".gif") -> "image/gif"
                 lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
+                lower.endsWith(".pdf") -> "application/pdf"
                 else -> null
             }
         }

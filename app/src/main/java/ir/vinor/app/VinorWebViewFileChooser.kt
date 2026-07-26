@@ -58,7 +58,7 @@ class VinorWebViewFileChooser {
         ) { granted ->
             val req = pendingPermissionRequest
             pendingPermissionRequest = null
-            if (granted && req != null) {
+            if (granted && req != null && VinorBridgeGate.isTrustedOrigin(req.origin?.toString())) {
                 req.grant(req.resources)
             } else {
                 req?.deny()
@@ -80,7 +80,7 @@ class VinorWebViewFileChooser {
         ) { granted ->
             val req = pendingPermissionRequest
             pendingPermissionRequest = null
-            if (granted && req != null) {
+            if (granted && req != null && VinorBridgeGate.isTrustedOrigin(req.origin?.toString())) {
                 req.grant(req.resources)
             } else {
                 req?.deny()
@@ -113,6 +113,11 @@ class VinorWebViewFileChooser {
 
     private fun handlePermissionRequest(request: PermissionRequest?) {
         if (request == null) return
+        val origin = request.origin?.toString().orEmpty()
+        if (!VinorBridgeGate.isTrustedOrigin(origin)) {
+            request.deny()
+            return
+        }
         val activity = hostActivity()
         if (activity == null) {
             request.deny()
