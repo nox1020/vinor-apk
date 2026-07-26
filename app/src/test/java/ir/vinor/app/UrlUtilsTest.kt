@@ -36,6 +36,8 @@ class UrlUtilsTest {
     fun safeDownload_allowsUploadsApk_blocksApi() {
         assertTrue(UrlUtils.isSafePublicDownloadUrl("https://vinor.ir/uploads/apk/vinor_1.0.1.apk"))
         assertTrue(UrlUtils.isSafePublicDownloadUrl("https://vinor.ir/d"))
+        assertTrue(UrlUtils.isSafePublicDownloadUrl("https://vinor.ir/d/vinor-1.0.253.apk"))
+        assertTrue(UrlUtils.isApkDownloadUrl("https://vinor.ir/d/vinor-1.0.253.apk"))
         assertFalse(UrlUtils.isSafePublicDownloadUrl("https://vinor.ir/api/express/partner/secret"))
         assertFalse(UrlUtils.isSafePublicDownloadUrl("https://evil.test/uploads/x.apk"))
     }

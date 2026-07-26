@@ -106,6 +106,16 @@ object VinorAppUpdateChecker {
                 webView?.let { applyToWebView(it, state) }
                 if (state.show) {
                     VinorApkUpdateInstaller.ensureDownload(context, state.url, state.version, webView)
+                } else if (previous.show) {
+                    VinorApkUpdateInstaller.clearState(context)
+                    webView?.let {
+                        VinorApkUpdateInstaller.notifyWebView(
+                            it,
+                            VinorApkUpdateInstaller.DownloadState(
+                                VinorApkUpdateInstaller.Status.IDLE,
+                            ),
+                        )
+                    }
                 }
             } finally {
                 checking.set(false)

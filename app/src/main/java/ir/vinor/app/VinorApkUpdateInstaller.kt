@@ -74,8 +74,13 @@ object VinorApkUpdateInstaller {
         val status = runCatching { Status.valueOf(raw) }.getOrDefault(Status.IDLE)
         val version = p.getString(KEY_VERSION, "").orEmpty()
         val url = p.getString(KEY_URL, "").orEmpty()
+        val error = p.getString(KEY_ERROR, "").orEmpty()
         val file = if (version.isNotEmpty()) apkFileForVersion(context, version) else null
         val resolved = when {
+            // بعد از kill پروسه، AtomicBoolean ریست می‌شود ولی prefs روی DOWNLOADING می‌ماند
+            status == Status.DOWNLOADING && !downloading.get() -> {
+                DownloadState(Status.IDLE, version = version, url = url, error = "stale_download")
+            }
             status == Status.READY && (file == null || !VinorApkTrust.isTrustedUpdateApk(context, file)) -> {
                 file?.delete()
                 DownloadState(Status.IDLE, version = version, url = url)
@@ -84,10 +89,18 @@ object VinorApkUpdateInstaller {
                 status = status,
                 version = version,
                 url = url,
-                error = p.getString(KEY_ERROR, "").orEmpty(),
+                error = error,
             )
         }
+        // وضعیت اصلاح‌شده را پایدار کن تا UI روی downloading گیر نکند
+        if (resolved.status != status) {
+            persistState(context, resolved)
+        }
         return resolved
+    }
+
+    fun clearState(context: Context) {
+        persistState(context, DownloadState(Status.IDLE))
     }
 
     private fun persistState(context: Context, state: DownloadState) {
@@ -214,16 +227,35 @@ object VinorApkUpdateInstaller {
                     Log.w(TAG, "HTTP ${response.code} for $absUrl")
                     return false
                 }
+                val finalUrl = response.request.url.toString()
+                // /d ممکن است بدون پسوند .apk باشد؛ uploads/apk و .apk هم مجازند
+                if (!UrlUtils.isTrustedVinorHttps(finalUrl)) {
+                    Log.w(TAG, "Redirect left trusted host: $finalUrl")
+                    return false
+                }
+                if (!UrlUtils.isApkDownloadUrl(finalUrl) && !UrlUtils.isSafePublicDownloadUrl(finalUrl)) {
+                    Log.w(TAG, "Redirect is not an APK download path: $finalUrl")
+                    return false
+                }
                 val ct = response.header("Content-Type").orEmpty().lowercase()
                 if (ct.contains("text/html") || ct.contains("application/json")) {
                     Log.w(TAG, "Unexpected Content-Type=$ct for $absUrl")
                     return false
                 }
                 val body = response.body ?: return false
+                val expectedLen = body.contentLength()
                 body.byteStream().use { input ->
                     tmp.outputStream().use { output ->
                         input.copyTo(output)
                     }
+                }
+                if (expectedLen > 0L && tmp.length() != expectedLen) {
+                    Log.w(
+                        TAG,
+                        "Incomplete download size=${tmp.length()} expected=$expectedLen",
+                    )
+                    tmp.delete()
+                    return false
                 }
             }
 
@@ -314,11 +346,20 @@ object VinorApkUpdateInstaller {
     private fun commitPackageInstallerSession(context: Context, apkFile: File): Boolean {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        try {
+            params.setAppPackageName(context.packageName)
+        } catch (_: Exception) {
+        }
+        try {
+            params.setSize(apkFile.length())
+        } catch (_: Exception) {
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
         }
         val sessionId = installer.createSession(params)
-        installer.openSession(sessionId).use { session ->
+        val session = installer.openSession(sessionId)
+        try {
             apkFile.inputStream().use { input ->
                 session.openWrite("vinor-update.apk", 0, apkFile.length()).use { out ->
                     input.copyTo(out, DEFAULT_BUFFER_SIZE)
@@ -337,6 +378,17 @@ object VinorApkUpdateInstaller {
                 }
             val pending = PendingIntent.getBroadcast(context, sessionId, callback, flags)
             session.commit(pending.intentSender)
+        } catch (e: Exception) {
+            try {
+                session.abandon()
+            } catch (_: Exception) {
+            }
+            throw e
+        } finally {
+            try {
+                session.close()
+            } catch (_: Exception) {
+            }
         }
         Log.i(TAG, "PackageInstaller session committed id=$sessionId size=${apkFile.length()}")
         return true

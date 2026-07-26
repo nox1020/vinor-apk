@@ -115,7 +115,11 @@
 
         <receiver
             android:name=".ApkInstallResultReceiver"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ir.vinor.app.ACTION_APK_INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

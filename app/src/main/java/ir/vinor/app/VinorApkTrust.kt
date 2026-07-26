@@ -1,14 +1,22 @@
 package ir.vinor.app
 
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.content.pm.Signature
+import android.content.pm.SigningInfo
 import android.os.Build
 import android.util.Log
 import java.io.File
 import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.util.zip.ZipFile
 
 /**
  * Verify a downloaded update APK matches this app's package name and signing certs.
+ *
+ * Note: [PackageManager.getPackageArchiveInfo] often returns null [SigningInfo] on
+ * some API levels — we fall back to classic signatures and JAR META-INF certs.
  */
 object VinorApkTrust {
 
@@ -20,8 +28,7 @@ object VinorApkTrust {
         return try {
             val pm = context.packageManager
             val expectedPkg = context.packageName
-            val archive = pm.getPackageArchiveInfo(file.absolutePath, archiveFlags())
-                ?: return false
+            val archive = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: return false
             archive.applicationInfo?.apply {
                 sourceDir = file.absolutePath
                 publicSourceDir = file.absolutePath
@@ -34,7 +41,10 @@ object VinorApkTrust {
             val installed = installedSigningDigests(pm, expectedPkg)
             val incoming = archiveSigningDigests(pm, file)
             if (installed.isEmpty() || incoming.isEmpty()) {
-                Log.w(TAG, "missing signing certs installed=${installed.size} incoming=${incoming.size}")
+                Log.w(
+                    TAG,
+                    "missing signing certs installed=${installed.size} incoming=${incoming.size}",
+                )
                 return false
             }
             val match = incoming.any { dig -> installed.contains(dig) }
@@ -48,32 +58,17 @@ object VinorApkTrust {
         }
     }
 
-    private fun archiveFlags(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            @Suppress("DEPRECATION")
-            PackageManager.GET_SIGNATURES
-        }
-    }
-
     private fun installedSigningDigests(pm: PackageManager, packageName: String): Set<String> {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-                val si = info.signingInfo ?: return emptySet()
-                val signers = if (si.hasMultipleSigners()) {
-                    si.apkContentsSigners
-                } else {
-                    si.signingCertificateHistory
-                }
-                signers?.mapNotNull { sha256Hex(it.toByteArray()) }?.toSet().orEmpty()
-            } else {
-                @Suppress("DEPRECATION")
-                val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
-                @Suppress("DEPRECATION")
-                info.signatures?.mapNotNull { sha256Hex(it.toByteArray()) }?.toSet().orEmpty()
+                val fromSi = digestsFromSigningInfo(info.signingInfo)
+                if (fromSi.isNotEmpty()) return fromSi
             }
+            @Suppress("DEPRECATION")
+            val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+            @Suppress("DEPRECATION")
+            digestsFromSignatures(info.signatures)
         } catch (e: Exception) {
             Log.w(TAG, "installedSigningDigests failed", e)
             emptySet()
@@ -81,30 +76,83 @@ object VinorApkTrust {
     }
 
     private fun archiveSigningDigests(pm: PackageManager, file: File): Set<String> {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        // 1) Modern signing info from archive (may be empty on many devices)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
                 val info = pm.getPackageArchiveInfo(
                     file.absolutePath,
                     PackageManager.GET_SIGNING_CERTIFICATES,
-                ) ?: return emptySet()
-                val si = info.signingInfo ?: return emptySet()
-                val signers = if (si.hasMultipleSigners()) {
-                    si.apkContentsSigners
-                } else {
-                    si.signingCertificateHistory
-                }
-                signers?.mapNotNull { sha256Hex(it.toByteArray()) }?.toSet().orEmpty()
-            } else {
-                @Suppress("DEPRECATION")
-                val info = pm.getPackageArchiveInfo(
-                    file.absolutePath,
-                    PackageManager.GET_SIGNATURES,
-                ) ?: return emptySet()
-                @Suppress("DEPRECATION")
-                info.signatures?.mapNotNull { sha256Hex(it.toByteArray()) }?.toSet().orEmpty()
+                )
+                val fromSi = digestsFromSigningInfo(info?.signingInfo)
+                if (fromSi.isNotEmpty()) return fromSi
+            } catch (e: Exception) {
+                Log.w(TAG, "archive GET_SIGNING_CERTIFICATES failed", e)
             }
+        }
+        // 2) Classic Signature[] — usually works for APK archives
+        try {
+            @Suppress("DEPRECATION")
+            val info: PackageInfo? = pm.getPackageArchiveInfo(
+                file.absolutePath,
+                PackageManager.GET_SIGNATURES,
+            )
+            @Suppress("DEPRECATION")
+            val fromSigs = digestsFromSignatures(info?.signatures)
+            if (fromSigs.isNotEmpty()) return fromSigs
         } catch (e: Exception) {
-            Log.w(TAG, "archiveSigningDigests failed", e)
+            Log.w(TAG, "archive GET_SIGNATURES failed", e)
+        }
+        // 3) JAR v1 signer blocks in META-INF
+        val fromJar = jarSignerDigests(file)
+        if (fromJar.isNotEmpty()) return fromJar
+        return emptySet()
+    }
+
+    private fun digestsFromSigningInfo(si: SigningInfo?): Set<String> {
+        if (si == null) return emptySet()
+        val signers = if (si.hasMultipleSigners()) {
+            si.apkContentsSigners
+        } else {
+            // Include current + history so key-rotation updates still match.
+            val history = si.signingCertificateHistory
+            if (history != null && history.isNotEmpty()) history else si.apkContentsSigners
+        }
+        return digestsFromSignatures(signers)
+    }
+
+    private fun digestsFromSignatures(signatures: Array<Signature>?): Set<String> {
+        if (signatures.isNullOrEmpty()) return emptySet()
+        return signatures.mapNotNull { sha256Hex(it.toByteArray()) }.toSet()
+    }
+
+    private fun jarSignerDigests(file: File): Set<String> {
+        return try {
+            val out = linkedSetOf<String>()
+            ZipFile(file).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    val name = entry.name.uppercase()
+                    if (!name.startsWith("META-INF/")) continue
+                    if (
+                        !name.endsWith(".RSA") &&
+                        !name.endsWith(".DSA") &&
+                        !name.endsWith(".EC")
+                    ) {
+                        continue
+                    }
+                    zip.getInputStream(entry).use { ins ->
+                        val certs = CertificateFactory.getInstance("X.509")
+                            .generateCertificates(ins)
+                        for (cert in certs) {
+                            sha256Hex(cert.encoded)?.let { out.add(it) }
+                        }
+                    }
+                }
+            }
+            out
+        } catch (e: Exception) {
+            Log.w(TAG, "jarSignerDigests failed", e)
             emptySet()
         }
     }
@@ -112,7 +160,11 @@ object VinorApkTrust {
     private fun sha256Hex(bytes: ByteArray): String? {
         return try {
             val dig = MessageDigest.getInstance("SHA-256").digest(bytes)
-            dig.joinToString("") { "%02x".format(it) }
+            buildString(dig.size * 2) {
+                for (b in dig) {
+                    append("%02x".format(b.toInt() and 0xff))
+                }
+            }
         } catch (_: Exception) {
             null
         }
