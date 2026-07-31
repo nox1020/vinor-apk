@@ -65,7 +65,7 @@ object DeepLinkRouter {
         }
         val path = normalizePath(uri.path)
         val route = when {
-            isApkDownloadPath(path) ->
+            isApkDownloadPath(path) || path.equals("/express/partner/download-app", ignoreCase = true) ->
                 Route(
                     type = DestinationType.APK_DOWNLOAD,
                     targetUrl = "https://$HOST/d",

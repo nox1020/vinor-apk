@@ -718,14 +718,21 @@ class MainActivity : AppCompatActivity() {
      */
     private fun consumeApkDownloadDeepLink(deepLinkUrl: String?): Boolean {
         if (deepLinkUrl.isNullOrBlank()) return false
+        val route = DeepLinkRouter.resolve(deepLinkUrl)
         val isApk = UrlUtils.isApkDownloadUrl(deepLinkUrl) ||
-            DeepLinkRouter.resolve(deepLinkUrl).type == DeepLinkRouter.DestinationType.APK_DOWNLOAD
+            route.type == DeepLinkRouter.DestinationType.APK_DOWNLOAD
         if (!isApk) return false
+        // download-app و مسیرهای غیر-/d را به لینک کوتاه دانلود واقعی ببر
+        val downloadUrl = when {
+            UrlUtils.isApkDownloadUrl(deepLinkUrl) -> deepLinkUrl
+            UrlUtils.isApkDownloadUrl(route.targetUrl) -> route.targetUrl
+            else -> "https://vinor.ir/d"
+        }
         VinorDownloadBridge.enqueueDownload(
             this,
-            deepLinkUrl,
+            downloadUrl,
             VinorDownloadBridge.apkDownloadFilename(
-                deepLinkUrl,
+                downloadUrl,
                 VinorAppUpdateChecker.readCached(this).version,
             ),
             showToast = true,

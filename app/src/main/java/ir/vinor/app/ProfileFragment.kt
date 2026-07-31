@@ -216,7 +216,13 @@ class ProfileFragment : Fragment() {
             } else {
                 "نسخه جدید برای دانلود آماده است"
             }
-            links.add(Triple("بروزرسانی اپلیکیشن", appUpdateSub, androidApkUrl))
+            links.add(
+                Triple(
+                    "بروزرسانی اپلیکیشن",
+                    appUpdateSub,
+                    "apk_update:$androidApkUrl|$androidApkVersion",
+                ),
+            )
         }
         links.add(Triple("فروشنده‌های برتر", "رتبه‌بندی همکاران", "$BASE/express/partner/top-sellers"))
         links.add(Triple("راهنما", "راهنمای استفاده از پلتفرم", "$BASE/express/partner/help"))
@@ -238,19 +244,26 @@ class ProfileFragment : Fragment() {
             item.itemProfileLinkSubtitle.text = subtitle
             item.itemProfileLinkIcon.setImageResource(iconRes[title] ?: R.drawable.ic_help)
             item.root.setOnClickListener {
-                when (url) {
-                    "restart_tour" -> {
+                when {
+                    url == "restart_tour" -> {
                         context?.getSharedPreferences("vinor", 0)?.edit()?.putBoolean("restart_tour", true)?.apply()
                         context?.let { Toast.makeText(it, "برای اجرای تور به تب وینور بروید", Toast.LENGTH_SHORT).show() }
                     }
-                    "notes_native" -> {
+                    url == "notes_native" -> {
                         try {
                             findNavController().navigate(R.id.notesFragment)
                         } catch (_: Exception) {
                             openUrl("$BASE/express/partner/notes")
                         }
                     }
-                    "" -> { }
+                    url.startsWith("apk_update:") -> {
+                        val payload = url.removePrefix("apk_update:")
+                        val sep = payload.indexOf('|')
+                        val apkUrl = if (sep >= 0) payload.substring(0, sep) else payload
+                        val ver = if (sep >= 0) payload.substring(sep + 1) else androidApkVersion
+                        startApkUpdate(apkUrl, ver)
+                    }
+                    url.isBlank() -> { }
                     else -> openUrl(url)
                 }
             }
@@ -322,10 +335,47 @@ class ProfileFragment : Fragment() {
         }
     }
 
+    private fun startApkUpdate(apkUrl: String, version: String) {
+        val ctx = context ?: return
+        val abs = VinorDownloadBridge.resolveAbsoluteUrl(apkUrl)
+        if (abs.isNullOrBlank()) {
+            Toast.makeText(ctx, "آدرس بروزرسانی نامعتبر است", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val ver = version.trim().ifEmpty {
+            VinorAppUpdateChecker.readCached(ctx).version
+        }
+        if (ver.isNotEmpty()) {
+            VinorApkUpdateInstaller.ensureDownload(ctx.applicationContext, abs, ver)
+        }
+        val state = VinorApkUpdateInstaller.readState(ctx.applicationContext)
+        if (state.status == VinorApkUpdateInstaller.Status.READY) {
+            VinorApkUpdateInstaller.install(ctx)
+        } else {
+            Toast.makeText(ctx, "در حال آماده‌سازی فایل نصب…", Toast.LENGTH_SHORT).show()
+            if (ver.isNotEmpty()) {
+                VinorApkUpdateInstaller.ensureDownload(ctx.applicationContext, abs, ver)
+            } else {
+                VinorDownloadBridge.enqueueDownload(
+                    ctx,
+                    abs,
+                    VinorDownloadBridge.apkDownloadFilename(abs, version),
+                    showToast = true,
+                )
+            }
+        }
+    }
+
     private fun openUrl(url: String) {
         if (url.isBlank()) return
+        val absolute = when {
+            url.startsWith("https://", ignoreCase = true) -> url
+            url.startsWith("http://", ignoreCase = true) -> "https://" + url.substring(7)
+            url.startsWith("/") -> "$BASE$url"
+            else -> url
+        }
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(absolute)))
         } catch (e: Exception) {
             context?.let { Toast.makeText(it, "خطا در باز کردن لینک", Toast.LENGTH_SHORT).show() }
         }
