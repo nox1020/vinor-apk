@@ -58,6 +58,37 @@ object VinorApkTrust {
         }
     }
 
+    /**
+     * اگر versionCode فایل ≤ نسخهٔ نصب‌شده باشد، پیام فارسی برمی‌گرداند؛ وگرنه null.
+     */
+    fun downgradeOrConflictMessage(context: Context, file: File?): String? {
+        if (file == null || !file.isFile) return "فایل نصب آماده نیست"
+        return try {
+            val pm = context.packageManager
+            val archive = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: return null
+            val incomingCode = packageVersionCode(archive)
+            val installed = pm.getPackageInfo(context.packageName, 0)
+            val installedCode = packageVersionCode(installed)
+            if (incomingCode > 0L && installedCode > 0L && incomingCode <= installedCode) {
+                "نسخهٔ این فایل از نسخهٔ نصب‌شده قدیمی‌تر یا یکسان است؛ نصب ممکن نیست"
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "downgradeOrConflictMessage failed", e)
+            null
+        }
+    }
+
+    private fun packageVersionCode(info: PackageInfo): Long {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
+        }
+    }
+
     private fun installedSigningDigests(pm: PackageManager, packageName: String): Set<String> {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

@@ -37,10 +37,45 @@ class ApkInstallResultReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_FAILURE_ABORTED -> {
                 // کاربر لغو کرد — بی‌صدا
             }
+            PackageInstaller.STATUS_FAILURE_CONFLICT -> {
+                toast(
+                    context,
+                    "نصب ممکن نیست: نسخهٔ فعلی با این فایل سازگار نیست " +
+                        "(امضای متفاوت یا نسخهٔ پایین‌تر). اپ را حذف کنید یا APK جدیدتر بگیرید.",
+                )
+            }
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> {
+                toast(context, "این نسخه با دستگاه شما سازگار نیست")
+            }
+            PackageInstaller.STATUS_FAILURE_INVALID -> {
+                toast(context, "فایل نصب نامعتبر است؛ دوباره دانلود کنید")
+            }
+            PackageInstaller.STATUS_FAILURE_STORAGE -> {
+                toast(context, "فضای ذخیره‌سازی کافی نیست")
+            }
             else -> {
-                val detail = message.trim().ifEmpty { "امکان نصب وجود ندارد" }
+                val detail = humanizeInstallFailure(status, message)
                 toast(context, "نصب ناموفق: $detail")
             }
+        }
+    }
+
+    private fun humanizeInstallFailure(status: Int, message: String): String {
+        val raw = message.trim()
+        val lower = raw.lowercase()
+        when {
+            "update incompatible" in lower || "signatures" in lower ||
+                "signature" in lower ->
+                return "امضای فایل با اپ نصب‌شده یکی نیست؛ ابتدا اپ را حذف کنید"
+            "downgrade" in lower || "version" in lower && "code" in lower ->
+                return "نسخهٔ فایل از نسخهٔ نصب‌شده قدیمی‌تر است"
+            "parse" in lower || "invalid" in lower ->
+                return "فایل APK خراب یا ناقص است؛ دوباره دانلود کنید"
+        }
+        if (raw.isNotEmpty()) return raw
+        return when (status) {
+            PackageInstaller.STATUS_FAILURE -> "امکان نصب برنامه وجود ندارد"
+            else -> "امکان نصب برنامه وجود ندارد (کد $status)"
         }
     }
 

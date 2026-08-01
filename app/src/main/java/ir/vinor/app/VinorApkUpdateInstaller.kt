@@ -314,6 +314,12 @@ object VinorApkUpdateInstaller {
             }
         }
 
+        val downgradeMsg = VinorApkTrust.downgradeOrConflictMessage(appCtx, file)
+        if (downgradeMsg != null) {
+            toast(context, downgradeMsg)
+            return false
+        }
+
         // کپی چندمگابایتی روی thread پل JS نباشد
         scope.launch(Dispatchers.IO) {
             try {
@@ -402,6 +408,8 @@ object VinorApkUpdateInstaller {
         )
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
+            // بعضی OEMها بدون ClipData مجوز URI را به نصب‌گر نمی‌دهند
+            clipData = android.content.ClipData.newRawUri("", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
