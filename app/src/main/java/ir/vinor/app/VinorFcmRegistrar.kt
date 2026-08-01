@@ -6,11 +6,8 @@ import android.webkit.CookieManager
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -19,7 +16,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-/** ثبت FCM token روی سرور بعد از لاگین WebView */
+/** ثبت FCM token روی سرور بعد از لاگین WebView — بدون poll پس‌زمینه */
 object VinorFcmRegistrar {
     private const val TAG = "VinorFcmRegistrar"
     private const val BASE = "https://vinor.ir"
@@ -35,30 +32,25 @@ object VinorFcmRegistrar {
         .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
-    private var pollJob: Job? = null
     private var lastRegisteredToken: String? = null
 
+    /** یک‌بار bootstrap Firebase + ثبت token؛ تکرار دوره‌ای نداره (FCM onNewToken کافی است) */
     fun start(context: Context) {
-        if (pollJob?.isActive == true) return
         VinorFirebaseAutoConfig.bootstrap(context) { ready ->
             if (!ready) return@bootstrap
-            requestTokenAndRegister(context)
-            if (pollJob?.isActive == true) return@bootstrap
-            pollJob = scope.launch {
-                while (isActive) {
-                    delay(45_000L)
-                    requestTokenAndRegister(context.applicationContext)
-                }
-            }
+            // Application.onCreate قبل از foreground است — force تا skip نشود
+            requestTokenAndRegister(context, force = true)
         }
     }
 
-    fun stop() {
-        pollJob?.cancel()
-        pollJob = null
-    }
+    /** سازگاری با فراخوان‌های قبلی — کار پس‌زمینه‌ای برای توقف نیست */
+    fun stop() = Unit
 
     fun requestTokenAndRegister(context: Context, force: Boolean = false) {
+        if (!VinorAppForeground.isInForeground && !force) {
+            Log.d(TAG, "skip FCM token fetch — app backgrounded")
+            return
+        }
         runCatching {
             FirebaseMessaging.getInstance().token
                 .addOnCompleteListener { task ->
@@ -178,7 +170,6 @@ object VinorFcmRegistrar {
     }
 
     fun destroy() {
-        stop()
         scope.cancel()
     }
 }

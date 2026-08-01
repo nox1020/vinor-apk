@@ -1066,6 +1066,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         unregisterConnectivityLostCallback()
+        // لغو callbackهای معوق تا پروسه پس‌زمینه بیدار نماند
+        if (::webView.isInitialized) {
+            webView.removeCallbacks(revealAfterLoadRunnable)
+            webView.removeCallbacks(shellRevealFallbackRunnable)
+            webView.removeCallbacks(offlineRevealTimeoutRunnable)
+        }
         super.onStop()
     }
 
