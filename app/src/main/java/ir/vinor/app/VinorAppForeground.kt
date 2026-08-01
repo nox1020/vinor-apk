@@ -21,17 +21,22 @@ object VinorAppForeground {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 isInForeground = true
-                runCatching { WebView.resumeTimers() }
-                    .onFailure { Log.d(TAG, "resumeTimers failed", it) }
+                setWebViewTimersPaused(false)
             }
 
             override fun onStop(owner: LifecycleOwner) {
                 isInForeground = false
                 // قطع کار پس‌زمینهٔ غیرضروری — اجازهٔ Doze / deep sleep
                 VinorFcmRegistrar.stop()
-                runCatching { WebView.pauseTimers() }
-                    .onFailure { Log.d(TAG, "pauseTimers failed", it) }
+                setWebViewTimersPaused(true)
             }
         })
+    }
+
+    private fun setWebViewTimersPaused(paused: Boolean) {
+        runCatching {
+            val name = if (paused) "pauseTimers" else "resumeTimers"
+            WebView::class.java.getMethod(name).invoke(null)
+        }.onFailure { Log.d(TAG, "WebView timers $paused failed", it) }
     }
 }
