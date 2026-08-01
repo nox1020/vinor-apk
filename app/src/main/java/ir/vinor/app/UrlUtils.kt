@@ -115,9 +115,10 @@ object UrlUtils {
         val p = pathOrUrl.trim().lowercase(Locale.US)
         if (p.isEmpty()) return false
         val pathOnly = p.substringBefore('?').substringBefore('#')
+            .trimEnd('/')
         if (pathOnly == "/d" || pathOnly.endsWith("/d")) return true
         if (pathOnly.endsWith(".apk")) return true
-        if (pathOnly.contains("/uploads/apk/")) return true
+        if (pathOnly.contains("/uploads/apk")) return true
         return false
     }
 

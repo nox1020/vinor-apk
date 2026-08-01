@@ -345,8 +345,14 @@ class ProfileFragment : Fragment() {
         val ver = version.trim().ifEmpty {
             VinorAppUpdateChecker.readCached(ctx).version
         }
+        val source = VinorAppUpdateChecker.readCached(ctx).sourceUrl
         if (ver.isNotEmpty()) {
-            VinorApkUpdateInstaller.ensureDownload(ctx.applicationContext, abs, ver)
+            VinorApkUpdateInstaller.ensureDownload(
+                ctx.applicationContext,
+                abs,
+                ver,
+                sourceUrl = source,
+            )
         }
         val state = VinorApkUpdateInstaller.readState(ctx.applicationContext)
         if (state.status == VinorApkUpdateInstaller.Status.READY) {
@@ -354,7 +360,12 @@ class ProfileFragment : Fragment() {
         } else {
             Toast.makeText(ctx, "در حال آماده‌سازی فایل نصب…", Toast.LENGTH_SHORT).show()
             if (ver.isNotEmpty()) {
-                VinorApkUpdateInstaller.ensureDownload(ctx.applicationContext, abs, ver)
+                VinorApkUpdateInstaller.ensureDownload(
+                    ctx.applicationContext,
+                    abs,
+                    ver,
+                    sourceUrl = source,
+                )
             } else {
                 VinorDownloadBridge.enqueueDownload(
                     ctx,

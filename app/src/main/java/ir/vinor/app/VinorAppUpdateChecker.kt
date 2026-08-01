@@ -24,6 +24,7 @@ object VinorAppUpdateChecker {
     private const val KEY_SHOW = "show"
     private const val KEY_VERSION = "version"
     private const val KEY_URL = "url"
+    private const val KEY_SOURCE_URL = "source_url"
     private const val BASE = "https://vinor.ir"
     private val VERSION_URLS = arrayOf(
         "$BASE/api/express/app-version",
@@ -41,6 +42,7 @@ object VinorAppUpdateChecker {
         val show: Boolean,
         val version: String = "",
         val url: String = "",
+        val sourceUrl: String = "",
     )
 
     fun appVersionName(context: Context): String = try {
@@ -58,6 +60,7 @@ object VinorAppUpdateChecker {
             show = p.getBoolean(KEY_SHOW, false),
             version = p.getString(KEY_VERSION, "").orEmpty(),
             url = p.getString(KEY_URL, "").orEmpty(),
+            sourceUrl = p.getString(KEY_SOURCE_URL, "").orEmpty(),
         )
     }
 
@@ -66,6 +69,7 @@ object VinorAppUpdateChecker {
             .putBoolean(KEY_SHOW, state.show)
             .putString(KEY_VERSION, state.version)
             .putString(KEY_URL, state.url)
+            .putString(KEY_SOURCE_URL, state.sourceUrl)
             .apply()
     }
 
@@ -76,7 +80,13 @@ object VinorAppUpdateChecker {
             val cached = readCached(context)
             webView?.let { applyToWebView(it, cached) }
             if (cached.show) {
-                VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+                VinorApkUpdateInstaller.ensureDownload(
+                    context,
+                    cached.url,
+                    cached.version,
+                    webView,
+                    cached.sourceUrl,
+                )
             }
             return
         }
@@ -84,7 +94,13 @@ object VinorAppUpdateChecker {
             val cached = readCached(context)
             webView?.let { applyToWebView(it, cached) }
             if (cached.show) {
-                VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+                VinorApkUpdateInstaller.ensureDownload(
+                    context,
+                    cached.url,
+                    cached.version,
+                    webView,
+                    cached.sourceUrl,
+                )
             }
             return
         }
@@ -105,7 +121,13 @@ object VinorAppUpdateChecker {
                 persist(context, state)
                 webView?.let { applyToWebView(it, state) }
                 if (state.show) {
-                    VinorApkUpdateInstaller.ensureDownload(context, state.url, state.version, webView)
+                    VinorApkUpdateInstaller.ensureDownload(
+                        context,
+                        state.url,
+                        state.version,
+                        webView,
+                        state.sourceUrl,
+                    )
                 } else if (previous.show) {
                     VinorApkUpdateInstaller.clearState(context)
                     webView?.let {
@@ -146,14 +168,21 @@ object VinorAppUpdateChecker {
                 val serverV = json.optString("android_apk_version", "").trim()
                 val apkUrlRaw = json.optString("android_apk_url", "").trim()
                 val apkUrl = VinorDownloadBridge.resolveAbsoluteUrl(apkUrlRaw).orEmpty()
+                val sourceRaw = json.optString("android_apk_source_url", "").trim()
+                val sourceUrl = VinorDownloadBridge.resolveAbsoluteUrl(sourceRaw).orEmpty()
                 return if (
                     serverV.isNotEmpty() &&
                     apkUrl.isNotEmpty() &&
                     UrlUtils.isTrustedVinorHttps(apkUrl) &&
-                    UrlUtils.isApkDownloadUrl(apkUrl) &&
+                    (UrlUtils.isApkDownloadUrl(apkUrl) || UrlUtils.isSafePublicDownloadUrl(apkUrl)) &&
                     ApkVersionUtils.isServerNewer(serverV, clientV)
                 ) {
-                    UpdateState(show = true, version = serverV, url = apkUrl)
+                    UpdateState(
+                        show = true,
+                        version = serverV,
+                        url = apkUrl,
+                        sourceUrl = sourceUrl,
+                    )
                 } else {
                     UpdateState(show = false)
                 }
@@ -193,7 +222,13 @@ object VinorAppUpdateChecker {
         val cached = readCached(context)
         applyToWebView(webView, cached)
         if (cached.show) {
-            VinorApkUpdateInstaller.ensureDownload(context, cached.url, cached.version, webView)
+            VinorApkUpdateInstaller.ensureDownload(
+                context,
+                cached.url,
+                cached.version,
+                webView,
+                cached.sourceUrl,
+            )
         } else {
             val dl = VinorApkUpdateInstaller.readState(context)
             if (dl.status != VinorApkUpdateInstaller.Status.IDLE) {

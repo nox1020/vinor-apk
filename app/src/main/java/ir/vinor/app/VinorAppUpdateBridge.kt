@@ -27,6 +27,7 @@ class VinorAppUpdateBridge(
             .put("show", state.show)
             .put("version", state.version)
             .put("url", state.url)
+            .put("sourceUrl", state.sourceUrl)
             .toString()
     }
 
@@ -38,11 +39,13 @@ class VinorAppUpdateBridge(
     fun ensureDownload(url: String, version: String) {
         val webView = webViewProvider()
         if (!VinorBridgeGate.isTrustedPage(webView)) return
+        val cached = VinorAppUpdateChecker.readCached(context.applicationContext)
         VinorApkUpdateInstaller.ensureDownload(
             context.applicationContext,
             url,
             version,
             webView,
+            cached.sourceUrl,
         )
     }
 
