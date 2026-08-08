@@ -20,7 +20,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -42,8 +41,6 @@ class MainActivity : AppCompatActivity() {
     private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
     private var mainFrameLoadFailed = false
     private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
-    private var lastBackPressTime: Long = 0
-    private val backPressThreshold = 2000L
     private val defaultUrl = VinorPartnerUrls.ENTRY
     private var otpSmsHelper: WebLoginOtpSmsHelper? = null
     private var speechBridge: VinorSpeechBridge? = null
@@ -1040,17 +1037,7 @@ class MainActivity : AppCompatActivity() {
                     webView.goBack()
                     return
                 }
-                val now = System.currentTimeMillis()
-                if (now - lastBackPressTime < backPressThreshold) {
-                    finish()
-                } else {
-                    lastBackPressTime = now
-                    Toast.makeText(
-                        this@MainActivity,
-                        "برای خروج دوباره دکمه بازگشت را فشار دهید",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                finish()
             }
         }
         onBackPressedDispatcher.addCallback(this, callback)
