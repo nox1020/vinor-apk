@@ -4,7 +4,6 @@ import android.content.Context
 import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -19,10 +18,15 @@ object VinorApiCacheStore {
         Thread(r, "vinor-api-cache").apply { isDaemon = true }
     }
 
-    private fun root(context: Context): File {
+    private fun root(context: Context, forWrite: Boolean = false): File {
+        val fp = if (forWrite) {
+            VinorCacheSession.scopeForWrite(context)
+        } else {
+            VinorCacheSession.scopeForRead(context)
+        }
         val d = File(
             context.filesDir,
-            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/api/${VinorCacheSession.fingerprint(context)}",
+            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/api/$fp",
         )
         if (!d.exists()) d.mkdirs()
         return d
@@ -39,7 +43,7 @@ object VinorApiCacheStore {
         if (body.isEmpty() || body.size > VinorCachePolicy.MAX_API_BODY_BYTES) return
         io.execute {
             runCatching {
-                val dir = root(context)
+                val dir = root(context, forWrite = false)
                 val id = key(url)
                 val bin = File(dir, "$id.bin")
                 val meta = File(dir, "$id.json")
@@ -50,7 +54,7 @@ object VinorApiCacheStore {
                     .put("createdAt", System.currentTimeMillis())
                     .put("lastAccessedAt", System.currentTimeMillis())
                     .put("size", body.size)
-                    .put("session", VinorCacheSession.fingerprint(context))
+                    .put("session", VinorCacheSession.scopeForRead(context))
                 VinorCacheIo.writeAtomicText(meta, json.toString())
                 VinorCacheLog.event("CACHE_WRITE", "api size=${body.size}")
                 trim(dir)
@@ -77,7 +81,7 @@ object VinorApiCacheStore {
         touch(meta)
         val ct = obj?.optString("ct").orEmpty().ifBlank { "application/json; charset=utf-8" }
         VinorCacheLog.event("CACHE_HIT", "api stale=${age > VinorCachePolicy.API_STALE_MS}")
-        return jsonResponse(bytes, ct, stale = age > VinorCachePolicy.API_STALE_MS)
+        return jsonResponse(bytes, ct)
     }
 
     private fun missNoQuery(context: Context, url: String): WebResourceResponse? {
@@ -90,7 +94,10 @@ object VinorApiCacheStore {
     }
 
     fun warmup(context: Context) {
-        val cookie = CookieManager.getInstance().getCookie(VinorPartnerUrls.BASE)?.trim().orEmpty()
+        VinorCacheSession.fingerprint(context)
+        val cookie = runCatching {
+            CookieManager.getInstance().getCookie(VinorPartnerUrls.BASE)?.trim().orEmpty()
+        }.getOrDefault("")
         if (cookie.length < 12) return
         val urls = listOf(
             "${VinorPartnerUrls.BASE}/express/partner/api/notifications",
@@ -132,26 +139,21 @@ object VinorApiCacheStore {
         runCatching { root(context).deleteRecursively() }
     }
 
-    private fun jsonResponse(bytes: ByteArray, ct: String, stale: Boolean): WebResourceResponse {
-        val headers = mutableMapOf(
-            "Cache-Control" to "no-store",
-            "X-Vinor-Cache" to if (stale) "STALE" else "HIT",
-        )
-        return WebResourceResponse(
+    private fun jsonResponse(bytes: ByteArray, ct: String): WebResourceResponse {
+        return VinorWebResponses.of(
             ct.substringBefore(';').ifBlank { "application/json" },
             "utf-8",
-            200,
-            "OK",
-            headers,
-            ByteArrayInputStream(bytes),
+            bytes,
         )
     }
 
     private fun touch(meta: File) {
-        val obj = VinorCacheIo.readJson(meta) ?: return
-        obj.put("lastAccessedAt", System.currentTimeMillis())
-        VinorCacheIo.writeAtomicText(meta, obj.toString())
-        meta.setLastModified(System.currentTimeMillis())
+        runCatching {
+            val obj = VinorCacheIo.readJson(meta) ?: return
+            obj.put("lastAccessedAt", System.currentTimeMillis())
+            VinorCacheIo.writeAtomicText(meta, obj.toString())
+            meta.setLastModified(System.currentTimeMillis())
+        }
     }
 
     private fun trim(dir: File) {

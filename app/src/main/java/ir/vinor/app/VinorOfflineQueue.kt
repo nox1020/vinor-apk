@@ -21,7 +21,7 @@ object VinorOfflineQueue {
             "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/queue",
         )
         if (!d.exists()) d.mkdirs()
-        val fp = VinorCacheSession.fingerprint(context)
+        val fp = VinorCacheSession.scopeForRead(context)
         return File(d, "$fp.json")
     }
 

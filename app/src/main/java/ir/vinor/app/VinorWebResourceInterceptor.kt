@@ -4,16 +4,27 @@ import android.content.Context
 import android.os.Build
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import org.json.JSONObject
-import java.io.ByteArrayInputStream
 
 /**
- * Intercept فقط برای GET استاتیک/API نمایشی و POST آفلاین.
- * POST معاملاتی را جعل موفقیت نمی‌کند.
+ * Intercept فقط GET: صفحه/asset/API نمایشی از کش.
+ * روی ترد Chromium اجرا می‌شود — بدون CookieManager، بدون POST، بدون mapOf غیرقابل‌تغییر.
  */
 object VinorWebResourceInterceptor {
 
     fun intercept(
+        context: Context,
+        request: WebResourceRequest?,
+        cacheFirst: Boolean,
+    ): WebResourceResponse? {
+        return try {
+            interceptUnsafe(context.applicationContext, request, cacheFirst)
+        } catch (t: Throwable) {
+            VinorCacheLog.event("CACHE_MISS", "intercept-error")
+            null
+        }
+    }
+
+    private fun interceptUnsafe(
         context: Context,
         request: WebResourceRequest?,
         cacheFirst: Boolean,
@@ -24,113 +35,38 @@ object VinorWebResourceInterceptor {
         if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
             return VinorWebViewErrorShield.silentHtmlResponse()
         }
-        if (!VinorCachePolicy.isVinorHttps(url) && !url.startsWith("/")) return null
+        if (!VinorCachePolicy.isVinorHttps(url)) return null
 
         val method = request.method?.uppercase().orEmpty().ifBlank { "GET" }
-        if (method == "GET") {
-            return interceptGet(context, request, url, cacheFirst)
-        }
-        if (cacheFirst && method == "POST") {
-            return interceptOfflinePost(context, url)
-        }
-        return null
-    }
+        if (method != "GET") return null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && request.isRedirect) return null
+        if (isServiceWorkerUrl(url)) return null
 
-    private fun interceptGet(
-        context: Context,
-        request: WebResourceRequest,
-        url: String,
-        cacheFirst: Boolean,
-    ): WebResourceResponse? {
         if (cacheFirst && request.isForMainFrame && VinorCachePolicy.isPartnerPath(url)) {
-            val page = VinorOfflinePageStore.asHtmlResponse(context, url)
-            if (page != null) return page
+            VinorOfflinePageStore.asHtmlResponse(context, url)?.let { return it }
         }
         if (VinorCachePolicy.isStaticAssetPath(url)) {
             if (!cacheFirst) {
                 VinorOfflineAssetStore.cacheAsync(context, url)
                 return null
             }
-            val asset = VinorOfflineAssetStore.asResponse(context, url)
-            if (asset != null) return asset
+            VinorOfflineAssetStore.asResponse(context, url)?.let { return it }
             VinorCacheLog.event("CACHE_MISS", "asset")
             return null
         }
-        if (VinorCachePolicy.isSafeGetApi(url)) {
-            if (!cacheFirst) {
-                return null
-            }
-            val api = VinorApiCacheStore.asResponse(context, url)
-            if (api != null) return api
-            return json(
-                JSONObject()
-                    .put("success", false)
-                    .put("offline", true)
-                    .put("message", "این بخش بدون اینترنت در دسترس نیست"),
-                503,
-            )
+        if (cacheFirst && VinorCachePolicy.isSafeGetApi(url)) {
+            VinorApiCacheStore.asResponse(context, url)?.let { return it }
+            VinorCacheLog.event("CACHE_MISS", "api")
+            return null
         }
         return null
     }
 
-    private fun interceptOfflinePost(
-        context: Context,
-        url: String,
-    ): WebResourceResponse? {
-        if (!VinorCachePolicy.isPartnerPath(url) &&
-            !url.contains("/express/partner/api/") &&
-            !url.contains("/api/express/")
-        ) {
-            return null
-        }
-        if (VinorCachePolicy.isSensitivePath(url)) {
-            VinorCacheLog.event("OFFLINE_ENTER", "blocked-sensitive-post")
-            return json(
-                JSONObject()
-                    .put("ok", false)
-                    .put("success", false)
-                    .put("offline", true)
-                    .put("message", "برای انجام این عملیات اینترنت لازم است"),
-                503,
-            )
-        }
-        if (VinorCachePolicy.isQueueablePost(url)) {
-            VinorCacheLog.event("QUEUE_ADD", "intercept-no-body")
-            return json(
-                JSONObject()
-                    .put("ok", false)
-                    .put("success", false)
-                    .put("offline", true)
-                    .put("queued", false)
-                    .put("canQueue", true)
-                    .put("message", "بدون اینترنت ذخیره نشد؛ پس از اتصال دوباره تلاش کنید"),
-                503,
-            )
-        }
-        return json(
-            JSONObject()
-                .put("ok", false)
-                .put("success", false)
-                .put("offline", true)
-                .put("message", "برای انجام این عملیات اینترنت لازم است"),
-            503,
-        )
-    }
-
-    private fun json(obj: JSONObject, status: Int): WebResourceResponse {
-        val bytes = obj.toString().toByteArray(Charsets.UTF_8)
-        val reason = if (status in 200..299) "OK" else "Unavailable"
-        return if (Build.VERSION.SDK_INT >= 21) {
-            WebResourceResponse(
-                "application/json",
-                "utf-8",
-                status,
-                reason,
-                mapOf("Content-Type" to "application/json; charset=utf-8", "X-Vinor-Cache" to "OFFLINE"),
-                ByteArrayInputStream(bytes),
-            )
-        } else {
-            WebResourceResponse("application/json", "utf-8", ByteArrayInputStream(bytes))
-        }
+    private fun isServiceWorkerUrl(url: String): Boolean {
+        val p = VinorCachePolicy.pathOf(url).lowercase()
+        return p.endsWith("-sw.js") ||
+            p.endsWith("/sw.js") ||
+            p.contains("service-worker") ||
+            p.contains("serviceworker")
     }
 }

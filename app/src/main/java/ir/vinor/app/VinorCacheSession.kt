@@ -15,12 +15,19 @@ object VinorCacheSession {
     const val ANON = "anon"
     const val PUBLIC = "public"
 
+    /**
+     * فقط از ترد UI صدا زده شود (CookieManager روی ChromiumNetThread کرش می‌دهد).
+     * اگر خواندن کوکی شکست بخورد، مقدار قبلی prefs را با anon بازنویسی نمی‌کند.
+     */
     fun fingerprint(context: Context? = null): String {
         val cookie = runCatching {
             CookieManager.getInstance().getCookie("https://vinor.ir")
                 ?: CookieManager.getInstance().getCookie("https://www.vinor.ir")
                 ?: ""
-        }.getOrDefault("")
+        }.getOrNull()
+        if (cookie == null) {
+            return context?.let { lastKnown(it) } ?: ANON
+        }
         val trimmed = cookie.trim()
         if (trimmed.length < 12) {
             persist(context, ANON)
@@ -30,6 +37,11 @@ object VinorCacheSession {
         persist(context, fp)
         return fp
     }
+
+    /** برای shouldInterceptRequest — فقط SharedPreferences، بدون CookieManager. */
+    fun scopeForRead(context: Context): String = lastKnown(context)
+
+    fun scopeForWrite(context: Context): String = fingerprint(context)
 
     fun lastKnown(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

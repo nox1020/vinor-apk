@@ -4,7 +4,6 @@ import android.os.Build
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import java.io.ByteArrayInputStream
 
 /**
  * جلوگیری از نمایش صفحهٔ پیش‌فرض WebView/Chromium با متن انگلیسی «offline» و خطاهای داخلی.
@@ -46,11 +45,7 @@ object VinorWebViewErrorShield {
     }
 
     fun silentHtmlResponse(): WebResourceResponse =
-        WebResourceResponse(
-            "text/html",
-            "UTF-8",
-            ByteArrayInputStream(silentHtmlBytes)
-        )
+        VinorWebResponses.html(silentHtmlBytes)
 
     fun shouldInterceptChromeErrorMainFrame(request: WebResourceRequest?): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false

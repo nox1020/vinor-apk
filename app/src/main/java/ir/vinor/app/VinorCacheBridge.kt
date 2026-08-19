@@ -29,50 +29,70 @@ class VinorCacheBridge(
                   } catch (_) {}
                 })();
             """.trimIndent()
-            webView.post { webView.evaluateJavascript(js, null) }
+            webView.post {
+                try {
+                    webView.evaluateJavascript(js, null)
+                } catch (_: Throwable) {
+                }
+            }
         }
     }
 
     @JavascriptInterface
-    fun networkState(): String = VinorNetworkStatus.current(context).name
+    fun networkState(): String =
+        runCatching { VinorNetworkStatus.current(context).name }.getOrDefault(VinorNetState.OFFLINE.name)
 
     @JavascriptInterface
-    fun isOnline(): Boolean = VinorNetworkStatus.isOnline(context)
+    fun isOnline(): Boolean =
+        runCatching { VinorNetworkStatus.isOnline(context) }.getOrDefault(false)
 
     @JavascriptInterface
-    fun lastCachedAt(): Long = VinorWebOfflineSession.lastCachedAt(context)
+    fun lastCachedAt(): Long =
+        runCatching { VinorWebOfflineSession.lastCachedAt(context) }.getOrDefault(0L)
 
     @JavascriptInterface
     fun enqueue(type: String?, url: String?, body: String?): String {
-        val wv = webViewProvider()
-        if (!VinorBridgeGate.isTrustedPage(wv)) {
-            return JSONObject().put("ok", false).put("message", "untrusted").toString()
+        return runCatching {
+            if (!trusted()) {
+                return@runCatching JSONObject().put("ok", false).put("message", "untrusted").toString()
+            }
+            VinorOfflineQueue.enqueue(
+                context.applicationContext,
+                type = type?.trim().orEmpty().ifBlank { "post" },
+                url = url?.trim().orEmpty(),
+                method = "POST",
+                body = body,
+            ).toString()
+        }.getOrElse {
+            JSONObject().put("ok", false).put("queued", false).put("offline", true).toString()
         }
-        return VinorOfflineQueue.enqueue(
-            context.applicationContext,
-            type = type?.trim().orEmpty().ifBlank { "post" },
-            url = url?.trim().orEmpty(),
-            method = "POST",
-            body = body,
-        ).toString()
     }
 
     @JavascriptInterface
-    fun pendingQueue(): String = VinorOfflineQueue.snapshotJson(context.applicationContext).toString()
+    fun pendingQueue(): String = runCatching {
+        VinorOfflineQueue.snapshotJson(context.applicationContext).toString()
+    }.getOrDefault("[]")
 
     @JavascriptInterface
     fun ackQueueItem(id: String?) {
         val trimmed = id?.trim().orEmpty()
         if (trimmed.isEmpty()) return
-        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return
-        VinorOfflineQueue.ack(context.applicationContext, trimmed)
+        if (!trusted()) return
+        runCatching { VinorOfflineQueue.ack(context.applicationContext, trimmed) }
     }
 
     @JavascriptInterface
     fun failQueueItem(id: String?, error: String?) {
         val trimmed = id?.trim().orEmpty()
         if (trimmed.isEmpty()) return
-        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return
-        VinorOfflineQueue.fail(context.applicationContext, trimmed, error.orEmpty())
+        if (!trusted()) return
+        runCatching { VinorOfflineQueue.fail(context.applicationContext, trimmed, error.orEmpty()) }
+    }
+
+    private fun trusted(): Boolean {
+        val wv = webViewProvider()
+        if (VinorBridgeGate.isTrustedPage(wv)) return true
+        val last = VinorWebOfflineSession.lastPartnerUrl(context)
+        return VinorBridgeGate.isTrustedUrl(last)
     }
 }

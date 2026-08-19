@@ -128,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         setupRetryButton()
         setupBackPressHandler()
         setupWebView()
+        VinorCacheSession.fingerprint(this)
         if (::webView.isInitialized) {
             VinorWebCacheManager.onAppStart(this, webView, isOnline())
         }
@@ -366,24 +367,34 @@ class MainActivity : AppCompatActivity() {
                 view: WebView?,
                 request: WebResourceRequest?
             ): WebResourceResponse? {
-                val intercepted = VinorWebResourceInterceptor.intercept(
-                    this@MainActivity,
-                    request,
-                    cacheFirst = VinorNetworkStatus.useCacheFirst(this@MainActivity),
-                )
-                if (intercepted != null) return intercepted
-                return super.shouldInterceptRequest(view, request)
+                return try {
+                    val intercepted = VinorWebResourceInterceptor.intercept(
+                        this@MainActivity,
+                        request,
+                        cacheFirst = VinorNetworkStatus.useCacheFirst(this@MainActivity),
+                    )
+                    if (intercepted != null) intercepted
+                    else super.shouldInterceptRequest(view, request)
+                } catch (t: Throwable) {
+                    Log.w("MainActivity", "shouldInterceptRequest failed", t)
+                    null
+                }
             }
 
             @Suppress("DEPRECATION")
             @Deprecated("API قدیمی برای زیر نسخه M")
             override fun shouldInterceptRequest(view: WebView?, url: String?): WebResourceResponse? {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
-                        return VinorWebViewErrorShield.silentHtmlResponse()
+                return try {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+                            return VinorWebViewErrorShield.silentHtmlResponse()
+                        }
                     }
+                    super.shouldInterceptRequest(view, url)
+                } catch (t: Throwable) {
+                    Log.w("MainActivity", "shouldInterceptRequest(legacy) failed", t)
+                    null
                 }
-                return super.shouldInterceptRequest(view, url)
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -434,6 +445,7 @@ class MainActivity : AppCompatActivity() {
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 probePartnerShellReady()
                 VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
+                VinorCacheSession.fingerprint(this@MainActivity)
                 syncConnectivityToWeb()
                 cacheCurrentPageSnapshot(url ?: webView.url)
                 if (isOnline() && !offlineAssetWarmupDone) {
@@ -631,15 +643,19 @@ class MainActivity : AppCompatActivity() {
         val target = (url ?: "").trim()
         val html = VinorOfflinePageStore.read(this, target) ?: return false
         val base = if (target.isNotBlank()) target else VinorPartnerUrls.ENTRY
-        webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
-        return true
+        return runCatching {
+            webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
+            true
+        }.getOrDefault(false)
     }
 
     private fun renderLatestOfflineSnapshot(): Boolean {
         val html = VinorOfflinePageStore.readLatest(this) ?: return false
         val base = VinorWebOfflineSession.lastPartnerUrl(this) ?: VinorPartnerUrls.ENTRY
-        webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
-        return true
+        return runCatching {
+            webView.loadDataWithBaseURL(base, html, "text/html", "utf-8", base)
+            true
+        }.getOrDefault(false)
     }
 
     private fun decodeJsStringResult(raw: String?): String? {
@@ -874,10 +890,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyWebCacheMode() {
         if (!::webView.isInitialized) return
-        webView.settings.cacheMode = if (VinorNetworkStatus.useCacheFirst(this)) {
-            WebSettings.LOAD_CACHE_ELSE_NETWORK
-        } else {
-            WebSettings.LOAD_DEFAULT
+        try {
+            webView.settings.cacheMode = if (VinorNetworkStatus.useCacheFirst(this)) {
+                WebSettings.LOAD_CACHE_ELSE_NETWORK
+            } else {
+                WebSettings.LOAD_DEFAULT
+            }
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "applyWebCacheMode failed", t)
         }
     }
 
@@ -941,7 +961,11 @@ class MainActivity : AppCompatActivity() {
         degradedOffline = true
         applyWebCacheMode()
         if (::webView.isInitialized) {
-            webView.stopLoading()
+            try {
+                webView.stopLoading()
+            } catch (t: Throwable) {
+                Log.w("MainActivity", "stopLoading failed", t)
+            }
         }
         if (canKeepCurrentWebContent()) {
             enterDegradedOffline()

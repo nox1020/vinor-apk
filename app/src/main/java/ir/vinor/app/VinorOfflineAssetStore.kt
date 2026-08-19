@@ -4,7 +4,6 @@ import android.content.Context
 import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -150,21 +149,7 @@ object VinorOfflineAssetStore {
             VinorCacheLog.event("CACHE_HIT", "asset")
         }
         val ct = hit.contentType.ifBlank { VinorCachePolicy.guessMime(u) }
-        val encoding = if (
-            ct.startsWith("text/") ||
-            ct.contains("javascript") ||
-            ct.contains("json") ||
-            ct.contains("xml") ||
-            ct.contains("svg")
-        ) "utf-8" else null
-        return WebResourceResponse(
-            ct,
-            encoding,
-            200,
-            "OK",
-            mapOf("X-Vinor-Cache" to "HIT"),
-            ByteArrayInputStream(hit.bytes),
-        )
+        return VinorWebResponses.of(ct, "utf-8", hit.bytes)
     }
 
     private data class AssetHit(

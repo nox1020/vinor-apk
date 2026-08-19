@@ -3,7 +3,6 @@ package ir.vinor.app
 import android.content.Context
 import android.webkit.WebResourceResponse
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
@@ -22,7 +21,7 @@ object VinorOfflinePageStore {
         if (h.length < 200) return
         h = ensureBaseHref(h, u)
         h = appendOfflineMeta(h, System.currentTimeMillis())
-        val dir = dir(context)
+        val dir = dir(context, forWrite = true)
         val id = key(u)
         val htmlFile = File(dir, "$id.html")
         val metaFile = File(dir, "$id.json")
@@ -71,15 +70,7 @@ object VinorOfflinePageStore {
 
     fun asHtmlResponse(context: Context, url: String?): WebResourceResponse? {
         val html = read(context, url) ?: return null
-        val bytes = html.toByteArray(Charsets.UTF_8)
-        return WebResourceResponse(
-            "text/html",
-            "utf-8",
-            200,
-            "OK",
-            mapOf("Cache-Control" to "no-store", "X-Vinor-Cache" to "HIT"),
-            ByteArrayInputStream(bytes),
-        )
+        return VinorWebResponses.html(html.toByteArray(Charsets.UTF_8))
     }
 
     fun readLatest(context: Context): String? {
@@ -115,10 +106,15 @@ object VinorOfflinePageStore {
         }
     }
 
-    private fun dir(context: Context): File {
+    private fun dir(context: Context, forWrite: Boolean = false): File {
+        val fp = if (forWrite) {
+            VinorCacheSession.scopeForWrite(context)
+        } else {
+            VinorCacheSession.scopeForRead(context)
+        }
         val d = File(
             context.filesDir,
-            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/pages/${VinorCacheSession.fingerprint(context)}",
+            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/pages/$fp",
         )
         if (!d.exists()) d.mkdirs()
         return d
@@ -163,10 +159,12 @@ object VinorOfflinePageStore {
     }
 
     private fun touch(meta: File) {
-        val obj = VinorCacheIo.readJson(meta) ?: return
-        obj.put("lastAccessedAt", System.currentTimeMillis())
-        VinorCacheIo.writeAtomicText(meta, obj.toString())
-        meta.setLastModified(System.currentTimeMillis())
+        runCatching {
+            val obj = VinorCacheIo.readJson(meta) ?: return
+            obj.put("lastAccessedAt", System.currentTimeMillis())
+            VinorCacheIo.writeAtomicText(meta, obj.toString())
+            meta.setLastModified(System.currentTimeMillis())
+        }
     }
 
     private fun deletePair(dir: File, id: String) {

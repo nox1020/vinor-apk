@@ -5,15 +5,20 @@ import android.webkit.WebView
 /** Gate for @JavascriptInterface / Web permission — only vinor HTTPS main frames. */
 object VinorBridgeGate {
     fun isTrustedPage(webView: WebView?): Boolean {
-        val url = webView?.url?.trim().orEmpty()
-        if (url.isEmpty()) return false
-        if (url.startsWith("about:", ignoreCase = true) ||
-            url.startsWith("data:", ignoreCase = true) ||
-            url.startsWith("chrome:", ignoreCase = true)
+        val url = runCatching { webView?.url?.trim().orEmpty() }.getOrDefault("")
+        return isTrustedUrl(url)
+    }
+
+    fun isTrustedUrl(url: String?): Boolean {
+        val raw = url?.trim().orEmpty()
+        if (raw.isEmpty()) return false
+        if (raw.startsWith("about:", ignoreCase = true) ||
+            raw.startsWith("data:", ignoreCase = true) ||
+            raw.startsWith("chrome:", ignoreCase = true)
         ) {
             return false
         }
-        return UrlUtils.isTrustedVinorHttps(url)
+        return UrlUtils.isTrustedVinorHttps(raw)
     }
 
     fun isTrustedOrigin(origin: String?): Boolean {

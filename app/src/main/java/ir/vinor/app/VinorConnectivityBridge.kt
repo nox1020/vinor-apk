@@ -53,13 +53,18 @@ class VinorConnectivityBridge(
                   } catch (_) {}
                 })();
             """.trimIndent()
-            webView.evaluateJavascript(js, null)
+            webView.post {
+                try {
+                    webView.evaluateJavascript(js, null)
+                } catch (_: Throwable) {
+                }
+            }
         }
     }
 
     @JavascriptInterface
-    fun isOnline(): Boolean = stateProvider() == VinorNetState.ONLINE
+    fun isOnline(): Boolean = runCatching { stateProvider() == VinorNetState.ONLINE }.getOrDefault(false)
 
     @JavascriptInterface
-    fun networkState(): String = stateProvider().name
+    fun networkState(): String = runCatching { stateProvider().name }.getOrDefault(VinorNetState.OFFLINE.name)
 }
