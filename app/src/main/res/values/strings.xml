@@ -7,9 +7,11 @@
     <string name="preloader_retry">تلاش مجدد</string>
     <string name="preloader_no_internet">اتصال اینترنت برقرار نیست</string>
     <string name="loading_message">در حال بارگذاری…</string>
-    <string name="offline_title">اتصال اینترنت برقرار نیست</string>
+    <string name="offline_title">آفلاین هستید</string>
     <string name="offline_message">اینترنت را روشن کنید و دوباره بزنید</string>
-    <string name="offline_retry">بررسی مجدد</string>
+    <string name="offline_message_cached">اطلاعات ممکن است به‌روز نباشد.</string>
+    <string name="offline_last_saved">آخرین اطلاعات ذخیره‌شده: %1$s</string>
+    <string name="offline_retry">تلاش دوباره</string>
     <string name="offline_checking">در حال بررسی…</string>
     <string name="offline_icon_cd">بدون اتصال</string>
 

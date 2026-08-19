@@ -2,14 +2,14 @@ package ir.vinor.app
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import android.webkit.WebStorage
 import android.webkit.WebView
 
 /**
  * چرخهٔ عمر کش WebView + Service Worker پنل همکاران.
  *
- * HTML پنل `no-store` است؛ کش آفلاین واقعی از SW runtime (فقط VinorApp UA) + WebView زنده.
+ * HTML پنل `no-store` است؛ کش آفلاین واقعی:
+ * SW runtime (VinorApp UA) + snapshot نیتیو + asset/API cache نسخه‌دار.
  */
 object VinorWebCacheManager {
 
@@ -17,6 +17,7 @@ object VinorWebCacheManager {
     private const val PREFS = "vinor_web_cache"
     private const val KEY_VERSION_CODE = "last_version_code"
     private const val KEY_PURGE_PENDING = "purge_pending"
+    private const val KEY_SCHEMA = "cache_schema"
 
     private val WARMUP_URLS = listOf(
         "/express/partner/login",
@@ -24,6 +25,9 @@ object VinorWebCacheManager {
         "/static/express-partner/skeleton-shell.html",
         "/static/express-partner/express-nav.js",
         "/static/express-partner/dashboard-chrome.js",
+        "/static/express-partner/land-detail.js",
+        "/static/fonts/vazirmatn.css",
+        "/static/vendor/fontawesome/css/all.min.css",
     )
 
     private fun prefs(context: Context) =
@@ -38,42 +42,50 @@ object VinorWebCacheManager {
         0
     }
 
-    /** پس از ساخت WebView — پاک‌سازی کش کهنه پس از آپدیت APK */
     fun onAppStart(context: Context, webView: WebView?, isOnline: Boolean) {
+        VinorOfflinePageStore.migrateLegacy(context)
+        VinorOfflineAssetStore.clearPublicIfCorrupted(context)
         val current = versionCode(context)
         val pref = prefs(context)
         val stored = pref.getInt(KEY_VERSION_CODE, -1)
+        val schema = pref.getInt(KEY_SCHEMA, 0)
         var shouldPurge = pref.getBoolean(KEY_PURGE_PENDING, false)
         if (stored >= 0 && stored != current) {
             shouldPurge = true
             pref.edit().putBoolean(KEY_PURGE_PENDING, true).apply()
         }
+        if (schema != 0 && schema != VinorCachePolicy.SCHEMA_VERSION && isOnline) {
+            shouldPurge = true
+        }
         if (shouldPurge && isOnline) {
-            Log.i(TAG, "purging stale web caches after online confirmation")
+            VinorCacheLog.event("CACHE_DELETE", "stale-http-sw")
             purgeHttpDiskCache(webView)
             clearServiceWorkerCaches(webView, includePrecache = false)
             pref.edit().putBoolean(KEY_PURGE_PENDING, false).apply()
         }
-        if (stored != current) {
-            pref.edit().putInt(KEY_VERSION_CODE, current).apply()
-        }
+        pref.edit()
+            .putInt(KEY_VERSION_CODE, current)
+            .putInt(KEY_SCHEMA, VinorCachePolicy.SCHEMA_VERSION)
+            .apply()
     }
 
-    /** خروج از حساب — کوکی‌ها جداگانه در MainActivity پاک می‌شوند */
     fun onLogout(context: Context, webView: WebView?) {
-        Log.i(TAG, "logout purge")
+        VinorCacheLog.event("CACHE_DELETE", "logout")
         clearServiceWorkerCaches(webView, includePrecache = true)
         purgeWebStorage(webView)
         purgeHttpDiskCache(webView)
         try {
             webView?.clearHistory()
         } catch (e: Exception) {
-            Log.w(TAG, "clearHistory failed", e)
+            android.util.Log.w(TAG, "clearHistory failed", e)
         }
+        VinorOfflinePageStore.clearUser(context)
+        VinorApiCacheStore.clearUser(context)
+        VinorOfflineQueue.clearUser(context)
+        VinorCacheSession.clearPrefs(context)
         VinorWebOfflineSession.clear(context)
     }
 
-    /** پس از لود موفق پنل — پر کردن precache/runtime در SW */
     fun warmupPartnerCaches(webView: WebView?) {
         if (webView == null) return
         val urlsJson = WARMUP_URLS.joinToString(",") { "\"$it\"" }
@@ -120,7 +132,7 @@ object VinorWebCacheManager {
         try {
             WebStorage.getInstance().deleteAllData()
         } catch (e: Exception) {
-            Log.w(TAG, "WebStorage purge failed", e)
+            android.util.Log.w(TAG, "WebStorage purge failed", e)
         }
         try {
             webView?.clearFormData()
@@ -132,7 +144,7 @@ object VinorWebCacheManager {
         try {
             webView?.clearCache(true)
         } catch (e: Exception) {
-            Log.w(TAG, "WebView clearCache failed", e)
+            android.util.Log.w(TAG, "WebView clearCache failed", e)
         }
     }
 }

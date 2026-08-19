@@ -10,7 +10,8 @@
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
--keep class ir.vinor.app.VinorShellBridge { *; }
+-keep class ir.vinor.app.VinorCacheBridge { *; }
+-keep class ir.vinor.app.VinorConnectivityBridge { *; }
 -keep class ir.vinor.app.VinorSpeechBridge { *; }
 -keep class ir.vinor.app.VinorNotifyBridge { *; }
 -keep class ir.vinor.app.VinorDownloadBridge { *; }

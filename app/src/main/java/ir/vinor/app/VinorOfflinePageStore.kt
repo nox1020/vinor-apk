@@ -2,69 +2,83 @@ package ir.vinor.app
 
 import android.content.Context
 import android.webkit.WebResourceResponse
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
 object VinorOfflinePageStore {
-    private const val DIR_NAME = "offline_pages"
-
-    private fun dir(context: Context): File {
-        val d = File(context.filesDir, DIR_NAME)
-        if (!d.exists()) d.mkdirs()
-        return d
-    }
-
-    private fun key(url: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun pageFile(context: Context, url: String): File =
-        File(dir(context), "${key(url)}.html")
 
     fun save(context: Context, url: String?, html: String?) {
         val u = (url ?: "").trim()
-        val h = (html ?: "").trim()
+        var h = (html ?: "").trim()
         if (u.isEmpty() || h.isEmpty()) return
         if (!VinorWebOfflineSession.isPartnerBrowsableUrl(u)) return
-        runCatching {
-            pageFile(context, u).writeText(h, Charsets.UTF_8)
-            val noQuery = runCatching {
-                val uri = URI(u)
-                URI(uri.scheme, uri.authority, uri.path, null, null).toString()
-            }.getOrNull().orEmpty()
-            if (noQuery.isNotBlank() && noQuery != u) {
-                pageFile(context, noQuery).writeText(h, Charsets.UTF_8)
-            }
+        if (h.toByteArray(Charsets.UTF_8).size > VinorCachePolicy.MAX_HTML_BYTES) {
+            VinorCacheLog.event("CACHE_DELETE", "snapshot too large")
+            return
         }
+        if (h.length < 200) return
+        h = ensureBaseHref(h, u)
+        h = appendOfflineMeta(h, System.currentTimeMillis())
+        val dir = dir(context)
+        val id = key(u)
+        val htmlFile = File(dir, "$id.html")
+        val metaFile = File(dir, "$id.json")
+        if (!VinorCacheIo.writeAtomicText(htmlFile, h)) return
+        val meta = JSONObject()
+            .put("url", VinorCachePolicy.normalizeUrl(u))
+            .put("createdAt", System.currentTimeMillis())
+            .put("lastAccessedAt", System.currentTimeMillis())
+            .put("size", h.length)
+            .put("session", VinorCacheSession.fingerprint(context))
+        VinorCacheIo.writeAtomicText(metaFile, meta.toString())
+        val noQuery = stripQuery(u)
+        if (noQuery.isNotBlank() && noQuery != u) {
+            val id2 = key(noQuery)
+            VinorCacheIo.writeAtomicText(File(dir, "$id2.html"), h)
+            VinorCacheIo.writeAtomicText(File(dir, "$id2.json"), meta.put("url", noQuery).toString())
+        }
+        VinorWebOfflineSession.markCachedAt(context, System.currentTimeMillis())
+        VinorCacheLog.event("CACHE_WRITE", "page")
+        trim(dir)
     }
 
     fun read(context: Context, url: String?): String? {
         val u = (url ?: "").trim()
         if (u.isEmpty()) return null
-        return runCatching {
-            val exact = pageFile(context, u)
-            if (exact.exists()) return@runCatching exact.readText(Charsets.UTF_8)
-            val noQuery = runCatching {
-                val uri = URI(u)
-                URI(uri.scheme, uri.authority, uri.path, null, null).toString()
-            }.getOrNull().orEmpty()
-            if (noQuery.isNotBlank()) {
-                val fallback = pageFile(context, noQuery)
-                if (fallback.exists()) return@runCatching fallback.readText(Charsets.UTF_8)
+        val dir = dir(context)
+        val exact = File(dir, "${key(u)}.html")
+        val html = VinorCacheIo.readText(exact)
+        if (!html.isNullOrBlank()) {
+            if (!htmlLooksHealthy(html)) {
+                VinorCacheLog.event("CACHE_DELETE", "page corrupt")
+                deletePair(dir, key(u))
+                return null
             }
-            null
-        }.getOrNull()
+            touch(File(dir, "${key(u)}.json"))
+            VinorCacheLog.event("CACHE_HIT", "page")
+            return html
+        }
+        val noQuery = stripQuery(u)
+        if (noQuery.isNotBlank() && noQuery != u) {
+            return read(context, noQuery)
+        }
+        VinorCacheLog.event("CACHE_MISS", "page")
+        return null
     }
 
     fun asHtmlResponse(context: Context, url: String?): WebResourceResponse? {
         val html = read(context, url) ?: return null
+        val bytes = html.toByteArray(Charsets.UTF_8)
         return WebResourceResponse(
             "text/html",
             "utf-8",
-            ByteArrayInputStream(html.toByteArray(Charsets.UTF_8))
+            200,
+            "OK",
+            mapOf("Cache-Control" to "no-store", "X-Vinor-Cache" to "HIT"),
+            ByteArrayInputStream(bytes),
         )
     }
 
@@ -74,8 +88,103 @@ object VinorOfflinePageStore {
                 .listFiles { f -> f.name.endsWith(".html") }
                 ?.maxByOrNull { it.lastModified() }
                 ?: return@runCatching null
-            latest.readText(Charsets.UTF_8).takeIf { it.isNotBlank() }
+            val html = VinorCacheIo.readText(latest)
+            if (html.isNullOrBlank() || !htmlLooksHealthy(html)) null else html
         }.getOrNull()
     }
-}
 
+    fun lastSavedAt(context: Context): Long =
+        VinorWebOfflineSession.lastCachedAt(context)
+
+    fun hasAny(context: Context): Boolean =
+        dir(context).listFiles { f -> f.name.endsWith(".html") }?.isNotEmpty() == true
+
+    fun clearUser(context: Context) {
+        runCatching { dir(context).deleteRecursively() }
+    }
+
+    fun migrateLegacy(context: Context) {
+        val old = File(context.filesDir, "offline_pages")
+        if (!old.isDirectory) return
+        val dest = dir(context)
+        old.listFiles { f -> f.name.endsWith(".html") }?.forEach { src ->
+            val target = File(dest, src.name)
+            if (!target.exists()) {
+                runCatching { src.copyTo(target, overwrite = false) }
+            }
+        }
+    }
+
+    private fun dir(context: Context): File {
+        val d = File(
+            context.filesDir,
+            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/pages/${VinorCacheSession.fingerprint(context)}",
+        )
+        if (!d.exists()) d.mkdirs()
+        return d
+    }
+
+    private fun key(url: String): String {
+        val n = VinorCachePolicy.normalizeUrl(url)
+        return MessageDigest.getInstance("SHA-256").digest(n.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    private fun stripQuery(url: String): String = runCatching {
+        val uri = URI(url)
+        URI(uri.scheme, uri.authority, uri.path, null, null).toString()
+    }.getOrDefault(url)
+
+    private fun htmlLooksHealthy(html: String): Boolean {
+        val lower = html.lowercase()
+        if (lower.contains("chrome-error://")) return false
+        if (!lower.contains("<html") && !lower.contains("<body")) return false
+        return html.length >= 200
+    }
+
+    private fun ensureBaseHref(html: String, url: String): String {
+        if (html.contains("<base", ignoreCase = true)) return html
+        val base = stripQuery(url).ifBlank { VinorPartnerUrls.ENTRY }
+        val tag = """<base href="$base">"""
+        val head = Regex("<head[^>]*>", RegexOption.IGNORE_CASE).find(html)
+        return if (head != null) {
+            html.replaceRange(head.range.last + 1, head.range.last + 1, tag)
+        } else {
+            "<head>$tag</head>$html"
+        }
+    }
+
+    private fun appendOfflineMeta(html: String, ts: Long): String {
+        if (html.contains("__vinorOfflineSnapshot")) return html
+        val snippet =
+            """<script>window.__vinorOfflineSnapshot=1;window.__vinorCacheMeta={lastCachedAt:$ts};</script>"""
+        val idx = html.lastIndexOf("</body>", ignoreCase = true)
+        return if (idx >= 0) html.substring(0, idx) + snippet + html.substring(idx) else html + snippet
+    }
+
+    private fun touch(meta: File) {
+        val obj = VinorCacheIo.readJson(meta) ?: return
+        obj.put("lastAccessedAt", System.currentTimeMillis())
+        VinorCacheIo.writeAtomicText(meta, obj.toString())
+        meta.setLastModified(System.currentTimeMillis())
+    }
+
+    private fun deletePair(dir: File, id: String) {
+        VinorCacheIo.deleteQuiet(File(dir, "$id.html"))
+        VinorCacheIo.deleteQuiet(File(dir, "$id.json"))
+    }
+
+    private fun trim(dir: File) {
+        val files = dir.listFiles { f -> f.name.endsWith(".html") }?.toList().orEmpty()
+        val remove = VinorCacheIo.lruTrim(
+            files,
+            VinorCachePolicy.MAX_SNAPSHOTS,
+            VinorCachePolicy.MAX_SNAPSHOT_TOTAL_BYTES,
+        )
+        remove.forEach { html ->
+            val id = html.name.removeSuffix(".html")
+            deletePair(dir, id)
+            VinorCacheLog.event("CACHE_DELETE", "page lru")
+        }
+    }
+}

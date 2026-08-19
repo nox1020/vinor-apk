@@ -4,15 +4,14 @@ import android.content.Context
 import android.webkit.WebView
 
 /**
- * وضعیت آفلاین وب در APK: آخرین URL موفق + پرچم «قبلاً محتوا دیده شده».
- * HTML پنل no-store است؛ کش آفلاین: SW runtime (VinorApp) + WebView زنده.
- * چرخهٔ عمر کش: [VinorWebCacheManager]
+ * وضعیت آفلاین وب در APK: آخرین URL موفق + زمان آخرین snapshot معتبر.
  */
 object VinorWebOfflineSession {
 
     private const val PREFS = "vinor_web_state"
     private const val KEY_REVEALED = "content_revealed_once"
     private const val KEY_LAST_URL = "last_partner_url"
+    private const val KEY_LAST_CACHED_AT = "last_cached_at"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -22,6 +21,13 @@ object VinorWebOfflineSession {
 
     fun lastPartnerUrl(context: Context): String? =
         prefs(context).getString(KEY_LAST_URL, null)?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun lastCachedAt(context: Context): Long =
+        prefs(context).getLong(KEY_LAST_CACHED_AT, 0L)
+
+    fun markCachedAt(context: Context, ts: Long) {
+        prefs(context).edit().putLong(KEY_LAST_CACHED_AT, ts).apply()
+    }
 
     fun markSuccess(context: Context, url: String?) {
         if (!isPartnerBrowsableUrl(url)) return
@@ -40,7 +46,8 @@ object VinorWebOfflineSession {
         if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return false
         if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) return false
         if (url.startsWith("about:")) return false
-        return url.contains("/express/partner") || url.contains("vinor.ir")
+        if (!UrlUtils.isVinorDomain(url) && !url.contains("vinor.ir")) return false
+        return VinorCachePolicy.isPartnerPath(url)
     }
 
     fun webViewHasBrowsablePage(webView: WebView): Boolean =

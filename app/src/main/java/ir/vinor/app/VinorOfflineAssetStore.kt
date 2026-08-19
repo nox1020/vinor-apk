@@ -3,6 +3,7 @@ package ir.vinor.app
 import android.content.Context
 import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.HttpURLConnection
@@ -13,25 +14,25 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 object VinorOfflineAssetStore {
-    private const val DIR_NAME = "offline_assets"
-    private const val MAX_ENTRIES = 700
-    private const val MAX_BYTES = 6 * 1024 * 1024
-    private val io = Executors.newSingleThreadExecutor()
+    private val io = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "vinor-asset-cache").apply { isDaemon = true }
+    }
     private val inFlight = ConcurrentHashMap<String, Boolean>()
 
     private fun dir(context: Context): File {
-        val d = File(context.filesDir, DIR_NAME)
+        val d = File(
+            context.filesDir,
+            "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/assets/${VinorCacheSession.PUBLIC}",
+        )
         if (!d.exists()) d.mkdirs()
         return d
     }
 
     private fun key(url: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+        val n = VinorCachePolicy.normalizeUrl(url)
+        return MessageDigest.getInstance("SHA-256").digest(n.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
     }
-
-    private fun binFile(context: Context, url: String) = File(dir(context), "${key(url)}.bin")
-    private fun metaFile(context: Context, url: String) = File(dir(context), "${key(url)}.meta")
 
     private fun normalizedNoQuery(url: String): String {
         return runCatching {
@@ -42,11 +43,12 @@ object VinorOfflineAssetStore {
 
     fun cacheAsync(context: Context, url: String?) {
         val u = (url ?: "").trim()
-        if (u.isEmpty()) return
+        if (u.isEmpty() || !VinorCachePolicy.isVinorHttps(u)) return
+        if (!VinorCachePolicy.isStaticAssetPath(u)) return
         if (inFlight.putIfAbsent(u, true) != null) return
         io.execute {
             try {
-                fetchAndStore(context, u)
+                fetchAndStore(context.applicationContext, u)
             } finally {
                 inFlight.remove(u)
             }
@@ -59,9 +61,19 @@ object VinorOfflineAssetStore {
             "https://vinor.ir/static/icons/icon-512.png",
             "https://vinor.ir/static/favicon-32x32.png",
             "https://vinor.ir/static/vendor/fontawesome/css/all.min.css",
-            "https://vinor.ir/static/fonts/vazirmatn.css"
+            "https://vinor.ir/static/vendor/fontawesome/webfonts/fa-solid-900.woff2",
+            "https://vinor.ir/static/fonts/vazirmatn.css",
+            "https://vinor.ir/static/fonts/vazirmatn-regular.woff2",
+            "https://vinor.ir/static/express-partner/express-nav.js",
+            "https://vinor.ir/static/express-partner/dashboard-chrome.js",
+            "https://vinor.ir/static/express-partner/land-detail.js",
+            "https://vinor.ir/static/express-partner/skeleton-shell.html",
         )
         defaults.forEach { cacheAsync(context, it) }
+    }
+
+    fun cacheMany(context: Context, urls: List<String>) {
+        urls.take(80).forEach { cacheAsync(context, it) }
     }
 
     private fun fetchAndStore(context: Context, url: String) {
@@ -83,89 +95,137 @@ object VinorOfflineAssetStore {
             return
         }
         val ct = (conn.contentType ?: "").lowercase()
-        if (!isCacheableContentType(ct)) {
+        val etag = conn.getHeaderField("ETag").orEmpty()
+        val lastMod = conn.getHeaderField("Last-Modified").orEmpty()
+        if (!VinorCachePolicy.isCacheableAssetContentType(ct) &&
+            !VinorCachePolicy.isStaticAssetPath(url)
+        ) {
             conn.disconnect()
             return
         }
         val body = conn.inputStream.use { it.readBytes() }
         conn.disconnect()
-        if (body.isEmpty() || body.size > MAX_BYTES) return
-        write(context, url, ct, body)
+        if (body.isEmpty() || body.size > VinorCachePolicy.MAX_ASSET_BYTES) return
+        write(context, url, ct.ifBlank { VinorCachePolicy.guessMime(url) }, body, etag, lastMod)
         val noQuery = normalizedNoQuery(url)
-        if (noQuery != url) write(context, noQuery, ct, body)
+        if (noQuery != url) write(context, noQuery, ct, body, etag, lastMod)
         trim(context)
     }
 
-    private fun isCacheableContentType(ct: String): Boolean {
-        return ct.startsWith("image/") ||
-            ct.contains("text/css") ||
-            ct.contains("javascript") ||
-            ct.startsWith("font/")
-    }
-
-    private fun write(context: Context, url: String, contentType: String, data: ByteArray) {
-        runCatching {
-            val bin = binFile(context, url)
-            val meta = metaFile(context, url)
-            bin.writeBytes(data)
-            meta.writeText(contentType, Charsets.UTF_8)
-        }
+    private fun write(
+        context: Context,
+        url: String,
+        contentType: String,
+        data: ByteArray,
+        etag: String,
+        lastMod: String,
+    ) {
+        val d = dir(context)
+        val id = key(url)
+        val bin = File(d, "$id.bin")
+        val meta = File(d, "$id.json")
+        if (!VinorCacheIo.writeAtomic(bin, data)) return
+        val json = JSONObject()
+            .put("url", VinorCachePolicy.normalizeUrl(url))
+            .put("ct", contentType)
+            .put("createdAt", System.currentTimeMillis())
+            .put("lastAccessedAt", System.currentTimeMillis())
+            .put("size", data.size)
+            .put("etag", etag)
+            .put("lastModified", lastMod)
+            .put("sha256", sha256(data))
+        VinorCacheIo.writeAtomicText(meta, json.toString())
+        VinorCacheLog.event("CACHE_WRITE", "asset")
     }
 
     fun asResponse(context: Context, url: String?): WebResourceResponse? {
         val u = (url ?: "").trim()
         if (u.isEmpty()) return null
-        val read = read(context, u) ?: read(context, normalizedNoQuery(u)) ?: return null
+        val hit = read(context, u) ?: read(context, normalizedNoQuery(u)) ?: return null
+        val age = System.currentTimeMillis() - hit.createdAt
+        if (age > VinorCachePolicy.ASSET_TTL_MS && hit.createdAt > 0L) {
+            // کهنه: همچنان سرو می‌کنیم تا UI نشکند؛ LRU بعداً حذف می‌کند
+            VinorCacheLog.event("CACHE_HIT", "asset stale")
+        } else {
+            VinorCacheLog.event("CACHE_HIT", "asset")
+        }
+        val ct = hit.contentType.ifBlank { VinorCachePolicy.guessMime(u) }
+        val encoding = if (
+            ct.startsWith("text/") ||
+            ct.contains("javascript") ||
+            ct.contains("json") ||
+            ct.contains("xml") ||
+            ct.contains("svg")
+        ) "utf-8" else null
         return WebResourceResponse(
-            read.first.ifBlank { guessMime(u) },
-            "utf-8",
-            ByteArrayInputStream(read.second)
+            ct,
+            encoding,
+            200,
+            "OK",
+            mapOf("X-Vinor-Cache" to "HIT"),
+            ByteArrayInputStream(hit.bytes),
         )
     }
 
-    private fun read(context: Context, url: String): Pair<String, ByteArray>? {
-        return runCatching {
-            val bin = binFile(context, url)
-            if (!bin.exists()) return@runCatching null
-            val meta = metaFile(context, url)
-            val ct = if (meta.exists()) meta.readText(Charsets.UTF_8).trim() else ""
-            Pair(ct, bin.readBytes())
-        }.getOrNull()
-    }
+    private data class AssetHit(
+        val contentType: String,
+        val bytes: ByteArray,
+        val createdAt: Long,
+    )
 
-    private fun guessMime(url: String): String {
-        val p = url.lowercase()
-        return when {
-            p.endsWith(".png") -> "image/png"
-            p.endsWith(".jpg") || p.endsWith(".jpeg") -> "image/jpeg"
-            p.endsWith(".webp") -> "image/webp"
-            p.endsWith(".gif") -> "image/gif"
-            p.endsWith(".svg") -> "image/svg+xml"
-            p.endsWith(".css") -> "text/css"
-            p.endsWith(".js") -> "application/javascript"
-            p.endsWith(".woff2") -> "font/woff2"
-            p.endsWith(".woff") -> "font/woff"
-            else -> "application/octet-stream"
+    private fun read(context: Context, url: String): AssetHit? {
+        val d = dir(context)
+        val id = key(url)
+        val bin = File(d, "$id.bin")
+        val bytes = VinorCacheIo.readBytes(bin) ?: return null
+        if (bytes.isEmpty()) {
+            VinorCacheIo.deleteQuiet(bin)
+            VinorCacheIo.deleteQuiet(File(d, "$id.json"))
+            return null
         }
+        val meta = VinorCacheIo.readJson(File(d, "$id.json"))
+        File(d, "$id.json").setLastModified(System.currentTimeMillis())
+        bin.setLastModified(System.currentTimeMillis())
+        return AssetHit(
+            contentType = meta?.optString("ct").orEmpty(),
+            bytes = bytes,
+            createdAt = meta?.optLong("createdAt") ?: 0L,
+        )
     }
 
     fun clear(context: Context) {
-        runCatching {
-            dir(context).listFiles()?.forEach { it.delete() }
+        runCatching { dir(context).deleteRecursively() }
+    }
+
+    /** استاتیک عمومی بعد از logout نگه داشته می‌شود. */
+    fun clearPublicIfCorrupted(context: Context) {
+        val d = dir(context)
+        d.listFiles { f -> f.name.endsWith(".bin") }?.forEach { bin ->
+            val bytes = VinorCacheIo.readBytes(bin)
+            if (bytes == null || bytes.isEmpty()) {
+                val id = bin.name.removeSuffix(".bin")
+                VinorCacheIo.deleteQuiet(bin)
+                VinorCacheIo.deleteQuiet(File(d, "$id.json"))
+            }
         }
     }
 
     private fun trim(context: Context) {
-        runCatching {
-            val files = dir(context).listFiles { f -> f.name.endsWith(".bin") }?.toList() ?: return
-            if (files.size <= MAX_ENTRIES) return
-            val remove = files.sortedBy { it.lastModified() }.take(files.size - MAX_ENTRIES)
-            remove.forEach { bin ->
-                val base = bin.name.removeSuffix(".bin")
-                bin.delete()
-                File(dir(context), "$base.meta").delete()
-            }
+        val d = dir(context)
+        val files = d.listFiles { f -> f.name.endsWith(".bin") }?.toList().orEmpty()
+        val remove = VinorCacheIo.lruTrim(
+            files,
+            VinorCachePolicy.MAX_ASSET_FILES,
+            VinorCachePolicy.MAX_ASSET_TOTAL_BYTES,
+        )
+        remove.forEach { bin ->
+            val id = bin.name.removeSuffix(".bin")
+            VinorCacheIo.deleteQuiet(bin)
+            VinorCacheIo.deleteQuiet(File(d, "$id.json"))
+            VinorCacheLog.event("CACHE_DELETE", "asset lru")
         }
     }
-}
 
+    private fun sha256(data: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
+}
