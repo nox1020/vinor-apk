@@ -232,7 +232,6 @@ class MainActivity : AppCompatActivity() {
         binding.offlineOverlay.root.visibility = View.GONE
         hideLoader()
         dismissSystemSplash()
-        binding.progressBar.visibility = View.GONE
         webView.visibility = View.VISIBLE
         VinorWebOfflineSession.markSuccess(this, webView.url)
         syncConnectivityToWeb()
@@ -534,10 +533,7 @@ class MainActivity : AppCompatActivity() {
             VinorDownloadBridge.enqueueDownload(this, url, filename, showToast = true)
         }
 
-        webView.webChromeClient = webViewFileChooser.createChromeClient { newProgress ->
-            binding.progressBar.progress = newProgress
-            binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
-        }
+        webView.webChromeClient = webViewFileChooser.createChromeClient()
     }
 
     private fun isExpressPartnerUrl(url: String?): Boolean {
@@ -889,7 +885,6 @@ class MainActivity : AppCompatActivity() {
         }
         hideLoader()
         dismissSystemSplash()
-        binding.progressBar.visibility = View.GONE
         if (::offlineUi.isInitialized) offlineUi.reset()
         syncConnectivityToWeb()
     }
@@ -930,7 +925,6 @@ class MainActivity : AppCompatActivity() {
             webView.visibility = View.GONE
         }
         hideLoader()
-        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
@@ -953,7 +947,6 @@ class MainActivity : AppCompatActivity() {
             VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
         hideLoader()
-        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()

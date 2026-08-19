@@ -283,10 +283,7 @@ abstract class BaseWebViewFragment : Fragment() {
             val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, null)
             VinorDownloadBridge.enqueueDownload(requireContext(), url, filename, showToast = true)
         }
-        webView.webChromeClient = fileChooser?.createChromeClient { newProgress ->
-            binding.progressBar.progress = newProgress
-            binding.progressBar.visibility = if (newProgress == 100) View.GONE else View.VISIBLE
-        } ?: WebChromeClient()
+        webView.webChromeClient = fileChooser?.createChromeClient() ?: WebChromeClient()
     }
 
     /**
@@ -374,11 +371,11 @@ abstract class BaseWebViewFragment : Fragment() {
     }
 
     /**
-     * نمایش Loader/Skeleton
+     * نمایش Loader
      */
     private fun showLoader() {
         binding.loaderContainer.visibility = View.VISIBLE
-        binding.skeletonView.root.visibility = View.VISIBLE
+        binding.splashView.root.visibility = View.VISIBLE
     }
 
     /**
@@ -386,7 +383,7 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     private fun hideLoader() {
         binding.loaderContainer.visibility = View.GONE
-        binding.skeletonView.root.visibility = View.GONE
+        binding.splashView.root.visibility = View.GONE
     }
 
     /**
@@ -399,7 +396,6 @@ abstract class BaseWebViewFragment : Fragment() {
             binding.webView.visibility = View.GONE
         }
         hideLoader()
-        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
@@ -416,7 +412,6 @@ abstract class BaseWebViewFragment : Fragment() {
             VinorWebViewErrorShield.clearToSilentPlaceholder(webView)
         }
         hideLoader()
-        binding.progressBar.visibility = View.GONE
         val overlay = binding.offlineOverlay.root
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()

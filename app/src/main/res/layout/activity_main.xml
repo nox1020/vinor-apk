@@ -22,17 +22,6 @@
             layout="@layout/splash_screen"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_gravity="top"
-            android:max="100"
-            android:progress="0"
-            android:progressTint="#16a34a"
-            android:visibility="visible" />
     </FrameLayout>
 
     <include
