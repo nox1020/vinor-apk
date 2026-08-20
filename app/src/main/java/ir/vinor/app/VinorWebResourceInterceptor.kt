@@ -20,7 +20,7 @@ object VinorWebResourceInterceptor {
             interceptUnsafe(context.applicationContext, request, cacheFirst)
         } catch (t: Throwable) {
             VinorCacheLog.event("CACHE_MISS", "intercept-error")
-            null
+            if (cacheFirst) VinorWebResponses.empty("application/octet-stream") else null
         }
     }
 
@@ -39,9 +39,12 @@ object VinorWebResourceInterceptor {
 
         val method = request.method?.uppercase().orEmpty().ifBlank { "GET" }
         if (method != "GET") return null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && request.isRedirect) return null
-        if (isServiceWorkerUrl(url)) return null
-        if (isServiceWorkerScriptRequest(request)) return null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && request.isRedirect && !cacheFirst) {
+            return null
+        }
+        if (isServiceWorkerUrl(url) || isServiceWorkerScriptRequest(request)) {
+            return if (cacheFirst) VinorWebResponses.empty("application/javascript") else null
+        }
 
         // سند اصلی را intercept نکن: SW + HTML مصنوعی رندرر را می‌کشد.
         // snapshot با loadDataWithBaseURL از MainActivity تزریق می‌شود.
@@ -54,14 +57,54 @@ object VinorWebResourceInterceptor {
             }
             VinorOfflineAssetStore.asResponse(context, url)?.let { return it }
             VinorCacheLog.event("CACHE_MISS", "asset")
-            return null
+            return VinorWebResponses.empty(VinorCachePolicy.guessMime(url))
         }
         if (cacheFirst && VinorCachePolicy.isSafeGetApi(url)) {
-            VinorApiCacheStore.asResponse(context, url)?.let { return it }
+            VinorApiCacheStore.asResponse(context, url, allowExpired = true)?.let { return it }
             VinorCacheLog.event("CACHE_MISS", "api")
-            return null
+            return VinorWebResponses.jsonOffline()
+        }
+        if (cacheFirst && VinorCachePolicy.isPartnerPath(url)) {
+            VinorOfflinePageStore.asHtmlResponse(context, url)?.let { return it }
+            return VinorWebResponses.empty("text/html")
+        }
+        if (cacheFirst) {
+            return VinorWebResponses.empty(VinorCachePolicy.guessMime(url))
         }
         return null
+    }
+
+    /**
+     * API زیر M: shouldInterceptRequest فقط URL می‌دهد و main-frame مشخص نیست.
+     * HTML صفحه را intercept نکن — فقط asset/API تا رندرر نکشد.
+     */
+    fun interceptLegacyUrl(
+        context: Context,
+        url: String?,
+        cacheFirst: Boolean,
+    ): WebResourceResponse? {
+        return try {
+            val u = url?.trim().orEmpty()
+            if (u.isEmpty() || !VinorCachePolicy.isVinorHttps(u)) return null
+            if (isServiceWorkerUrl(u)) {
+                return if (cacheFirst) VinorWebResponses.empty("application/javascript") else null
+            }
+            if (VinorCachePolicy.isStaticAssetPath(u)) {
+                if (!cacheFirst) {
+                    VinorOfflineAssetStore.cacheAsync(context.applicationContext, u)
+                    return null
+                }
+                VinorOfflineAssetStore.asResponse(context.applicationContext, u)?.let { return it }
+                return VinorWebResponses.empty(VinorCachePolicy.guessMime(u))
+            }
+            if (cacheFirst && VinorCachePolicy.isSafeGetApi(u)) {
+                VinorApiCacheStore.asResponse(context.applicationContext, u, allowExpired = true)?.let { return it }
+                return VinorWebResponses.jsonOffline()
+            }
+            null
+        } catch (_: Throwable) {
+            if (cacheFirst) VinorWebResponses.empty("application/octet-stream") else null
+        }
     }
 
     private fun isServiceWorkerUrl(url: String): Boolean {

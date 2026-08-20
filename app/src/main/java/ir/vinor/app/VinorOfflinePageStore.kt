@@ -18,7 +18,7 @@ object VinorOfflinePageStore {
             VinorCacheLog.event("CACHE_DELETE", "snapshot too large")
             return
         }
-        if (h.length < 200) return
+        if (!htmlLooksHealthy(h)) return
         h = ensureBaseHref(h, u)
         h = appendOfflineMeta(h, System.currentTimeMillis())
         val dir = dir(context, forWrite = true)
@@ -87,8 +87,7 @@ object VinorOfflinePageStore {
     fun lastSavedAt(context: Context): Long =
         VinorWebOfflineSession.lastCachedAt(context)
 
-    fun hasAny(context: Context): Boolean =
-        dir(context).listFiles { f -> f.name.endsWith(".html") }?.isNotEmpty() == true
+    fun hasAny(context: Context): Boolean = !readLatest(context).isNullOrBlank()
 
     fun clearUser(context: Context) {
         runCatching { dir(context).deleteRecursively() }
@@ -134,6 +133,9 @@ object VinorOfflinePageStore {
     private fun htmlLooksHealthy(html: String): Boolean {
         val lower = html.lowercase()
         if (lower.contains("chrome-error://")) return false
+        if (lower.contains("err_internet_disconnected")) return false
+        if (lower.contains("err_name_not_resolved")) return false
+        if (lower.contains("webpage not available")) return false
         if (!lower.contains("<html") && !lower.contains("<body")) return false
         return html.length >= 200
     }

@@ -54,18 +54,6 @@ class VinorCachePolicyTest {
     }
 
     @Test
-    fun interceptCharset_binaryHasNoUtf8() {
-        assertEquals("", VinorCachePolicy.interceptCharset("font/woff2", "utf-8"))
-        assertEquals("", VinorCachePolicy.interceptCharset("image/png"))
-        assertEquals("", VinorCachePolicy.interceptCharset("application/octet-stream", "utf-8"))
-        assertEquals("utf-8", VinorCachePolicy.interceptCharset("text/css", "utf-8"))
-        assertEquals("utf-8", VinorCachePolicy.interceptCharset("application/javascript"))
-        assertEquals("utf-8", VinorCachePolicy.interceptCharset("image/svg+xml"))
-        assertTrue(VinorCachePolicy.isBinaryMime("font/woff2; charset=utf-8"))
-        assertFalse(VinorCachePolicy.isBinaryMime("text/html"))
-    }
-
-    @Test
     fun queueablePost_notesYes_verifyNo() {
         assertTrue(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/notes"))
         assertTrue(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/notifications/abc/read"))

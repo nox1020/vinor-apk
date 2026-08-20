@@ -12,11 +12,27 @@ import java.io.ByteArrayInputStream
  */
 object VinorWebResponses {
 
+    private val offlineJson =
+        """{"ok":false,"success":false,"offline":true}""".toByteArray(Charsets.UTF_8)
+
     fun html(bytes: ByteArray): WebResourceResponse =
         of("text/html", "utf-8", bytes)
 
     fun json(bytes: ByteArray): WebResourceResponse =
         of("application/json", "utf-8", bytes)
+
+    fun jsonOffline(): WebResourceResponse = json(offlineJson)
+
+    fun empty(mime: String?): WebResourceResponse {
+        val safeMime = mime
+            ?.substringBefore(';')
+            ?.trim()
+            ?.ifBlank { null }
+            ?: "application/octet-stream"
+        val lower = safeMime.lowercase()
+        if (lower.contains("json")) return jsonOffline()
+        return of(safeMime, VinorCachePolicy.interceptCharset(safeMime), ByteArray(0))
+    }
 
     fun of(mime: String?, encoding: String?, bytes: ByteArray): WebResourceResponse {
         val safeMime = mime

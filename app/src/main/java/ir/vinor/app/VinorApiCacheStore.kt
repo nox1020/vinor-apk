@@ -62,17 +62,17 @@ object VinorApiCacheStore {
         }
     }
 
-    fun asResponse(context: Context, url: String?): WebResourceResponse? {
+    fun asResponse(context: Context, url: String?, allowExpired: Boolean = false): WebResourceResponse? {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return null
         val dir = root(context)
         val id = key(raw)
         val bin = File(dir, "$id.bin")
         val meta = File(dir, "$id.json")
-        val bytes = VinorCacheIo.readBytes(bin) ?: return missNoQuery(context, raw)
+        val bytes = VinorCacheIo.readBytes(bin) ?: return missNoQuery(context, raw, allowExpired)
         val obj = VinorCacheIo.readJson(meta)
         val age = System.currentTimeMillis() - (obj?.optLong("createdAt") ?: 0L)
-        if (age > VinorCachePolicy.API_KEEP_MS) {
+        if (age > VinorCachePolicy.API_KEEP_MS && !allowExpired) {
             VinorCacheLog.event("CACHE_DELETE", "api expired")
             VinorCacheIo.deleteQuiet(bin)
             VinorCacheIo.deleteQuiet(meta)
@@ -84,13 +84,13 @@ object VinorApiCacheStore {
         return jsonResponse(bytes, ct)
     }
 
-    private fun missNoQuery(context: Context, url: String): WebResourceResponse? {
+    private fun missNoQuery(context: Context, url: String, allowExpired: Boolean): WebResourceResponse? {
         val noQuery = runCatching {
             val uri = URI(url)
             URI(uri.scheme, uri.authority, uri.path, null, null).toString()
         }.getOrNull() ?: return null
         if (noQuery == url) return null
-        return asResponse(context, noQuery)
+        return asResponse(context, noQuery, allowExpired)
     }
 
     fun warmup(context: Context) {
