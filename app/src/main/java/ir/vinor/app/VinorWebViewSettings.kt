@@ -26,7 +26,9 @@ object VinorWebViewSettings {
         settings.allowFileAccess = false
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
-        settings.userAgentString = settings.userAgentString + userAgentSuffix
+        if (userAgentSuffix.isNotBlank() && !settings.userAgentString.contains("VinorApp/")) {
+            settings.userAgentString = settings.userAgentString + userAgentSuffix
+        }
     }
 
     fun configureCookies(webView: WebView) {

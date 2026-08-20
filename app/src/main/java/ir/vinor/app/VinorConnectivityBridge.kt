@@ -18,10 +18,9 @@ class VinorConnectivityBridge(
             lastCachedAt: Long = 0L,
         ) {
             if (webView == null) return
-            val online = state == VinorNetState.ONLINE
+            val online = state != VinorNetState.OFFLINE
             val flag = if (online) "true" else "false"
-            val onlineToast = lastSynced == VinorNetState.OFFLINE && online ||
-                lastSynced == VinorNetState.LIMITED && online
+            val onlineToast = lastSynced == VinorNetState.OFFLINE && online
             lastSynced = state
             val detail = JSONObject()
                 .put("online", online)
@@ -34,12 +33,7 @@ class VinorConnectivityBridge(
                 .put("lastCachedAt", lastCachedAt)
             if (onlineToast) opts.put("onlineToast", true)
             if (!online) {
-                val msg = if (state == VinorNetState.LIMITED) {
-                    "ارتباط محدود است؛ آخرین اطلاعات ذخیره‌شده نمایش داده می‌شود"
-                } else {
-                    "اتصال اینترنت قطع است"
-                }
-                opts.put("message", msg)
+                opts.put("message", "اتصال اینترنت قطع است")
             }
             val js = """
                 (function () {
@@ -63,7 +57,7 @@ class VinorConnectivityBridge(
     }
 
     @JavascriptInterface
-    fun isOnline(): Boolean = runCatching { stateProvider() == VinorNetState.ONLINE }.getOrDefault(false)
+    fun isOnline(): Boolean = runCatching { stateProvider() != VinorNetState.OFFLINE }.getOrDefault(false)
 
     @JavascriptInterface
     fun networkState(): String = runCatching { stateProvider().name }.getOrDefault(VinorNetState.OFFLINE.name)

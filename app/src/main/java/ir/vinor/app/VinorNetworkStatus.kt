@@ -35,7 +35,10 @@ object VinorNetworkStatus {
         }
     }
 
-    fun isOnline(context: Context): Boolean = current(context) == VinorNetState.ONLINE
+    fun isOnline(context: Context): Boolean = current(context) != VinorNetState.OFFLINE
 
-    fun useCacheFirst(context: Context): Boolean = current(context) != VinorNetState.ONLINE
+    fun isValidated(context: Context): Boolean = current(context) == VinorNetState.ONLINE
+
+    /** فقط قطع واقعی شبکه — LIMITED معمولاً VALIDATED نشده در استارت است، نه آفلاین. */
+    fun useCacheFirst(context: Context): Boolean = current(context) == VinorNetState.OFFLINE
 }

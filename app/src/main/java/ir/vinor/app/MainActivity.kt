@@ -58,6 +58,8 @@ class MainActivity : AppCompatActivity() {
     private var offlineAssetWarmupDone = false
     private var lastHandledNetState: VinorNetState? = null
     private var recoveringRenderer = false
+    private var launchedWithOfflineFallback = false
+    private var startLoadRetries = 0
     private val offlineRevealTimeoutMs = 4_500L
     private val offlineRevealTimeoutRunnable = Runnable {
         if (!isOnline() && ::webView.isInitialized && binding.offlineOverlay.root.visibility != View.VISIBLE) {
@@ -202,6 +204,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         degradedOffline = true
+        launchedWithOfflineFallback = true
 
         if (webViewStateRestored && VinorWebOfflineSession.webViewHasBrowsablePage(webView)) {
             revealExistingWebContent()
@@ -258,6 +261,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun beginOfflineLoad(url: String) {
+        launchedWithOfflineFallback = true
         degradedOffline = true
         pendingInitialReveal = true
         partnerAppReady = false
@@ -456,7 +460,6 @@ class MainActivity : AppCompatActivity() {
                 probePartnerShellReady()
                 VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
                 VinorCacheSession.fingerprint(this@MainActivity)
-                VinorWebCacheManager.unregisterServiceWorkers(webView)
                 syncConnectivityToWeb()
                 cacheCurrentPageSnapshot(url ?: webView.url)
                 if (isOnline() && !offlineAssetWarmupDone) {
@@ -494,6 +497,12 @@ class MainActivity : AppCompatActivity() {
                         webView.post { enterDegradedOffline() }
                         return
                     }
+                    if (pendingInitialReveal && startLoadRetries < 2) {
+                        startLoadRetries += 1
+                        Log.w("MainActivity", "Main frame error on start; retry $startLoadRetries")
+                        webView.post { loadEntryUrl(forceReload = true) }
+                        return
+                    }
                     mainFrameLoadFailed = true
                     VinorWebViewErrorShield.clearToSilentPlaceholder(view)
                     showOfflineHard()
@@ -515,6 +524,12 @@ class MainActivity : AppCompatActivity() {
                     mainFrameLoadFailed = false
                     view?.stopLoading()
                     webView.post { enterDegradedOffline() }
+                    return
+                }
+                if (pendingInitialReveal && startLoadRetries < 2) {
+                    startLoadRetries += 1
+                    Log.w("MainActivity", "Main frame error on start (legacy); retry $startLoadRetries")
+                    webView.post { loadEntryUrl(forceReload = true) }
                     return
                 }
                 mainFrameLoadFailed = true
@@ -698,6 +713,7 @@ class MainActivity : AppCompatActivity() {
         partnerAppReady = false
         cancelShellRevealFallback()
         applyWebCacheMode()
+        launchedWithOfflineFallback = false
         if (consumeApkDownloadDeepLink(intent?.dataString)) {
             degradedOffline = false
             hideOffline()
@@ -924,9 +940,6 @@ class MainActivity : AppCompatActivity() {
     private fun enterDegradedOffline() {
         degradedOffline = true
         userHasActiveSession = true
-        if (::webView.isInitialized) {
-            VinorWebCacheManager.unregisterServiceWorkers(webView)
-        }
         applyWebCacheMode()
         pendingInitialReveal = false
         cancelShellRevealFallback()
@@ -965,7 +978,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
         VinorApiCacheStore.warmup(this)
-        if (binding.offlineOverlay.root.visibility == View.VISIBLE) {
+        if (binding.offlineOverlay.root.visibility == View.VISIBLE || launchedWithOfflineFallback) {
+            launchedWithOfflineFallback = false
             loadEntryUrl(forceReload = true)
         }
     }
@@ -975,7 +989,6 @@ class MainActivity : AppCompatActivity() {
         degradedOffline = true
         applyWebCacheMode()
         if (::webView.isInitialized) {
-            VinorWebCacheManager.unregisterServiceWorkers(webView)
             if (!canKeepCurrentWebContent()) {
                 try {
                     webView.stopLoading()
@@ -997,20 +1010,27 @@ class MainActivity : AppCompatActivity() {
         val prev = lastHandledNetState
         lastHandledNetState = state
         when (state) {
-            VinorNetState.ONLINE -> onConnectivityRestored()
-            VinorNetState.OFFLINE, VinorNetState.LIMITED -> {
-                if (prev == VinorNetState.ONLINE || prev == null) {
-                    onConnectivityLost()
+            VinorNetState.ONLINE, VinorNetState.LIMITED -> {
+                if (prev == VinorNetState.OFFLINE) {
+                    onConnectivityRestored()
                 } else {
                     applyWebCacheMode()
                     syncConnectivityToWeb()
                 }
+            }
+            VinorNetState.OFFLINE -> {
+                if (prev != VinorNetState.OFFLINE) onConnectivityLost()
             }
         }
     }
 
     private fun recoverFromRendererGone() {
         if (recoveringRenderer || isFinishing) return
+        rendererCrashStreak += 1
+        if (rendererCrashStreak > 2) {
+            Log.e(TAG, "WebView renderer crashed repeatedly; skip recreate")
+            return
+        }
         recoveringRenderer = true
         runOnUiThread {
             try {
@@ -1135,6 +1155,8 @@ class MainActivity : AppCompatActivity() {
         dismissSystemSplash()
         webView.visibility = View.VISIBLE
         userHasActiveSession = true
+        startLoadRetries = 0
+        rendererCrashStreak = 0
         VinorWebOfflineSession.markSuccess(this, curUrl)
         if (isOnline() && isExpressPartnerUrl(curUrl)) {
             VinorWebCacheManager.warmupPartnerCaches(webView)
@@ -1262,5 +1284,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private var rendererCrashStreak = 0
     }
 }

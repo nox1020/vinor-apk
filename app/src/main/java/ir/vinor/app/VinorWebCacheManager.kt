@@ -43,8 +43,6 @@ object VinorWebCacheManager {
     }
 
     fun onAppStart(context: Context, webView: WebView?, isOnline: Boolean) {
-        // SW نباید با shouldInterceptRequest رقابت کند — رندرر Chromium کرش می‌کند.
-        unregisterServiceWorkers(webView)
         VinorOfflinePageStore.migrateLegacy(context)
         VinorOfflineAssetStore.clearPublicIfCorrupted(context)
         val current = versionCode(context)
