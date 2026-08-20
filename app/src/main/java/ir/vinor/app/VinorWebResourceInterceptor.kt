@@ -41,10 +41,12 @@ object VinorWebResourceInterceptor {
         if (method != "GET") return null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && request.isRedirect) return null
         if (isServiceWorkerUrl(url)) return null
+        if (isServiceWorkerScriptRequest(request)) return null
 
-        if (cacheFirst && request.isForMainFrame && VinorCachePolicy.isPartnerPath(url)) {
-            VinorOfflinePageStore.asHtmlResponse(context, url)?.let { return it }
-        }
+        // سند اصلی را intercept نکن: SW + HTML مصنوعی رندرر را می‌کشد.
+        // snapshot با loadDataWithBaseURL از MainActivity تزریق می‌شود.
+        if (request.isForMainFrame) return null
+
         if (VinorCachePolicy.isStaticAssetPath(url)) {
             if (!cacheFirst) {
                 VinorOfflineAssetStore.cacheAsync(context, url)
@@ -68,5 +70,11 @@ object VinorWebResourceInterceptor {
             p.endsWith("/sw.js") ||
             p.contains("service-worker") ||
             p.contains("serviceworker")
+    }
+
+    private fun isServiceWorkerScriptRequest(request: WebResourceRequest): Boolean {
+        val headers = request.requestHeaders ?: return false
+        val sw = headers["Service-Worker"] ?: headers["service-worker"] ?: return false
+        return sw.equals("script", ignoreCase = true)
     }
 }

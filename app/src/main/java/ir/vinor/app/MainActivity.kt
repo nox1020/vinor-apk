@@ -13,6 +13,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -55,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private var userHasActiveSession = false
     private var webViewStateRestored = false
     private var offlineAssetWarmupDone = false
+    private var lastHandledNetState: VinorNetState? = null
+    private var recoveringRenderer = false
     private val offlineRevealTimeoutMs = 4_500L
     private val offlineRevealTimeoutRunnable = Runnable {
         if (!isOnline() && ::webView.isInitialized && binding.offlineOverlay.root.visibility != View.VISIBLE) {
@@ -397,6 +400,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+                Log.e(TAG, "WebView renderer gone crash=${detail?.didCrash()}")
+                recoverFromRendererGone()
+                return true
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 if (::webView.isInitialized) {
@@ -446,6 +456,7 @@ class MainActivity : AppCompatActivity() {
                 probePartnerShellReady()
                 VinorAppUpdateChecker.syncCachedToWebView(this@MainActivity, webView)
                 VinorCacheSession.fingerprint(this@MainActivity)
+                VinorWebCacheManager.unregisterServiceWorkers(webView)
                 syncConnectivityToWeb()
                 cacheCurrentPageSnapshot(url ?: webView.url)
                 if (isOnline() && !offlineAssetWarmupDone) {
@@ -913,6 +924,9 @@ class MainActivity : AppCompatActivity() {
     private fun enterDegradedOffline() {
         degradedOffline = true
         userHasActiveSession = true
+        if (::webView.isInitialized) {
+            VinorWebCacheManager.unregisterServiceWorkers(webView)
+        }
         applyWebCacheMode()
         pendingInitialReveal = false
         cancelShellRevealFallback()
@@ -961,16 +975,50 @@ class MainActivity : AppCompatActivity() {
         degradedOffline = true
         applyWebCacheMode()
         if (::webView.isInitialized) {
-            try {
-                webView.stopLoading()
-            } catch (t: Throwable) {
-                Log.w("MainActivity", "stopLoading failed", t)
+            VinorWebCacheManager.unregisterServiceWorkers(webView)
+            if (!canKeepCurrentWebContent()) {
+                try {
+                    webView.stopLoading()
+                } catch (t: Throwable) {
+                    Log.w("MainActivity", "stopLoading failed", t)
+                }
             }
         }
         if (canKeepCurrentWebContent()) {
             enterDegradedOffline()
         } else {
             syncConnectivityToWeb()
+        }
+    }
+
+    private fun dispatchNetworkChange() {
+        val state = networkState()
+        if (state == lastHandledNetState) return
+        val prev = lastHandledNetState
+        lastHandledNetState = state
+        when (state) {
+            VinorNetState.ONLINE -> onConnectivityRestored()
+            VinorNetState.OFFLINE, VinorNetState.LIMITED -> {
+                if (prev == VinorNetState.ONLINE || prev == null) {
+                    onConnectivityLost()
+                } else {
+                    applyWebCacheMode()
+                    syncConnectivityToWeb()
+                }
+            }
+        }
+    }
+
+    private fun recoverFromRendererGone() {
+        if (recoveringRenderer || isFinishing) return
+        recoveringRenderer = true
+        runOnUiThread {
+            try {
+                WebViewProvider.destroyCached()
+                recreate()
+            } catch (t: Throwable) {
+                Log.e(TAG, "renderer recover failed", t)
+            }
         }
     }
 
@@ -1111,6 +1159,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        lastHandledNetState = networkState()
         registerConnectivityLostCallback()
     }
 
@@ -1163,10 +1212,13 @@ class MainActivity : AppCompatActivity() {
         notifyHelper = null
         notifyBridge = null
         cacheBridge = null
-        if (::webView.isInitialized) {
-            webView.removeCallbacks(revealAfterLoadRunnable)
-            webView.removeCallbacks(shellRevealFallbackRunnable)
-            webView.removeCallbacks(offlineRevealTimeoutRunnable)
+        if (::webView.isInitialized && !recoveringRenderer) {
+            try {
+                webView.removeCallbacks(revealAfterLoadRunnable)
+                webView.removeCallbacks(shellRevealFallbackRunnable)
+                webView.removeCallbacks(offlineRevealTimeoutRunnable)
+            } catch (_: Throwable) {
+            }
             WebViewProvider.detach(this)
         }
         super.onDestroy()
@@ -1178,25 +1230,18 @@ class MainActivity : AppCompatActivity() {
         val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         connectivityCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onLost(network: Network) {
-                runOnUiThread {
-                    if (!isOnline()) onConnectivityLost()
-                }
+                runOnUiThread { dispatchNetworkChange() }
             }
 
             override fun onAvailable(network: Network) {
-                runOnUiThread {
-                    if (isOnline()) onConnectivityRestored()
-                }
+                runOnUiThread { dispatchNetworkChange() }
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities
             ) {
-                runOnUiThread {
-                    if (isOnline()) onConnectivityRestored()
-                    else onConnectivityLost()
-                }
+                runOnUiThread { dispatchNetworkChange() }
             }
         }
         val request = NetworkRequest.Builder()

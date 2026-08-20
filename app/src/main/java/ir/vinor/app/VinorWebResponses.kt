@@ -2,11 +2,13 @@ package ir.vinor.app
 
 import android.webkit.WebResourceResponse
 import java.io.ByteArrayInputStream
-import java.util.HashMap
 
 /**
  * پاسخ Intercept پایدار برای WebView.
- * mapOf غیرقابل‌تغییر و encoding=null روی Chromium کرش می‌دهند.
+ *
+ * سازندهٔ ۶آرگومان (status/headers) و mapOf غیرقابل‌تغییر روی چند نسخهٔ Chromium
+ * داخل shouldInterceptRequest رندرر را می‌کشند. فقط سازندهٔ ۳آرگومان.
+ * encoding برای باینری باید خالی باشد، نه utf-8 و نه null.
  */
 object VinorWebResponses {
 
@@ -22,14 +24,7 @@ object VinorWebResponses {
             ?.trim()
             ?.ifBlank { null }
             ?: "application/octet-stream"
-        val safeEnc = encoding?.trim().orEmpty().ifBlank { "utf-8" }
-        return WebResourceResponse(
-            safeMime,
-            safeEnc,
-            200,
-            "OK",
-            HashMap<String, String>(),
-            ByteArrayInputStream(bytes),
-        )
+        val safeEnc = VinorCachePolicy.interceptCharset(safeMime, encoding)
+        return WebResourceResponse(safeMime, safeEnc, ByteArrayInputStream(bytes))
     }
 }

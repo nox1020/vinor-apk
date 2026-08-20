@@ -1,7 +1,6 @@
 package ir.vinor.app
 
 import android.content.Context
-import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import org.json.JSONObject
 import java.io.File
@@ -84,10 +83,6 @@ object VinorOfflineAssetStore {
         VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) ->
             conn.setRequestProperty(k, v)
         }
-        runCatching {
-            val ck = CookieManager.getInstance().getCookie(url)
-            if (!ck.isNullOrBlank()) conn.setRequestProperty("Cookie", ck)
-        }
         conn.connect()
         if (conn.responseCode !in 200..299) {
             conn.disconnect()
@@ -149,7 +144,7 @@ object VinorOfflineAssetStore {
             VinorCacheLog.event("CACHE_HIT", "asset")
         }
         val ct = hit.contentType.ifBlank { VinorCachePolicy.guessMime(u) }
-        return VinorWebResponses.of(ct, "utf-8", hit.bytes)
+        return VinorWebResponses.of(ct, VinorCachePolicy.interceptCharset(ct), hit.bytes)
     }
 
     private data class AssetHit(

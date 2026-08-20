@@ -116,6 +116,28 @@ object VinorCachePolicy {
         return QUEUEABLE_POST_EXACT.contains(p) || QUEUEABLE_POST_PREFIX.any { p.startsWith(it) }
     }
 
+    /**
+     * charset برای WebResourceResponse.
+     * فونت/عکس با encoding=utf-8 در Chromium رندرر را می‌کشد؛
+     * encoding=null هم روی بعضی WebViewها NPE می‌دهد → برای باینری رشتهٔ خالی.
+     */
+    fun isBinaryMime(mime: String?): Boolean {
+        val m = (mime ?: "").substringBefore(';').trim().lowercase(Locale.US)
+        if (m.contains("svg")) return false
+        return m.startsWith("image/") ||
+            m.startsWith("font/") ||
+            m.startsWith("audio/") ||
+            m.startsWith("video/") ||
+            m.contains("woff") ||
+            m.contains("octet-stream") ||
+            m.contains("wasm")
+    }
+
+    fun interceptCharset(mime: String?, requested: String? = null): String {
+        if (isBinaryMime(mime)) return ""
+        return requested?.trim().orEmpty().ifBlank { "utf-8" }
+    }
+
     fun guessMime(url: String): String {
         val p = url.lowercase(Locale.US)
         return when {

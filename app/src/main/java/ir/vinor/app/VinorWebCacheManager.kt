@@ -43,6 +43,8 @@ object VinorWebCacheManager {
     }
 
     fun onAppStart(context: Context, webView: WebView?, isOnline: Boolean) {
+        // SW نباید با shouldInterceptRequest رقابت کند — رندرر Chromium کرش می‌کند.
+        unregisterServiceWorkers(webView)
         VinorOfflinePageStore.migrateLegacy(context)
         VinorOfflineAssetStore.clearPublicIfCorrupted(context)
         val current = versionCode(context)
@@ -84,6 +86,26 @@ object VinorWebCacheManager {
         VinorOfflineQueue.clearUser(context)
         VinorCacheSession.clearPrefs(context)
         VinorWebOfflineSession.clear(context)
+    }
+
+    fun unregisterServiceWorkers(webView: WebView?) {
+        if (webView == null) return
+        val js = """
+            (function () {
+              try {
+                if (!navigator.serviceWorker) return;
+                navigator.serviceWorker.getRegistrations().then(function (rs) {
+                  rs.forEach(function (r) { r.unregister(); });
+                });
+              } catch (_) {}
+            })();
+        """.trimIndent()
+        webView.post {
+            try {
+                webView.evaluateJavascript(js, null)
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     fun warmupPartnerCaches(webView: WebView?) {

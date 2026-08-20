@@ -54,6 +54,27 @@ object WebViewProvider {
 
     fun peek(): WebView? = cachedWebView
 
+    /** پس از مرگ رندرر Chromium، نمونهٔ مرده را دور بریز. */
+    fun destroyCached() {
+        synchronized(this) {
+            val old = cachedWebView
+            cachedWebView = null
+            if (old == null) return
+            try {
+                (old.parent as? ViewGroup)?.removeView(old)
+            } catch (_: Exception) {
+            }
+            try {
+                old.stopLoading()
+            } catch (_: Exception) {
+            }
+            try {
+                old.destroy()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun obtain(context: Context): WebView {
         prewarm(context)
         return cachedWebView ?: createWebView(context.applicationContext).also { cachedWebView = it }
