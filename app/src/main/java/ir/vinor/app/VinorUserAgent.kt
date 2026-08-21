@@ -18,6 +18,10 @@ object VinorUserAgent {
     /** هدر نسخه برای درخواست‌های HTML پنل — تشخیص APK در سرور */
     fun webViewLoadHeaders(context: Context): Map<String, String> {
         val version = appVersionName(context)
-        return if (version.isNotEmpty()) mapOf("X-Vinor-App-Version" to version) else emptyMap()
+        val code = VinorAppUpdateChecker.appVersionCode(context)
+        val headers = linkedMapOf<String, String>()
+        if (version.isNotEmpty()) headers["X-Vinor-App-Version"] = version
+        if (code > 0L) headers["X-Vinor-App-Version-Code"] = code.toString()
+        return headers
     }
 }

@@ -4,7 +4,7 @@ import android.content.Context
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 
-/** پل JS — بررسی نسخه، دانلود خودکار و نصب APK */
+/** پل JS — فقط نمایش state نیتیو و actionهای مجاز. URL دلخواه از JS پذیرفته نمی‌شود. */
 class VinorAppUpdateBridge(
     private val context: Context,
     private val webViewProvider: () -> WebView?,
@@ -18,26 +18,19 @@ class VinorAppUpdateBridge(
         VinorSafe.onMain {
             val webView = webViewProvider()
             if (!VinorBridgeGate.isTrustedPage(webView)) return@onMain
-            VinorAppUpdateChecker.check(context.applicationContext, webView, force = true)
+            VinorAppUpdateController.check(context.applicationContext, webView, force = true)
         }
     }
 
     @JavascriptInterface
     fun getCachedState(): String {
-        return runCatching {
-            val state = VinorAppUpdateChecker.readCached(context.applicationContext)
-            org.json.JSONObject()
-                .put("show", state.show)
-                .put("version", state.version)
-                .put("url", state.url)
-                .put("sourceUrl", state.sourceUrl)
-                .toString()
-        }.getOrDefault("{}")
+        return runCatching { VinorAppUpdateController.stateJson(context.applicationContext) }
+            .getOrDefault("{}")
     }
 
     @JavascriptInterface
     fun getDownloadState(): String =
-        runCatching { VinorApkUpdateInstaller.stateJson(context.applicationContext) }
+        runCatching { VinorAppUpdateController.stateJson(context.applicationContext) }
             .getOrDefault("{}")
 
     @JavascriptInterface
@@ -45,19 +38,32 @@ class VinorAppUpdateBridge(
         VinorSafe.onMain {
             val webView = webViewProvider()
             if (!VinorBridgeGate.isTrustedPage(webView)) return@onMain
-            val cached = VinorAppUpdateChecker.readCached(context.applicationContext)
+            // url/version از JS نادیده گرفته می‌شود
             VinorApkUpdateInstaller.ensureDownload(
                 context.applicationContext,
-                url,
-                version,
-                webView,
-                cached.sourceUrl,
+                url = "",
+                version = "",
+                webView = webView,
             )
         }
     }
 
     @JavascriptInterface
+    fun retryDownload() {
+        VinorSafe.onMain {
+            val webView = webViewProvider()
+            if (!VinorBridgeGate.isTrustedPage(webView)) return@onMain
+            VinorAppUpdateController.attachWebView(webView)
+            VinorAppUpdateController.retryDownload(context.applicationContext)
+        }
+    }
+
+    @JavascriptInterface
     fun installUpdate(): Boolean {
+        val webView = webViewProvider()
+        if (!VinorBridgeGate.isTrustedPage(webView)) return false
+        val state = VinorAppUpdateController.read(context.applicationContext)
+        if (state.status != VinorAppUpdateStatus.READY) return false
         VinorSafe.onMain {
             if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return@onMain
             VinorApkUpdateInstaller.install(context)

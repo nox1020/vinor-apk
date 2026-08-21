@@ -337,43 +337,16 @@ class ProfileFragment : Fragment() {
 
     private fun startApkUpdate(apkUrl: String, version: String) {
         val ctx = context ?: return
-        val abs = VinorDownloadBridge.resolveAbsoluteUrl(apkUrl)
-        if (abs.isNullOrBlank()) {
-            Toast.makeText(ctx, "آدرس بروزرسانی نامعتبر است", Toast.LENGTH_SHORT).show()
+        val state = VinorAppUpdateController.read(ctx.applicationContext)
+        if (state.status == VinorAppUpdateStatus.READY) {
+            VinorApkUpdateInstaller.install(ctx)
             return
         }
-        val ver = version.trim().ifEmpty {
-            VinorAppUpdateChecker.readCached(ctx).version
-        }
-        val source = VinorAppUpdateChecker.readCached(ctx).sourceUrl
-        if (ver.isNotEmpty()) {
-            VinorApkUpdateInstaller.ensureDownload(
-                ctx.applicationContext,
-                abs,
-                ver,
-                sourceUrl = source,
-            )
-        }
-        val state = VinorApkUpdateInstaller.readState(ctx.applicationContext)
-        if (state.status == VinorApkUpdateInstaller.Status.READY) {
-            VinorApkUpdateInstaller.install(ctx)
+        Toast.makeText(ctx, "در حال آماده‌سازی فایل نصب…", Toast.LENGTH_SHORT).show()
+        if (state.show) {
+            VinorAppUpdateController.retryDownload(ctx.applicationContext)
         } else {
-            Toast.makeText(ctx, "در حال آماده‌سازی فایل نصب…", Toast.LENGTH_SHORT).show()
-            if (ver.isNotEmpty()) {
-                VinorApkUpdateInstaller.ensureDownload(
-                    ctx.applicationContext,
-                    abs,
-                    ver,
-                    sourceUrl = source,
-                )
-            } else {
-                VinorDownloadBridge.enqueueDownload(
-                    ctx,
-                    abs,
-                    VinorDownloadBridge.apkDownloadFilename(abs, version),
-                    showToast = true,
-                )
-            }
+            VinorAppUpdateController.check(ctx.applicationContext, force = true)
         }
     }
 

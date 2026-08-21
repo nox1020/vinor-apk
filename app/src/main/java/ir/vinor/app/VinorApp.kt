@@ -15,5 +15,6 @@ class VinorApp : Application() {
         }
         // prewarm فقط پس از اولین Activity — جلوگیری از کرش WebView با context اپلیکیشن روی برخی دستگاه‌ها
         runCatching { VinorFcmRegistrar.start(this) }
+        runCatching { VinorAppUpdateController.bootstrap(this) }
     }
 }

@@ -151,6 +151,7 @@ dependencies {
     implementation "com.google.android.gms:play-services-auth-api-phone:18.0.1"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
     implementation "com.squareup.okhttp3:okhttp-brotli:4.12.0"
+    implementation "androidx.work:work-runtime-ktx:2.9.1"
     
     // Navigation Component
     implementation "androidx.navigation:navigation-fragment-ktx:2.8.2"

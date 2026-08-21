@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- WebView: دوربین برای capture و ورودی file؛ بدون READ_MEDIA (انتخابگر سیستمی) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- WebView ضبط صدا + VinorSpeechBridge -->
@@ -93,6 +95,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"
+            tools:node="merge" />
 
         <service
             android:name=".VinorFcmService"

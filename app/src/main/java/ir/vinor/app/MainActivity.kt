@@ -1454,6 +1454,7 @@ class MainActivity : AppCompatActivity() {
             runCatching { webView.onResume() }
             VinorLandDetailVolume.syncVolumeControlStream(this, currentWebUrl())
             VinorLandDetailVolume.kickGallery(webView)
+            VinorAppUpdateController.onReturnedFromUnknownSources(this)
             VinorAppUpdateChecker.check(this, webView)
             applyWebCacheMode()
             syncConnectivityToWeb()

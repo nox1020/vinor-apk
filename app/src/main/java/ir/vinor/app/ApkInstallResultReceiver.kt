@@ -32,12 +32,14 @@ class ApkInstallResultReceiver : BroadcastReceiver() {
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> {
+                VinorAppUpdateController.onInstallResult(context, success = true, aborted = false)
                 toast(context, "نصب با موفقیت انجام شد")
             }
             PackageInstaller.STATUS_FAILURE_ABORTED -> {
-                // کاربر لغو کرد — بی‌صدا
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = true)
             }
             PackageInstaller.STATUS_FAILURE_CONFLICT -> {
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = false)
                 toast(
                     context,
                     "نصب ممکن نیست: نسخهٔ فعلی با این فایل سازگار نیست " +
@@ -45,15 +47,19 @@ class ApkInstallResultReceiver : BroadcastReceiver() {
                 )
             }
             PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> {
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = false)
                 toast(context, "این نسخه با دستگاه شما سازگار نیست")
             }
             PackageInstaller.STATUS_FAILURE_INVALID -> {
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = false)
                 toast(context, "فایل نصب نامعتبر است؛ دوباره دانلود کنید")
             }
             PackageInstaller.STATUS_FAILURE_STORAGE -> {
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = false)
                 toast(context, "فضای ذخیره‌سازی کافی نیست")
             }
             else -> {
+                VinorAppUpdateController.onInstallResult(context, success = false, aborted = false)
                 val detail = humanizeInstallFailure(status, message)
                 toast(context, "نصب ناموفق: $detail")
             }

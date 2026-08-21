@@ -22,13 +22,38 @@ object VinorApkTrust {
 
     private const val TAG = "VinorApkTrust"
 
-    fun isTrustedUpdateApk(context: Context, file: File?): Boolean {
-        if (file == null || !file.isFile) return false
-        if (!VinorApkUpdateInstaller.isValidApkFile(file)) return false
+    enum class Result {
+        OK,
+        MISSING,
+        INVALID_APK,
+        WRONG_PACKAGE,
+        SIGNATURE_MISMATCH,
+        SHA_MISMATCH,
+        NOT_NEWER,
+        UNREADABLE,
+    }
+
+    fun isTrustedUpdateApk(context: Context, file: File?, expectedSha256: String = ""): Boolean =
+        evaluate(context, file, expectedSha256) == Result.OK
+
+    fun evaluate(
+        context: Context,
+        file: File?,
+        expectedSha256: String = "",
+        requireNewer: Boolean = true,
+    ): Result {
+        if (file == null || !file.isFile) return Result.MISSING
+        if (VinorApkUpdateFiles.looksLikeHtml(file)) return Result.INVALID_APK
+        if (!VinorApkUpdateFiles.isValidApkFile(file)) return Result.INVALID_APK
+        val wantSha = VinorApkHashes.normalize(expectedSha256)
+        if (wantSha.isNotEmpty() && !VinorApkHashes.matches(file, wantSha)) {
+            Log.w(TAG, "sha256 mismatch for ${file.name}")
+            return Result.SHA_MISMATCH
+        }
         return try {
             val pm = context.packageManager
             val expectedPkg = context.packageName
-            val archive = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: return false
+            val archive = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: return Result.UNREADABLE
             archive.applicationInfo?.apply {
                 sourceDir = file.absolutePath
                 publicSourceDir = file.absolutePath
@@ -36,7 +61,12 @@ object VinorApkTrust {
             val archivePkg = archive.packageName?.trim().orEmpty()
             if (archivePkg != expectedPkg) {
                 Log.w(TAG, "package mismatch: archive=$archivePkg expected=$expectedPkg")
-                return false
+                return Result.WRONG_PACKAGE
+            }
+            val incomingCode = packageVersionCode(archive)
+            val installedCode = installedVersionCode(context)
+            if (requireNewer && incomingCode > 0L && installedCode > 0L && incomingCode <= installedCode) {
+                return Result.NOT_NEWER
             }
             val installed = installedSigningDigests(pm, expectedPkg)
             val incoming = archiveSigningDigests(pm, file)
@@ -45,16 +75,34 @@ object VinorApkTrust {
                     TAG,
                     "missing signing certs installed=${installed.size} incoming=${incoming.size}",
                 )
-                return false
+                return Result.UNREADABLE
             }
             val match = incoming.any { dig -> installed.contains(dig) }
             if (!match) {
                 Log.w(TAG, "signing cert mismatch for ${file.name}")
+                return Result.SIGNATURE_MISMATCH
             }
-            match
+            Result.OK
         } catch (e: Exception) {
-            Log.w(TAG, "isTrustedUpdateApk failed", e)
-            false
+            Log.w(TAG, "evaluate failed", e)
+            Result.UNREADABLE
+        }
+    }
+
+    fun installedVersionCode(context: Context): Long {
+        return try {
+            packageVersionCode(context.packageManager.getPackageInfo(context.packageName, 0))
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+    fun archiveVersionCode(context: Context, file: File): Long {
+        return try {
+            val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0) ?: return 0L
+            packageVersionCode(info)
+        } catch (_: Exception) {
+            0L
         }
     }
 
