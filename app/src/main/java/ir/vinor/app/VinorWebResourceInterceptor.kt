@@ -20,7 +20,8 @@ object VinorWebResourceInterceptor {
             interceptUnsafe(context.applicationContext, request, cacheFirst)
         } catch (t: Throwable) {
             VinorCacheLog.event("CACHE_MISS", "intercept-error")
-            if (cacheFirst) VinorWebResponses.empty("application/octet-stream") else null
+            // هرگز بدنهٔ باینری خالی برنگردان — رندرر کرش می‌کند
+            null
         }
     }
 
@@ -43,7 +44,7 @@ object VinorWebResourceInterceptor {
             return null
         }
         if (isServiceWorkerUrl(url) || isServiceWorkerScriptRequest(request)) {
-            return if (cacheFirst) VinorWebResponses.empty("application/javascript") else null
+            return if (cacheFirst) VinorWebResponses.forCacheMiss("application/javascript") else null
         }
 
         // سند اصلی را intercept نکن: SW + HTML مصنوعی رندرر را می‌کشد.
@@ -57,7 +58,7 @@ object VinorWebResourceInterceptor {
             }
             VinorOfflineAssetStore.asResponse(context, url)?.let { return it }
             VinorCacheLog.event("CACHE_MISS", "asset")
-            return VinorWebResponses.empty(VinorCachePolicy.guessMime(url))
+            return VinorWebResponses.forCacheMiss(VinorCachePolicy.guessMime(url))
         }
         if (cacheFirst && VinorCachePolicy.isSafeGetApi(url)) {
             VinorApiCacheStore.asResponse(context, url, allowExpired = true)?.let { return it }
@@ -66,10 +67,14 @@ object VinorWebResourceInterceptor {
         }
         if (cacheFirst && VinorCachePolicy.isPartnerPath(url)) {
             VinorOfflinePageStore.asHtmlResponse(context, url)?.let { return it }
-            return VinorWebResponses.empty("text/html")
+            return VinorWebResponses.silentHtml()
         }
         if (cacheFirst) {
-            return VinorWebResponses.empty(VinorCachePolicy.guessMime(url))
+            val path = VinorCachePolicy.pathOf(url)
+            if (path.contains("/api/") || path.endsWith("/data")) {
+                return VinorWebResponses.jsonOffline()
+            }
+            return VinorWebResponses.forCacheMiss(VinorCachePolicy.guessMime(url))
         }
         return null
     }
@@ -87,7 +92,7 @@ object VinorWebResourceInterceptor {
             val u = url?.trim().orEmpty()
             if (u.isEmpty() || !VinorCachePolicy.isVinorHttps(u)) return null
             if (isServiceWorkerUrl(u)) {
-                return if (cacheFirst) VinorWebResponses.empty("application/javascript") else null
+                return if (cacheFirst) VinorWebResponses.forCacheMiss("application/javascript") else null
             }
             if (VinorCachePolicy.isStaticAssetPath(u)) {
                 if (!cacheFirst) {
@@ -95,7 +100,7 @@ object VinorWebResourceInterceptor {
                     return null
                 }
                 VinorOfflineAssetStore.asResponse(context.applicationContext, u)?.let { return it }
-                return VinorWebResponses.empty(VinorCachePolicy.guessMime(u))
+                return VinorWebResponses.forCacheMiss(VinorCachePolicy.guessMime(u))
             }
             if (cacheFirst && VinorCachePolicy.isSafeGetApi(u)) {
                 VinorApiCacheStore.asResponse(context.applicationContext, u, allowExpired = true)?.let { return it }
@@ -103,7 +108,7 @@ object VinorWebResourceInterceptor {
             }
             null
         } catch (_: Throwable) {
-            if (cacheFirst) VinorWebResponses.empty("application/octet-stream") else null
+            if (cacheFirst) VinorWebResponses.forCacheMiss("application/javascript") else null
         }
     }
 

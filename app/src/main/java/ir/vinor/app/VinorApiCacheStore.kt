@@ -1,7 +1,6 @@
 package ir.vinor.app
 
 import android.content.Context
-import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import org.json.JSONObject
 import java.io.File
@@ -94,44 +93,47 @@ object VinorApiCacheStore {
     }
 
     fun warmup(context: Context) {
-        VinorCacheSession.fingerprint(context)
-        val cookie = runCatching {
-            CookieManager.getInstance().getCookie(VinorPartnerUrls.BASE)?.trim().orEmpty()
-        }.getOrDefault("")
-        if (cookie.length < 12) return
-        val urls = listOf(
-            "${VinorPartnerUrls.BASE}/express/partner/api/notifications",
-            "${VinorPartnerUrls.BASE}/express/partner/api/notes",
-            "${VinorPartnerUrls.BASE}/express/partner/api/public-lands",
-            "${VinorPartnerUrls.BASE}/express/partner/profile/data",
-            "${VinorPartnerUrls.BASE}/express/partner/routine/data",
-            "${VinorPartnerUrls.BASE}/express/partner/commissions/data",
-        )
-        io.execute {
-            urls.forEach { fetchAndStore(context, it, cookie) }
+        VinorSafe.onMain {
+            VinorCacheSession.fingerprint(context)
+            val cookie = VinorSafe.cookieOrEmpty(VinorPartnerUrls.BASE)
+            if (cookie.length < 12) return@onMain
+            val urls = listOf(
+                "${VinorPartnerUrls.BASE}/express/partner/api/notifications",
+                "${VinorPartnerUrls.BASE}/express/partner/api/notes",
+                "${VinorPartnerUrls.BASE}/express/partner/api/public-lands",
+                "${VinorPartnerUrls.BASE}/express/partner/profile/data",
+                "${VinorPartnerUrls.BASE}/express/partner/routine/data",
+                "${VinorPartnerUrls.BASE}/express/partner/commissions/data",
+            )
+            io.execute {
+                urls.forEach { fetchAndStore(context.applicationContext, it, cookie) }
+            }
         }
     }
 
     private fun fetchAndStore(context: Context, url: String, cookie: String) {
-        runCatching {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 12_000
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("Cookie", cookie)
-                setRequestProperty("X-Requested-With", "XMLHttpRequest")
-                setRequestProperty("User-Agent", VinorUserAgent.forHttpRequest(context))
-            }
-            val code = conn.responseCode
-            val ct = conn.contentType ?: "application/json"
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        var conn: HttpURLConnection? = null
+        try {
+            val opened = (URL(url).openConnection() as? HttpURLConnection) ?: return
+            conn = opened
+            opened.requestMethod = "GET"
+            opened.connectTimeout = 10_000
+            opened.readTimeout = 12_000
+            opened.instanceFollowRedirects = true
+            opened.setRequestProperty("Accept", "application/json")
+            opened.setRequestProperty("Cookie", cookie)
+            opened.setRequestProperty("X-Requested-With", "XMLHttpRequest")
+            opened.setRequestProperty("User-Agent", VinorUserAgent.forHttpRequest(context))
+            val code = opened.responseCode
+            val ct = opened.contentType ?: "application/json"
+            val stream = if (code in 200..299) opened.inputStream else opened.errorStream
             val body = stream?.use { it.readBytes() } ?: ByteArray(0)
-            conn.disconnect()
             if (code in 200..299 && body.isNotEmpty()) {
                 put(context, url, body, ct)
             }
+        } catch (_: Throwable) {
+        } finally {
+            runCatching { conn?.disconnect() }
         }
     }
 

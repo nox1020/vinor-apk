@@ -28,6 +28,7 @@ class VinorSpeechBridge(
     private val audioPermissionLauncher = activity.registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
+        if (!VinorSafe.isActivityAlive(activity)) return@registerForActivityResult
         if (granted && pendingStart) {
             pendingStart = false
             startListeningInternal()
@@ -39,13 +40,15 @@ class VinorSpeechBridge(
 
     @JavascriptInterface
     fun isNativeAvailable(): Boolean {
-        return SpeechRecognizer.isRecognitionAvailable(activity)
+        return runCatching { SpeechRecognizer.isRecognitionAvailable(activity.applicationContext) }
+            .getOrDefault(false)
     }
 
     @JavascriptInterface
     fun startNative() {
         activity.runOnUiThread {
-            if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
+            if (!VinorSafe.isActivityAlive(activity)) return@runOnUiThread
+            if (!SpeechRecognizer.isRecognitionAvailable(activity.applicationContext)) {
                 notifyWeb("error", "unavailable")
                 return@runOnUiThread
             }
@@ -53,7 +56,11 @@ class VinorSpeechBridge(
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 pendingStart = true
-                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                runCatching { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                    .onFailure {
+                        pendingStart = false
+                        notifyWeb("error", "not-allowed")
+                    }
                 return@runOnUiThread
             }
             startListeningInternal()
@@ -81,64 +88,73 @@ class VinorSpeechBridge(
     }
 
     private fun startListeningInternal() {
+        if (!VinorSafe.isActivityAlive(activity)) {
+            notifyWeb("error", "unavailable")
+            return
+        }
         sessionFinished = false
         try {
             speechRecognizer?.destroy()
         } catch (_: Exception) {
         }
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    notifyWeb("start", "")
-                }
-
-                override fun onBeginningOfSpeech() {}
-
-                override fun onRmsChanged(rmsdB: Float) {}
-
-                override fun onBufferReceived(buffer: ByteArray?) {}
-
-                override fun onEndOfSpeech() {}
-
-                override fun onError(error: Int) {
-                    if (sessionFinished) return
-                    sessionFinished = true
-                    val code = when (error) {
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "not-allowed"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "no-speech"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
-                        else -> "error"
-                    }
-                    notifyWeb("error", code)
-                }
-
-                override fun onResults(results: Bundle?) {
-                    if (sessionFinished) return
-                    sessionFinished = true
-                    val text = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                        ?.trim()
-                        .orEmpty()
-                    if (text.isNotEmpty()) {
-                        notifyWeb("complete", text)
-                    } else {
-                        notifyWeb("error", "no-speech")
-                    }
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val text = partialResults
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                        ?.trim()
-                        .orEmpty()
-                    if (text.isNotEmpty()) notifyWeb("partial", text)
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+        speechRecognizer = try {
+            SpeechRecognizer.createSpeechRecognizer(activity.applicationContext)
+        } catch (e: Exception) {
+            Log.w(TAG, "createSpeechRecognizer failed", e)
+            notifyWeb("error", "unavailable")
+            return
         }
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                notifyWeb("start", "")
+            }
+
+            override fun onBeginningOfSpeech() {}
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {}
+
+            override fun onError(error: Int) {
+                if (sessionFinished) return
+                sessionFinished = true
+                val code = when (error) {
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "not-allowed"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "no-speech"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no-speech"
+                    else -> "error"
+                }
+                notifyWeb("error", code)
+            }
+
+            override fun onResults(results: Bundle?) {
+                if (sessionFinished) return
+                sessionFinished = true
+                val text = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+                if (text.isNotEmpty()) {
+                    notifyWeb("complete", text)
+                } else {
+                    notifyWeb("error", "no-speech")
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val text = partialResults
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+                if (text.isNotEmpty()) notifyWeb("partial", text)
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -161,13 +177,10 @@ class VinorSpeechBridge(
             .replace("\\", "\\\\")
             .replace("'", "\\'")
             .replace("\n", " ")
-        val webView = webViewProvider() ?: return
-        webView.post {
-            webView.evaluateJavascript(
-                "window.__vinorVoiceNativeEvent && window.__vinorVoiceNativeEvent('$safeType','$safePayload');",
-                null,
-            )
-        }
+        VinorSafe.evalJs(
+            webViewProvider(),
+            "window.__vinorVoiceNativeEvent && window.__vinorVoiceNativeEvent('$safeType','$safePayload');",
+        )
     }
 
     companion object {

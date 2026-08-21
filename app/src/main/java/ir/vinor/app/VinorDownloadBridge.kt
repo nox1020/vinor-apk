@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
-import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
 import android.webkit.WebView
@@ -69,9 +68,10 @@ class VinorDownloadBridge(
                     setAllowedOverRoaming(true)
                     setMimeType(guessMimeType(absUrl, safeName))
                     addRequestHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
-                    // Cookie only for allowlisted public media/APK paths
-                    CookieManager.getInstance().getCookie(absUrl)?.takeIf { it.isNotBlank() }?.let { cookie ->
-                        addRequestHeader("Cookie", cookie)
+                    if (VinorSafe.isMainThread()) {
+                        VinorSafe.cookieOrEmpty(absUrl).takeIf { it.isNotBlank() }?.let { cookie ->
+                            addRequestHeader("Cookie", cookie)
+                        }
                     }
                     setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
                 }

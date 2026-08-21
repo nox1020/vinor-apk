@@ -20,10 +20,12 @@ object VinorLandDetailVolume {
 
     /** روی صفحه جزئیات، دکمه صدا ولوم مدیا را تنظیم کند نه زنگ. */
     fun syncVolumeControlStream(activity: Activity, url: String?) {
-        activity.volumeControlStream = if (isLandDetailUrl(url)) {
-            AudioManager.STREAM_MUSIC
-        } else {
-            AudioManager.STREAM_NOTIFICATION
+        runCatching {
+            activity.volumeControlStream = if (isLandDetailUrl(url)) {
+                AudioManager.STREAM_MUSIC
+            } else {
+                AudioManager.STREAM_NOTIFICATION
+            }
         }
     }
 
@@ -34,10 +36,11 @@ object VinorLandDetailVolume {
         if (keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
             return false
         }
-        val url = webView.url
+        val url = VinorSafe.webUrl(webView)
         if (!isLandDetailUrl(url)) return false
         syncVolumeControlStream(activity, url)
-        webView.evaluateJavascript(
+        VinorSafe.evalJs(
+            webView,
             """
             (function(){
               try {
@@ -48,15 +51,15 @@ object VinorLandDetailVolume {
               return false;
             })();
             """.trimIndent(),
-            null
         )
         return false
     }
 
     /** پس از soft-nav یا onResume WebView — گالری و دکمه‌های پایین را دوباره فعال کن */
     fun kickLandDetail(webView: WebView) {
-        if (!isLandDetailUrl(webView.url)) return
-        webView.evaluateJavascript(
+        if (!isLandDetailUrl(VinorSafe.webUrl(webView))) return
+        VinorSafe.evalJs(
+            webView,
             """
             (function () {
               try {
@@ -73,7 +76,6 @@ object VinorLandDetailVolume {
               } catch (_) {}
             })();
             """.trimIndent(),
-            null
         )
     }
 

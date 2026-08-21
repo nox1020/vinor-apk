@@ -52,18 +52,13 @@ class VinorWebViewFileChooser {
         }
         permissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
-        ) { launchPendingChooser() }
+        ) { result ->
+            val granted = result[Manifest.permission.CAMERA] == true
+            onCameraPermissionResult(granted)
+        }
         audioPermissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            val req = pendingPermissionRequest
-            pendingPermissionRequest = null
-            if (granted && req != null && VinorBridgeGate.isTrustedOrigin(req.origin?.toString())) {
-                req.grant(req.resources)
-            } else {
-                req?.deny()
-            }
-        }
+        ) { granted -> onMediaPermissionResult(granted) }
     }
 
     fun register(fragment: Fragment) {
@@ -74,18 +69,13 @@ class VinorWebViewFileChooser {
         }
         permissionLauncher = fragment.registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
-        ) { launchPendingChooser() }
+        ) { result ->
+            val granted = result[Manifest.permission.CAMERA] == true
+            onCameraPermissionResult(granted)
+        }
         audioPermissionLauncher = fragment.registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            val req = pendingPermissionRequest
-            pendingPermissionRequest = null
-            if (granted && req != null && VinorBridgeGate.isTrustedOrigin(req.origin?.toString())) {
-                req.grant(req.resources)
-            } else {
-                req?.deny()
-            }
-        }
+        ) { granted -> onMediaPermissionResult(granted) }
     }
 
     fun createChromeClient(
@@ -115,27 +105,85 @@ class VinorWebViewFileChooser {
         if (request == null) return
         val origin = request.origin?.toString().orEmpty()
         if (!VinorBridgeGate.isTrustedOrigin(origin)) {
-            request.deny()
+            runCatching { request.deny() }
             return
         }
         val activity = hostActivity()
-        if (activity == null) {
-            request.deny()
+        if (!VinorSafe.isActivityAlive(activity) || activity == null) {
+            runCatching { request.deny() }
             return
         }
-        val needsAudio = request.resources.any {
-            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+        val resources = request.resources ?: run {
+            runCatching { request.deny() }
+            return
         }
+        val needsAudio = resources.any { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+        val needsVideo = resources.any { it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }
         if (needsAudio && !hasRecordAudioPermission(activity)) {
             pendingPermissionRequest = request
             if (::audioPermissionLauncher.isInitialized) {
-                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                runCatching { audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                    .onFailure {
+                        pendingPermissionRequest = null
+                        runCatching { request.deny() }
+                    }
             } else {
-                request.deny()
+                runCatching { request.deny() }
             }
             return
         }
-        request.grant(request.resources)
+        if (needsVideo && !hasCameraPermission(activity)) {
+            pendingPermissionRequest = request
+            if (::permissionLauncher.isInitialized) {
+                runCatching { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }
+                    .onFailure {
+                        pendingPermissionRequest = null
+                        runCatching { request.deny() }
+                    }
+            } else {
+                runCatching { request.deny() }
+            }
+            return
+        }
+        grantPermittedResources(activity, request, resources)
+    }
+
+    private fun onCameraPermissionResult(granted: Boolean) {
+        if (pendingPermissionRequest != null) {
+            onMediaPermissionResult(granted)
+            return
+        }
+        launchPendingChooser()
+    }
+
+    private fun onMediaPermissionResult(granted: Boolean) {
+        val req = pendingPermissionRequest
+        pendingPermissionRequest = null
+        val activity = hostActivity()
+        if (!granted || req == null || !VinorSafe.isActivityAlive(activity) ||
+            !VinorBridgeGate.isTrustedOrigin(req.origin?.toString())
+        ) {
+            runCatching { req?.deny() }
+            return
+        }
+        grantPermittedResources(activity!!, req, req.resources ?: emptyArray())
+    }
+
+    private fun grantPermittedResources(
+        activity: Activity,
+        request: PermissionRequest,
+        resources: Array<String>,
+    ) {
+        val allowed = resources.filter { resource ->
+            when (resource) {
+                PermissionRequest.RESOURCE_AUDIO_CAPTURE -> hasRecordAudioPermission(activity)
+                PermissionRequest.RESOURCE_VIDEO_CAPTURE -> hasCameraPermission(activity)
+                else -> true
+            }
+        }.toTypedArray()
+        runCatching {
+            if (allowed.isEmpty()) request.deny() else request.grant(allowed)
+        }
     }
 
     private fun showFileChooser(
@@ -143,11 +191,15 @@ class VinorWebViewFileChooser {
         params: WebChromeClient.FileChooserParams?,
     ): Boolean {
         val activity = hostActivity() ?: run {
-            callback?.onReceiveValue(null)
+            runCatching { callback?.onReceiveValue(null) }
+            return false
+        }
+        if (!VinorSafe.isActivityAlive(activity)) {
+            runCatching { callback?.onReceiveValue(null) }
             return false
         }
 
-        filePathCallback?.onReceiveValue(null)
+        filePathCallback?.let { runCatching { it.onReceiveValue(null) } }
         filePathCallback = callback
 
         val acceptTypes = params?.acceptTypes?.filter { it.isNotBlank() }.orEmpty()
@@ -170,7 +222,12 @@ class VinorWebViewFileChooser {
         }
 
         if (initialIntents.isNotEmpty() && !hasCameraPermission(activity)) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            if (::permissionLauncher.isInitialized) {
+                runCatching { permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA)) }
+                    .onFailure { cancelCallback() }
+            } else {
+                cancelCallback()
+            }
             return true
         }
 
@@ -189,6 +246,10 @@ class VinorWebViewFileChooser {
         try {
             chooserLauncher.launch(intent)
         } catch (_: ActivityNotFoundException) {
+            cancelCallback()
+        } catch (_: IllegalStateException) {
+            cancelCallback()
+        } catch (_: Exception) {
             cancelCallback()
         }
     }
@@ -232,7 +293,7 @@ class VinorWebViewFileChooser {
         if (callback == null) return
 
         if (!success) {
-            callback.onReceiveValue(null)
+            runCatching { callback.onReceiveValue(null) }
             cameraOutputUri = null
             return
         }
@@ -252,14 +313,14 @@ class VinorWebViewFileChooser {
         cameraOutputUri = null
 
         if (results.isEmpty()) {
-            callback.onReceiveValue(null)
+            runCatching { callback.onReceiveValue(null) }
         } else {
-            callback.onReceiveValue(results.toTypedArray())
+            runCatching { callback.onReceiveValue(results.toTypedArray()) }
         }
     }
 
     private fun cancelCallback() {
-        filePathCallback?.onReceiveValue(null)
+        runCatching { filePathCallback?.onReceiveValue(null) }
         filePathCallback = null
         cameraOutputUri = null
     }

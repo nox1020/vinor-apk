@@ -132,7 +132,7 @@ class WebLoginOtpSmsHelper(
 
     private fun installUrlChangeHook() {
         val wv = webViewProvider() ?: return
-        wv.post { wv.evaluateJavascript(URL_CHANGE_HOOK_JS, null) }
+        wv.post { VinorSafe.evalJs(wv, URL_CHANGE_HOOK_JS) }
     }
 
     private fun unregisterReceiver() {
@@ -158,11 +158,13 @@ class WebLoginOtpSmsHelper(
         Log.i(TAG, "OTP received")
         pendingCode = code
         tryInject(code, fromPoll = false)
-        Toast.makeText(
-            activity,
-            activity.getString(R.string.login_otp_auto_filled),
-            Toast.LENGTH_SHORT,
-        ).show()
+        if (VinorSafe.isActivityAlive(activity)) {
+            Toast.makeText(
+                activity.applicationContext,
+                activity.getString(R.string.login_otp_auto_filled),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     private fun tryInject(code: String, fromPoll: Boolean) {
@@ -223,16 +225,20 @@ class WebLoginOtpSmsHelper(
             })();
         """.trimIndent()
         wv.post {
-            wv.evaluateJavascript(js) { result ->
-                val ok = result != null && result != "null" && result.replace("\"", "").isNotEmpty()
-                if (!ok && attempt < MAX_INJECT_RETRIES) {
-                    wv.postDelayed(
-                        { injectIntoWebView(code, attempt + 1, onDone) },
-                        INJECT_RETRY_MS,
-                    )
-                } else {
-                    onDone(ok)
+            try {
+                wv.evaluateJavascript(js) { result ->
+                    val ok = result != null && result != "null" && result.replace("\"", "").isNotEmpty()
+                    if (!ok && attempt < MAX_INJECT_RETRIES) {
+                        wv.postDelayed(
+                            { injectIntoWebView(code, attempt + 1, onDone) },
+                            INJECT_RETRY_MS,
+                        )
+                    } else {
+                        onDone(ok)
+                    }
                 }
+            } catch (_: Throwable) {
+                onDone(false)
             }
         }
     }

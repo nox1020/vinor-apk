@@ -98,12 +98,7 @@ object VinorWebCacheManager {
               } catch (_) {}
             })();
         """.trimIndent()
-        webView.post {
-            try {
-                webView.evaluateJavascript(js, null)
-            } catch (_: Throwable) {
-            }
-        }
+        VinorSafe.evalJs(webView, js)
     }
 
     fun warmupPartnerCaches(webView: WebView?) {
@@ -120,7 +115,7 @@ object VinorWebCacheManager {
               } catch (_) {}
             })();
         """.trimIndent()
-        webView.post { webView.evaluateJavascript(js, null) }
+        VinorSafe.evalJs(webView, js)
     }
 
     fun clearServiceWorkerCaches(webView: WebView?, includePrecache: Boolean) {
@@ -145,7 +140,7 @@ object VinorWebCacheManager {
               } catch (_) {}
             })();
         """.trimIndent()
-        webView.post { webView.evaluateJavascript(js, null) }
+        VinorSafe.evalJs(webView, js)
     }
 
     private fun purgeWebStorage(webView: WebView?) {

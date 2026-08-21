@@ -29,12 +29,7 @@ class VinorCacheBridge(
                   } catch (_) {}
                 })();
             """.trimIndent()
-            webView.post {
-                try {
-                    webView.evaluateJavascript(js, null)
-                } catch (_: Throwable) {
-                }
-            }
+            VinorSafe.evalJs(webView, js)
         }
     }
 

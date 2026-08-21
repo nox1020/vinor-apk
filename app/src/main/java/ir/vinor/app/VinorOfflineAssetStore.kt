@@ -47,6 +47,7 @@ object VinorOfflineAssetStore {
         io.execute {
             try {
                 fetchAndStore(context.applicationContext, u)
+            } catch (_: Throwable) {
             } finally {
                 inFlight.remove(u)
             }
@@ -86,35 +87,37 @@ object VinorOfflineAssetStore {
     }
 
     private fun fetchAndStore(context: Context, url: String) {
-        val conn = (URL(url).openConnection() as? HttpURLConnection) ?: return
-        conn.instanceFollowRedirects = true
-        conn.connectTimeout = 8000
-        conn.readTimeout = 12000
-        conn.setRequestProperty("User-Agent", VinorUserAgent.forHttpRequest(context))
-        VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) ->
-            conn.setRequestProperty(k, v)
+        var conn: HttpURLConnection? = null
+        try {
+            val opened = (URL(url).openConnection() as? HttpURLConnection) ?: return
+            conn = opened
+            opened.instanceFollowRedirects = true
+            opened.connectTimeout = 8000
+            opened.readTimeout = 12000
+            opened.setRequestProperty("User-Agent", VinorUserAgent.forHttpRequest(context))
+            VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) ->
+                opened.setRequestProperty(k, v)
+            }
+            opened.connect()
+            if (opened.responseCode !in 200..299) return
+            val ct = (opened.contentType ?: "").lowercase()
+            val etag = opened.getHeaderField("ETag").orEmpty()
+            val lastMod = opened.getHeaderField("Last-Modified").orEmpty()
+            if (!VinorCachePolicy.isCacheableAssetContentType(ct) &&
+                !VinorCachePolicy.isStaticAssetPath(url)
+            ) {
+                return
+            }
+            val body = opened.inputStream.use { it.readBytes() }
+            if (body.isEmpty() || body.size > VinorCachePolicy.MAX_ASSET_BYTES) return
+            write(context, url, ct.ifBlank { VinorCachePolicy.guessMime(url) }, body, etag, lastMod)
+            val noQuery = normalizedNoQuery(url)
+            if (noQuery != url) write(context, noQuery, ct, body, etag, lastMod)
+            trim(context)
+        } catch (_: Throwable) {
+        } finally {
+            runCatching { conn?.disconnect() }
         }
-        conn.connect()
-        if (conn.responseCode !in 200..299) {
-            conn.disconnect()
-            return
-        }
-        val ct = (conn.contentType ?: "").lowercase()
-        val etag = conn.getHeaderField("ETag").orEmpty()
-        val lastMod = conn.getHeaderField("Last-Modified").orEmpty()
-        if (!VinorCachePolicy.isCacheableAssetContentType(ct) &&
-            !VinorCachePolicy.isStaticAssetPath(url)
-        ) {
-            conn.disconnect()
-            return
-        }
-        val body = conn.inputStream.use { it.readBytes() }
-        conn.disconnect()
-        if (body.isEmpty() || body.size > VinorCachePolicy.MAX_ASSET_BYTES) return
-        write(context, url, ct.ifBlank { VinorCachePolicy.guessMime(url) }, body, etag, lastMod)
-        val noQuery = normalizedNoQuery(url)
-        if (noQuery != url) write(context, noQuery, ct, body, etag, lastMod)
-        trim(context)
     }
 
     private fun write(
@@ -188,12 +191,11 @@ object VinorOfflineAssetStore {
         runCatching { dir(context).deleteRecursively() }
     }
 
-    /** استاتیک عمومی بعد از logout نگه داشته می‌شود. */
+    /** استاتیک عمومی بعد از logout نگه داشته می‌شود. فقط فایل خراب/خالی را بدون خواندن کل بایت‌ها پاک کن. */
     fun clearPublicIfCorrupted(context: Context) {
         val d = dir(context)
         d.listFiles { f -> f.name.endsWith(".bin") }?.forEach { bin ->
-            val bytes = VinorCacheIo.readBytes(bin)
-            if (bytes == null || bytes.isEmpty()) {
+            if (!bin.isFile || bin.length() <= 0L) {
                 val id = bin.name.removeSuffix(".bin")
                 VinorCacheIo.deleteQuiet(bin)
                 VinorCacheIo.deleteQuiet(File(d, "$id.json"))

@@ -50,6 +50,6 @@ object VinorWebOfflineSession {
         return VinorCachePolicy.isPartnerPath(url)
     }
 
-    fun webViewHasBrowsablePage(webView: WebView): Boolean =
-        isPartnerBrowsableUrl(webView.url)
+    fun webViewHasBrowsablePage(webView: WebView?): Boolean =
+        isPartnerBrowsableUrl(VinorSafe.webUrl(webView))
 }

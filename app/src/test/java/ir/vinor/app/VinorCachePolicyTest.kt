@@ -51,6 +51,11 @@ class VinorCachePolicyTest {
         assertEquals("utf-8", VinorCachePolicy.interceptCharset("image/svg+xml"))
         assertTrue(VinorCachePolicy.isBinaryMime("font/woff2; charset=utf-8"))
         assertFalse(VinorCachePolicy.isBinaryMime("text/html"))
+        assertTrue(VinorCachePolicy.isBinaryMime("image/webp"))
+        assertTrue(VinorCachePolicy.isBinaryMime("application/octet-stream"))
+        assertFalse(VinorCachePolicy.isBinaryMime("application/javascript"))
+        assertFalse(VinorCachePolicy.isBinaryMime("application/json"))
+        assertFalse(VinorCachePolicy.isBinaryMime("text/css"))
     }
 
     @Test

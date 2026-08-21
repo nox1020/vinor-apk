@@ -1,6 +1,5 @@
 package ir.vinor.app
 
-import android.app.Activity
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -560,7 +559,7 @@ object VinorApkUpdateInstaller {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         grantUriToInstallers(context, intent, uri)
-        context.startActivity(intent)
+        context.applicationContext.startActivity(intent)
         return true
     }
 
@@ -585,12 +584,13 @@ object VinorApkUpdateInstaller {
 
     private fun openUnknownSourcesSettings(context: Context) {
         try {
+            val appCtx = context.applicationContext
             val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = Uri.parse("package:${context.packageName}")
+                data = Uri.parse("package:${appCtx.packageName}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(intent)
-            toast(context, "اجازهٔ نصب از این منبع را فعال کنید")
+            appCtx.startActivity(intent)
+            toast(appCtx, "اجازهٔ نصب از این منبع را فعال کنید")
         } catch (e: Exception) {
             Log.e(TAG, "openUnknownSourcesSettings failed", e)
         }
@@ -598,14 +598,8 @@ object VinorApkUpdateInstaller {
 
     private fun toast(context: Context, message: String) {
         val appCtx = context.applicationContext
-        if (context is Activity) {
-            context.runOnUiThread {
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-            }
-        } else {
-            android.os.Handler(appCtx.mainLooper).post {
-                Toast.makeText(appCtx, message, Toast.LENGTH_LONG).show()
-            }
+        VinorSafe.onMain {
+            Toast.makeText(appCtx, message, Toast.LENGTH_LONG).show()
         }
     }
 

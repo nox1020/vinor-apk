@@ -2,7 +2,6 @@ package ir.vinor.app
 
 import android.content.Context
 import android.util.Log
-import android.webkit.CookieManager
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +81,18 @@ object VinorFcmRegistrar {
         val token = prefs.getString(KEY_LAST_TOKEN, null)?.trim().orEmpty()
         if (token.isEmpty()) return
 
-        val cookie = CookieManager.getInstance().getCookie(BASE)?.trim().orEmpty()
+        VinorSafe.onMain {
+            val cookie = VinorSafe.cookieOrEmpty(BASE)
+            postUnregister(appCtx, prefs, token, cookie)
+        }
+    }
+
+    private fun postUnregister(
+        appCtx: Context,
+        prefs: android.content.SharedPreferences,
+        token: String,
+        cookie: String,
+    ) {
         scope.launch {
             try {
                 if (cookie.isNotBlank()) {
@@ -111,12 +121,23 @@ object VinorFcmRegistrar {
     fun registerToken(context: Context, token: String, force: Boolean = false) {
         val tokenTrim = token.trim()
         if (tokenTrim.isEmpty()) return
-
-        val cookie = CookieManager.getInstance().getCookie(BASE)?.trim().orEmpty()
-        if (cookie.isBlank()) {
-            Log.d(TAG, "skip FCM register — not logged in")
-            return
+        val appCtx = context.applicationContext
+        VinorSafe.onMain {
+            val cookie = VinorSafe.cookieOrEmpty(BASE)
+            if (cookie.isBlank()) {
+                Log.d(TAG, "skip FCM register — not logged in")
+                return@onMain
+            }
+            registerTokenWithCookie(appCtx, tokenTrim, cookie, force)
         }
+    }
+
+    private fun registerTokenWithCookie(
+        context: Context,
+        tokenTrim: String,
+        cookie: String,
+        force: Boolean,
+    ) {
 
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()

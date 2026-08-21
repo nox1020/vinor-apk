@@ -87,7 +87,11 @@ object VinorOfflinePageStore {
     fun lastSavedAt(context: Context): Long =
         VinorWebOfflineSession.lastCachedAt(context)
 
-    fun hasAny(context: Context): Boolean = !readLatest(context).isNullOrBlank()
+    fun hasAny(context: Context): Boolean = runCatching {
+        dir(context).listFiles { f ->
+            f.isFile && f.name.endsWith(".html") && f.length() >= 200L
+        }?.isNotEmpty() == true
+    }.getOrDefault(false)
 
     fun clearUser(context: Context) {
         runCatching { dir(context).deleteRecursively() }

@@ -44,7 +44,7 @@ object VinorCacheIo {
         return runCatching {
             RandomAccessFile(file, "r").use { raf ->
                 val len = raf.length()
-                if (len <= 0L || len > Int.MAX_VALUE) return@use null
+                if (len <= 0L || len > 8L * 1024 * 1024) return@use null
                 val buf = ByteArray(len.toInt())
                 raf.readFully(buf)
                 buf

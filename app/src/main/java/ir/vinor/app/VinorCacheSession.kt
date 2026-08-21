@@ -20,6 +20,9 @@ object VinorCacheSession {
      * اگر خواندن کوکی شکست بخورد، مقدار قبلی prefs را با anon بازنویسی نمی‌کند.
      */
     fun fingerprint(context: Context? = null): String {
+        if (!VinorSafe.isMainThread()) {
+            return context?.let { lastKnown(it) } ?: ANON
+        }
         val cookie = runCatching {
             CookieManager.getInstance().getCookie("https://vinor.ir")
                 ?: CookieManager.getInstance().getCookie("https://www.vinor.ir")
@@ -41,7 +44,7 @@ object VinorCacheSession {
     /** برای shouldInterceptRequest — فقط SharedPreferences، بدون CookieManager. */
     fun scopeForRead(context: Context): String = lastKnown(context)
 
-    fun scopeForWrite(context: Context): String = fingerprint(context)
+    fun scopeForWrite(context: Context): String = lastKnown(context)
 
     fun lastKnown(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

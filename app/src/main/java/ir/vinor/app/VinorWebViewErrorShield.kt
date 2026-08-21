@@ -13,8 +13,6 @@ object VinorWebViewErrorShield {
     private const val SILENT_HTML =
         """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#030712;height:100%;overflow:hidden}</style></head><body></body></html>"""
 
-    private val silentHtmlBytes = SILENT_HTML.toByteArray(Charsets.UTF_8)
-
     fun looksLikeChromeErrorPage(url: String?): Boolean {
         if (url.isNullOrBlank()) return false
         val u = url.lowercase()
@@ -44,8 +42,7 @@ object VinorWebViewErrorShield {
         }
     }
 
-    fun silentHtmlResponse(): WebResourceResponse =
-        VinorWebResponses.html(silentHtmlBytes)
+    fun silentHtmlResponse(): WebResourceResponse = VinorWebResponses.silentHtml()
 
     fun shouldInterceptChromeErrorMainFrame(request: WebResourceRequest?): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false

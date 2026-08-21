@@ -100,18 +100,16 @@ abstract class BaseWebViewFragment : Fragment() {
         settings.displayZoomControls = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         VinorWebViewFileChooser.configureWebViewSettings(settings)
+        val hostCtx = context
         val appVersion = try {
-            requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName?.trim().orEmpty()
+            if (hostCtx == null) ""
+            else hostCtx.packageManager.getPackageInfo(hostCtx.packageName, 0).versionName?.trim().orEmpty()
         } catch (_: Exception) {
             ""
         }
         settings.userAgentString = settings.userAgentString + " VinorApp/Android" +
             if (appVersion.isNotEmpty()) "/$appVersion" else ""
-        
-        // پشتیبانی از تم تاریک در WebView
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            settings.forceDark = WebSettings.FORCE_DARK_ON
-        }
+        VinorWebViewSettings.applyDarkening(settings)
 
         // WebViewClient برای مدیریت navigation و errors
         webView.webViewClient = object : WebViewClient() {
@@ -280,8 +278,9 @@ abstract class BaseWebViewFragment : Fragment() {
 
         val fileChooser = webViewFileChooser
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            val ctx = context ?: return@setDownloadListener
             val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, null)
-            VinorDownloadBridge.enqueueDownload(requireContext(), url, filename, showToast = true)
+            VinorDownloadBridge.enqueueDownload(ctx, url, filename, showToast = true)
         }
         webView.webChromeClient = fileChooser?.createChromeClient() ?: WebChromeClient()
     }
@@ -362,12 +361,8 @@ abstract class BaseWebViewFragment : Fragment() {
      * بررسی اتصال به اینترنت
      */
     protected fun isOnline(): Boolean {
-        val connectivityManager =
-            requireContext().getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        val ctx = context ?: return false
+        return VinorNetworkStatus.isOnline(ctx)
     }
 
     /**
@@ -743,8 +738,9 @@ abstract class BaseWebViewFragment : Fragment() {
     @SuppressLint("MissingPermission")
     private fun registerConnectivityLostCallback() {
         if (connectivityCallback != null) return
+        val ctx = context ?: return
         val cm =
-            requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         connectivityCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onLost(network: Network) {
                 view?.post {
@@ -756,7 +752,11 @@ abstract class BaseWebViewFragment : Fragment() {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
-        cm.registerNetworkCallback(request, connectivityCallback!!)
+        try {
+            cm.registerNetworkCallback(request, connectivityCallback!!)
+        } catch (_: Exception) {
+            connectivityCallback = null
+        }
     }
 
     private fun unregisterConnectivityLostCallback() {
@@ -772,8 +772,8 @@ abstract class BaseWebViewFragment : Fragment() {
 
     override fun onDestroyView() {
         if (::webView.isInitialized) {
-            webView.removeCallbacks(revealAfterLoadRunnable)
-            webView.destroy()
+            runCatching { webView.removeCallbacks(revealAfterLoadRunnable) }
+            runCatching { webView.destroy() }
         }
         super.onDestroyView()
     }

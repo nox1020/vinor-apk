@@ -43,6 +43,7 @@ object DeepLinkPendingStore {
      * Fail-open: اگر کوکی نامشخص باشد، برای مسیرهای عمومی اجازه می‌دهد.
      */
     fun hasPartnerSessionCookie(context: Context? = null): Boolean {
+        if (!VinorSafe.isMainThread()) return false
         return try {
             val cm = CookieManager.getInstance()
             val cookie = cm.getCookie("https://vinor.ir") ?: cm.getCookie("https://www.vinor.ir") ?: ""

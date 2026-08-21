@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import android.webkit.CookieManager
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -180,7 +179,7 @@ class VinorNotifyHelper(
     }
 
     private fun cookieHeader(): String =
-        CookieManager.getInstance().getCookie(BASE)?.trim().orEmpty()
+        VinorSafe.cookieOrEmpty(BASE)
 
     private suspend fun fetchUnread(cookie: String): Int? = withContext(Dispatchers.IO) {
         try {

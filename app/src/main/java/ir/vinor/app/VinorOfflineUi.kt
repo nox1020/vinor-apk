@@ -63,12 +63,14 @@ class VinorOfflineUi(private val container: View) {
     }
 
     private fun performTap(view: View) {
-        view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        } else {
-            @Suppress("DEPRECATION")
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        runCatching {
+            view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+            } else {
+                @Suppress("DEPRECATION")
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            }
         }
     }
 }

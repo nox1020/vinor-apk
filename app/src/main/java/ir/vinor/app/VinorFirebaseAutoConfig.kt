@@ -43,20 +43,22 @@ object VinorFirebaseAutoConfig {
     }
 
     suspend fun ensureInitialized(context: Context): Boolean {
-        if (FirebaseApp.getApps(context).isNotEmpty()) return true
+        val appCtx = context.applicationContext
+        if (FirebaseApp.getApps(appCtx).isNotEmpty()) return true
 
-        readCache(context)?.let { cached ->
-            if (initWithJson(context, cached)) return true
-        }
+        val cached = readCache(appCtx)
+        if (cached != null && initOnMain(appCtx, cached)) return true
 
-        fetchRemoteConfig(context)?.let { remote ->
-            if (initWithJson(context, remote)) {
-                writeCache(context, remote)
-                return true
-            }
+        val remote = fetchRemoteConfig(appCtx)
+        if (remote != null && initOnMain(appCtx, remote)) {
+            writeCache(appCtx, remote)
+            return true
         }
         return false
     }
+
+    private suspend fun initOnMain(context: Context, mobile: JSONObject): Boolean =
+        withContext(Dispatchers.Main) { initWithJson(context, mobile) }
 
     private fun initWithJson(context: Context, mobile: JSONObject): Boolean {
         return runCatching {

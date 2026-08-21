@@ -29,13 +29,35 @@ object VinorWebViewSettings {
         if (userAgentSuffix.isNotBlank() && !settings.userAgentString.contains("VinorApp/")) {
             settings.userAgentString = settings.userAgentString + userAgentSuffix
         }
+        applyDarkening(settings)
+    }
+
+    fun applyDarkening(settings: WebSettings) {
+        runCatching {
+            if (androidx.webkit.WebViewFeature.isFeatureSupported(
+                    androidx.webkit.WebViewFeature.ALGORITHMIC_DARKENING
+                )
+            ) {
+                androidx.webkit.WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, true)
+            } else if (androidx.webkit.WebViewFeature.isFeatureSupported(
+                    androidx.webkit.WebViewFeature.FORCE_DARK
+                )
+            ) {
+                @Suppress("DEPRECATION")
+                androidx.webkit.WebSettingsCompat.setForceDark(
+                    settings,
+                    androidx.webkit.WebSettingsCompat.FORCE_DARK_ON,
+                )
+            }
+        }
     }
 
     fun configureCookies(webView: WebView) {
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            // First-party session only — reduces cross-site tracking / bridge abuse surface
-            setAcceptThirdPartyCookies(webView, false)
+        runCatching {
+            CookieManager.getInstance().apply {
+                setAcceptCookie(true)
+                setAcceptThirdPartyCookies(webView, false)
+            }
         }
     }
 }

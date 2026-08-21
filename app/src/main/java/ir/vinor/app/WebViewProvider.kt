@@ -15,23 +15,42 @@ object WebViewProvider {
     private var cachedWebView: WebView? = null
 
     fun prewarm(context: Context) {
+        val host = context as? Activity ?: return
         if (cachedWebView != null) return
         synchronized(this) {
             if (cachedWebView == null) {
-                cachedWebView = createWebView(context.applicationContext).also { warmupInstance(context, it) }
+                cachedWebView = createWebView(host)
             }
         }
     }
 
     fun attach(activity: Activity, container: ViewGroup): WebView {
         val webView = obtain(activity)
-        val ctxWrapper = webView.context as MutableContextWrapper
-        ctxWrapper.baseContext = activity
-        (webView.parent as? ViewGroup)?.removeView(webView)
-        container.addView(
-            webView,
-            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        )
+        (webView.context as? MutableContextWrapper)?.let { wrapper ->
+            try {
+                wrapper.baseContext = activity
+            } catch (_: Exception) {
+            }
+        }
+        try {
+            (webView.parent as? ViewGroup)?.removeView(webView)
+        } catch (_: Exception) {
+        }
+        try {
+            container.addView(
+                webView,
+                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            )
+        } catch (_: Exception) {
+            try {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                container.addView(
+                    webView,
+                    ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                )
+            } catch (_: Exception) {
+            }
+        }
         return webView
     }
 
@@ -76,12 +95,17 @@ object WebViewProvider {
     }
 
     private fun obtain(context: Context): WebView {
-        prewarm(context)
-        return cachedWebView ?: createWebView(context.applicationContext).also { cachedWebView = it }
+        cachedWebView?.let { return it }
+        synchronized(this) {
+            cachedWebView?.let { return it }
+            val created = createWebView(context)
+            cachedWebView = created
+            return created
+        }
     }
 
-    private fun createWebView(appContext: Context): WebView {
-        val ctx = MutableContextWrapper(appContext)
+    private fun createWebView(host: Context): WebView {
+        val ctx = MutableContextWrapper(host)
         return WebView(ctx).apply {
             setBackgroundColor(Color.TRANSPARENT)
             with(settings) {
@@ -89,7 +113,7 @@ object WebViewProvider {
                     this,
                     userAgentSuffix = ""
                 )
-                // Online-first; MainActivity flips to CACHE_ELSE_NETWORK when offline
+                // Interceptor owns cache-first; LOAD_CACHE_ONLY + empty intercept can kill Chromium.
                 cacheMode = WebSettings.LOAD_DEFAULT
             }
             if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) {
@@ -102,9 +126,5 @@ object WebViewProvider {
                 WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_ON)
             }
         }
-    }
-
-    private fun warmupInstance(context: Context, webView: WebView) {
-        // فقط موتور Chromium را گرم کن — loadUrl صفحهٔ قبلی را پاک می‌کند
     }
 }

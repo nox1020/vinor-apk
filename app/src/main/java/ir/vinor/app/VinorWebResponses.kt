@@ -15,6 +15,10 @@ object VinorWebResponses {
     private val offlineJson =
         """{"ok":false,"success":false,"offline":true}""".toByteArray(Charsets.UTF_8)
 
+    private val silentHtmlBytes =
+        """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#030712;height:100%;overflow:hidden}</style></head><body></body></html>"""
+            .toByteArray(Charsets.UTF_8)
+
     fun html(bytes: ByteArray): WebResourceResponse =
         of("text/html", "utf-8", bytes)
 
@@ -23,16 +27,27 @@ object VinorWebResponses {
 
     fun jsonOffline(): WebResourceResponse = json(offlineJson)
 
-    fun empty(mime: String?): WebResourceResponse {
+    fun silentHtml(): WebResourceResponse = html(silentHtmlBytes)
+
+    /**
+     * پاسخ miss آفلاین. بدنهٔ خالی برای فونت/عکس رندرر Chromium را می‌کشد → null
+     * تا WebView همان منبع را fail کند، نه اینکه بایت نامعتبر سرو شود.
+     */
+    fun forCacheMiss(mime: String?): WebResourceResponse? {
         val safeMime = mime
             ?.substringBefore(';')
             ?.trim()
             ?.ifBlank { null }
             ?: "application/octet-stream"
+        if (VinorCachePolicy.isBinaryMime(safeMime)) return null
         val lower = safeMime.lowercase()
         if (lower.contains("json")) return jsonOffline()
+        if (lower.contains("html")) return silentHtml()
         return of(safeMime, VinorCachePolicy.interceptCharset(safeMime), ByteArray(0))
     }
+
+    fun empty(mime: String?): WebResourceResponse =
+        forCacheMiss(mime) ?: jsonOffline()
 
     fun of(mime: String?, encoding: String?, bytes: ByteArray): WebResourceResponse {
         val safeMime = mime

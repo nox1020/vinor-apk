@@ -13,6 +13,7 @@ class VinorOtpBridge(
     @JavascriptInterface
     fun onUrlChanged(url: String?) {
         activity.runOnUiThread {
+            if (!VinorSafe.isActivityAlive(activity)) return@runOnUiThread
             val helper = helperProvider() ?: return@runOnUiThread
             helper.onUrlChanged(url)
             helper.onPageContentReady()
@@ -23,6 +24,7 @@ class VinorOtpBridge(
     @JavascriptInterface
     fun restartRetriever() {
         activity.runOnUiThread {
+            if (!VinorSafe.isActivityAlive(activity)) return@runOnUiThread
             helperProvider()?.restartSmsRetriever()
         }
     }
@@ -30,6 +32,7 @@ class VinorOtpBridge(
     @JavascriptInterface
     fun onOtpPageReady() {
         activity.runOnUiThread {
+            if (!VinorSafe.isActivityAlive(activity)) return@runOnUiThread
             helperProvider()?.onOtpPageReady()
         }
     }
