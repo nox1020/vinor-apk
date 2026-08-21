@@ -31,7 +31,10 @@ class VinorAppUpdateWorker(
             }
         }
 
-        runCatching { setForeground(foregroundInfo(ctx, state.percent.coerceAtLeast(0))) }
+        try {
+            setForeground(foregroundInfo(ctx, state.percent.coerceAtLeast(0)))
+        } catch (_: Exception) {
+        }
 
         VinorAppUpdateController.markDownloading(ctx)
 
@@ -65,7 +68,7 @@ class VinorAppUpdateWorker(
                         )
                     }
                     if (percent == 0 || percent % 5 == 0) {
-                        runCatching { setForeground(foregroundInfo(ctx, percent)) }
+                        runCatching { setForegroundAsync(foregroundInfo(ctx, percent)) }
                     }
                 },
             )
