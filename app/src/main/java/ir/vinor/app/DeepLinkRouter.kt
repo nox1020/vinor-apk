@@ -75,18 +75,21 @@ object DeepLinkRouter {
                 )
             path.matches(Regex("^/property/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
                 val id = Regex("^/property/([^/]+)$", RegexOption.IGNORE_CASE)
-                    .find(path)!!.groupValues[1]
-                propertyRoute(id, raw)
+                    .find(path)?.groupValues?.getOrNull(1)
+                if (id.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "property_missing_id")
+                else propertyRoute(id, raw)
             }
             path.matches(Regex("^/express/partner/lands/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
                 val id = Regex("^/express/partner/lands/([^/]+)$", RegexOption.IGNORE_CASE)
-                    .find(path)!!.groupValues[1]
-                propertyRoute(id, raw, partnerPath = true)
+                    .find(path)?.groupValues?.getOrNull(1)
+                if (id.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "land_missing_id")
+                else propertyRoute(id, raw, partnerPath = true)
             }
             path.matches(Regex("^/express/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
                 val code = Regex("^/express/([^/]+)$", RegexOption.IGNORE_CASE)
-                    .find(path)!!.groupValues[1]
-                if (code.equals("partner", ignoreCase = true)) {
+                    .find(path)?.groupValues?.getOrNull(1)
+                if (code.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "express_missing_code")
+                else if (code.equals("partner", ignoreCase = true)) {
                     Route(
                         type = DestinationType.PARTNER_HOME,
                         targetUrl = VinorPartnerUrls.ENTRY,

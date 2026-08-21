@@ -64,6 +64,8 @@ class VinorCachePolicyTest {
         assertTrue(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/notifications/abc/read"))
         assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/verify"))
         assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/profile/update"))
+        assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/login-request"))
+        assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/visit/foo"))
     }
 
     @Test

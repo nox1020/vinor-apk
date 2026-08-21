@@ -6,13 +6,26 @@ import org.json.JSONObject
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.concurrent.Executors
 
 object VinorOfflinePageStore {
 
+    private val io = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "vinor-page-cache").apply { isDaemon = true }
+    }
+
     fun save(context: Context, url: String?, html: String?) {
+        val app = context.applicationContext
         val u = (url ?: "").trim()
-        var h = (html ?: "").trim()
-        if (u.isEmpty() || h.isEmpty()) return
+        val raw = (html ?: "").trim()
+        if (u.isEmpty() || raw.isEmpty()) return
+        io.execute {
+            runCatching { saveSync(app, u, raw) }
+        }
+    }
+
+    private fun saveSync(context: Context, u: String, html: String) {
+        var h = html
         if (!VinorWebOfflineSession.isPartnerBrowsableUrl(u)) return
         if (h.toByteArray(Charsets.UTF_8).size > VinorCachePolicy.MAX_HTML_BYTES) {
             VinorCacheLog.event("CACHE_DELETE", "snapshot too large")
@@ -31,7 +44,7 @@ object VinorOfflinePageStore {
             .put("createdAt", System.currentTimeMillis())
             .put("lastAccessedAt", System.currentTimeMillis())
             .put("size", h.length)
-            .put("session", VinorCacheSession.fingerprint(context))
+            .put("session", VinorCacheSession.scopeForWrite(context))
         VinorCacheIo.writeAtomicText(metaFile, meta.toString())
         val noQuery = stripQuery(u)
         if (noQuery.isNotBlank() && noQuery != u) {

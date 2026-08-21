@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -50,7 +51,7 @@ class VinorNotifyHelper(
         .build()
 
     private var pollJob: Job? = null
-    private var lastUnread = -1
+    private var lastUnread = AtomicInteger(-1)
     private var permissionRequested = false
     private var pendingOpenUrl: String? = null
 
@@ -75,7 +76,7 @@ class VinorNotifyHelper(
 
     /** همگام‌سازی baseline از JS تا دوباره نوتیفیکیشن تکراری نشود */
     fun updateBaselineUnread(count: Int) {
-        if (count >= 0) lastUnread = count
+        if (count >= 0) lastUnread.set(count)
     }
 
     fun requestPermissionIfNeeded() {
@@ -101,12 +102,17 @@ class VinorNotifyHelper(
     }
 
     fun openNotificationsPage() {
-        webViewProvider()?.loadUrl("$BASE/express/partner/notifications")
-            ?: activity.startActivity(
-                Intent(activity, MainActivity::class.java).apply {
-                    putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
-                }
-            )
+        val wv = webViewProvider()
+        if (wv != null && VinorSafe.isWebViewUsable(wv)) {
+            runCatching { wv.loadUrl("$BASE/express/partner/notifications") }
+            return
+        }
+        if (!VinorSafe.isActivityAlive(activity)) return
+        activity.startActivity(
+            Intent(activity, MainActivity::class.java).apply {
+                putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
+            }
+        )
     }
 
     fun handleOpenIntent(intent: Intent?, immediate: Boolean = true) {
@@ -122,14 +128,18 @@ class VinorNotifyHelper(
         )
         pendingOpenUrl = target
         if (immediate) {
-            webViewProvider()?.loadUrl(target)
-                ?: activity.startActivity(
+            val wv = webViewProvider()
+            if (wv != null && VinorSafe.isWebViewUsable(wv)) {
+                runCatching { wv.loadUrl(target) }
+            } else if (VinorSafe.isActivityAlive(activity)) {
+                activity.startActivity(
                     Intent(activity, MainActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                         putExtra(EXTRA_OPEN_NOTIFICATIONS, true)
                         putExtra(VinorNotificationTray.EXTRA_URL, target)
                     }
                 )
+            }
             pendingOpenUrl = null
         }
         intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS)
@@ -161,21 +171,21 @@ class VinorNotifyHelper(
     private suspend fun pollOnce() {
         val cookie = cookieHeader()
         if (cookie.isBlank()) {
-            lastUnread = -1
+            lastUnread.set(-1)
             return
         }
         val unread = fetchUnread(cookie) ?: return
-        if (lastUnread >= 0 && unread > lastUnread) {
-            // اپ باز است — بج فوتر وب به‌روز می‌شود؛ سینی فقط از FCM در پس‌زمینه
+        val prev = lastUnread.get()
+        if (prev >= 0 && unread > prev) {
             requestPermissionIfNeeded()
         }
         if (unread == 0) {
             NotificationManagerCompat.from(activity).cancel(NOTIF_ID)
         }
-        if (lastUnread == -1) {
+        if (prev == -1) {
             requestPermissionIfNeeded()
         }
-        lastUnread = unread
+        lastUnread.set(unread)
     }
 
     private fun cookieHeader(): String =
@@ -192,7 +202,7 @@ class VinorNotifyHelper(
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (resp.code == 401) {
-                    lastUnread = -1
+                    lastUnread.set(-1)
                     return@withContext null
                 }
                 if (!resp.isSuccessful) return@withContext null

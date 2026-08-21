@@ -147,22 +147,19 @@ object VinorAppUpdateChecker {
 
     private fun fetchUpdateState(clientV: String): UpdateState? {
         for (urlStr in VERSION_URLS) {
+            var conn: HttpURLConnection? = null
             try {
-                val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 12_000
-                    readTimeout = 12_000
-                    useCaches = false
-                    setRequestProperty("Accept", "application/json")
-                    setRequestProperty("X-Vinor-App-Version", clientV)
-                    setRequestProperty("User-Agent", "VinorApp/WebViewOnly/$clientV")
-                }
-                if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                    conn.disconnect()
-                    continue
-                }
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                conn.disconnect()
+                val opened = (URL(urlStr).openConnection() as? HttpURLConnection) ?: continue
+                conn = opened
+                opened.requestMethod = "GET"
+                opened.connectTimeout = 12_000
+                opened.readTimeout = 12_000
+                opened.useCaches = false
+                opened.setRequestProperty("Accept", "application/json")
+                opened.setRequestProperty("X-Vinor-App-Version", clientV)
+                opened.setRequestProperty("User-Agent", "VinorApp/WebViewOnly/$clientV")
+                if (opened.responseCode != HttpURLConnection.HTTP_OK) continue
+                val body = opened.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(body)
                 if (!json.optBoolean("success", false)) continue
                 val serverV = json.optString("android_apk_version", "").trim()
@@ -188,6 +185,8 @@ object VinorAppUpdateChecker {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Version check failed for $urlStr: ${e.message}")
+            } finally {
+                runCatching { conn?.disconnect() }
             }
         }
         return null
@@ -210,12 +209,7 @@ object VinorAppUpdateChecker {
               } catch (_) {}
             })();
         """.trimIndent()
-        webView.post {
-            try {
-                webView.evaluateJavascript(js, null)
-            } catch (_: Exception) {
-            }
-        }
+        VinorSafe.evalJs(webView, js)
     }
 
     fun syncCachedToWebView(context: Context, webView: WebView) {

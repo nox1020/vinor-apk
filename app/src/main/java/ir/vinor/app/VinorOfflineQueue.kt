@@ -1,19 +1,39 @@
 package ir.vinor.app
 
 import android.content.Context
+import android.util.Log
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * صف عملیات آفلاین غیرحساس.
- * موفقیت جعلی برنمی‌گردد؛ بعد از آنلاین شدن وب replay می‌کند.
+ * موفقیت جعلی برنمی‌گردد. پس از آنلاین شدن ابتدا نیتیو flush می‌شود
+ * تا بدون وابستگی به JS و بدون ارسال دوباره، روی دیسک ack شود.
  */
 object VinorOfflineQueue {
 
+    private const val TAG = "VinorOfflineQueue"
+
     @Volatile
     private var lastSyncAt = 0L
+    private val flushing = AtomicBoolean(false)
+    private val io = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "vinor-offline-queue").apply { isDaemon = true }
+    }
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     private fun file(context: Context): File {
         val d = File(
@@ -49,6 +69,8 @@ object VinorOfflineQueue {
                 .put("offline", true)
                 .put("message", "برای انجام این عملیات اینترنت لازم است")
         }
+        val normalized = VinorCachePolicy.normalizeUrl(url)
+        val payload = body ?: ""
         synchronized(this) {
             val items = load(context)
             if (items.length() >= VinorCachePolicy.MAX_QUEUE_ITEMS) {
@@ -58,12 +80,25 @@ object VinorOfflineQueue {
                     .put("offline", true)
                     .put("message", "صف آفلاین پر است؛ پس از اتصال دوباره تلاش کنید")
             }
+            for (i in 0 until items.length()) {
+                val it = items.optJSONObject(i) ?: continue
+                if (it.optString("status") != "pending") continue
+                if (it.optString("url") == normalized && it.optString("payload") == payload) {
+                    VinorCacheLog.event("QUEUE_ADD", "deduped")
+                    return JSONObject()
+                        .put("ok", false)
+                        .put("queued", true)
+                        .put("offline", true)
+                        .put("duplicate", true)
+                        .put("message", "پس از اتصال اینترنت ارسال می‌شود")
+                }
+            }
             val item = JSONObject()
                 .put("id", UUID.randomUUID().toString())
                 .put("type", type)
-                .put("url", VinorCachePolicy.normalizeUrl(url))
+                .put("url", normalized)
                 .put("method", method.ifBlank { "POST" })
-                .put("payload", body ?: "")
+                .put("payload", payload)
                 .put("createdAt", now)
                 .put("retryCount", 0)
                 .put("status", "pending")
@@ -113,20 +148,117 @@ object VinorOfflineQueue {
         VinorCacheLog.event("QUEUE_RETRY", "err")
     }
 
-    fun onNetworkRestored(context: Context, dispatch: (JSONArray) -> Unit) {
+    /**
+     * Flush نیتیو سپس باقی‌مانده را به وب می‌دهد تا UI به‌روز شود.
+     * اگر کوکی جلسه نباشد، همان صف برای replay در WebView می‌ماند.
+     */
+    fun flushWhenOnline(context: Context, after: (JSONArray) -> Unit) {
+        if (!VinorNetworkStatus.isOnline(context)) {
+            after(JSONArray())
+            return
+        }
         val now = System.currentTimeMillis()
-        if (now - lastSyncAt < 2_000L) return
+        if (now - lastSyncAt < 2_000L) {
+            after(runCatching { snapshotJson(context) }.getOrDefault(JSONArray()))
+            return
+        }
+        if (!flushing.compareAndSet(false, true)) {
+            after(runCatching { snapshotJson(context) }.getOrDefault(JSONArray()))
+            return
+        }
         lastSyncAt = now
-        prune(context)
-        val items = snapshotJson(context)
-        if (items.length() == 0) return
-        VinorCacheLog.event("SYNC_START", "n=${items.length()}")
-        dispatch(items)
+        val app = context.applicationContext
+        VinorSafe.onMain {
+            val cookie = VinorSafe.cookieOrEmpty(VinorPartnerUrls.BASE)
+            io.execute {
+                try {
+                    prune(app)
+                    if (cookie.length >= 12) {
+                        flushOnce(app, cookie)
+                    }
+                    val remaining = snapshotJson(app)
+                    if (remaining.length() > 0) {
+                        VinorCacheLog.event("SYNC_START", "n=${remaining.length()}")
+                    }
+                    VinorSafe.onMain { after(remaining) }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "flush failed", t)
+                    VinorSafe.onMain { after(JSONArray()) }
+                } finally {
+                    flushing.set(false)
+                }
+            }
+        }
+    }
+
+    fun onNetworkRestored(context: Context, dispatch: (JSONArray) -> Unit) {
+        flushWhenOnline(context, dispatch)
     }
 
     fun clearUser(context: Context) {
         synchronized(this) {
             VinorCacheIo.deleteQuiet(file(context))
+        }
+    }
+
+    private fun flushOnce(context: Context, cookie: String) {
+        val pending = synchronized(this) {
+            val items = load(context)
+            buildList {
+                for (i in 0 until items.length()) {
+                    val it = items.optJSONObject(i) ?: continue
+                    if (it.optString("status") == "pending") add(it)
+                }
+            }
+        }
+        for (item in pending) {
+            val id = item.optString("id")
+            val url = item.optString("url")
+            if (id.isBlank() || url.isBlank()) continue
+            if (!VinorCachePolicy.isQueueablePost(url)) {
+                fail(context, id, "not-queueable")
+                continue
+            }
+            val method = item.optString("method", "POST").ifBlank { "POST" }
+            val payload = item.optString("payload")
+            val outcome = postOnce(url, method, payload, cookie)
+            when (outcome) {
+                PostOutcome.OK -> ack(context, id)
+                PostOutcome.UNAUTHORIZED -> {
+                    VinorCacheLog.event("SYNC_STOP", "401")
+                    return
+                }
+                PostOutcome.RETRY -> fail(context, id, "network")
+                PostOutcome.DROP -> fail(context, id, "http")
+            }
+        }
+    }
+
+    private enum class PostOutcome { OK, RETRY, DROP, UNAUTHORIZED }
+
+    private fun postOnce(url: String, method: String, payload: String, cookie: String): PostOutcome {
+        return try {
+            val body = payload.toRequestBody("application/json; charset=utf-8".toMediaType())
+            val req = Request.Builder()
+                .url(url)
+                .method(method.uppercase(), if (method.equals("GET", true)) null else body)
+                .addHeader("Cookie", cookie)
+                .addHeader("Accept", "application/json")
+                .addHeader("Content-Type", "application/json; charset=utf-8")
+                .addHeader("X-Requested-With", "XMLHttpRequest")
+                .addHeader("User-Agent", "VinorApp/OfflineQueue")
+                .build()
+            http.newCall(req).execute().use { resp ->
+                when (resp.code) {
+                    in 200..299, 409 -> PostOutcome.OK
+                    401, 403 -> PostOutcome.UNAUTHORIZED
+                    408, 429, in 500..599 -> PostOutcome.RETRY
+                    else -> PostOutcome.DROP
+                }
+            }
+        } catch (t: Throwable) {
+            Log.d(TAG, "post failed: ${t.javaClass.simpleName}")
+            PostOutcome.RETRY
         }
     }
 

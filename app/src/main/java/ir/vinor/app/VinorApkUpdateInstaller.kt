@@ -630,11 +630,6 @@ object VinorApkUpdateInstaller {
               } catch (_) {}
             })();
         """.trimIndent()
-        webView.post {
-            try {
-                webView.evaluateJavascript(js, null)
-            } catch (_: Exception) {
-            }
-        }
+        VinorSafe.evalJs(webView, js)
     }
 }

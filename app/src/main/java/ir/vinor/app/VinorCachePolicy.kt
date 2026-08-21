@@ -93,8 +93,9 @@ object VinorCachePolicy {
     }
 
     fun isSafeGetApi(url: String?): Boolean {
-        if (!isVinorHttps(url)) return false
-        val p = pathOf(url!!).lowercase(Locale.US)
+        val raw = url ?: return false
+        if (!isVinorHttps(raw)) return false
+        val p = pathOf(raw).lowercase(Locale.US)
         if (isSensitivePath(p)) return false
         return SAFE_GET_EXACT.contains(p) || SAFE_GET_PREFIX.any { p.startsWith(it) }
     }
@@ -110,8 +111,9 @@ object VinorCachePolicy {
     }
 
     fun isQueueablePost(url: String?): Boolean {
-        if (!isVinorHttps(url)) return false
-        val p = pathOf(url!!).lowercase(Locale.US)
+        val raw = url ?: return false
+        if (!isVinorHttps(raw)) return false
+        val p = pathOf(raw).lowercase(Locale.US)
         if (isSensitivePath(p)) return false
         return QUEUEABLE_POST_EXACT.contains(p) || QUEUEABLE_POST_PREFIX.any { p.startsWith(it) }
     }

@@ -596,6 +596,18 @@ class MainActivity : AppCompatActivity() {
                     showOfflineHard()
                 }
             }
+
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: android.webkit.SslErrorHandler?,
+                error: android.net.http.SslError?,
+            ) {
+                runCatching { handler?.cancel() }
+                Log.w(TAG, "SSL error code=${error?.primaryError}")
+                if (!isOnline() || shouldPreserveOfflineSession()) {
+                    restoreOfflineMainFrame(VinorWebOfflineSession.lastPartnerUrl(this@MainActivity))
+                }
+            }
         }
 
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
@@ -1451,6 +1463,16 @@ class MainActivity : AppCompatActivity() {
                 } else if (canKeepCurrentWebContent()) {
                     restoreOfflineMainFrame(currentWebUrl())
                 }
+            } else {
+                VinorOfflineQueue.flushWhenOnline(this) { queue ->
+                    if (isWebViewUsable() && queue.length() > 0) {
+                        VinorCacheBridge.dispatchSync(
+                            webView,
+                            queue,
+                            VinorWebOfflineSession.lastCachedAt(this),
+                        )
+                    }
+                }
             }
         }
         VinorFcmRegistrar.requestTokenAndRegister(this)
@@ -1486,7 +1508,7 @@ class MainActivity : AppCompatActivity() {
     private fun registerConnectivityLostCallback() {
         if (connectivityCallback != null) return
         val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        connectivityCallback = object : ConnectivityManager.NetworkCallback() {
+        val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onLost(network: Network) {
                 runOnUiThread { if (isUiAlive()) dispatchNetworkChange() }
             }
@@ -1502,11 +1524,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { if (isUiAlive()) dispatchNetworkChange() }
             }
         }
+        connectivityCallback = cb
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         try {
-            cm.registerNetworkCallback(request, connectivityCallback!!)
+            cm.registerNetworkCallback(request, cb)
         } catch (t: Throwable) {
             Log.w(TAG, "registerNetworkCallback failed", t)
             connectivityCallback = null

@@ -24,8 +24,15 @@ class DeepLinkRouterTest {
     }
 
     @Test
-    fun unknown_fallsBackHome() {
-        val r = DeepLinkRouter.resolve("https://vinor.ir/some/unknown/path")
+    fun blank_fallsBackHome() {
+        val r = DeepLinkRouter.resolve("   ")
+        assertEquals(DeepLinkRouter.DestinationType.UNKNOWN_FALLBACK, r.type)
+        assertFalse(r.requiresAuth)
+    }
+
+    @Test
+    fun foreignHost_fallsBackHome() {
+        val r = DeepLinkRouter.resolve("https://evil.example/express/partner")
         assertEquals(DeepLinkRouter.DestinationType.UNKNOWN_FALLBACK, r.type)
     }
 

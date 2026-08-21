@@ -159,14 +159,14 @@ class VinorWebViewFileChooser {
     private fun onMediaPermissionResult(granted: Boolean) {
         val req = pendingPermissionRequest
         pendingPermissionRequest = null
-        val activity = hostActivity()
-        if (!granted || req == null || !VinorSafe.isActivityAlive(activity) ||
+        val host = hostActivity()
+        if (!granted || req == null || host == null || !VinorSafe.isActivityAlive(host) ||
             !VinorBridgeGate.isTrustedOrigin(req.origin?.toString())
         ) {
             runCatching { req?.deny() }
             return
         }
-        grantPermittedResources(activity!!, req, req.resources ?: emptyArray())
+        grantPermittedResources(host, req, req.resources ?: emptyArray())
     }
 
     private fun grantPermittedResources(
@@ -178,7 +178,7 @@ class VinorWebViewFileChooser {
             when (resource) {
                 PermissionRequest.RESOURCE_AUDIO_CAPTURE -> hasRecordAudioPermission(activity)
                 PermissionRequest.RESOURCE_VIDEO_CAPTURE -> hasCameraPermission(activity)
-                else -> true
+                else -> false
             }
         }.toTypedArray()
         runCatching {
