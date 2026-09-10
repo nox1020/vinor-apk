@@ -151,17 +151,36 @@ class DashboardFragment : Fragment() {
     private fun loadAll() {
         binding.dashboardProgress.isVisible = true
         scope.launch {
+            var home = JSONObject()
+            var loadError: String? = null
             try {
-                val home = withContext(Dispatchers.IO) {
+                home = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/home/data", requireContext())
                 }
-                if (_binding == null) return@launch
-                bindHome(home)
             } catch (e: Exception) {
-                if (_binding != null) {
-                    bindHome(JSONObject())
-                    Toast.makeText(requireContext(), e.message ?: "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
+                loadError = e.message ?: "خطا در بارگذاری"
+            }
+            if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
+                try {
+                    val html = withContext(Dispatchers.IO) {
+                        PartnerApi.getHtml("/express/partner/home", requireContext())
+                    }
+                    val ads = HomeAdsHtml.parse(html)
+                    if (ads.length() > 0) {
+                        home.put("divar_pro_ads", ads)
+                        if (home.optInt("divar_pro_ads_count") <= 0) {
+                            home.put("divar_pro_ads_count", ads.length())
+                        }
+                        loadError = null
+                    }
+                } catch (e: Exception) {
+                    if (loadError == null) loadError = e.message
                 }
+            }
+            if (_binding == null) return@launch
+            bindHome(home)
+            if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
+                Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
             }
             try {
                 if (PartnerApi.hasSession()) {
@@ -191,7 +210,7 @@ class DashboardFragment : Fragment() {
             if (line.isNotBlank()) newsItems.add(line)
         }
         if (newsItems.isEmpty()) {
-            newsItems.add("باغ گیلان فروخته شد؛ پورسانت قابل برداشت شد")
+            newsItems.add("زمین جابان فروش رفت و پورسانت رسید")
         }
         binding.dashboardNewsText.text = newsItems.first()
         newsHandler.removeCallbacks(newsTick)
@@ -205,6 +224,12 @@ class DashboardFragment : Fragment() {
         for (i in 0 until ads.length()) {
             val ad = ads.optJSONObject(i) ?: continue
             binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds, loadImage = i < 10).root)
+        }
+        if (showCarousel) {
+            binding.dashboardAdsScroll.post {
+                val b = _binding ?: return@post
+                b.dashboardAdsScroll.scrollTo(0, 0)
+            }
         }
 
         val emptyPad = if (showCarousel) 6 else 56

@@ -31,6 +31,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:clipToPadding="false"
+                    android:layoutDirection="rtl"
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
                     android:scrollbars="none">
@@ -60,6 +61,7 @@
                         android:layout_height="wrap_content"
                         android:background="@drawable/bg_home_news"
                         android:gravity="center_vertical"
+                        android:layoutDirection="rtl"
                         android:orientation="horizontal"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="9dp">
@@ -92,7 +94,7 @@
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
                                 android:maxLines="1"
-                                android:text="باغ گیلان فروخته شد؛ پورسانت قابل برداشت شد"
+                                android:text="زمین جابان فروش رفت و پورسانت رسید"
                                 android:textColor="#ECECEC"
                                 android:textSize="13sp" />
                         </LinearLayout>
@@ -271,6 +273,7 @@
                     android:id="@+id/dashboardChatList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layoutDirection="rtl"
                     android:orientation="vertical"
                     android:paddingHorizontal="12dp"
                     android:paddingTop="8dp" />

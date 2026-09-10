@@ -104,15 +104,46 @@
             android:layout_marginTop="14dp"
             android:background="#14FFFFFF" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/drawerTraining"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center_vertical"
-            android:paddingHorizontal="18dp"
-            android:text="آموزش"
-            android:textColor="#ECECEC"
-            android:textSize="16sp" />
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp">
+
+            <FrameLayout
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_drawer_nav_icon">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:contentDescription=""
+                    android:src="@drawable/ic_graduation" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:text="آموزش"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp" />
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_chevron_left"
+                app:tint="#52525B" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/drawerRoutine"
@@ -152,6 +183,11 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#14FFFFFF" />
+
         <LinearLayout
             android:id="@+id/drawerGuestLogin"
             android:layout_width="match_parent"
@@ -170,7 +206,7 @@
                     android:layout_height="wrap_content"
                     android:text="ورود به وینور"
                     android:textColor="#FFFFFF"
-                    android:textSize="18sp"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -179,7 +215,7 @@
                     android:layout_marginTop="4dp"
                     android:text="شماره موبایل را وارد کنید؛ کد تأیید پیامک می‌شود."
                     android:textColor="#8E8E93"
-                    android:textSize="13sp" />
+                    android:textSize="12.5sp" />
 
                 <EditText
                     android:id="@+id/drawerPhone"
@@ -206,6 +242,7 @@
                     android:visibility="gone" />
 
                 <TextView
+                    android:id="@+id/drawerLegal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"

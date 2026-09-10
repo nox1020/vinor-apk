@@ -1,12 +1,20 @@
 package ir.vinor.app
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import android.webkit.WebView
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 
 class VinorApp : Application() {
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(VinorLocale.wrap(base))
+    }
+
     override fun onCreate() {
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("fa"))
         super.onCreate()
         VinorAppForeground.install()
         VinorNotificationTray.ensureChannel(this)

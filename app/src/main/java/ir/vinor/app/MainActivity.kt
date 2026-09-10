@@ -2,6 +2,12 @@ package ir.vinor.app
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -36,6 +42,10 @@ class MainActivity : AppCompatActivity() {
 
     private val navController: NavController
         get() = (supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment).navController
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(VinorLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -226,8 +236,32 @@ class MainActivity : AppCompatActivity() {
         binding.drawerChangePhone.setOnClickListener { showDrawerPhoneStep() }
         binding.drawerPhone.addTextChangedListener(simpleWatcher { syncDrawerPhoneEnabled() })
         binding.drawerOtp.addTextChangedListener(simpleWatcher { syncDrawerOtpEnabled() })
+        bindDrawerLegal()
         syncDrawerPhoneEnabled()
         syncDrawerOtpEnabled()
+    }
+
+    private fun bindDrawerLegal() {
+        val full = "با ادامه، شرایط و حریم خصوصی را می‌پذیرید."
+        val spanned = SpannableString(full)
+        fun link(label: String, path: String) {
+            val start = full.indexOf(label)
+            if (start < 0) return
+            spanned.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}$path")))
+                }
+                override fun updateDrawState(ds: TextPaint) {
+                    ds.color = Color.parseColor("#E4E4E7")
+                    ds.isUnderlineText = true
+                }
+            }, start, start + label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        link("شرایط", "/express/partner/legal/terms")
+        link("حریم خصوصی", "/privacy")
+        binding.drawerLegal.text = spanned
+        binding.drawerLegal.movementMethod = LinkMovementMethod.getInstance()
+        binding.drawerLegal.highlightColor = Color.TRANSPARENT
     }
 
     private fun syncDrawerSession() {

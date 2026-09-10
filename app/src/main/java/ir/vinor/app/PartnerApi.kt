@@ -31,6 +31,23 @@ object PartnerApi {
         return execute(req)
     }
 
+    fun getHtml(path: String, context: Context? = null): String {
+        val url = if (path.startsWith("http")) path else "$BASE$path"
+        val b = Request.Builder()
+            .url(url)
+            .addHeader("Accept", "text/html")
+        val cookie = cookieHeader()
+        if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
+        if (context != null) {
+            b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+            VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
+        }
+        client.newCall(b.get().build()).execute().use { resp ->
+            saveCookies(resp)
+            return resp.body?.string().orEmpty()
+        }
+    }
+
     fun postJson(path: String, body: JSONObject, context: Context? = null): JSONObject {
         val req = requestBuilder(path, context)
             .post(body.toString().toRequestBody(jsonType))

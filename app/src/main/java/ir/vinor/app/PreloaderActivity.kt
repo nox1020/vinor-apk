@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -26,6 +27,10 @@ class PreloaderActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var retry: AppCompatButton
     private lateinit var content: LinearLayout
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(VinorLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
