@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity() {
         splash.setKeepOnScreenCondition { keepSystemSplash }
         super.onCreate(savedInstanceState)
         SystemUi.apply(this)
-        CookieManager.getInstance().setAcceptCookie(true)
+        runCatching { CookieManager.getInstance().setAcceptCookie(true) }
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -70,8 +70,8 @@ class MainActivity : AppCompatActivity() {
         })
 
         handleDeepLink(intent)
-        VinorAppUpdateChecker.check(this, webView = null)
-        VinorFcmRegistrar.requestTokenAndRegister(this)
+        runCatching { VinorAppUpdateChecker.check(this, webView = null) }
+        runCatching { VinorFcmRegistrar.requestTokenAndRegister(this) }
         keepSystemSplash = false
         updateOfflineBanner()
     }

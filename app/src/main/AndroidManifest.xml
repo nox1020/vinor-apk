@@ -40,6 +40,7 @@
 
     <application
         android:name=".VinorApp"
+        android:extractNativeLibs="true"
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:label="@string/app_name"

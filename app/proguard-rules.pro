@@ -43,3 +43,8 @@
 # ViewBinding
 -keep class ir.vinor.app.databinding.** { *; }
 
+# Navigation / fragments used by the native shell
+-keep class androidx.navigation.** { *; }
+-keep class androidx.fragment.app.NavHostFragment { *; }
+-keep class com.google.android.material.bottomnavigation.** { *; }
+

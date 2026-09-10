@@ -60,7 +60,7 @@ jobs:
   debug:
     name: Build Debug APK
     needs: changes
-    if: github.event_name == 'pull_request' || needs.changes.outputs.app == 'true'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -88,14 +88,25 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: vinor-debug-unsigned
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
+
+      - name: Debug APK is not for phones with a release install
+        run: |
+          {
+            echo "## Debug artifact"
+            echo "\`vinor-debug-unsigned\` uses the debug keystore. Installing it over the store/sideload app fails with **App not installed** (signature mismatch)."
+            echo "برای گوشی، آرتیفکت **vinor-direct-apk** را بگیرید."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   direct:
     name: Build Release APK (signed)
     needs: changes
-    if: needs.changes.outputs.release == 'true'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.release == 'true' ||
+      (github.ref == 'refs/heads/main' && needs.changes.outputs.app == 'true')
     permissions:
       contents: read
       actions: write
@@ -351,7 +362,7 @@ jobs:
             echo "| Artifact | Install by opening on phone? |"
             echo "|----------|--------------------------------|"
             echo "| **vinor-direct-apk** (\`.apk\`) | Yes — use this for direct install |"
-            echo "| **vinor-release-aab** (\`.aab\`) | **No** — Play Console only; opening it on device often shows *Problem parsing the package* |"
+            echo "| **vinor-play-bundle-not-for-phone** (\`.aab\`) | **No** — Play Console only; opening it on device often shows *Problem parsing the package* |"
             echo ""
             echo "### فارسی"
             echo "برای نصب دستی، حتماً آرتیفکت **vinor-direct-apk** (پسوند **apk**) را بگیرید. فایل **aab** شبیه اپ نیست و قابل نصب مستقیم روی گوشی نیست."
@@ -376,7 +387,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: vinor-release-aab
+          name: vinor-play-bundle-not-for-phone
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: warn
           retention-days: 14
