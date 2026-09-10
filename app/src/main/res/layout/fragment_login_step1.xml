@@ -1,108 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/vinor_bg_dark"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:background="#050A0E"
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:layoutDirection="rtl">
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp">
 
         <ImageButton
             android:id="@+id/loginStep1Back"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="بازگشت"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="#9CA3AF" />
+            android:background="@drawable/bg_menu_orb"
+            android:contentDescription="بستن"
+            android:padding="10dp"
+            android:src="@drawable/ic_close" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="ورود"
-            android:textColor="#F9FAFB"
-            android:textSize="18sp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="تأیید شماره موبایل"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
             android:textStyle="bold" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="ورود به پنل همکار اکسپرس"
-            android:textColor="#F9FAFB"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="شماره موبایل خود را وارد کنید"
-            android:textColor="#9CA3AF"
-            android:textSize="14sp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="شماره موبایل"
-            android:textColor="#D1D5DB"
-            android:textSize="14sp" />
-        <FrameLayout
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_routine_card"
-            android:padding="16dp">
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="24dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="شماره موبایل خود را وارد کنید"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="کد تأیید به این شماره پیامک می‌شود."
+                android:textColor="#A1A1AA"
+                android:textSize="14sp" />
+
             <EditText
                 android:id="@+id/loginStep1Phone"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@null"
-                android:hint="09123456789"
-                android:inputType="phone"
+                android:layout_height="56dp"
+                android:layout_marginTop="32dp"
+                android:background="@drawable/bg_auth_input"
+                android:hint="شماره موبایل"
                 android:imeOptions="actionNext"
+                android:inputType="phone"
                 android:maxLength="11"
-                android:textColor="#F9FAFB"
-                android:textColorHint="#6B7280"
-                android:textSize="16sp"
-                android:textDirection="ltr" />
-        </FrameLayout>
+                android:paddingHorizontal="16dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#52525B"
+                android:textDirection="ltr"
+                android:textSize="16sp" />
 
-        <TextView
-            android:id="@+id/loginStep1Error"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="#F87171"
-            android:textSize="12sp"
-            android:visibility="gone" />
+            <TextView
+                android:id="@+id/loginStep1Error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="#F87171"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
-        <ProgressBar
-            android:id="@+id/loginStep1Progress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:visibility="gone" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:lineSpacingExtra="3dp"
+                android:text="با ورود به وینور اکسپرس، شرایط و قوانین استفاده و سیاست‌نامه حریم خصوصی را می‌پذیرم."
+                android:textColor="#A1A1AA"
+                android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/loginStep1Submit"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="24dp"
-            android:background="@drawable/bg_button_primary"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="ادامه"
-            android:textColor="#F9FAFB"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</ScrollView>
+            <ProgressBar
+                android:id="@+id/loginStep1Progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="16dp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/loginStep1Submit"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_auth_btn"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="بعدی"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+</LinearLayout>

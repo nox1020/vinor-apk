@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#000000</color>
-    <color name="vinor_bg_light">#030712</color>
-    <color name="vinor_bg_dark">#030712</color>
-    <color name="vinor_pwa_bg">#030712</color>
-    <color name="vinor_primary_red">#E53935</color>
-    <color name="vinor_text_dark">#F9FAFB</color>
-    <color name="vinor_text_muted">#9CA3AF</color>
-    <color name="vinor_skeleton_bg">#374151</color>
-    <color name="vinor_offline_bg">#030712</color>
-    <color name="vinor_offline_text_primary">#F9FAFB</color>
-    <color name="vinor_offline_text_secondary">#9CA3AF</color>
-    <color name="vinor_offline_card_bg">#1F2937</color>
-    <color name="vinor_offline_btn">#16a34a</color>
+    <color name="vinor_bg">#000000</color>
+    <color name="vinor_bg_light">#000000</color>
+    <color name="vinor_bg_dark">#000000</color>
+    <color name="vinor_pwa_bg">#000000</color>
+    <color name="vinor_raised">#1C1C1E</color>
+    <color name="vinor_raised_2">#2F2F2F</color>
+    <color name="vinor_primary_red">#E22828</color>
+    <color name="vinor_accent_green">#10B981</color>
+    <color name="vinor_text">#ECECEC</color>
+    <color name="vinor_text_dark">#ECECEC</color>
+    <color name="vinor_text_muted">#8E8E93</color>
+    <color name="vinor_border">#14FFFFFF</color>
+    <color name="vinor_skeleton_bg">#2F2F2F</color>
+    <color name="vinor_offline_bg">#000000</color>
+    <color name="vinor_offline_text_primary">#ECECEC</color>
+    <color name="vinor_offline_text_secondary">#8E8E93</color>
+    <color name="vinor_offline_card_bg">#1C1C1E</color>
+    <color name="vinor_offline_btn">#10B981</color>
+    <color name="vinor_nav_selected">#FFFFFF</color>
+    <color name="vinor_nav_unselected">#8E8E93</color>
 </resources>
-

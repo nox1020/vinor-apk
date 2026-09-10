@@ -117,6 +117,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun openProfile() {
+        if (navController.currentDestination?.id != R.id.profileFragment) {
+            navController.navigate(R.id.profileFragment)
+        }
+    }
+
     fun openNotifications() {
         if (navController.currentDestination?.id != R.id.notificationsFragment) {
             navController.navigate(R.id.notificationsFragment)

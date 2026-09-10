@@ -25,9 +25,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="روتین و آمار فعالیت"
-                android:textColor="#F9FAFB"
-                android:textSize="18sp"
+                android:text="روتین"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
             <!-- جای خالی برای آیکن‌های احتمالی آینده (اعلان‌ها و ...) -->

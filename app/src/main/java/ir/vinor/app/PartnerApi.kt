@@ -39,6 +39,20 @@ object PartnerApi {
         return execute(req)
     }
 
+    fun bytes(url: String, context: Context? = null): ByteArray? {
+        val abs = if (url.startsWith("http")) url else if (url.startsWith("/")) "$BASE$url" else "$BASE/$url"
+        val b = Request.Builder().url(abs).addHeader("Accept", "*/*")
+        val cookie = cookieHeader()
+        if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
+        if (context != null) {
+            b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+        }
+        client.newCall(b.build()).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            return resp.body?.bytes()
+        }
+    }
+
     private fun requestBuilder(path: String, context: Context?): Request.Builder {
         val url = if (path.startsWith("http")) path else "$BASE$path"
         val b = Request.Builder()

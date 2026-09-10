@@ -73,6 +73,7 @@ class LandDetailFragment : Fragment() {
                 binding.landDetailMeta.text = meta
                 val body = land.optString("description").ifBlank { land.optString("body") }
                 binding.landDetailBody.text = body
+                PartnerImages.bind(scope, binding.landDetailImage, PartnerImages.coverUrl(land))
             } catch (e: Exception) {
                 if (_binding != null) {
                     binding.landDetailError.isVisible = true

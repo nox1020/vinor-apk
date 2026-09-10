@@ -1,113 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
-    android:background="@drawable/bg_routine_card"
+    android:background="@android:color/transparent"
     android:clickable="true"
-    android:focusable="true">
+    android:focusable="true"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="14dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="12dp"
+        android:gravity="top|end"
+        android:minHeight="120dp"
         android:orientation="vertical">
 
-        <!-- تصویر -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="160dp">
-            <ImageView
-                android:id="@+id/landCardImage"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:background="#1F2937"
-                android:contentDescription="" />
-            <TextView
-                android:id="@+id/landCardImagePlaceholder"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="📷"
-                android:textSize="32sp"
-                android:background="#1F2937" />
-            <LinearLayout
-                android:id="@+id/landCardBadges"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|start"
-                android:layout_margin="8dp"
-                android:orientation="vertical"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/landCardTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:lineSpacingMultiplier="1.35" />
 
-            <TextView
-                android:id="@+id/landCardTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:maxLines="2"
-                android:ellipsize="end"
-                android:textColor="#F9FAFB"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/landCardPrice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="#94A3B8"
+            android:textSize="14sp" />
 
-            <TextView
-                android:id="@+id/landCardPrice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="#F9FAFB"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/landCardCommission"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textColor="#4ADE80"
-                android:textSize="12sp"
-                android:visibility="gone" />
+        <TextView
+            android:id="@+id/landCardCommission"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#4ADE80"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/landCardMeta"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="#9CA3AF"
-                android:textSize="12sp"
-                android:maxLines="2"
-                android:ellipsize="end" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-                <TextView
-                    android:id="@+id/landCardDate"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColor="#6B7280"
-                    android:textSize="11sp" />
-                <TextView
-                    android:id="@+id/landCardStatusChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_routine_chip_blue"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="4dp"
-                    android:text="تایید شده"
-                    android:textColor="#93C5FD"
-                    android:textSize="10sp" />
-            </LinearLayout>
-        </LinearLayout>
+        <TextView
+            android:id="@+id/landCardMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#64748B"
+            android:textSize="13sp" />
     </LinearLayout>
-</FrameLayout>
+
+    <FrameLayout
+        android:layout_width="120dp"
+        android:layout_height="120dp">
+
+        <ImageView
+            android:id="@+id/landCardImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_land_thumb"
+            android:contentDescription=""
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/landCardImagePlaceholder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_land_thumb"
+            android:gravity="center"
+            android:letterSpacing="0.12"
+            android:text="- V -"
+            android:textColor="#737373"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1AFFFFFF" />
+</LinearLayout>

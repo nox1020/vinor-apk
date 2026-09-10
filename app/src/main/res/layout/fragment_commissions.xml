@@ -16,9 +16,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:text="پورسانت‌های من"
-            android:textColor="#F9FAFB"
-            android:textSize="18sp"
+            android:text="پورسانت"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <ProgressBar

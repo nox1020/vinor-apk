@@ -4,14 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/vinor_bg_dark"
+    android:background="@color/vinor_bg"
     android:layoutDirection="rtl">
 
     <TextView
         android:id="@+id/offlineBanner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1F2937"
+        android:background="#1C1C1E"
         android:gravity="center"
         android:padding="8dp"
         android:text="@string/offline_message_cached"
@@ -32,9 +32,13 @@
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#111827"
-        app:itemIconTint="@color/vinor_text_muted"
-        app:itemTextColor="@color/vinor_text_dark"
+        android:background="#000000"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp"
+        app:elevation="0dp"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemRippleColor="@android:color/transparent"
+        app:itemTextColor="@color/bottom_nav_color"
         app:labelVisibilityMode="labeled"
         app:menu="@menu/bottom_nav" />
 </LinearLayout>
