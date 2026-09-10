@@ -20,10 +20,18 @@ class LandDetailFragment : Fragment() {
 
     private var _binding: FragmentLandDetailBinding? = null
     private val binding get() = _binding!!
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
         _binding = FragmentLandDetailBinding.inflate(inflater, container, false)
         return binding.root
     }

@@ -10,9 +10,11 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
@@ -35,8 +37,8 @@ class DashboardFragment : Fragment() {
 
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
     private val newsItems = mutableListOf<String>()
@@ -55,6 +57,10 @@ class DashboardFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
         _binding = FragmentDashboardBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -77,6 +83,21 @@ class DashboardFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) { syncSendEnabled() }
         })
+        binding.dashboardChatInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendChat()
+                true
+            } else false
+        }
+        binding.dashboardAdsScroll.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE ->
+                    v.parent.requestDisallowInterceptTouchEvent(true)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+            }
+            false
+        }
         syncSendEnabled()
         loadAll()
     }
@@ -91,6 +112,13 @@ class DashboardFragment : Fragment() {
     fun reload() {
         if (_binding == null) return
         loadAll()
+    }
+
+    fun setHeaderVisible(visible: Boolean) {
+        val b = _binding ?: return
+        b.dashboardHeader.animate().cancel()
+        b.dashboardHeader.animate().alpha(if (visible) 1f else 0f).setDuration(160).start()
+        b.dashboardHeader.isClickable = visible
     }
 
     fun closeAdsAll(): Boolean {
@@ -129,16 +157,25 @@ class DashboardFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 bindHome(home)
-                val hist = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/ai/history", requireContext())
-                }
-                if (_binding == null) return@launch
-                bindChat(hist)
             } catch (e: Exception) {
                 if (_binding != null) {
                     bindHome(JSONObject())
                     Toast.makeText(requireContext(), e.message ?: "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
                 }
+            }
+            try {
+                if (PartnerApi.hasSession()) {
+                    val hist = withContext(Dispatchers.IO) {
+                        PartnerApi.get("/express/partner/ai/history", requireContext())
+                    }
+                    if (_binding == null) return@launch
+                    val status = hist.optInt("http_status")
+                    if (status != 401 && status != 403) bindChat(hist)
+                } else if (_binding != null) {
+                    bindChat(JSONObject())
+                }
+            } catch (_: Exception) {
+                if (_binding != null) bindChat(JSONObject())
             } finally {
                 if (_binding != null) binding.dashboardProgress.isVisible = false
             }
@@ -165,10 +202,9 @@ class DashboardFragment : Fragment() {
         binding.dashboardAds.removeAllViews()
         val showCarousel = ads.length() > 0
         binding.dashboardAdsScroll.isVisible = showCarousel
-        val carouselN = minOf(ads.length(), 12)
-        for (i in 0 until carouselN) {
+        for (i in 0 until ads.length()) {
             val ad = ads.optJSONObject(i) ?: continue
-            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
+            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds, loadImage = i < 10).root)
         }
 
         val emptyPad = if (showCarousel) 6 else 56
@@ -210,7 +246,7 @@ class DashboardFragment : Fragment() {
         if (adsCount > 0) binding.dashboardTileBuyCount.text = PartnerFormat.toman(adsCount)
     }
 
-    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
+    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup, loadImage: Boolean = true): ItemHomeAdBinding {
         val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
         card.homeAdTitle.text = ad.optString("title")
         card.homeAdPrice.text = ad.optString("price")
@@ -229,7 +265,13 @@ class DashboardFragment : Fragment() {
             card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
         PartnerImages.roundClip(card.root, 15f)
-        PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
+        if (loadImage) {
+            PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
+        } else {
+            card.homeAdImage.post {
+                if (_binding != null) PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
+            }
+        }
         card.root.setOnClickListener { openAd(ad) }
         return card
     }
@@ -238,10 +280,11 @@ class DashboardFragment : Fragment() {
         val token = ad.optString("token")
         val source = ad.optString("source")
         val url = ad.optString("url")
-        if (source == "vinor" && token.isNotBlank()) {
-            (activity as? MainActivity)?.openLand(token)
-        } else if (url.isNotBlank()) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(url))))
+        when {
+            source == "vinor" && token.isNotBlank() -> (activity as? MainActivity)?.openLand(token)
+            source == "divar" && token.isNotBlank() ->
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://divar.ir/v/$token")))
+            url.isNotBlank() -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(url))))
         }
     }
 
@@ -272,6 +315,40 @@ class DashboardFragment : Fragment() {
     private fun bindChat(obj: JSONObject) {
         threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
         val messages = obj.optJSONArray("messages") ?: JSONArray()
+        scope.launch {
+            prefetchLandCodes(messages)
+            if (_binding == null) return@launch
+            renderMessages(messages)
+        }
+    }
+
+    private suspend fun prefetchLandCodes(messages: JSONArray) {
+        val codes = linkedSetOf<String>()
+        for (i in 0 until messages.length()) {
+            val msg = messages.optJSONObject(i) ?: continue
+            val arr = msg.optJSONArray("land_codes") ?: continue
+            for (j in 0 until arr.length()) {
+                val code = arr.optString(j)
+                if (code.isNotBlank()) codes.add(code)
+            }
+        }
+        codes.forEach { prefetchLand(it) }
+    }
+
+    private suspend fun prefetchLand(code: String) {
+        if (code.isBlank() || landsByCode.containsKey(code)) return
+        try {
+            val obj = withContext(Dispatchers.IO) {
+                PartnerApi.get("/api/express/$code", requireContext())
+            }
+            val land = obj.optJSONObject("land") ?: return
+            if (!land.has("code")) land.put("code", code)
+            landsByCode[code] = land
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun renderMessages(messages: JSONArray) {
         binding.dashboardChatList.removeAllViews()
         var hasUser = false
         for (i in 0 until messages.length()) {
@@ -359,7 +436,11 @@ class DashboardFragment : Fragment() {
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {
                     threadId = resp.optString("thread_id").takeIf { it.isNotBlank() } ?: threadId
-                    addBubble("assistant", resp.optString("reply"), resp.optJSONArray("land_codes"))
+                    val codes = resp.optJSONArray("land_codes")
+                    if (codes != null) {
+                        for (i in 0 until codes.length()) prefetchLand(codes.optString(i))
+                    }
+                    addBubble("assistant", resp.optString("reply"), codes)
                     binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }

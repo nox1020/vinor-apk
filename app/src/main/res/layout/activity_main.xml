@@ -57,7 +57,7 @@
         android:id="@+id/drawerPanel"
         android:layout_width="320dp"
         android:layout_height="match_parent"
-        android:layout_gravity="end"
+        android:layout_gravity="right"
         android:background="#000000"
         android:clickable="true"
         android:elevation="16dp"

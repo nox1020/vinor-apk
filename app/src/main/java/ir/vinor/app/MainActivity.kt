@@ -114,18 +114,29 @@ class MainActivity : AppCompatActivity() {
         if (!::binding.isInitialized) return
         sizeDrawer()
         syncDrawerSession()
+        binding.drawerBackdrop.animate().cancel()
+        binding.drawerPanel.animate().cancel()
         binding.drawerBackdrop.visibility = View.VISIBLE
         binding.drawerPanel.visibility = View.VISIBLE
         binding.drawerBackdrop.alpha = 0f
-        val w = binding.drawerPanel.width.toFloat().coerceAtLeast(binding.drawerPanel.layoutParams.width.toFloat())
-        binding.drawerPanel.translationX = w
-        binding.drawerBackdrop.animate().alpha(1f).setDuration(200).start()
-        binding.drawerPanel.animate().translationX(0f).setDuration(280).start()
+        val hideX = binding.drawerPanel.layoutParams.width.toFloat().coerceAtLeast(1f)
+        binding.drawerPanel.translationX = hideX
+        findDashboard()?.setHeaderVisible(false)
+        binding.drawerPanel.post {
+            if (!binding.drawerPanel.isVisible) return@post
+            val w = binding.drawerPanel.width.toFloat().coerceAtLeast(hideX)
+            binding.drawerPanel.translationX = w
+            binding.drawerBackdrop.animate().alpha(1f).setDuration(200).start()
+            binding.drawerPanel.animate().translationX(0f).setDuration(280).start()
+        }
     }
 
     fun closeDrawer() {
         if (!::binding.isInitialized || !binding.drawerPanel.isVisible) return
+        binding.drawerBackdrop.animate().cancel()
+        binding.drawerPanel.animate().cancel()
         val w = binding.drawerPanel.width.toFloat().coerceAtLeast(1f)
+        findDashboard()?.setHeaderVisible(true)
         binding.drawerBackdrop.animate().alpha(0f).setDuration(180).withEndAction {
             binding.drawerBackdrop.visibility = View.GONE
         }.start()

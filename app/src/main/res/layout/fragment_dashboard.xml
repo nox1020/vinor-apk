@@ -51,7 +51,7 @@
                     android:layout_height="wrap_content"
                     android:layoutDirection="rtl"
                     android:orientation="vertical"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
                     android:paddingTop="6dp">
 
                     <LinearLayout
@@ -82,6 +82,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="خبر وینور"
                                 android:textColor="#6EE7B7"
+                                android:letterSpacing="0.04"
                                 android:textSize="10sp"
                                 android:textStyle="bold" />
 
@@ -190,8 +191,8 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="خرید ملک"
-                                        android:textColor="#E4E4E7"
-                                        android:textSize="14sp"
+                                        android:textColor="#F4F4F5"
+                                        android:textSize="14.5sp"
                                         android:textStyle="bold" />
 
                                     <TextView
@@ -213,7 +214,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="جستجوی فایل و ملک"
-                                    android:textColor="#A1A1AA"
+                                    android:textColor="#8E8E93"
                                     android:textSize="11sp" />
                             </LinearLayout>
                         </LinearLayout>
@@ -251,15 +252,15 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="سطوح همکاری"
-                                    android:textColor="#E4E4E7"
-                                    android:textSize="14sp"
+                                    android:textColor="#F4F4F5"
+                                    android:textSize="14.5sp"
                                     android:textStyle="bold" />
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="شرایط و پورسانت"
-                                    android:textColor="#A1A1AA"
+                                    android:textColor="#8E8E93"
                                     android:textSize="11sp" />
                             </LinearLayout>
                         </LinearLayout>
@@ -314,12 +315,15 @@
                     android:layout_weight="1"
                     android:background="@null"
                     android:hint="از وینور بپرس"
+                    android:imeOptions="actionSend"
                     android:inputType="textMultiLine|textCapSentences"
                     android:maxLines="4"
                     android:minHeight="40dp"
                     android:paddingHorizontal="6dp"
+                    android:textAlignment="viewStart"
                     android:textColor="@color/vinor_text"
                     android:textColorHint="#8F8F8F"
+                    android:textDirection="rtl"
                     android:textSize="16sp" />
 
                 <ImageButton
@@ -336,6 +340,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/dashboardHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
