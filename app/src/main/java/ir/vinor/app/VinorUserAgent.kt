@@ -10,7 +10,7 @@ object VinorUserAgent {
     /** سافیکس یکسان با WebView در MainActivity — برای API، دانلود و FCM */
     fun appSuffix(context: Context): String {
         val version = appVersionName(context)
-        return "VinorApp/WebViewOnly" + if (version.isNotEmpty()) "/$version" else ""
+        return "VinorApp/Native" + if (version.isNotEmpty()) "/$version" else ""
     }
 
     fun forHttpRequest(context: Context): String = appSuffix(context)

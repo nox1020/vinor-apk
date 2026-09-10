@@ -1,31 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@color/vinor_bg_dark"
-    android:fitsSystemWindows="true">
+    android:layoutDirection="rtl">
 
-    <FrameLayout
-        android:id="@+id/webViewContainer"
+    <TextView
+        android:id="@+id/offlineBanner"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="wrap_content"
+        android:background="#1F2937"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="@string/offline_message_cached"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
-    <FrameLayout
-        android:id="@+id/loaderContainer"
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/navHostFragment"
+        android:name="androidx.navigation.fragment.NavHostFragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/splash_bg"
-        android:visibility="visible">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:defaultNavHost="true"
+        app:navGraph="@navigation/nav_graph" />
 
-        <include
-            android:id="@+id/splashView"
-            layout="@layout/splash_screen"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </FrameLayout>
-
-    <include
-        android:id="@+id/offlineOverlay"
-        layout="@layout/offline_fullscreen_overlay" />
-
-</FrameLayout>
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#111827"
+        app:itemIconTint="@color/vinor_text_muted"
+        app:itemTextColor="@color/vinor_text_dark"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav" />
+</LinearLayout>

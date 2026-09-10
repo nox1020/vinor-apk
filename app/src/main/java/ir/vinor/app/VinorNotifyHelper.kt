@@ -31,8 +31,9 @@ import java.util.concurrent.TimeUnit
  * - نوتیف سینی سیستم فقط از FCM وقتی اپ در پس‌زمینه است
  */
 class VinorNotifyHelper(
-    private val activity: MainActivity,
-    private val webViewProvider: () -> android.webkit.WebView?
+    private val activity: androidx.appcompat.app.AppCompatActivity,
+    private val webViewProvider: () -> android.webkit.WebView?,
+    private val onOpenNotifications: (() -> Unit)? = null,
 ) : DefaultLifecycleObserver {
 
     companion object {
@@ -102,6 +103,10 @@ class VinorNotifyHelper(
     }
 
     fun openNotificationsPage() {
+        onOpenNotifications?.let {
+            it.invoke()
+            return
+        }
         val wv = webViewProvider()
         if (wv != null && VinorSafe.isWebViewUsable(wv)) {
             runCatching { wv.loadUrl("$BASE/express/partner/notifications") }
@@ -128,6 +133,13 @@ class VinorNotifyHelper(
         )
         pendingOpenUrl = target
         if (immediate) {
+            onOpenNotifications?.let {
+                it.invoke()
+                pendingOpenUrl = null
+                intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS)
+                intent.removeExtra(VinorNotificationTray.EXTRA_URL)
+                return
+            }
             val wv = webViewProvider()
             if (wv != null && VinorSafe.isWebViewUsable(wv)) {
                 runCatching { wv.loadUrl(target) }
