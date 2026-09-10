@@ -10,6 +10,16 @@ object HomeAdsHtml {
         RegexOption.IGNORE_CASE,
     )
 
+    fun parseNews(html: String): JSONArray {
+        if (html.isBlank()) return JSONArray()
+        val raw = Regex("""var ITEMS = (\[[\s\S]*?\]);""").find(html)?.groupValues?.get(1) ?: return JSONArray()
+        return try {
+            JSONArray(raw)
+        } catch (_: Exception) {
+            JSONArray()
+        }
+    }
+
     fun parse(html: String): JSONArray {
         val out = JSONArray()
         if (html.isBlank()) return out

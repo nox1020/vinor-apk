@@ -64,8 +64,11 @@ object PartnerImages {
             fallback?.isVisible = false
             return
         }
+        val maxEdge = maxOf(view.width, view.height).let { size ->
+            if (size > 1) size else (320 * view.resources.displayMetrics.density).toInt()
+        }
         scope.launch {
-            val bmp = withContext(Dispatchers.IO) { decode(resolved, view.context) }
+            val bmp = withContext(Dispatchers.IO) { decode(resolved, view.context, maxEdge) }
             if (bmp == null) {
                 fallback?.isVisible = true
                 return@launch
@@ -76,10 +79,17 @@ object PartnerImages {
         }
     }
 
-    private fun decode(url: String, context: android.content.Context): Bitmap? {
+    private fun decode(url: String, context: android.content.Context, maxEdge: Int): Bitmap? {
         return try {
             val bytes = PartnerApi.bytes(url, context) ?: return null
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            val edge = maxOf(bounds.outWidth, bounds.outHeight)
+            val target = maxEdge.coerceAtLeast(64)
+            while (edge / (sample * 2) >= target) sample *= 2
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
         } catch (_: Exception) {
             null
         }

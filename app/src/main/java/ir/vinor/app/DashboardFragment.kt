@@ -2,6 +2,7 @@ package ir.vinor.app
 
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -13,8 +14,10 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
@@ -46,6 +49,8 @@ class DashboardFragment : Fragment() {
     private var allAds = JSONArray()
     private var isApproved = false
     private val newsHandler = Handler(Looper.getMainLooper())
+    private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
+    private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
     private val newsTick = object : Runnable {
         override fun run() {
             val b = _binding ?: return
@@ -98,11 +103,18 @@ class DashboardFragment : Fragment() {
             }
             false
         }
+        binding.dashboardAdsScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
+        (binding.dashboardAdsAllList.parent as? View)?.viewTreeObserver?.addOnScrollChangedListener(adsAllScrollListener)
         syncSendEnabled()
         loadAll()
     }
 
     override fun onDestroyView() {
+        runCatching { binding.dashboardAdsScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
+        runCatching {
+            (binding.dashboardAdsAllList.parent as? View)?.viewTreeObserver
+                ?.removeOnScrollChangedListener(adsAllScrollListener)
+        }
         newsHandler.removeCallbacks(newsTick)
         job.cancel()
         super.onDestroyView()
@@ -173,6 +185,10 @@ class DashboardFragment : Fragment() {
                         }
                         loadError = null
                     }
+                    if ((home.optJSONArray("home_news_items")?.length() ?: 0) == 0) {
+                        val newsHtml = HomeAdsHtml.parseNews(html)
+                        if (newsHtml.length() > 0) home.put("home_news_items", newsHtml)
+                    }
                 } catch (e: Exception) {
                     if (loadError == null) loadError = e.message
                 }
@@ -223,12 +239,13 @@ class DashboardFragment : Fragment() {
         binding.dashboardAdsScroll.isVisible = showCarousel
         for (i in 0 until ads.length()) {
             val ad = ads.optJSONObject(i) ?: continue
-            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds, loadImage = i < 10).root)
+            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
         }
         if (showCarousel) {
-            binding.dashboardAdsScroll.post {
+            binding.dashboardAds.post {
                 val b = _binding ?: return@post
-                b.dashboardAdsScroll.scrollTo(0, 0)
+                b.dashboardAdsScroll.fullScroll(View.FOCUS_RIGHT)
+                bindVisibleCarouselImages()
             }
         }
 
@@ -271,7 +288,7 @@ class DashboardFragment : Fragment() {
         if (adsCount > 0) binding.dashboardTileBuyCount.text = PartnerFormat.toman(adsCount)
     }
 
-    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup, loadImage: Boolean = true): ItemHomeAdBinding {
+    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
         val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
         card.homeAdTitle.text = ad.optString("title")
         card.homeAdPrice.text = ad.optString("price")
@@ -290,13 +307,7 @@ class DashboardFragment : Fragment() {
             card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
         PartnerImages.roundClip(card.root, 15f)
-        if (loadImage) {
-            PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
-        } else {
-            card.homeAdImage.post {
-                if (_binding != null) PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
-            }
-        }
+        card.homeAdImage.tag = ad.optString("image_url")
         card.root.setOnClickListener { openAd(ad) }
         return card
     }
@@ -327,7 +338,7 @@ class DashboardFragment : Fragment() {
                 else -> "در $loc"
             }
             PartnerImages.roundClip(row.adsAllThumb, 8f)
-            PartnerImages.bind(scope, row.adsAllThumb, ad.optString("image_url"))
+            row.adsAllThumb.tag = ad.optString("image_url")
             row.root.setOnClickListener {
                 closeAdsAll()
                 openAd(ad)
@@ -335,6 +346,40 @@ class DashboardFragment : Fragment() {
             binding.dashboardAdsAllList.addView(row.root)
         }
         binding.dashboardAdsAll.isVisible = true
+        binding.dashboardAdsAllList.post { bindVisibleAdsAllImages() }
+    }
+
+    private fun bindVisibleCarouselImages() {
+        val b = _binding ?: return
+        bindVisibleRowImages(b.dashboardAdsScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
+    }
+
+    private fun bindVisibleAdsAllImages() {
+        val b = _binding ?: return
+        if (!b.dashboardAdsAll.isVisible) return
+        val host = b.dashboardAdsAllList.parent as? View ?: return
+        bindVisibleRowImages(host, b.dashboardAdsAllList) { it.findViewById(R.id.adsAllThumb) }
+    }
+
+    private fun bindVisibleRowImages(
+        host: View,
+        row: ViewGroup,
+        imageOf: (View) -> ImageView?,
+    ) {
+        val extra = (80 * resources.displayMetrics.density).toInt()
+        val vis = Rect()
+        if (!host.getGlobalVisibleRect(vis)) return
+        vis.inset(-extra, -extra)
+        val childBox = Rect()
+        for (i in 0 until row.childCount) {
+            val child = row.getChildAt(i)
+            val img = imageOf(child) ?: continue
+            if (img.getTag(R.id.homeAdImage) == true) continue
+            if (!child.getGlobalVisibleRect(childBox)) continue
+            if (!Rect.intersects(vis, childBox)) continue
+            img.setTag(R.id.homeAdImage, true)
+            PartnerImages.bind(scope, img, img.tag as? String)
+        }
     }
 
     private fun bindChat(obj: JSONObject) {

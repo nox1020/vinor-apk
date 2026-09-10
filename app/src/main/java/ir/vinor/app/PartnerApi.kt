@@ -44,6 +44,7 @@ object PartnerApi {
         }
         client.newCall(b.get().build()).execute().use { resp ->
             saveCookies(resp)
+            if (!resp.isSuccessful) return ""
             return resp.body?.string().orEmpty()
         }
     }

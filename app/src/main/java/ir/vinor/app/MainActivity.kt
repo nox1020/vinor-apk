@@ -203,11 +203,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun sizeDrawer() {
         val dm = resources.displayMetrics
-        val peek = (3.25f * dm.density).toInt()
-        val cap = (26f * dm.density).toInt()
-        val width = minOf((dm.widthPixels * 0.85f).toInt(), cap, dm.widthPixels - peek)
+        val rem = 16f * dm.density
+        val peek = (3.25f * rem).toInt()
+        val cap = (26f * rem).toInt()
+        val width = minOf(
+            (dm.widthPixels * 0.85f).toInt(),
+            cap,
+            (dm.widthPixels - peek).coerceAtLeast(1),
+        )
         val lp = binding.drawerPanel.layoutParams
-        lp.width = width.coerceAtLeast((280 * dm.density).toInt())
+        lp.width = width.coerceAtLeast(1)
         binding.drawerPanel.layoutParams = lp
     }
 
