@@ -99,6 +99,11 @@ class MainActivity : AppCompatActivity() {
         notifyHelper?.requestPermissionIfNeeded()
     }
 
+    fun setBottomNavVisible(visible: Boolean) {
+        if (!::binding.isInitialized) return
+        binding.bottomNav.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
     fun openPartnerHome() {
         val nav = navController
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
