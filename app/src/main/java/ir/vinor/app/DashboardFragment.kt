@@ -1,17 +1,26 @@
 package ir.vinor.app
 
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.core.view.isVisible
+import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentDashboardBinding
+import ir.vinor.app.databinding.ItemAdsAllRowBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
+import ir.vinor.app.databinding.ItemHomeAdBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +30,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** خانه نیتیو — همان چیدمان وب: چت GPT + کارت دیوار. */
+/** خانه نیتیو — همان چیدمان وب خالی: آگهی، خبر، کارت همکاری، کامپوزر. */
 class DashboardFragment : Fragment() {
 
     private var _binding: FragmentDashboardBinding? = null
@@ -30,6 +39,20 @@ class DashboardFragment : Fragment() {
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
+    private val newsItems = mutableListOf<String>()
+    private var newsIndex = 0
+    private var allAds = JSONArray()
+    private var isApproved = false
+    private val newsHandler = Handler(Looper.getMainLooper())
+    private val newsTick = object : Runnable {
+        override fun run() {
+            val b = _binding ?: return
+            if (newsItems.isEmpty() || !b.dashboardEmpty.isVisible) return
+            newsIndex = (newsIndex + 1) % newsItems.size
+            b.dashboardNewsText.text = newsItems[newsIndex]
+            newsHandler.postDelayed(this, 4000)
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentDashboardBinding.inflate(inflater, container, false)
@@ -38,46 +61,74 @@ class DashboardFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.dashboardLoginChip.setOnClickListener { (activity as? MainActivity)?.openLogin() }
-        binding.dashboardMenu.setOnClickListener { (activity as? MainActivity)?.openProfile() }
-        binding.dashboardBrand.setOnClickListener { binding.dashboardScroll.fullScroll(View.FOCUS_UP) }
+        binding.dashboardMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+        binding.dashboardBrand.setOnClickListener { (activity as? MainActivity)?.closeDrawer() }
         binding.dashboardChatSend.setOnClickListener { sendChat() }
-        binding.dashboardChipCustomer.setOnClickListener { fillAndSend("مشتری دارم، مشخصات را می‌فرستم.") }
-        binding.dashboardChipFile.setOnClickListener { fillAndSend("فایل مناسب برای بازاریابی می‌خواهم.") }
+        binding.dashboardHero.setOnClickListener { onHero() }
+        binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
+        binding.dashboardTileLevels.setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/levels")))
+        }
+        binding.dashboardAdsAllBackdrop.setOnClickListener { closeAdsAll() }
+        binding.dashboardAdsAllClose.setOnClickListener { closeAdsAll() }
+        binding.dashboardNewsDot.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.news_dot_pulse))
         binding.dashboardChatInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                syncSendEnabled()
-            }
+            override fun afterTextChanged(s: Editable?) { syncSendEnabled() }
         })
         syncSendEnabled()
         loadAll()
     }
 
     override fun onDestroyView() {
+        newsHandler.removeCallbacks(newsTick)
         job.cancel()
         super.onDestroyView()
         _binding = null
     }
 
+    fun reload() {
+        if (_binding == null) return
+        loadAll()
+    }
+
+    fun closeAdsAll(): Boolean {
+        val b = _binding ?: return false
+        if (!b.dashboardAdsAll.isVisible) return false
+        b.dashboardAdsAll.isVisible = false
+        return true
+    }
+
+    private fun onHero() {
+        if (PartnerApi.hasSession()) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/apply")))
+        } else {
+            (activity as? MainActivity)?.openDrawer()
+        }
+    }
+
     private fun syncSendEnabled() {
         val on = !binding.dashboardChatInput.text.isNullOrBlank()
         binding.dashboardChatSend.isEnabled = on
-        binding.dashboardChatSend.alpha = if (on) 1f else 0.35f
+        binding.dashboardChatSend.setBackgroundResource(
+            if (on) R.drawable.bg_send_circle else R.drawable.bg_send_idle
+        )
+        ImageViewCompat.setImageTintList(
+            binding.dashboardChatSend,
+            android.content.res.ColorStateList.valueOf(Color.parseColor(if (on) "#0D0D0D" else "#111111")),
+        )
     }
 
     private fun loadAll() {
-        val loggedIn = PartnerApi.hasSession()
-        binding.dashboardLoginChip.isVisible = !loggedIn
         binding.dashboardProgress.isVisible = true
         scope.launch {
             try {
-                val dash = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/dashboard/data", requireContext())
+                val home = withContext(Dispatchers.IO) {
+                    PartnerApi.get("/express/partner/home/data", requireContext())
                 }
                 if (_binding == null) return@launch
-                cacheLands(dash)
+                bindHome(home)
                 val hist = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/ai/history", requireContext())
                 }
@@ -85,7 +136,7 @@ class DashboardFragment : Fragment() {
                 bindChat(hist)
             } catch (e: Exception) {
                 if (_binding != null) {
-                    showEmpty(true, e.message ?: "خطا در بارگذاری")
+                    bindHome(JSONObject())
                     Toast.makeText(requireContext(), e.message ?: "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
                 }
             } finally {
@@ -94,39 +145,147 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun cacheLands(obj: JSONObject) {
-        landsByCode.clear()
-        val assigned = obj.optJSONArray("assigned_lands") ?: JSONArray()
-        val publicLands = obj.optJSONArray("public_lands") ?: JSONArray()
-        val lands = if (assigned.length() > 0) assigned else publicLands
-        for (i in 0 until lands.length()) {
-            val land = lands.optJSONObject(i) ?: continue
-            val code = land.optString("code")
-            if (code.isNotBlank()) landsByCode[code] = land
+    private fun bindHome(obj: JSONObject) {
+        isApproved = obj.optBoolean("is_approved")
+        newsItems.clear()
+        val news = obj.optJSONArray("home_news_items") ?: JSONArray()
+        for (i in 0 until news.length()) {
+            val line = news.optString(i)
+            if (line.isNotBlank()) newsItems.add(line)
         }
+        if (newsItems.isEmpty()) {
+            newsItems.add("باغ گیلان فروخته شد؛ پورسانت قابل برداشت شد")
+        }
+        binding.dashboardNewsText.text = newsItems.first()
+        newsHandler.removeCallbacks(newsTick)
+        if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
+
+        val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
+        allAds = ads
+        binding.dashboardAds.removeAllViews()
+        val showCarousel = ads.length() > 0
+        binding.dashboardAdsScroll.isVisible = showCarousel
+        val carouselN = minOf(ads.length(), 12)
+        for (i in 0 until carouselN) {
+            val ad = ads.optJSONObject(i) ?: continue
+            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
+        }
+
+        val emptyPad = if (showCarousel) 6 else 56
+        binding.dashboardEmpty.setPadding(
+            binding.dashboardEmpty.paddingLeft,
+            (emptyPad * resources.displayMetrics.density).toInt(),
+            binding.dashboardEmpty.paddingRight,
+            binding.dashboardEmpty.paddingBottom,
+        )
+
+        val prompts = obj.optJSONArray("ai_quick_prompts") ?: JSONArray()
+        for (i in 0 until prompts.length()) {
+            val p = prompts.optJSONObject(i) ?: continue
+            when (p.optString("variant")) {
+                "hero" -> {
+                    binding.dashboardHeroTitle.text = p.optString("label").ifBlank { "می‌خواهم بازاریاب وینور شوم" }
+                    binding.dashboardHeroSub.text = p.optString("subtitle")
+                    val href = p.optString("href")
+                    binding.dashboardHero.setOnClickListener {
+                        if (!PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1")) {
+                            (activity as? MainActivity)?.openDrawer()
+                        } else if (href.isNotBlank()) {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
+                        } else {
+                            onHero()
+                        }
+                    }
+                }
+                "tile" -> {
+                    if (p.optString("ui_action") == "open_divar_ads_all") {
+                        binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
+                    }
+                }
+            }
+        }
+
+        val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
+        binding.dashboardTileBuyCount.isVisible = adsCount > 0
+        if (adsCount > 0) binding.dashboardTileBuyCount.text = PartnerFormat.toman(adsCount)
+    }
+
+    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
+        val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
+        card.homeAdTitle.text = ad.optString("title")
+        card.homeAdPrice.text = ad.optString("price")
+        val loc = ad.optString("location")
+        card.homeAdLoc.text = when {
+            loc.isBlank() -> ""
+            loc.startsWith("در ") -> loc
+            else -> "در $loc"
+        }
+        val shots = ad.optInt("image_count")
+        card.homeAdShots.isVisible = shots > 1
+        if (shots > 1) card.homeAdShotsText.text = PartnerFormat.toman(shots)
+        val comm = ad.optInt("commission_amount")
+        card.homeAdComm.isVisible = isApproved && comm > 0
+        if (isApproved && comm > 0) {
+            card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
+        }
+        PartnerImages.roundClip(card.root, 15f)
+        PartnerImages.bind(scope, card.homeAdImage, ad.optString("image_url"))
+        card.root.setOnClickListener { openAd(ad) }
+        return card
+    }
+
+    private fun openAd(ad: JSONObject) {
+        val token = ad.optString("token")
+        val source = ad.optString("source")
+        val url = ad.optString("url")
+        if (source == "vinor" && token.isNotBlank()) {
+            (activity as? MainActivity)?.openLand(token)
+        } else if (url.isNotBlank()) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(url))))
+        }
+    }
+
+    private fun openAdsAll() {
+        binding.dashboardAdsAllList.removeAllViews()
+        for (i in 0 until allAds.length()) {
+            val ad = allAds.optJSONObject(i) ?: continue
+            val row = ItemAdsAllRowBinding.inflate(layoutInflater, binding.dashboardAdsAllList, false)
+            row.adsAllTitle.text = ad.optString("title")
+            row.adsAllPrice.text = ad.optString("price")
+            val loc = ad.optString("location")
+            row.adsAllLoc.text = when {
+                loc.isBlank() -> ""
+                loc.startsWith("در ") -> loc
+                else -> "در $loc"
+            }
+            PartnerImages.roundClip(row.adsAllThumb, 8f)
+            PartnerImages.bind(scope, row.adsAllThumb, ad.optString("image_url"))
+            row.root.setOnClickListener {
+                closeAdsAll()
+                openAd(ad)
+            }
+            binding.dashboardAdsAllList.addView(row.root)
+        }
+        binding.dashboardAdsAll.isVisible = true
     }
 
     private fun bindChat(obj: JSONObject) {
         threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
         val messages = obj.optJSONArray("messages") ?: JSONArray()
         binding.dashboardChatList.removeAllViews()
-        val hasMsgs = messages.length() > 0
-        showEmpty(!hasMsgs, null)
-        binding.dashboardChips.isVisible = !hasMsgs
+        var hasUser = false
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
+            if (msg.optString("role") == "user") hasUser = true
             addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"))
         }
-        binding.dashboardScroll.post {
-            binding.dashboardScroll.fullScroll(View.FOCUS_DOWN)
+        val empty = !hasUser
+        binding.dashboardEmpty.isVisible = empty
+        binding.dashboardAdsScroll.isVisible = empty && binding.dashboardAds.childCount > 0
+        if (!empty) newsHandler.removeCallbacks(newsTick)
+        if (hasUser) {
+            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
         }
-    }
-
-    private fun showEmpty(show: Boolean, override: String?) {
-        binding.dashboardEmpty.isVisible = show
-        if (!override.isNullOrBlank()) binding.dashboardEmptyText.text = override
-        else binding.dashboardEmptyText.text =
-            "مشتری داری مشخصاتش را بفرست — یا بگو چه فایلی برای بازاریابی می‌خواهی تا معرفی کنم"
     }
 
     private fun addBubble(role: String, content: String, codes: JSONArray?) {
@@ -169,32 +328,7 @@ class DashboardFragment : Fragment() {
         val code = land.optString("code")
         card.landCardTitle.text = land.optString("title", "—")
         card.landCardPrice.text = PartnerFormat.toman(land.optInt("price_total")) + " تومان"
-        val status = land.optString("assignment_status").lowercase()
-        val comm = land.optInt("commission_amount")
         val city = land.optString("city").ifBlank { land.optString("location") }
-        when {
-            status == "sold" -> {
-                card.landCardCommission.isVisible = true
-                card.landCardCommission.setTextColor(0xFF4ADE80.toInt())
-                card.landCardCommission.text = "فروخته شد"
-            }
-            status == "in_transaction" || land.optBoolean("_in_transaction") -> {
-                card.landCardCommission.isVisible = true
-                card.landCardCommission.setTextColor(0xFFFB923C.toInt())
-                card.landCardCommission.text = "در حال معامله"
-            }
-            land.optBoolean("is_expired") -> {
-                card.landCardCommission.isVisible = true
-                card.landCardCommission.setTextColor(0xFFF87171.toInt())
-                card.landCardCommission.text = "منقضی"
-            }
-            comm > 0 -> {
-                card.landCardCommission.isVisible = true
-                card.landCardCommission.setTextColor(0xFF4ADE80.toInt())
-                card.landCardCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
-            }
-            else -> card.landCardCommission.isVisible = false
-        }
         card.landCardMeta.text = if (city.isNotBlank()) "در $city" else ""
         PartnerImages.roundClip(card.landCardImage)
         PartnerImages.bind(scope, card.landCardImage, PartnerImages.coverUrl(land), card.landCardImagePlaceholder)
@@ -202,21 +336,14 @@ class DashboardFragment : Fragment() {
         return card
     }
 
-    private fun fillAndSend(text: String) {
-        binding.dashboardChatInput.setText(text)
-        sendChat()
-    }
-
     private fun sendChat() {
         val text = binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
         if (text.isEmpty()) return
         binding.dashboardChatInput.setText("")
         syncSendEnabled()
-        showEmpty(false, null)
-        binding.dashboardChips.isVisible = false
+        binding.dashboardEmpty.isVisible = false
+        binding.dashboardAdsScroll.isVisible = false
         addBubble("user", text, null)
-        binding.dashboardChatSend.isEnabled = false
-        binding.dashboardChatSend.alpha = 0.35f
         scope.launch {
             try {
                 val body = JSONObject().put("message", text)
@@ -227,7 +354,7 @@ class DashboardFragment : Fragment() {
                 if (_binding == null) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
-                    (activity as? MainActivity)?.openLogin()
+                    (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {
@@ -237,7 +364,7 @@ class DashboardFragment : Fragment() {
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }
                     if (err.contains("ورود") || err.contains("لاگین")) {
-                        (activity as? MainActivity)?.openLogin()
+                        (activity as? MainActivity)?.openDrawer()
                     } else {
                         Toast.makeText(requireContext(), err, Toast.LENGTH_SHORT).show()
                     }

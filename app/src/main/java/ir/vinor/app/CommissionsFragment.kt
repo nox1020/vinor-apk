@@ -55,6 +55,7 @@ class CommissionsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.commissionsMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         loadData()
     }
 

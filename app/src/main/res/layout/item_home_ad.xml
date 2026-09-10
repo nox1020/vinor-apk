@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="212dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="9dp"
+    android:background="@drawable/bg_home_ad"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="159dp">
+
+        <ImageView
+            android:id="@+id/homeAdImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#1A2332"
+            android:contentDescription=""
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:id="@+id/homeAdShots"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="6dp"
+            android:background="#8C000000"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_camera_small" />
+
+            <TextView
+                android:id="@+id/homeAdShotsText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:textColor="#FFFFFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="9dp"
+        android:paddingBottom="10dp">
+
+        <TextView
+            android:id="@+id/homeAdTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#F4F4F5"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/homeAdPrice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="#D4D4D8"
+            android:textSize="10.5sp" />
+
+        <TextView
+            android:id="@+id/homeAdComm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#34D399"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/homeAdLoc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#71717A"
+            android:textSize="10sp" />
+    </LinearLayout>
+</LinearLayout>

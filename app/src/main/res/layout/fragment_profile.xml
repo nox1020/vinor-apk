@@ -38,6 +38,15 @@
                 android:visibility="gone"
                 app:srcCompat="@drawable/ic_messages"
                 app:tint="#9CA3AF" />
+
+            <ImageButton
+                android:id="@+id/profileMenu"
+                android:layout_width="41dp"
+                android:layout_height="41dp"
+                android:background="@drawable/bg_menu_orb"
+                android:contentDescription="منو"
+                android:padding="11dp"
+                android:src="@drawable/ic_menu_stroke" />
         </LinearLayout>
 
         <ProgressBar

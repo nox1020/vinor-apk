@@ -19,6 +19,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:layoutDirection="rtl"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -30,10 +31,14 @@
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
-            <!-- جای خالی برای آیکن‌های احتمالی آینده (اعلان‌ها و ...) -->
-            <View
-                android:layout_width="40dp"
-                android:layout_height="40dp" />
+            <ImageButton
+                android:id="@+id/routineMenu"
+                android:layout_width="41dp"
+                android:layout_height="41dp"
+                android:background="@drawable/bg_menu_orb"
+                android:contentDescription="منو"
+                android:padding="11dp"
+                android:src="@drawable/ic_menu_stroke" />
         </LinearLayout>
 
         <!-- پیشرفت امروز -->

@@ -89,6 +89,7 @@ class RoutineFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.routineMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         todayStr = todayDateString()
         setupStepsReadOnly()
         setupCalendarNav()

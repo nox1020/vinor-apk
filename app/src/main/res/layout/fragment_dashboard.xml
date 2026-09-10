@@ -1,214 +1,455 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/vinor_bg"
-    android:layoutDirection="rtl">
+    android:background="@color/vinor_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <ScrollView
+            android:id="@+id/dashboardScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:paddingTop="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="8dp">
+
+                <HorizontalScrollView
+                    android:id="@+id/dashboardAdsScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/dashboardAds"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layoutDirection="rtl"
+                        android:orientation="horizontal"
+                        android:paddingTop="48dp"
+                        android:paddingBottom="8dp" />
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:id="@+id/dashboardEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layoutDirection="rtl"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="12dp"
+                    android:paddingTop="6dp">
+
+                    <LinearLayout
+                        android:id="@+id/dashboardNews"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_home_news"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="9dp">
+
+                        <View
+                            android:id="@+id/dashboardNewsDot"
+                            android:layout_width="7dp"
+                            android:layout_height="7dp"
+                            android:background="@drawable/bg_news_dot" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="9dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="خبر وینور"
+                                android:textColor="#6EE7B7"
+                                android:textSize="10sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/dashboardNewsText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="باغ گیلان فروخته شد؛ پورسانت قابل برداشت شد"
+                                android:textColor="#ECECEC"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/dashboardHero"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_home_hero"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingTop="18dp"
+                        android:paddingBottom="14dp">
+
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:contentDescription=""
+                            android:src="@drawable/ic_handshake" />
+
+                        <TextView
+                            android:id="@+id/dashboardHeroTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center"
+                            android:text="می‌خواهم بازاریاب وینور شوم"
+                            android:textColor="#FFFFFF"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/dashboardHeroSub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:gravity="center"
+                            android:text="شروع همکاری فروش و دریافت پورسانت"
+                            android:textColor="#C7E4E4E7"
+                            android:textSize="12.5sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="⌄"
+                            android:textColor="#F4F4F5"
+                            android:textSize="16sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/dashboardTiles"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingVertical="6dp">
+
+                        <LinearLayout
+                            android:id="@+id/dashboardTileBuy"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="top"
+                            android:orientation="horizontal"
+                            android:padding="8dp">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_marginTop="2dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_search_stroke" />
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:orientation="vertical">
+
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="خرید ملک"
+                                        android:textColor="#E4E4E7"
+                                        android:textSize="14sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/dashboardTileBuyCount"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="6dp"
+                                        android:background="@drawable/bg_count_badge"
+                                        android:minWidth="19dp"
+                                        android:paddingHorizontal="5dp"
+                                        android:paddingVertical="2dp"
+                                        android:textColor="#FFFFFF"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold"
+                                        android:visibility="gone" />
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="جستجوی فایل و ملک"
+                                    android:textColor="#A1A1AA"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="36dp"
+                            android:background="#1FFFFFFF" />
+
+                        <LinearLayout
+                            android:id="@+id/dashboardTileLevels"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="top"
+                            android:orientation="horizontal"
+                            android:padding="8dp">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_marginTop="2dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_users_stroke" />
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="سطوح همکاری"
+                                    android:textColor="#E4E4E7"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="شرایط و پورسانت"
+                                    android:textColor="#A1A1AA"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/dashboardChatList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="12dp"
+                    android:paddingTop="8dp" />
+            </LinearLayout>
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/dashboardComposer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_composer_pill"
+                android:gravity="center_vertical"
+                android:layoutDirection="rtl"
+                android:minHeight="54dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingVertical="6dp">
+
+                <ImageButton
+                    android:id="@+id/dashboardChatPlus"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="افزودن"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_add"
+                    app:tint="#ECECEC" />
+
+                <EditText
+                    android:id="@+id/dashboardChatInput"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="از وینور بپرس"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="4"
+                    android:minHeight="40dp"
+                    android:paddingHorizontal="6dp"
+                    android:textColor="@color/vinor_text"
+                    android:textColorHint="#8F8F8F"
+                    android:textSize="16sp" />
+
+                <ImageButton
+                    android:id="@+id/dashboardChatSend"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="@drawable/bg_send_idle"
+                    android:contentDescription="ارسال"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_send_up"
+                    app:tint="#111111" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="top"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="6dp">
+        android:layoutDirection="rtl"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="14dp">
 
         <TextView
             android:id="@+id/dashboardBrand"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:letterSpacing="-0.02"
             android:text="وینور"
             android:textColor="#FFFFFF"
             android:textSize="22sp"
-            android:textStyle="bold"
-            android:letterSpacing="-0.02" />
-
-        <TextView
-            android:id="@+id/dashboardLoginChip"
-            android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_chip"
-            android:gravity="center"
-            android:paddingHorizontal="14dp"
-            android:text="ورود"
-            android:textColor="#FAFAFA"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/dashboardMenu"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="41dp"
+            android:layout_height="41dp"
             android:background="@drawable/bg_menu_orb"
             android:contentDescription="منو"
-            android:padding="10dp"
-            android:src="@drawable/ic_menu"
-            app:tint="#F4F4F5" />
+            android:padding="11dp"
+            android:src="@drawable/ic_menu_stroke" />
     </LinearLayout>
 
     <ProgressBar
         android:id="@+id/dashboardProgress"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
         android:layout_gravity="center"
         android:indeterminateTint="#8E8E93"
         android:visibility="gone" />
 
-    <ScrollView
-        android:id="@+id/dashboardScroll"
+    <FrameLayout
+        android:id="@+id/dashboardAdsAll"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true"
-        android:overScrollMode="never">
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/dashboardAdsAllBackdrop"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#B8000000"
+            android:clickable="true"
+            android:focusable="true" />
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="12dp">
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom"
+            android:layout_marginTop="80dp"
+            android:background="@drawable/bg_ads_all_panel"
+            android:clickable="true"
+            android:orientation="vertical">
 
-            <LinearLayout
-                android:id="@+id/dashboardEmpty"
+            <View
+                android:layout_width="40dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="9dp"
+                android:background="#33FFFFFF" />
+
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="18dp"
-                android:paddingBottom="8dp"
-                android:visibility="gone">
+                android:paddingHorizontal="8dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="10dp">
 
                 <TextView
-                    android:id="@+id/dashboardEmptyTitle"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="از چت شروع کن"
-                    android:textColor="@color/vinor_text"
+                    android:layout_gravity="center"
+                    android:text="آگهی‌ها"
+                    android:textColor="#F4F4F5"
                     android:textSize="15sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/dashboardEmptyText"
+                <ImageButton
+                    android:id="@+id/dashboardAdsAllClose"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="بستن"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_close" />
+            </FrameLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#14FFFFFF" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true"
+                android:overScrollMode="never">
+
+                <LinearLayout
+                    android:id="@+id/dashboardAdsAllList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:lineSpacingExtra="2dp"
-                    android:text="مشتری داری مشخصاتش را بفرست — یا بگو چه فایلی برای بازاریابی می‌خواهی تا معرفی کنم"
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/dashboardChatList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingTop="4dp" />
-
-            <LinearLayout
-                android:id="@+id/dashboardLandList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                    android:orientation="vertical" />
+            </ScrollView>
         </LinearLayout>
-    </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/dashboardComposer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="8dp">
-
-        <LinearLayout
-            android:id="@+id/dashboardChips"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/dashboardChipCustomer"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_chip"
-                android:gravity="center"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="10dp"
-                android:text="مشتری دارم"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/dashboardChipFile"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:background="@drawable/bg_chip"
-                android:gravity="center"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="10dp"
-                android:text="فایل می‌خواهم"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_composer_pill"
-            android:gravity="center_vertical"
-            android:minHeight="54dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:paddingVertical="6dp">
-
-            <ImageButton
-                android:id="@+id/dashboardChatPlus"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="افزودن"
-                android:padding="8dp"
-                android:src="@drawable/ic_add"
-                app:tint="#ECECEC" />
-
-            <EditText
-                android:id="@+id/dashboardChatInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@null"
-                android:hint="از وینور بپرس"
-                android:inputType="textMultiLine|textCapSentences"
-                android:maxLines="4"
-                android:minHeight="40dp"
-                android:paddingHorizontal="6dp"
-                android:textColor="@color/vinor_text"
-                android:textColorHint="#8F8F8F"
-                android:textSize="15sp" />
-
-            <ImageButton
-                android:id="@+id/dashboardChatSend"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_send_circle"
-                android:contentDescription="ارسال"
-                android:padding="8dp"
-                android:src="@drawable/ic_send_up" />
-        </LinearLayout>
-    </LinearLayout>
-</LinearLayout>
+    </FrameLayout>
+</FrameLayout>
