@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private var drawerApproved = false
     private var drawerPendingApp = false
     private var resendLeft = 0
+    private var drawerOtpPending = false
+    private var drawerSmsReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
     private var otpSubmitting = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
@@ -128,6 +130,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         resendHandler.removeCallbacks(resendTick)
+        stopDrawerSmsListen()
         notifyHelper?.destroy()
         super.onDestroy()
     }
@@ -183,6 +186,7 @@ class MainActivity : AppCompatActivity() {
 
     fun openPartnerHome() {
         closeDrawer()
+        if (::binding.isInitialized) syncDrawerSession()
         val nav = navController
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
             nav.navigate(R.id.dashboardFragment)
@@ -287,7 +291,7 @@ class MainActivity : AppCompatActivity() {
         binding.drawerPhone.addTextChangedListener(simpleWatcher { syncDrawerPhoneEnabled() })
         binding.drawerOtp.addTextChangedListener(simpleWatcher {
             syncDrawerOtpEnabled()
-            val digits = binding.drawerOtp.text?.toString()?.filter { it.isDigit() }.orEmpty()
+            val digits = OtpSmsAutoFill.normalizeOtpDigits(binding.drawerOtp.text?.toString())
             if (digits.length >= 5) submitDrawerOtp()
         })
         bindDrawerLegal()
@@ -345,9 +349,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun syncDrawerSession() {
         val session = PartnerApi.hasSession()
+        binding.drawerUserMenu.isVisible = false
+        if (drawerOtpPending && !session) {
+            binding.drawerGuestLogin.isVisible = true
+            binding.drawerUserFoot.isVisible = false
+            binding.drawerPostchi.isVisible = false
+            binding.drawerChatLabel.text = "گفتگو"
+            binding.drawerNavGuest.isVisible = true
+            binding.drawerNavStart.isVisible = false
+            binding.drawerNavApproved.isVisible = false
+            binding.drawerNavPlus.isVisible = false
+            return
+        }
         binding.drawerGuestLogin.isVisible = !session
         binding.drawerUserFoot.isVisible = session
-        binding.drawerUserMenu.isVisible = false
         binding.drawerPostchi.isVisible = session
         binding.drawerChatLabel.text = if (session) "گفتگوها" else "گفتگو"
         if (!session) {
@@ -355,10 +370,11 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavStart.isVisible = false
             binding.drawerNavApproved.isVisible = false
             binding.drawerNavPlus.isVisible = false
-            showDrawerPhoneStep()
+            if (!drawerOtpPending) showDrawerPhoneStep()
             return
         }
         binding.drawerNavGuest.isVisible = false
+        stopDrawerSmsListen()
         refreshDrawerProfile()
     }
 
@@ -376,7 +392,7 @@ class MainActivity : AppCompatActivity() {
                 val profile = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/profile/data", this@MainActivity)
                 }
-                if (profile.optBoolean("success") || profile.optString("me_phone").isNotBlank()) {
+                if (profile.optString("me_phone").isNotBlank()) {
                     phone = profile.optString("me_phone")
                     name = profile.optString("me_name").ifBlank { "همکار وینور" }
                     avatar = profile.optString("avatar_url")
@@ -396,6 +412,19 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {
             }
             if (!::binding.isInitialized) return@launch
+            val loggedIn = phone.isNotBlank() && PartnerApi.hasSession()
+            if (!loggedIn) {
+                if (drawerOtpPending) return@launch
+                binding.drawerGuestLogin.isVisible = true
+                binding.drawerUserFoot.isVisible = false
+                binding.drawerPostchi.isVisible = false
+                binding.drawerNavGuest.isVisible = true
+                binding.drawerNavStart.isVisible = false
+                binding.drawerNavApproved.isVisible = false
+                binding.drawerNavPlus.isVisible = false
+                binding.drawerChatLabel.text = "گفتگو"
+                return@launch
+            }
             drawerApproved = approved
             drawerPendingApp = pending
             binding.drawerNavStart.isVisible = !approved
@@ -437,6 +466,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showDrawerPhoneStep() {
         if (!::binding.isInitialized) return
+        drawerOtpPending = false
+        stopDrawerSmsListen()
         binding.drawerPhoneStep.isVisible = true
         binding.drawerOtpStep.isVisible = false
         binding.drawerOtp.setText("")
@@ -460,7 +491,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun resendDrawerOtp() {
-        val phone = drawerPhoneNormalized.ifBlank { normalizePhone(binding.drawerPhone.text?.toString().orEmpty()) }
+        val phone = drawerPhoneNormalized.ifBlank { PartnerApi.normalizePhone(binding.drawerPhone.text?.toString().orEmpty()) }
         if (phone.length != 11) return
         binding.drawerResend.isEnabled = false
         lifecycleScope.launch {
@@ -486,39 +517,36 @@ class MainActivity : AppCompatActivity() {
     private fun logoutFromDrawer() {
         binding.drawerUserMenu.isVisible = false
         lifecycleScope.launch {
+            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
             try {
                 withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/api/logout", JSONObject(), this@MainActivity)
                 }
             } catch (_: Exception) {
             }
-            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
-            val cm = CookieManager.getInstance()
-            cm.removeAllCookies {
-                cm.flush()
-                binding.drawerUserFoot.post {
-                    Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
-                    syncDrawerSession()
-                    openPartnerHome()
-                }
+            PartnerApi.clearCookies {
+                drawerOtpPending = false
+                Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
+                syncDrawerSession()
+                openPartnerHome()
             }
         }
     }
 
     private fun syncDrawerPhoneEnabled() {
-        val on = normalizePhone(binding.drawerPhone.text?.toString().orEmpty()).length == 11
+        val on = PartnerApi.normalizePhone(binding.drawerPhone.text?.toString().orEmpty()).length == 11
         binding.drawerLoginSubmit.isEnabled = on
         binding.drawerLoginSubmit.alpha = if (on) 1f else 0.45f
     }
 
     private fun syncDrawerOtpEnabled() {
-        val on = (binding.drawerOtp.text?.toString()?.filter { it.isDigit() }?.length ?: 0) >= 5
+        val on = OtpSmsAutoFill.normalizeOtpDigits(binding.drawerOtp.text?.toString()).length >= 5
         binding.drawerOtpSubmit.isEnabled = on
         binding.drawerOtpSubmit.alpha = if (on) 1f else 0.45f
     }
 
     private fun submitDrawerPhone() {
-        val phone = normalizePhone(binding.drawerPhone.text?.toString().orEmpty())
+        val phone = PartnerApi.normalizePhone(binding.drawerPhone.text?.toString().orEmpty())
         binding.drawerLoginHint.isVisible = false
         if (phone.length != 11 || !phone.startsWith("09")) {
             binding.drawerLoginHint.text = "شماره موبایل ۱۱ رقمی معتبر وارد کنید."
@@ -534,12 +562,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (resp.optBoolean("success")) {
                     drawerPhoneNormalized = phone
+                    drawerOtpPending = true
                     binding.drawerOtpPhoneLabel.text = formatPhoneDisplay(phone)
                     binding.drawerPhoneStep.isVisible = false
                     binding.drawerOtpStep.isVisible = true
                     binding.drawerOtpHint.isVisible = false
                     binding.drawerOtp.requestFocus()
                     startResendTimer()
+                    startDrawerSmsListen()
                 } else {
                     binding.drawerLoginHint.text = resp.optString("error").ifBlank { "ارسال کد ممکن نشد." }
                     binding.drawerLoginHint.isVisible = true
@@ -555,8 +585,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun submitDrawerOtp() {
         if (otpSubmitting) return
-        val phone = drawerPhoneNormalized.ifBlank { normalizePhone(binding.drawerPhone.text?.toString().orEmpty()) }
-        val code = binding.drawerOtp.text?.toString()?.filter { it.isDigit() }.orEmpty()
+        val phone = drawerPhoneNormalized.ifBlank {
+            PartnerApi.normalizePhone(binding.drawerPhone.text?.toString().orEmpty())
+        }
+        val code = OtpSmsAutoFill.normalizeOtpDigits(binding.drawerOtp.text?.toString())
         binding.drawerOtpHint.isVisible = false
         if (code.length < 5) {
             showOtpHint("کد ۵ رقمی را وارد کنید.")
@@ -571,6 +603,9 @@ class MainActivity : AppCompatActivity() {
                     PartnerApi.postJson("/express/partner/api/verify", body, this@MainActivity)
                 }
                 if (resp.optBoolean("success")) {
+                    PartnerApi.markLoggedIn()
+                    drawerOtpPending = false
+                    stopDrawerSmsListen()
                     VinorFcmRegistrar.registerAfterLogin(this@MainActivity)
                     requestNotificationPermission()
                     showDrawerPhoneStep()
@@ -601,19 +636,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatPhoneDisplay(phone: String): String {
-        val d = normalizePhone(phone)
+        val d = PartnerApi.normalizePhone(phone)
         return if (d.length >= 11) "${d.take(4)} ${d.substring(4, 7)} ${d.substring(7, 11)}" else d
     }
 
-    private fun normalizePhone(input: String): String {
-        val digits = input.filter { it.isDigit() }
-        return when {
-            digits.startsWith("0098") && digits.length >= 14 -> "0" + digits.drop(4).take(10)
-            digits.startsWith("98") && digits.length >= 12 -> "0" + digits.drop(2).take(10)
-            digits.length == 11 && digits.startsWith("0") -> digits
-            digits.length == 10 && digits.startsWith("9") -> "0$digits"
-            else -> digits.take(11)
-        }
+    private fun startDrawerSmsListen() {
+        stopDrawerSmsListen()
+        val receiver = OtpSmsAutoFill.SmsRetrieverReceiver(
+            onCode = { code ->
+                runOnUiThread {
+                    if (!::binding.isInitialized || !binding.drawerOtpStep.isVisible) return@runOnUiThread
+                    val digits = OtpSmsAutoFill.normalizeOtpDigits(code)
+                    if (digits.length != 5) return@runOnUiThread
+                    binding.drawerOtp.setText(digits)
+                    binding.drawerOtp.setSelection(digits.length)
+                    submitDrawerOtp()
+                }
+            },
+            onTimeout = {
+                runOnUiThread { OtpSmsAutoFill.startSmsRetriever(this) }
+            },
+        )
+        drawerSmsReceiver = receiver
+        OtpSmsAutoFill.registerSmsRetrieverReceiver(this, receiver)
+        OtpSmsAutoFill.startSmsRetriever(this)
+    }
+
+    private fun stopDrawerSmsListen() {
+        drawerSmsReceiver?.let { OtpSmsAutoFill.unregisterReceiver(this, it) }
+        drawerSmsReceiver = null
     }
 
     private fun simpleWatcher(after: () -> Unit): TextWatcher = object : TextWatcher {

@@ -16,13 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import android.webkit.CookieManager
-import java.util.concurrent.TimeUnit
 import android.os.Handler
 import android.os.Looper
 
@@ -36,10 +30,6 @@ class LoginStep2Fragment : Fragment() {
 
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
 
     private var phone: String = ""
     private var otpFilled = false
@@ -47,7 +37,6 @@ class LoginStep2Fragment : Fragment() {
 
     companion object {
         private const val TAG = "LoginStep2"
-        private const val BASE = "https://vinor.ir"
         private const val API_VERIFY = "/express/partner/api/verify"
         private const val API_OTP_RESEND = "/express/partner/otp/resend"
         private const val RESEND_COOLDOWN_SEC = 60
@@ -142,8 +131,6 @@ class LoginStep2Fragment : Fragment() {
         _binding = null
     }
 
-    private fun cookieHeader(): String = CookieManager.getInstance().getCookie(BASE) ?: ""
-
     private fun submitCode(phone: String) {
         val raw = binding.loginStep2Code.text?.toString()?.trim() ?: ""
         val code = OtpSmsAutoFill.normalizeOtpDigits(raw)
@@ -154,7 +141,7 @@ class LoginStep2Fragment : Fragment() {
             otpFilled = false
             return
         }
-        val cookie = cookieHeader()
+        val cookie = PartnerApi.cookieHeader()
         if (cookie.isBlank()) {
             binding.loginStep2Error.text = getString(R.string.login_session_expired)
             binding.loginStep2Error.visibility = View.VISIBLE
@@ -167,19 +154,11 @@ class LoginStep2Fragment : Fragment() {
 
         scope.launch {
             try {
-                val json = JSONObject().put("code", code).put("phone", phone).toString()
-                val req = Request.Builder()
-                    .url("$BASE$API_VERIFY")
-                    .post(json.toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .addHeader("Accept", "application/json")
-                    .addHeader("Content-Type", "application/json; charset=utf-8")
-                    .addHeader("Cookie", cookie)
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                saveCookiesFromResponse(resp)
-                val body = resp.body?.string() ?: ""
-                val obj = try { JSONObject(body) } catch (_: Exception) { null }
-                val success = obj?.optBoolean("success", false) == true
+                val body = JSONObject().put("code", code).put("phone", phone)
+                val obj = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(API_VERIFY, body, requireContext())
+                }
+                val success = obj.optBoolean("success", false) == true
 
                 withContext(Dispatchers.Main) {
                     binding.loginStep2Progress.visibility = View.GONE
@@ -187,6 +166,7 @@ class LoginStep2Fragment : Fragment() {
                     if (_binding == null) return@withContext
                     if (success) {
                         unregisterSmsReceiver()
+                        PartnerApi.markLoggedIn()
                         VinorFcmRegistrar.registerAfterLogin(requireContext())
                         if (isAdded) {
                             Toast.makeText(
@@ -212,7 +192,7 @@ class LoginStep2Fragment : Fragment() {
                     } else {
                         otpFilled = false
                         binding.loginStep2Error.text =
-                            obj?.optString("error", getString(R.string.login_otp_wrong))
+                            obj.optString("error", getString(R.string.login_otp_wrong))
                         binding.loginStep2Error.visibility = View.VISIBLE
                     }
                 }
@@ -277,21 +257,14 @@ class LoginStep2Fragment : Fragment() {
         OtpSmsAutoFill.startSmsRetriever(requireContext().applicationContext)
         scope.launch {
             try {
-                val json = JSONObject().put("phone", phone).toString()
-                val req = Request.Builder()
-                    .url("$BASE$API_OTP_RESEND")
-                    .post(json.toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .addHeader("Accept", "application/json")
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Cookie", cookieHeader())
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                saveCookiesFromResponse(resp)
-                val body = resp.body?.string() ?: ""
-                val obj = try { JSONObject(body) } catch (_: Exception) { null }
-                val ok = obj?.optBoolean("ok", false) == true
-                val msg = obj?.optString("message", null)
-                    ?: obj?.optString("error", if (ok) getString(R.string.login_resend_ok) else getString(R.string.login_resend_fail))
+                val body = JSONObject().put("phone", phone)
+                val obj = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(API_OTP_RESEND, body, requireContext())
+                }
+                val ok = obj.optBoolean("ok", false) == true
+                val msg = obj.optString("message").ifBlank {
+                    obj.optString("error", if (ok) getString(R.string.login_resend_ok) else getString(R.string.login_resend_fail))
+                }
                 withContext(Dispatchers.Main) {
                     if (_binding != null && isAdded) {
                         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
@@ -313,16 +286,6 @@ class LoginStep2Fragment : Fragment() {
                     }
                 }
             }
-        }
-    }
-
-    private fun saveCookiesFromResponse(resp: okhttp3.Response) {
-        try {
-            resp.headers("Set-Cookie").forEach { value ->
-                CookieManager.getInstance().setCookie(BASE, value)
-            }
-            CookieManager.getInstance().flush()
-        } catch (_: Exception) {
         }
     }
 }

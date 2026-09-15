@@ -14,17 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import android.webkit.CookieManager
-import java.util.concurrent.TimeUnit
 
-/**
- * ورود نیتیو - مرحله ۱: وارد کردن شماره موبایل و دریافت کد OTP.
- */
+/** ورود نیتیو - مرحله ۱: شماره موبایل و دریافت کد OTP. */
 class LoginStep1Fragment : Fragment() {
 
     private var _binding: FragmentLoginStep1Binding? = null
@@ -32,14 +24,9 @@ class LoginStep1Fragment : Fragment() {
 
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
 
     companion object {
         private const val TAG = "LoginStep1"
-        private const val BASE = "https://vinor.ir"
         private const val API_LOGIN_REQUEST = "/express/partner/api/login-request"
     }
 
@@ -67,24 +54,9 @@ class LoginStep1Fragment : Fragment() {
         _binding = null
     }
 
-    /**
-     * نرمال‌سازی مطابق بک‌اند (notifications._normalize_user_id / _normalize_phone):
-     * خروجی همیشه ۱۱ رقم به صورت 09xxxxxxxxx
-     */
-    private fun normalizePhone(input: String): String {
-        val digits = input.filter { it.isDigit() }
-        return when {
-            digits.startsWith("0098") && digits.length >= 14 -> "0" + digits.drop(4).take(10)
-            digits.startsWith("98") && digits.length >= 12 -> "0" + digits.drop(2).take(10)
-            digits.length == 11 && digits.startsWith("0") -> digits
-            digits.length == 10 && digits.startsWith("9") -> "0$digits"
-            else -> digits.take(11)
-        }
-    }
-
     private fun submitPhone() {
         val raw = binding.loginStep1Phone.text?.toString()?.trim() ?: ""
-        val phone = normalizePhone(raw)
+        val phone = PartnerApi.normalizePhone(raw)
         binding.loginStep1Error.visibility = View.GONE
         if (phone.length != 11 || !phone.startsWith("09")) {
             binding.loginStep1Error.text = "لطفاً یک شماره موبایل ۱۱ رقمی معتبر وارد کنید."
@@ -97,33 +69,20 @@ class LoginStep1Fragment : Fragment() {
 
         scope.launch {
             try {
-                val json = JSONObject()
+                val body = JSONObject()
                     .put("phone", phone)
                     .put("accept_legal", true)
-                    .toString()
-                val req = Request.Builder()
-                    .url("$BASE$API_LOGIN_REQUEST")
-                    .post(json.toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .addHeader("Accept", "application/json")
-                    .addHeader("Content-Type", "application/json; charset=utf-8")
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                saveCookiesFromResponse(resp)
-                val body = resp.body?.string() ?: ""
-                val code = resp.code
-                val obj = try { JSONObject(body) } catch (_: Exception) { null }
-                val success = resp.isSuccessful && (obj?.optBoolean("success", false) == true)
-
-                if (!success && code != 200) {
-                    Log.w(TAG, "login-request failed: code=$code body=${body.take(300)}")
+                val obj = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(API_LOGIN_REQUEST, body, requireContext())
                 }
+                val success = obj.optBoolean("success", false)
 
                 withContext(Dispatchers.Main) {
                     binding.loginStep1Progress.visibility = View.GONE
                     binding.loginStep1Submit.isEnabled = true
                     if (_binding == null) return@withContext
                     if (success) {
-                        if (isAdded) Toast.makeText(requireContext(), obj?.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
+                        if (isAdded) Toast.makeText(requireContext(), obj.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
                         val bundle = android.os.Bundle().apply { putString("phone", phone) }
                         view?.post {
                             if (!isAdded) return@post
@@ -139,7 +98,7 @@ class LoginStep1Fragment : Fragment() {
                             }
                         }
                     } else {
-                        binding.loginStep1Error.text = obj?.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
+                        binding.loginStep1Error.text = obj.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
                         binding.loginStep1Error.visibility = View.VISIBLE
                     }
                 }
@@ -155,16 +114,5 @@ class LoginStep1Fragment : Fragment() {
                 }
             }
         }
-    }
-
-    private fun saveCookiesFromResponse(resp: okhttp3.Response) {
-        try {
-            val setCookies = resp.headers("Set-Cookie")
-            setCookies.forEach { value ->
-                CookieManager.getInstance().setCookie(BASE, value)
-            }
-            CookieManager.getInstance().flush()
-            if (setCookies.isEmpty()) Log.w(TAG, "login-request: no Set-Cookie in response")
-        } catch (_: Exception) { }
     }
 }

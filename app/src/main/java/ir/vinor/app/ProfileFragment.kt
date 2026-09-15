@@ -293,42 +293,26 @@ class ProfileFragment : Fragment() {
 
     private fun doLogout() {
         scope.launch {
+            VinorFcmRegistrar.unregisterCurrentToken(requireContext())
             try {
-                val req = Request.Builder()
-                    .url("$BASE$API_LOGOUT")
-                    .post(okhttp3.RequestBody.create(null, ByteArray(0)))
-                    .addHeader("Cookie", cookieHeader())
-                    .build()
-                val ok = withContext(Dispatchers.IO) {
-                    client.newCall(req).execute().use { it.isSuccessful }
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    if (!ok) {
-                        context?.let { Toast.makeText(it, "خطا در خروج", Toast.LENGTH_SHORT).show() }
-                        return@withContext
-                    }
-                    VinorFcmRegistrar.unregisterCurrentToken(requireContext())
-                    /* removeAllCookies ناهمزمان است؛ loadData فقط بعد از flush تا درخواست بعدی بدون کوکی قدیمی باشد */
-                    val cm = CookieManager.getInstance()
-                    cm.removeAllCookies { _ ->
-                        cm.flush()
-                        view?.post {
-                            if (_binding == null) return@post
-                            context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
-                            loadData()
-                            try {
-                                findNavController().navigate(R.id.dashboardFragment)
-                            } catch (_: Exception) {
-                                openUrl(VinorPartnerUrls.ENTRY)
-                            }
-                        }
-                    }
+                withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(API_LOGOUT, JSONObject(), requireContext())
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "logout error", e)
-                withContext(Dispatchers.Main) {
-                    context?.let { Toast.makeText(it, "خطا در ارتباط", Toast.LENGTH_SHORT).show() }
+            }
+            PartnerApi.clearCookies {
+                if (_binding == null) return@clearCookies
+                context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
+                val host = activity as? MainActivity
+                if (host != null) {
+                    host.openPartnerHome()
+                } else {
+                    try {
+                        findNavController().navigate(R.id.dashboardFragment)
+                    } catch (_: Exception) {
+                        openUrl(VinorPartnerUrls.ENTRY)
+                    }
                 }
             }
         }
