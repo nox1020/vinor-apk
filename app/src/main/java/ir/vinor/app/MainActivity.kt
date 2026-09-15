@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 val dash = findDashboard()
-                if (dash != null && dash.closeAdsAll()) return
+                if (dash != null && dash.closeOverlays()) return
                 if (!navController.popBackStack()) finish()
             }
         })

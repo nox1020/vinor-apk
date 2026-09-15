@@ -36,6 +36,13 @@
         <intent>
             <action android:name="android.intent.action.INSTALL_PACKAGE" />
         </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="*/*" />
+        </intent>
     </queries>
 
     <application

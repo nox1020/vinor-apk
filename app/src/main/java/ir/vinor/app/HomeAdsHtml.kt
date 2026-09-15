@@ -52,7 +52,7 @@ object HomeAdsHtml {
                     .put("token", land.ifBlank { divar })
                     .put("source", source)
                     .put("url", href)
-                    .put("commission_amount", 0),
+                    .put("commission_amount", commission(block)),
             )
         }
         return out
@@ -73,6 +73,11 @@ object HomeAdsHtml {
     private fun imgSrc(block: String): String {
         val re = Regex("""<img[^>]+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
         return re.find(block)?.groupValues?.get(1).orEmpty()
+    }
+
+    private fun commission(block: String): Int {
+        val raw = inner(block, "vn-home-divar__comm")
+        return if (raw.isBlank()) 0 else digits(raw)
     }
 
     private fun shots(block: String): Int {

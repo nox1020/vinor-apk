@@ -1,12 +1,15 @@
 package ir.vinor.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
@@ -19,6 +22,9 @@ import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
@@ -34,8 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
-/** خانه نیتیو — همان چیدمان وب خالی: آگهی، خبر، کارت همکاری، کامپوزر. */
+/** خانه نیتیو — همان چیدمان وب خالی: آگهی، خبر، کارت همکاری، کامپوزر و پیوست. */
 class DashboardFragment : Fragment() {
 
     private var _binding: FragmentDashboardBinding? = null
@@ -48,15 +55,41 @@ class DashboardFragment : Fragment() {
     private var newsIndex = 0
     private var allAds = JSONArray()
     private var isApproved = false
+    private var pendingAttachment: JSONObject? = null
+    private var attachUploading = false
+    private var cameraOutput: Uri? = null
     private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
+    private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { startUpload(it, "image") }
+    }
+    private val pickVideo = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { startUpload(it, "video") }
+    }
+    private val pickFile = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { startUpload(it, "file") }
+    }
+    private val takePicture = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = cameraOutput
+        if (ok && uri != null) startUpload(uri, "image")
+    }
+    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) launchCamera()
+        else Toast.makeText(requireContext(), "برای عکس اجازهٔ دوربین لازم است.", Toast.LENGTH_SHORT).show()
+    }
     private val newsTick = object : Runnable {
         override fun run() {
             val b = _binding ?: return
             if (newsItems.isEmpty() || !b.dashboardEmpty.isVisible) return
             newsIndex = (newsIndex + 1) % newsItems.size
-            b.dashboardNewsText.text = newsItems[newsIndex]
+            val next = newsItems[newsIndex]
+            b.dashboardNewsText.animate().cancel()
+            b.dashboardNewsText.animate().alpha(0f).setDuration(180).withEndAction {
+                val live = _binding ?: return@withEndAction
+                live.dashboardNewsText.text = next
+                live.dashboardNewsText.animate().alpha(1f).setDuration(220).start()
+            }.start()
             newsHandler.postDelayed(this, 4000)
         }
     }
@@ -75,6 +108,13 @@ class DashboardFragment : Fragment() {
         binding.dashboardMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.dashboardBrand.setOnClickListener { (activity as? MainActivity)?.closeDrawer() }
         binding.dashboardChatSend.setOnClickListener { sendChat() }
+        binding.dashboardChatPlus.setOnClickListener { toggleAttach() }
+        binding.dashboardAttachScrim.setOnClickListener { closeAttach() }
+        binding.dashboardAttachGallery.setOnClickListener { onAttachKind("gallery") }
+        binding.dashboardAttachCamera.setOnClickListener { onAttachKind("camera") }
+        binding.dashboardAttachVideo.setOnClickListener { onAttachKind("video") }
+        binding.dashboardAttachFile.setOnClickListener { onAttachKind("file") }
+        binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
         binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
         binding.dashboardTileLevels.setOnClickListener {
@@ -82,6 +122,9 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardAdsAllBackdrop.setOnClickListener { closeAdsAll() }
         binding.dashboardAdsAllClose.setOnClickListener { closeAdsAll() }
+        binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
+        binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
+        binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
         binding.dashboardNewsDot.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.news_dot_pulse))
         binding.dashboardChatInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -133,11 +176,198 @@ class DashboardFragment : Fragment() {
         b.dashboardHeader.isClickable = visible
     }
 
+    fun closeOverlays(): Boolean {
+        if (closeAttach()) return true
+        if (closeCustomer()) return true
+        return closeAdsAll()
+    }
+
     fun closeAdsAll(): Boolean {
         val b = _binding ?: return false
         if (!b.dashboardAdsAll.isVisible) return false
         b.dashboardAdsAll.isVisible = false
         return true
+    }
+
+    private fun closeCustomer(): Boolean {
+        val b = _binding ?: return false
+        if (!b.dashboardCustomer.isVisible) return false
+        b.dashboardCustomer.isVisible = false
+        return true
+    }
+
+    private fun closeAttach(): Boolean {
+        val b = _binding ?: return false
+        if (!b.dashboardAttachSheet.isVisible && !b.dashboardAttachScrim.isVisible) return false
+        b.dashboardAttachSheet.isVisible = false
+        b.dashboardAttachScrim.isVisible = false
+        b.dashboardChatPlus.animate().rotation(0f).setDuration(200).start()
+        val out = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(
+            android.R.attr.selectableItemBackgroundBorderless,
+            out,
+            true,
+        )
+        b.dashboardChatPlus.setBackgroundResource(out.resourceId)
+        return true
+    }
+
+    private fun toggleAttach() {
+        if (binding.dashboardAttachSheet.isVisible) closeAttach() else openAttach()
+    }
+
+    private fun openAttach() {
+        binding.dashboardAttachSheet.isVisible = true
+        binding.dashboardAttachScrim.isVisible = true
+        binding.dashboardChatPlus.animate().rotation(45f).setDuration(200).start()
+        binding.dashboardChatPlus.setBackgroundResource(R.drawable.bg_plus_open)
+    }
+
+    private fun onAttachKind(kind: String) {
+        closeAttach()
+        if (!PartnerApi.hasSession()) {
+            Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
+            (activity as? MainActivity)?.openDrawer()
+            return
+        }
+        when (kind) {
+            "gallery" -> pickGallery.launch("image/*")
+            "camera" -> {
+                if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED
+                ) {
+                    launchCamera()
+                } else {
+                    cameraPermission.launch(Manifest.permission.CAMERA)
+                }
+            }
+            "video" -> pickVideo.launch("video/*")
+            else -> pickFile.launch("*/*")
+        }
+    }
+
+    private fun launchCamera() {
+        val ctx = context ?: return
+        val dir = File(ctx.cacheDir, "camera").apply { mkdirs() }
+        val file = File.createTempFile("capture_", ".jpg", dir)
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        cameraOutput = uri
+        takePicture.launch(uri)
+    }
+
+    private fun startUpload(uri: Uri, kind: String) {
+        if (_binding == null) return
+        if (!PartnerApi.hasSession()) {
+            Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
+            (activity as? MainActivity)?.openDrawer()
+            return
+        }
+        val ctx = requireContext()
+        val name = uriName(uri)
+        val mime = ctx.contentResolver.getType(uri).orEmpty()
+        val size = uriSize(uri)
+        pendingAttachment = null
+        attachUploading = true
+        showAttachPreview(kind, name, size, uploading = true)
+        syncSendEnabled()
+        scope.launch {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postUpload(
+                        "/express/partner/ai/upload",
+                        uri,
+                        kind,
+                        name,
+                        mime,
+                        ctx,
+                    )
+                }
+                if (_binding == null) return@launch
+                attachUploading = false
+                val http = resp.optInt("http_status")
+                if (http == 401 || http == 403 || resp.optBoolean("need_login")) {
+                    clearPendingAttachment()
+                    Toast.makeText(ctx, resp.optString("error").ifBlank { "برای ارسال فایل وارد شوید." }, Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                if (resp.optBoolean("ok") && resp.optString("url").isNotBlank()) {
+                    pendingAttachment = JSONObject()
+                        .put("kind", resp.optString("kind").ifBlank { kind })
+                        .put("url", resp.optString("url"))
+                        .put("name", resp.optString("name").ifBlank { name })
+                        .put("mime", resp.optString("mime").ifBlank { mime })
+                        .put("size", resp.optLong("size").let { if (it > 0) it else size })
+                    showAttachPreview(
+                        pendingAttachment!!.optString("kind"),
+                        pendingAttachment!!.optString("name"),
+                        pendingAttachment!!.optLong("size"),
+                        uploading = false,
+                    )
+                } else {
+                    clearPendingAttachment()
+                    Toast.makeText(ctx, resp.optString("error").ifBlank { "آپلود ناموفق بود." }, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                if (_binding == null) return@launch
+                attachUploading = false
+                clearPendingAttachment()
+                Toast.makeText(requireContext(), e.message ?: "خطا در آپلود فایل.", Toast.LENGTH_SHORT).show()
+            } finally {
+                if (_binding != null) syncSendEnabled()
+            }
+        }
+    }
+
+    private fun showAttachPreview(kind: String, name: String, size: Long, uploading: Boolean) {
+        binding.dashboardAttachPreview.isVisible = true
+        binding.dashboardAttachName.text = name.ifBlank { "پیوست" }
+        binding.dashboardAttachSub.text = when {
+            uploading -> "در حال آپلود…"
+            size > 0L -> formatSize(size)
+            kind == "image" -> "تصویر"
+            kind == "video" -> "ویدیو"
+            else -> "فایل"
+        }
+        binding.dashboardAttachThumb.setImageResource(
+            when (kind) {
+                "image" -> R.drawable.ic_attach_gallery
+                "video" -> R.drawable.ic_attach_video
+                else -> R.drawable.ic_attach_file
+            },
+        )
+        binding.dashboardAttachPreview.alpha = if (uploading) 0.75f else 1f
+    }
+
+    private fun clearPendingAttachment() {
+        pendingAttachment = null
+        attachUploading = false
+        val b = _binding ?: return
+        b.dashboardAttachPreview.isVisible = false
+        b.dashboardAttachPreview.alpha = 1f
+        syncSendEnabled()
+    }
+
+    private fun uriName(uri: Uri): String {
+        val cr = requireContext().contentResolver
+        cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) return c.getString(0).orEmpty().ifBlank { "file" }
+        }
+        return uri.lastPathSegment ?: "file"
+    }
+
+    private fun uriSize(uri: Uri): Long {
+        val cr = requireContext().contentResolver
+        cr.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) return c.getLong(0)
+        }
+        return 0L
+    }
+
+    private fun formatSize(bytes: Long): String {
+        if (bytes <= 0L) return ""
+        val kb = bytes / 1024.0
+        return if (kb < 1024) "${kb.toInt()} کیلوبایت" else "${"%.1f".format(kb / 1024.0)} مگابایت"
     }
 
     private fun onHero() {
@@ -148,9 +378,72 @@ class DashboardFragment : Fragment() {
         }
     }
 
+    private fun openCustomer() {
+        if (!PartnerApi.hasSession()) {
+            (activity as? MainActivity)?.openDrawer()
+            return
+        }
+        closeAttach()
+        binding.dashboardCustomer.isVisible = true
+    }
+
+    private fun submitCustomer() {
+        if (!PartnerApi.hasSession()) {
+            (activity as? MainActivity)?.openDrawer()
+            return
+        }
+        val body = JSONObject()
+            .put("customer_first_name", binding.dashboardCustomerFirst.text?.toString()?.trim().orEmpty())
+            .put("customer_last_name", binding.dashboardCustomerLast.text?.toString()?.trim().orEmpty())
+            .put("customer_phone", binding.dashboardCustomerPhone.text?.toString()?.trim().orEmpty())
+            .put("notes", binding.dashboardCustomerNotes.text?.toString()?.trim().orEmpty())
+        binding.dashboardCustomerSubmit.isEnabled = false
+        scope.launch {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson("/express/partner/home/register-customer", body, requireContext())
+                }
+                if (_binding == null) return@launch
+                val http = resp.optInt("http_status")
+                if (http == 401 || http == 403) {
+                    Toast.makeText(
+                        requireContext(),
+                        resp.optString("error").ifBlank { "برای ثبت درخواست وارد شوید." },
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    if (http == 401) (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                if (resp.optBoolean("ok")) {
+                    closeCustomer()
+                    binding.dashboardCustomerFirst.setText("")
+                    binding.dashboardCustomerLast.setText("")
+                    binding.dashboardCustomerPhone.setText("")
+                    binding.dashboardCustomerNotes.setText("")
+                    Toast.makeText(
+                        requireContext(),
+                        resp.optString("message").ifBlank { "درخواست بازدید ثبت شد." },
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        requireContext(),
+                        resp.optString("error").ifBlank { "ثبت ناموفق بود." },
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } finally {
+                if (_binding != null) binding.dashboardCustomerSubmit.isEnabled = true
+            }
+        }
+    }
+
     private fun syncSendEnabled() {
-        val on = !binding.dashboardChatInput.text.isNullOrBlank()
-        binding.dashboardChatSend.isEnabled = on
+        val on = !binding.dashboardChatInput.text.isNullOrBlank() || pendingAttachment != null
+        binding.dashboardChatSend.isEnabled = true
+        binding.dashboardChatSend.alpha = 1f
         binding.dashboardChatSend.setBackgroundResource(
             if (on) R.drawable.bg_send_circle else R.drawable.bg_send_idle
         )
@@ -228,6 +521,7 @@ class DashboardFragment : Fragment() {
         if (newsItems.isEmpty()) {
             newsItems.add("زمین جابان فروش رفت و پورسانت رسید")
         }
+        binding.dashboardNewsText.alpha = 1f
         binding.dashboardNewsText.text = newsItems.first()
         newsHandler.removeCallbacks(newsTick)
         if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
@@ -257,35 +551,207 @@ class DashboardFragment : Fragment() {
             binding.dashboardEmpty.paddingBottom,
         )
 
-        val prompts = obj.optJSONArray("ai_quick_prompts") ?: JSONArray()
+        val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
+        val reqCount = obj.optInt("home_requests_pipeline_count")
+        bindPrompts(obj, adsCount, reqCount)
+    }
+
+    private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {
+        var prompts = obj.optJSONArray("ai_quick_prompts") ?: JSONArray()
+        if (prompts.length() == 0) prompts = defaultPrompts(obj)
+        var hero: JSONObject? = null
+        val tiles = mutableListOf<JSONObject>()
         for (i in 0 until prompts.length()) {
             val p = prompts.optJSONObject(i) ?: continue
-            when (p.optString("variant")) {
-                "hero" -> {
-                    binding.dashboardHeroTitle.text = p.optString("label").ifBlank { "می‌خواهم بازاریاب وینور شوم" }
-                    binding.dashboardHeroSub.text = p.optString("subtitle")
-                    val href = p.optString("href")
-                    binding.dashboardHero.setOnClickListener {
-                        if (!PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1")) {
-                            (activity as? MainActivity)?.openDrawer()
-                        } else if (href.isNotBlank()) {
-                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
-                        } else {
-                            onHero()
-                        }
-                    }
-                }
-                "tile" -> {
-                    if (p.optString("ui_action") == "open_divar_ads_all") {
-                        binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
-                    }
-                }
+            if (p.optString("variant") == "hero") {
+                if (hero == null) hero = p
+            } else {
+                tiles.add(p)
             }
         }
+        bindHeroPrompt(hero)
+        bindTilePrompt(
+            tile = binding.dashboardTileBuy,
+            icon = binding.dashboardTileBuyIcon,
+            title = binding.dashboardTileBuyTitle,
+            sub = binding.dashboardTileBuySub,
+            count = binding.dashboardTileBuyCount,
+            prompt = tiles.getOrNull(0),
+            fallbackTitle = "خرید ملک",
+            fallbackSub = "جستجوی فایل و ملک",
+            fallbackIcon = R.drawable.ic_search_stroke,
+            fallbackAction = { openAdsAll() },
+            adsCount = adsCount,
+            reqCount = reqCount,
+        )
+        bindTilePrompt(
+            tile = binding.dashboardTileLevels,
+            icon = binding.dashboardTileLevelsIcon,
+            title = binding.dashboardTileLevelsTitle,
+            sub = binding.dashboardTileLevelsSub,
+            count = binding.dashboardTileLevelsCount,
+            prompt = tiles.getOrNull(1),
+            fallbackTitle = "سطوح همکاری",
+            fallbackSub = "شرایط و پورسانت",
+            fallbackIcon = R.drawable.ic_users_stroke,
+            fallbackAction = {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/levels")))
+            },
+            adsCount = adsCount,
+            reqCount = reqCount,
+        )
+    }
 
-        val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
-        binding.dashboardTileBuyCount.isVisible = adsCount > 0
-        if (adsCount > 0) binding.dashboardTileBuyCount.text = PartnerFormat.toman(adsCount)
+    private fun defaultPrompts(obj: JSONObject): JSONArray {
+        val out = JSONArray()
+        val approved = obj.optBoolean("is_approved")
+        val pending = obj.optBoolean("has_pending_app")
+        val loggedIn = PartnerApi.hasSession() ||
+            obj.optBoolean("is_logged_in") ||
+            obj.optString("me_phone").isNotBlank()
+        if (approved) {
+            out.put(
+                JSONObject()
+                    .put("label", "مشتری دارم")
+                    .put("subtitle", "برای مشتری وقت بازدید بگیرید")
+                    .put("variant", "hero")
+                    .put("icon", "user_plus")
+                    .put("ui_action", "open_customer_modal"),
+            )
+            out.put(
+                JSONObject()
+                    .put("label", "لیست ملک‌ها")
+                    .put("subtitle", "جستجوی فایل و ملک")
+                    .put("variant", "tile")
+                    .put("icon", "search")
+                    .put("ui_action", "open_divar_ads_all"),
+            )
+            out.put(
+                JSONObject()
+                    .put("label", "پیگیری")
+                    .put("subtitle", "درخواست، بازدید و معامله")
+                    .put("variant", "tile")
+                    .put("icon", "clipboard")
+                    .put("href", "/express/partner/requests"),
+            )
+            return out
+        }
+        if (pending) {
+            out.put(
+                JSONObject()
+                    .put("label", "وضعیت درخواست")
+                    .put("subtitle", "پیگیری تأیید همکاری")
+                    .put("variant", "hero")
+                    .put("icon", "clipboard")
+                    .put("href", "/express/partner/thanks"),
+            )
+        } else {
+            out.put(
+                JSONObject()
+                    .put("label", "می‌خواهم بازاریاب وینور شوم")
+                    .put("subtitle", "شروع همکاری فروش و دریافت پورسانت")
+                    .put("variant", "hero")
+                    .put("icon", "handshake")
+                    .put(
+                        "href",
+                        if (loggedIn) "/express/partner/apply"
+                        else "/express/partner/home?menu=1&login_next=/express/partner/apply",
+                    ),
+            )
+        }
+        out.put(
+            JSONObject()
+                .put("label", "خرید ملک")
+                .put("subtitle", "جستجوی فایل و ملک")
+                .put("variant", "tile")
+                .put("icon", "search")
+                .put("ui_action", "open_divar_ads_all"),
+        )
+        out.put(
+            JSONObject()
+                .put("label", "سطوح همکاری")
+                .put("subtitle", "شرایط و پورسانت")
+                .put("variant", "tile")
+                .put("icon", "users")
+                .put("href", "/express/partner/levels"),
+        )
+        return out
+    }
+
+    private fun bindHeroPrompt(prompt: JSONObject?) {
+        val label = prompt?.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
+        val sub = prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        binding.dashboardHeroTitle.text = label
+        binding.dashboardHeroSub.text = sub
+        binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
+        val href = prompt?.optString("href").orEmpty()
+        val action = prompt?.optString("ui_action").orEmpty()
+        binding.dashboardHero.setOnClickListener {
+            when {
+                action == "open_customer_modal" -> openCustomer()
+                action == "open_divar_ads_all" -> openAdsAll()
+                !PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1") ->
+                    (activity as? MainActivity)?.openDrawer()
+                href.isNotBlank() ->
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
+                else -> onHero()
+            }
+        }
+    }
+
+    private fun bindTilePrompt(
+        tile: View,
+        icon: ImageView,
+        title: android.widget.TextView,
+        sub: android.widget.TextView,
+        count: android.widget.TextView,
+        prompt: JSONObject?,
+        fallbackTitle: String,
+        fallbackSub: String,
+        fallbackIcon: Int,
+        fallbackAction: () -> Unit,
+        adsCount: Int,
+        reqCount: Int,
+    ) {
+        title.text = prompt?.optString("label").orEmpty().ifBlank { fallbackTitle }
+        sub.text = prompt?.optString("subtitle").orEmpty().ifBlank { fallbackSub }
+        icon.setImageResource(tileIcon(prompt?.optString("icon"), fallbackIcon))
+        val href = prompt?.optString("href").orEmpty()
+        val action = prompt?.optString("ui_action").orEmpty()
+        val showAds = action == "open_divar_ads_all"
+        val showReq = prompt?.optString("intent") == "followup" || href.contains("/requests")
+        val n = when {
+            showAds -> adsCount
+            showReq -> reqCount
+            else -> 0
+        }
+        count.isVisible = n > 0
+        if (n > 0) count.text = PartnerFormat.toman(n)
+        tile.setOnClickListener {
+            when {
+                action == "open_divar_ads_all" -> openAdsAll()
+                action == "open_customer_modal" -> openCustomer()
+                href.isNotBlank() ->
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
+                else -> fallbackAction()
+            }
+        }
+    }
+
+    private fun heroIcon(name: String?): Int = when (name) {
+        "clipboard" -> R.drawable.ic_clipboard
+        "user_plus" -> R.drawable.ic_user_plus_stroke
+        "search" -> R.drawable.ic_search_stroke
+        "users" -> R.drawable.ic_users_stroke
+        else -> R.drawable.ic_handshake
+    }
+
+    private fun tileIcon(name: String?, fallback: Int): Int = when (name) {
+        "search" -> R.drawable.ic_search_stroke
+        "users" -> R.drawable.ic_users_stroke
+        "clipboard" -> R.drawable.ic_clipboard
+        "user_plus" -> R.drawable.ic_user_plus_stroke
+        else -> fallback
     }
 
     private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
@@ -424,7 +890,9 @@ class DashboardFragment : Fragment() {
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
             if (msg.optString("role") == "user") hasUser = true
-            addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"))
+            val att = msg.optJSONObject("attachment")
+                ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
+            addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
         }
         val empty = !hasUser
         binding.dashboardEmpty.isVisible = empty
@@ -435,12 +903,34 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun addBubble(role: String, content: String, codes: JSONArray?) {
-        if (content.isBlank() && (codes == null || codes.length() == 0)) return
+    private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null) {
+        if (content.isBlank() && (codes == null || codes.length() == 0) && attachment == null) return
         val bubble = ItemChatBubbleBinding.inflate(layoutInflater, binding.dashboardChatList, false)
         val isUser = role == "user"
         bubble.chatBubbleAvatar.isVisible = !isUser
         bubble.chatBubbleRow.gravity = if (isUser) Gravity.END else Gravity.START
+        val hasAtt = attachment != null && attachment.optString("url").isNotBlank()
+        bubble.chatBubbleAttach.isVisible = hasAtt
+        if (hasAtt) {
+            val kind = attachment!!.optString("kind")
+            bubble.chatBubbleAttachName.text = attachment.optString("name").ifBlank { "پیوست" }
+            bubble.chatBubbleAttachSub.text = when (kind) {
+                "image" -> "تصویر"
+                "video" -> "ویدیو"
+                else -> "فایل"
+            }
+            bubble.chatBubbleAttachThumb.setImageResource(
+                when (kind) {
+                    "image" -> R.drawable.ic_attach_gallery
+                    "video" -> R.drawable.ic_attach_video
+                    else -> R.drawable.ic_attach_file
+                },
+            )
+            val url = PartnerImages.resolve(attachment.optString("url"))
+            bubble.chatBubbleAttach.setOnClickListener {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        }
         if (content.isNotBlank()) {
             bubble.chatBubbleText.isVisible = true
             bubble.chatBubbleText.text = content
@@ -485,22 +975,41 @@ class DashboardFragment : Fragment() {
 
     private fun sendChat() {
         val text = binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
-        if (text.isEmpty()) return
+        val attach = pendingAttachment
+        if (attachUploading) {
+            Toast.makeText(requireContext(), "صبر کنید تا آپلود تمام شود.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (text.isEmpty() && attach == null) return
+        closeAttach()
         binding.dashboardChatInput.setText("")
+        val toSend = attach
+        pendingAttachment = null
+        binding.dashboardAttachPreview.isVisible = false
         syncSendEnabled()
         binding.dashboardEmpty.isVisible = false
         binding.dashboardAdsScroll.isVisible = false
-        addBubble("user", text, null)
+        addBubble("user", text, null, toSend)
         scope.launch {
             try {
                 val body = JSONObject().put("message", text)
                 threadId?.let { body.put("thread_id", it) }
+                if (toSend != null) body.put("attachment", toSend)
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
                 if (_binding == null) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
+                    if (toSend != null) {
+                        pendingAttachment = toSend
+                        showAttachPreview(
+                            toSend.optString("kind"),
+                            toSend.optString("name"),
+                            toSend.optLong("size"),
+                            uploading = false,
+                        )
+                    }
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }

@@ -1,12 +1,18 @@
 package ir.vinor.app
 
 import android.content.Context
+import android.net.Uri
 import android.webkit.CookieManager
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.BufferedSink
+import okio.source
 import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -20,6 +26,10 @@ object PartnerApi {
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
+        .build()
+    private val uploadClient = client.newBuilder()
+        .readTimeout(90, TimeUnit.SECONDS)
+        .writeTimeout(90, TimeUnit.SECONDS)
         .build()
     private val cookieLock = Any()
     @Volatile private var appCtx: Context? = null
@@ -142,6 +152,36 @@ object PartnerApi {
         return execute(req)
     }
 
+    fun postUpload(
+        path: String,
+        uri: Uri,
+        kind: String,
+        fileName: String,
+        mime: String,
+        context: Context,
+    ): JSONObject {
+        val resolver = context.contentResolver
+        val type = mime.ifBlank { resolver.getType(uri) ?: "application/octet-stream" }
+        val fileBody = object : RequestBody() {
+            override fun contentType() = type.toMediaTypeOrNull()
+            override fun contentLength(): Long {
+                return resolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+            }
+            override fun writeTo(sink: BufferedSink) {
+                resolver.openInputStream(uri)?.use { input ->
+                    sink.writeAll(input.source())
+                } ?: error("خواندن فایل ناموفق بود.")
+            }
+        }
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("kind", kind)
+            .addFormDataPart("file", fileName.ifBlank { "file" }, fileBody)
+            .build()
+        val req = requestBuilder(path, context).post(body).build()
+        return execute(req, uploadClient)
+    }
+
     fun bytes(url: String, context: Context? = null): ByteArray? {
         val abs = if (url.startsWith("http")) url else if (url.startsWith("/")) "$BASE$url" else "$BASE/$url"
         val b = Request.Builder().url(abs).addHeader("Accept", "*/*")
@@ -192,8 +232,8 @@ object PartnerApi {
         return b
     }
 
-    private fun execute(req: Request): JSONObject {
-        client.newCall(req).execute().use { resp ->
+    private fun execute(req: Request, http: OkHttpClient = client): JSONObject {
+        http.newCall(req).execute().use { resp ->
             saveCookies(resp)
             val text = resp.body?.string().orEmpty()
             val obj = try {
