@@ -78,6 +78,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -125,6 +127,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Ensure signing secrets (bootstrap if missing)
         shell: bash
