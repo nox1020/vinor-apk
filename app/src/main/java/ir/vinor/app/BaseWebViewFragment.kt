@@ -129,6 +129,10 @@ abstract class BaseWebViewFragment : Fragment() {
                     return true
                 }
 
+                if (consumeInternalUrl(url)) {
+                    return true
+                }
+
                 // امکان محدود کردن تب به یک URL (مثلاً فقط صفحه وینور)
                 shouldOverrideUrlLoadingForFragment(url)?.let { override ->
                     if (override) {
@@ -284,6 +288,11 @@ abstract class BaseWebViewFragment : Fragment() {
         }
         webView.webChromeClient = fileChooser?.createChromeClient() ?: WebChromeClient()
     }
+
+    /**
+     * اگر true برگردد، URL داخل همین Fragment مصرف شده و نباید در WebView/کروم باز شود.
+     */
+    protected open fun consumeInternalUrl(url: String): Boolean = false
 
     /**
      * آدرس نهایی برای بارگذاری. در فرزندان (مثل Dashboard) می‌توان همیشه فقط targetUrl را برگرداند.

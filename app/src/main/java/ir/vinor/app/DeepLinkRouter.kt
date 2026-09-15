@@ -24,6 +24,7 @@ object DeepLinkRouter {
         PARTNER_LANDS,
         PARTNER_NOTIFICATIONS,
         PARTNER_LOGIN,
+        PARTNER_WEB,
         PUBLIC_HOME,
         SEARCH,
         EXPRESS_PUBLIC,
@@ -90,13 +91,7 @@ object DeepLinkRouter {
                     .find(path)?.groupValues?.getOrNull(1)
                 if (code.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "express_missing_code")
                 else if (code.equals("partner", ignoreCase = true)) {
-                    Route(
-                        type = DestinationType.PARTNER_HOME,
-                        targetUrl = VinorPartnerUrls.ENTRY,
-                        requiresAuth = true,
-                        originalUri = raw,
-                        logLabel = "partner_home",
-                    )
+                    partnerHomeRoute(raw, uri)
                 } else {
                     Route(
                         type = DestinationType.EXPRESS_PUBLIC,
@@ -165,13 +160,14 @@ object DeepLinkRouter {
                     originalUri = raw,
                     logLabel = "login",
                 )
+            path == "/express/partner/home" -> partnerHomeRoute(raw, uri)
             path.startsWith("/express/partner") ->
                 Route(
-                    type = DestinationType.PARTNER_HOME,
-                    targetUrl = VinorPartnerUrls.normalizeEntryUrl(raw),
-                    requiresAuth = true,
+                    type = DestinationType.PARTNER_WEB,
+                    targetUrl = "https://$HOST$path${querySuffix(uri)}",
+                    requiresAuth = !isPublicPartnerPath(path),
                     originalUri = raw,
-                    logLabel = "partner_path",
+                    logLabel = "partner_web",
                 )
             path == "/public" || path.startsWith("/public/") || path == "/search" ->
                 Route(
@@ -205,11 +201,47 @@ object DeepLinkRouter {
         return Route(
             type = DestinationType.PROPERTY_DETAIL,
             targetUrl = target,
-            requiresAuth = true,
+            requiresAuth = false,
             propertyId = id,
             originalUri = raw,
             logLabel = "property:$id",
         )
+    }
+
+    private fun partnerHomeRoute(raw: String, uri: URI): Route {
+        val land = queryParam(uri, "land")
+        if (!land.isNullOrBlank()) {
+            return propertyRoute(land, raw, partnerPath = true)
+        }
+        return Route(
+            type = DestinationType.PARTNER_HOME,
+            targetUrl = VinorPartnerUrls.ENTRY,
+            requiresAuth = false,
+            originalUri = raw,
+            logLabel = "partner_home",
+        )
+    }
+
+    private fun isPublicPartnerPath(path: String): Boolean {
+        val p = path.lowercase(Locale.US)
+        return p.startsWith("/express/partner/training") ||
+            p.startsWith("/express/partner/levels") ||
+            p.startsWith("/express/partner/plus") ||
+            p.startsWith("/express/partner/cooperation") ||
+            p.startsWith("/express/partner/legal") ||
+            p.startsWith("/express/partner/login")
+    }
+
+    private fun queryParam(uri: URI, name: String): String? {
+        val q = uri.rawQuery ?: return null
+        return q.split("&").mapNotNull { part ->
+            val i = part.indexOf('=')
+            if (i <= 0) return@mapNotNull null
+            val key = part.substring(0, i)
+            if (key != name) return@mapNotNull null
+            runCatching { java.net.URLDecoder.decode(part.substring(i + 1), StandardCharsets.UTF_8.name()) }
+                .getOrNull()
+        }.firstOrNull()?.takeIf { it.isNotBlank() }
     }
 
     private fun normalizePath(path: String?): String {

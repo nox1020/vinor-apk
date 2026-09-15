@@ -112,4 +112,15 @@
             android:defaultValue="" />
     </fragment>
 
+    <fragment
+        android:id="@+id/partnerPageFragment"
+        android:name="ir.vinor.app.PartnerPageFragment"
+        android:label="وینور"
+        tools:layout="@layout/fragment_webview">
+        <argument
+            android:name="url"
+            app:argType="string"
+            android:defaultValue="https://vinor.ir/express/partner/home" />
+    </fragment>
+
 </navigation>

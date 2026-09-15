@@ -8,11 +8,11 @@ import org.junit.Test
 class DeepLinkRouterTest {
 
     @Test
-    fun propertyPath_mapsToLandDetail_requiresAuth() {
+    fun propertyPath_mapsToLandDetail_guestAllowed() {
         val r = DeepLinkRouter.resolve("https://vinor.ir/property/ABC123")
         assertEquals(DeepLinkRouter.DestinationType.PROPERTY_DETAIL, r.type)
         assertEquals("ABC123", r.propertyId)
-        assertTrue(r.requiresAuth)
+        assertFalse(r.requiresAuth)
         assertTrue(r.targetUrl.contains("/express/partner/lands/ABC123"))
     }
 
@@ -77,5 +77,28 @@ class DeepLinkRouterTest {
         val login = DeepLinkRouter.loginUrlFor("https://vinor.ir/express/partner/lands/A1")
         assertTrue(login.startsWith("https://vinor.ir/express/partner/login?next="))
         assertTrue(login.contains("lands"))
+    }
+
+    @Test
+    fun requests_isPartnerWeb_requiresAuth() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/requests")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertTrue(r.requiresAuth)
+        assertTrue(r.targetUrl.contains("/requests"))
+    }
+
+    @Test
+    fun training_isPublicPartnerWeb() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/training")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertFalse(r.requiresAuth)
+    }
+
+    @Test
+    fun homeLandQuery_opensProperty() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/home?land=JB12")
+        assertEquals(DeepLinkRouter.DestinationType.PROPERTY_DETAIL, r.type)
+        assertEquals("JB12", r.propertyId)
+        assertFalse(r.requiresAuth)
     }
 }

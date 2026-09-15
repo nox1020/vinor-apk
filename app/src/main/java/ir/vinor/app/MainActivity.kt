@@ -102,6 +102,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 val dash = findDashboard()
                 if (dash != null && dash.closeOverlays()) return
+                val web = findWebPage()
+                if (web != null && web.goBackInWebView()) return
                 if (!navController.popBackStack()) finish()
             }
         })
@@ -230,6 +232,11 @@ class MainActivity : AppCompatActivity() {
         return host?.childFragmentManager?.primaryNavigationFragment as? DashboardFragment
     }
 
+    private fun findWebPage(): BaseWebViewFragment? {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        return host?.childFragmentManager?.primaryNavigationFragment as? BaseWebViewFragment
+    }
+
     private fun sizeDrawer() {
         val dm = resources.displayMetrics
         val rem = 16f * dm.density
@@ -258,12 +265,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.drawerInvite.root.setOnClickListener { openPath("/express/partner/invite") }
         binding.drawerInviteStart.root.setOnClickListener { openPath("/express/partner/invite") }
-        binding.drawerRoutine.root.setOnClickListener {
-            closeDrawer()
-            if (navController.currentDestination?.id != R.id.routineFragment) {
-                navController.navigate(R.id.routineFragment)
-            }
-        }
+        binding.drawerRoutine.root.setOnClickListener { openPath("/express/partner/requests") }
         binding.drawerWallet.root.setOnClickListener {
             closeDrawer()
             if (navController.currentDestination?.id != R.id.commissionsFragment) {
@@ -319,9 +321,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun openTraining() = openPath("/express/partner/training")
 
-    private fun openPath(path: String) {
+    fun openPath(path: String) {
         closeDrawer()
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}$path")))
+        val uri = Uri.parse(if (path.startsWith("http")) path else "${PartnerApi.BASE}$path")
+        val p = (uri.path ?: "/").trimEnd('/').ifBlank { "/" }
+        if (p == "/express/partner/home" || p == "/express/partner") {
+            val land = uri.getQueryParameter("land")
+            if (!land.isNullOrBlank()) openLand(land) else openPartnerHome()
+            return
+        }
+        val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
+        navController.navigate(R.id.partnerPageFragment, args)
+    }
+
+    fun consumePendingDeepLink(): Boolean {
+        val pending = DeepLinkPendingStore.consume(this) ?: return false
+        handleDeepLink(Intent(Intent.ACTION_VIEW, Uri.parse(pending)))
+        return true
     }
 
     private fun bindDrawerLegal() {
@@ -332,7 +348,7 @@ class MainActivity : AppCompatActivity() {
             if (start < 0) return
             spanned.setSpan(object : ClickableSpan() {
                 override fun onClick(widget: View) {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}$path")))
+                    openPath(path)
                 }
                 override fun updateDrawState(ds: TextPaint) {
                     ds.color = Color.parseColor("#E4E4E7")
@@ -611,7 +627,7 @@ class MainActivity : AppCompatActivity() {
                     showDrawerPhoneStep()
                     closeDrawer()
                     syncDrawerSession()
-                    openPartnerHome()
+                    if (!consumePendingDeepLink()) openPartnerHome()
                 } else {
                     showOtpHint(resp.optString("error").ifBlank { "کد نادرست است." })
                 }
@@ -684,7 +700,8 @@ class MainActivity : AppCompatActivity() {
         val uri = intent?.data?.toString() ?: data ?: return
         val route = DeepLinkRouter.resolve(uri)
         if (route.requiresAuth && !PartnerApi.hasSession()) {
-            openLogin()
+            DeepLinkPendingStore.save(this, uri)
+            openDrawer()
             return
         }
         when (route.type) {
@@ -700,6 +717,7 @@ class MainActivity : AppCompatActivity() {
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
             DeepLinkRouter.DestinationType.PARTNER_LOGIN -> openLogin()
+            DeepLinkRouter.DestinationType.PARTNER_WEB -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.APK_DOWNLOAD -> {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(route.targetUrl)))
             }

@@ -118,7 +118,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardHero.setOnClickListener { onHero() }
         binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
         binding.dashboardTileLevels.setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/levels")))
+            (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
         binding.dashboardAdsAllBackdrop.setOnClickListener { closeAdsAll() }
         binding.dashboardAdsAllClose.setOnClickListener { closeAdsAll() }
@@ -372,7 +372,7 @@ class DashboardFragment : Fragment() {
 
     private fun onHero() {
         if (PartnerApi.hasSession()) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/apply")))
+            (activity as? MainActivity)?.openPath("/express/partner/apply")
         } else {
             (activity as? MainActivity)?.openDrawer()
         }
@@ -595,7 +595,7 @@ class DashboardFragment : Fragment() {
             fallbackSub = "شرایط و پورسانت",
             fallbackIcon = R.drawable.ic_users_stroke,
             fallbackAction = {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/levels")))
+                (activity as? MainActivity)?.openPath("/express/partner/levels")
             },
             adsCount = adsCount,
             reqCount = reqCount,
@@ -692,8 +692,7 @@ class DashboardFragment : Fragment() {
                 action == "open_divar_ads_all" -> openAdsAll()
                 !PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1") ->
                     (activity as? MainActivity)?.openDrawer()
-                href.isNotBlank() ->
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
+                href.isNotBlank() -> openVinorOrExternal(href)
                 else -> onHero()
             }
         }
@@ -731,8 +730,7 @@ class DashboardFragment : Fragment() {
             when {
                 action == "open_divar_ads_all" -> openAdsAll()
                 action == "open_customer_modal" -> openCustomer()
-                href.isNotBlank() ->
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(href))))
+                href.isNotBlank() -> openVinorOrExternal(href)
                 else -> fallbackAction()
             }
         }
@@ -778,6 +776,17 @@ class DashboardFragment : Fragment() {
         return card
     }
 
+    private fun openVinorOrExternal(raw: String) {
+        val abs = PartnerImages.resolve(raw)
+        val uri = Uri.parse(abs)
+        val host = (uri.host ?: "").lowercase().removePrefix("www.")
+        if (host == "vinor.ir" || host.endsWith(".vinor.ir")) {
+            (activity as? MainActivity)?.openPath(abs)
+        } else {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        }
+    }
+
     private fun openAd(ad: JSONObject) {
         val token = ad.optString("token")
         val source = ad.optString("source")
@@ -786,7 +795,7 @@ class DashboardFragment : Fragment() {
             source == "vinor" && token.isNotBlank() -> (activity as? MainActivity)?.openLand(token)
             source == "divar" && token.isNotBlank() ->
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://divar.ir/v/$token")))
-            url.isNotBlank() -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PartnerImages.resolve(url))))
+            url.isNotBlank() -> openVinorOrExternal(url)
         }
     }
 
@@ -928,7 +937,7 @@ class DashboardFragment : Fragment() {
             )
             val url = PartnerImages.resolve(attachment.optString("url"))
             bubble.chatBubbleAttach.setOnClickListener {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                openVinorOrExternal(url)
             }
         }
         if (content.isNotBlank()) {

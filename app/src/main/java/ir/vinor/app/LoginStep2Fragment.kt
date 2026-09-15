@@ -179,6 +179,7 @@ class LoginStep2Fragment : Fragment() {
                         if (host is MainActivity) {
                             host.requestNotificationPermission()
                             host.openPartnerHome()
+                            host.consumePendingDeepLink()
                             return@withContext
                         }
                         val nav = findNavController()
