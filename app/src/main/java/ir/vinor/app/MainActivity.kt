@@ -13,6 +13,8 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -27,6 +29,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import ir.vinor.app.databinding.ActivityMainBinding
+import ir.vinor.app.databinding.ItemDrawerNavBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,6 +42,24 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var drawerPhoneNormalized = ""
+    private var drawerApproved = false
+    private var drawerPendingApp = false
+    private var resendLeft = 0
+    private val resendHandler = Handler(Looper.getMainLooper())
+    private val resendTick = object : Runnable {
+        override fun run() {
+            if (!::binding.isInitialized) return
+            resendLeft -= 1
+            if (resendLeft <= 0) {
+                binding.drawerResend.isEnabled = true
+                binding.drawerResend.setTextColor(Color.WHITE)
+                binding.drawerResendTimer.text = ""
+            } else {
+                binding.drawerResendTimer.text = PartnerFormat.toman(resendLeft)
+                resendHandler.postDelayed(this, 1000)
+            }
+        }
+    }
 
     private val navController: NavController
         get() = (supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment).navController
@@ -105,6 +126,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        resendHandler.removeCallbacks(resendTick)
         notifyHelper?.destroy()
         super.onDestroy()
     }
@@ -122,6 +144,7 @@ class MainActivity : AppCompatActivity() {
 
     fun openDrawer() {
         if (!::binding.isInitialized) return
+        binding.drawerUserMenu.isVisible = false
         sizeDrawer()
         syncDrawerSession()
         binding.drawerBackdrop.animate().cancel()
@@ -147,6 +170,7 @@ class MainActivity : AppCompatActivity() {
         binding.drawerPanel.animate().cancel()
         val w = binding.drawerPanel.width.toFloat().coerceAtLeast(1f)
         findDashboard()?.setHeaderVisible(true)
+        binding.drawerUserMenu.isVisible = false
         binding.drawerBackdrop.animate().alpha(0f).setDuration(180).withEndAction {
             binding.drawerBackdrop.visibility = View.GONE
         }.start()
@@ -217,33 +241,78 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun wireDrawer() {
+        bindNavRows()
         binding.drawerBackdrop.setOnClickListener { closeDrawer() }
         binding.drawerVinorChat.setOnClickListener { openPartnerHome() }
-        binding.drawerTraining.setOnClickListener {
-            closeDrawer()
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}/express/partner/training")))
+        binding.drawerPostchi.setOnClickListener { openNotifications() }
+        binding.drawerTraining.root.setOnClickListener { openTraining() }
+        binding.drawerTrainingStart.root.setOnClickListener { openTraining() }
+        binding.drawerTrainingApproved.root.setOnClickListener { openTraining() }
+        binding.drawerApply.root.setOnClickListener {
+            openPath(if (drawerPendingApp) "/express/partner/thanks" else "/express/partner/apply")
         }
-        binding.drawerWallet.setOnClickListener {
-            closeDrawer()
-            if (navController.currentDestination?.id != R.id.commissionsFragment) {
-                navController.navigate(R.id.commissionsFragment)
-            }
-        }
-        binding.drawerRoutine.setOnClickListener {
+        binding.drawerInvite.root.setOnClickListener { openPath("/express/partner/invite") }
+        binding.drawerInviteStart.root.setOnClickListener { openPath("/express/partner/invite") }
+        binding.drawerRoutine.root.setOnClickListener {
             closeDrawer()
             if (navController.currentDestination?.id != R.id.routineFragment) {
                 navController.navigate(R.id.routineFragment)
             }
         }
-        binding.drawerProfile.setOnClickListener { openProfile() }
+        binding.drawerWallet.root.setOnClickListener {
+            closeDrawer()
+            if (navController.currentDestination?.id != R.id.commissionsFragment) {
+                navController.navigate(R.id.commissionsFragment)
+            }
+        }
+        binding.drawerFavorites.root.setOnClickListener { openPath("/express/partner/favorites") }
+        binding.drawerListings.root.setOnClickListener { openPath("/express/partner/listings") }
+        binding.drawerUserCard.setOnClickListener {
+            closeDrawer()
+            if (navController.currentDestination?.id != R.id.profileEditFragment) {
+                navController.navigate(R.id.profileEditFragment)
+            }
+        }
+        binding.drawerUserRole.setOnClickListener { openPath("/express/partner/levels") }
+        binding.drawerUserMore.setOnClickListener {
+            binding.drawerUserMenu.isVisible = !binding.drawerUserMenu.isVisible
+        }
+        binding.drawerSettings.setOnClickListener { openPath("/express/partner/settings") }
+        binding.drawerLogout.setOnClickListener { logoutFromDrawer() }
         binding.drawerLoginSubmit.setOnClickListener { submitDrawerPhone() }
         binding.drawerOtpSubmit.setOnClickListener { submitDrawerOtp() }
         binding.drawerChangePhone.setOnClickListener { showDrawerPhoneStep() }
+        binding.drawerResend.setOnClickListener { resendDrawerOtp() }
         binding.drawerPhone.addTextChangedListener(simpleWatcher { syncDrawerPhoneEnabled() })
         binding.drawerOtp.addTextChangedListener(simpleWatcher { syncDrawerOtpEnabled() })
         bindDrawerLegal()
         syncDrawerPhoneEnabled()
         syncDrawerOtpEnabled()
+    }
+
+    private fun bindNavRows() {
+        fun row(b: ItemDrawerNavBinding, icon: Int, title: String) {
+            b.drawerRowIcon.setImageResource(icon)
+            b.drawerRowTitle.text = title
+        }
+        row(binding.drawerTraining, R.drawable.ic_graduation, "آموزش")
+        row(binding.drawerTrainingStart, R.drawable.ic_graduation, "آموزش")
+        row(binding.drawerTrainingApproved, R.drawable.ic_graduation, "آموزش")
+        row(binding.drawerApply, R.drawable.ic_person_add, "درخواست همکاری")
+        row(binding.drawerInviteStart, R.drawable.ic_person_add, "دعوت دوستان")
+        row(binding.drawerInvite, R.drawable.ic_person_add, "دعوت همکار")
+        row(binding.drawerRoutine, R.drawable.ic_routine, "پیگیری")
+        row(binding.drawerListings, R.drawable.ic_search_stroke, "آگهی‌های من")
+        binding.drawerListings.root.isVisible = false
+        row(binding.drawerWallet, R.drawable.ic_wallet, "کیف پول")
+        row(binding.drawerFavorites, R.drawable.ic_bookmark, "نشان‌ها")
+    }
+
+    private fun openTraining() = openPath("/express/partner/training")
+
+    private fun openPath(path: String) {
+        closeDrawer()
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${PartnerApi.BASE}$path")))
     }
 
     private fun bindDrawerLegal() {
@@ -272,20 +341,158 @@ class MainActivity : AppCompatActivity() {
     private fun syncDrawerSession() {
         val session = PartnerApi.hasSession()
         binding.drawerGuestLogin.isVisible = !session
-        binding.drawerWallet.isVisible = session
-        binding.drawerRoutine.isVisible = session
-        binding.drawerProfile.isVisible = session
-        if (session) showDrawerPhoneStep()
+        binding.drawerUserFoot.isVisible = session
+        binding.drawerUserMenu.isVisible = false
+        binding.drawerPostchi.isVisible = session
+        binding.drawerChatLabel.text = if (session) "گفتگوها" else "گفتگو"
+        if (!session) {
+            binding.drawerNavGuest.isVisible = true
+            binding.drawerNavStart.isVisible = false
+            binding.drawerNavApproved.isVisible = false
+            showDrawerPhoneStep()
+            return
+        }
+        binding.drawerNavGuest.isVisible = false
+        refreshDrawerProfile()
+    }
+
+    private fun refreshDrawerProfile() {
+        lifecycleScope.launch {
+            var approved = drawerApproved
+            var pending = drawerPendingApp
+            var name = "همکار وینور"
+            var phone = ""
+            var avatar = ""
+            var special = false
+            var tier = ""
+            var wallet = 0
+            try {
+                val profile = withContext(Dispatchers.IO) {
+                    PartnerApi.get("/express/partner/profile/data", this@MainActivity)
+                }
+                if (profile.optBoolean("success") || profile.optString("me_phone").isNotBlank()) {
+                    phone = profile.optString("me_phone")
+                    name = profile.optString("me_name").ifBlank { "همکار وینور" }
+                    avatar = profile.optString("avatar_url")
+                    approved = profile.optBoolean("is_approved")
+                    special = profile.optBoolean("is_special")
+                    tier = profile.optString("partner_tier")
+                }
+            } catch (_: Exception) {
+            }
+            try {
+                val home = withContext(Dispatchers.IO) {
+                    PartnerApi.get("/express/partner/home/data", this@MainActivity)
+                }
+                if (home.has("is_approved")) approved = home.optBoolean("is_approved")
+                pending = home.optBoolean("has_pending_app")
+                wallet = home.optInt("withdrawable_balance")
+            } catch (_: Exception) {
+            }
+            if (!::binding.isInitialized) return@launch
+            drawerApproved = approved
+            drawerPendingApp = pending
+            binding.drawerNavStart.isVisible = !approved
+            binding.drawerNavApproved.isVisible = approved
+            binding.drawerListings.root.isVisible = special
+            binding.drawerApply.drawerRowTitle.text = if (pending) "وضعیت درخواست" else "درخواست همکاری"
+            binding.drawerApply.drawerRowIcon.setImageResource(
+                if (pending) R.drawable.ic_clock else R.drawable.ic_person_add
+            )
+            binding.drawerWallet.drawerRowMeta.isVisible = wallet > 0
+            if (wallet > 0) binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet)
+            binding.drawerUserName.text = name
+            binding.drawerUserPhone.text = phone
+            val initials = when {
+                name.isNotBlank() && name != "همکار وینور" -> name.take(1)
+                phone.length >= 2 -> phone.takeLast(2)
+                else -> "و"
+            }
+            binding.drawerUserInitials.text = initials
+            val role = when {
+                special || tier.contains("پلاس") -> Triple("پلاس", R.drawable.bg_drawer_role_plus, "#FBBF24")
+                approved || tier.contains("بازاریاب") -> Triple("بازاریاب", R.drawable.bg_drawer_role_marketer, "#2DD4BF")
+                else -> Triple("عادی", R.drawable.bg_drawer_role_normal, "#9EFFFFFF")
+            }
+            binding.drawerUserRole.text = role.first
+            binding.drawerUserRole.setBackgroundResource(role.second)
+            binding.drawerUserRole.setTextColor(Color.parseColor(role.third))
+            if (avatar.isNotBlank()) {
+                PartnerImages.roundClip(binding.drawerUserAvatar, 19f)
+                PartnerImages.bind(lifecycleScope, binding.drawerUserAvatar, avatar)
+                binding.drawerUserAvatar.isVisible = true
+                binding.drawerUserInitials.isVisible = false
+            } else {
+                binding.drawerUserAvatar.isVisible = false
+                binding.drawerUserInitials.isVisible = true
+            }
+        }
     }
 
     private fun showDrawerPhoneStep() {
+        if (!::binding.isInitialized) return
         binding.drawerPhoneStep.isVisible = true
         binding.drawerOtpStep.isVisible = false
         binding.drawerOtp.setText("")
         binding.drawerOtpHint.isVisible = false
         binding.drawerLoginHint.isVisible = false
         drawerPhoneNormalized = ""
+        resendHandler.removeCallbacks(resendTick)
+        binding.drawerResend.isEnabled = false
+        binding.drawerResend.setTextColor(Color.parseColor("#8E8E93"))
+        binding.drawerResendTimer.text = ""
         syncDrawerPhoneEnabled()
+    }
+
+    private fun startResendTimer() {
+        resendHandler.removeCallbacks(resendTick)
+        resendLeft = 60
+        binding.drawerResend.isEnabled = false
+        binding.drawerResend.setTextColor(Color.parseColor("#8E8E93"))
+        binding.drawerResendTimer.text = PartnerFormat.toman(resendLeft)
+        resendHandler.postDelayed(resendTick, 1000)
+    }
+
+    private fun resendDrawerOtp() {
+        val phone = drawerPhoneNormalized.ifBlank { normalizePhone(binding.drawerPhone.text?.toString().orEmpty()) }
+        if (phone.length != 11) return
+        binding.drawerResend.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson("/express/partner/otp/resend", JSONObject().put("phone", phone), this@MainActivity)
+                }
+                val ok = resp.optBoolean("ok") || resp.optBoolean("success")
+                val msg = resp.optString("message").ifBlank { resp.optString("error", if (ok) "کد تأیید مجدد ارسال شد." else "ارسال ناموفق بود.") }
+                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                if (ok) startResendTimer() else binding.drawerResend.isEnabled = true
+            } catch (e: Exception) {
+                binding.drawerResend.isEnabled = true
+                Toast.makeText(this@MainActivity, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun logoutFromDrawer() {
+        binding.drawerUserMenu.isVisible = false
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    PartnerApi.postJson("/express/partner/api/logout", JSONObject(), this@MainActivity)
+                }
+            } catch (_: Exception) {
+            }
+            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
+            val cm = CookieManager.getInstance()
+            cm.removeAllCookies {
+                cm.flush()
+                binding.drawerUserFoot.post {
+                    Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
+                    syncDrawerSession()
+                    openPartnerHome()
+                }
+            }
+        }
     }
 
     private fun syncDrawerPhoneEnabled() {
@@ -321,6 +528,7 @@ class MainActivity : AppCompatActivity() {
                     binding.drawerPhoneStep.isVisible = false
                     binding.drawerOtpStep.isVisible = true
                     binding.drawerOtp.requestFocus()
+                    startResendTimer()
                     Toast.makeText(this@MainActivity, resp.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
                 } else {
                     binding.drawerLoginHint.text = resp.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
