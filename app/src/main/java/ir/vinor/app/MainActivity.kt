@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private var drawerApproved = false
     private var drawerPendingApp = false
     private var resendLeft = 0
+    private var otpSubmitting = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -52,10 +53,10 @@ class MainActivity : AppCompatActivity() {
             resendLeft -= 1
             if (resendLeft <= 0) {
                 binding.drawerResend.isEnabled = true
-                binding.drawerResend.setTextColor(Color.WHITE)
+                binding.drawerResend.setTextColor(Color.parseColor("#8E8E93"))
                 binding.drawerResendTimer.text = ""
             } else {
-                binding.drawerResendTimer.text = PartnerFormat.toman(resendLeft)
+                binding.drawerResendTimer.text = "${resendLeft}ث"
                 resendHandler.postDelayed(this, 1000)
             }
         }
@@ -284,7 +285,11 @@ class MainActivity : AppCompatActivity() {
         binding.drawerChangePhone.setOnClickListener { showDrawerPhoneStep() }
         binding.drawerResend.setOnClickListener { resendDrawerOtp() }
         binding.drawerPhone.addTextChangedListener(simpleWatcher { syncDrawerPhoneEnabled() })
-        binding.drawerOtp.addTextChangedListener(simpleWatcher { syncDrawerOtpEnabled() })
+        binding.drawerOtp.addTextChangedListener(simpleWatcher {
+            syncDrawerOtpEnabled()
+            val digits = binding.drawerOtp.text?.toString()?.filter { it.isDigit() }.orEmpty()
+            if (digits.length >= 5) submitDrawerOtp()
+        })
         bindDrawerLegal()
         syncDrawerPhoneEnabled()
         syncDrawerOtpEnabled()
@@ -299,11 +304,11 @@ class MainActivity : AppCompatActivity() {
         row(binding.drawerTrainingStart, R.drawable.ic_graduation, "آموزش")
         row(binding.drawerTrainingApproved, R.drawable.ic_graduation, "آموزش")
         row(binding.drawerApply, R.drawable.ic_person_add, "درخواست همکاری")
-        row(binding.drawerInviteStart, R.drawable.ic_person_add, "دعوت دوستان")
+        row(binding.drawerInviteStart, R.drawable.ic_share_nodes, "دعوت دوستان")
         row(binding.drawerInvite, R.drawable.ic_person_add, "دعوت همکار")
         row(binding.drawerRoutine, R.drawable.ic_routine, "پیگیری")
-        row(binding.drawerListings, R.drawable.ic_search_stroke, "آگهی‌های من")
-        binding.drawerListings.root.isVisible = false
+        row(binding.drawerListings, R.drawable.ic_building, "آگهی‌های من")
+        binding.drawerNavPlus.isVisible = false
         row(binding.drawerWallet, R.drawable.ic_wallet, "کیف پول")
         row(binding.drawerFavorites, R.drawable.ic_bookmark, "نشان‌ها")
     }
@@ -349,6 +354,7 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavGuest.isVisible = true
             binding.drawerNavStart.isVisible = false
             binding.drawerNavApproved.isVisible = false
+            binding.drawerNavPlus.isVisible = false
             showDrawerPhoneStep()
             return
         }
@@ -394,13 +400,13 @@ class MainActivity : AppCompatActivity() {
             drawerPendingApp = pending
             binding.drawerNavStart.isVisible = !approved
             binding.drawerNavApproved.isVisible = approved
-            binding.drawerListings.root.isVisible = special
+            binding.drawerNavPlus.isVisible = special
             binding.drawerApply.drawerRowTitle.text = if (pending) "وضعیت درخواست" else "درخواست همکاری"
             binding.drawerApply.drawerRowIcon.setImageResource(
                 if (pending) R.drawable.ic_clock else R.drawable.ic_person_add
             )
-            binding.drawerWallet.drawerRowMeta.isVisible = wallet > 0
-            if (wallet > 0) binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet)
+            binding.drawerWallet.drawerRowMeta.isVisible = true
+            binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet) + " تومان"
             binding.drawerUserName.text = name
             binding.drawerUserPhone.text = phone
             val initials = when {
@@ -449,7 +455,7 @@ class MainActivity : AppCompatActivity() {
         resendLeft = 60
         binding.drawerResend.isEnabled = false
         binding.drawerResend.setTextColor(Color.parseColor("#8E8E93"))
-        binding.drawerResendTimer.text = PartnerFormat.toman(resendLeft)
+        binding.drawerResendTimer.text = "${resendLeft}ث"
         resendHandler.postDelayed(resendTick, 1000)
     }
 
@@ -463,12 +469,16 @@ class MainActivity : AppCompatActivity() {
                     PartnerApi.postJson("/express/partner/otp/resend", JSONObject().put("phone", phone), this@MainActivity)
                 }
                 val ok = resp.optBoolean("ok") || resp.optBoolean("success")
-                val msg = resp.optString("message").ifBlank { resp.optString("error", if (ok) "کد تأیید مجدد ارسال شد." else "ارسال ناموفق بود.") }
-                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-                if (ok) startResendTimer() else binding.drawerResend.isEnabled = true
-            } catch (e: Exception) {
+                if (ok) {
+                    showOtpHint(resp.optString("message").ifBlank { "کد مجدد ارسال شد." }, ok = true)
+                    startResendTimer()
+                } else {
+                    showOtpHint(resp.optString("error").ifBlank { "ارسال مجدد ممکن نشد." })
+                    binding.drawerResend.isEnabled = true
+                }
+            } catch (_: Exception) {
+                showOtpHint("ارتباط برقرار نشد.")
                 binding.drawerResend.isEnabled = true
-                Toast.makeText(this@MainActivity, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -511,7 +521,7 @@ class MainActivity : AppCompatActivity() {
         val phone = normalizePhone(binding.drawerPhone.text?.toString().orEmpty())
         binding.drawerLoginHint.isVisible = false
         if (phone.length != 11 || !phone.startsWith("09")) {
-            binding.drawerLoginHint.text = "لطفاً یک شماره موبایل ۱۱ رقمی معتبر وارد کنید."
+            binding.drawerLoginHint.text = "شماره موبایل ۱۱ رقمی معتبر وارد کنید."
             binding.drawerLoginHint.isVisible = true
             return
         }
@@ -524,18 +534,18 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (resp.optBoolean("success")) {
                     drawerPhoneNormalized = phone
-                    binding.drawerOtpPhoneLabel.text = phone
+                    binding.drawerOtpPhoneLabel.text = formatPhoneDisplay(phone)
                     binding.drawerPhoneStep.isVisible = false
                     binding.drawerOtpStep.isVisible = true
+                    binding.drawerOtpHint.isVisible = false
                     binding.drawerOtp.requestFocus()
                     startResendTimer()
-                    Toast.makeText(this@MainActivity, resp.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
                 } else {
-                    binding.drawerLoginHint.text = resp.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
+                    binding.drawerLoginHint.text = resp.optString("error").ifBlank { "ارسال کد ممکن نشد." }
                     binding.drawerLoginHint.isVisible = true
                 }
-            } catch (e: Exception) {
-                binding.drawerLoginHint.text = e.message ?: "خطا در ارتباط. دوباره تلاش کنید."
+            } catch (_: Exception) {
+                binding.drawerLoginHint.text = "ارتباط برقرار نشد. دوباره تلاش کنید."
                 binding.drawerLoginHint.isVisible = true
             } finally {
                 syncDrawerPhoneEnabled()
@@ -544,14 +554,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun submitDrawerOtp() {
+        if (otpSubmitting) return
         val phone = drawerPhoneNormalized.ifBlank { normalizePhone(binding.drawerPhone.text?.toString().orEmpty()) }
         val code = binding.drawerOtp.text?.toString()?.filter { it.isDigit() }.orEmpty()
         binding.drawerOtpHint.isVisible = false
         if (code.length < 5) {
-            binding.drawerOtpHint.text = "کد تأیید ناقص است."
-            binding.drawerOtpHint.isVisible = true
+            showOtpHint("کد ۵ رقمی را وارد کنید.")
             return
         }
+        otpSubmitting = true
         binding.drawerOtpSubmit.isEnabled = false
         lifecycleScope.launch {
             try {
@@ -562,22 +573,36 @@ class MainActivity : AppCompatActivity() {
                 if (resp.optBoolean("success")) {
                     VinorFcmRegistrar.registerAfterLogin(this@MainActivity)
                     requestNotificationPermission()
-                    Toast.makeText(this@MainActivity, "وارد شدید.", Toast.LENGTH_SHORT).show()
                     showDrawerPhoneStep()
                     closeDrawer()
                     syncDrawerSession()
                     openPartnerHome()
                 } else {
-                    binding.drawerOtpHint.text = resp.optString("error", "کد تأیید نادرست است.")
-                    binding.drawerOtpHint.isVisible = true
+                    showOtpHint(resp.optString("error").ifBlank { "کد نادرست است." })
                 }
-            } catch (e: Exception) {
-                binding.drawerOtpHint.text = e.message ?: "خطا در ارتباط."
-                binding.drawerOtpHint.isVisible = true
+            } catch (_: Exception) {
+                showOtpHint("ارتباط برقرار نشد. دوباره تلاش کنید.")
             } finally {
+                otpSubmitting = false
                 syncDrawerOtpEnabled()
             }
         }
+    }
+
+    private fun showOtpHint(msg: String, ok: Boolean = false) {
+        if (!::binding.isInitialized) return
+        if (msg.isBlank()) {
+            binding.drawerOtpHint.isVisible = false
+            return
+        }
+        binding.drawerOtpHint.text = msg
+        binding.drawerOtpHint.setTextColor(Color.parseColor(if (ok) "#86EFAC" else "#FDA4AF"))
+        binding.drawerOtpHint.isVisible = true
+    }
+
+    private fun formatPhoneDisplay(phone: String): String {
+        val d = normalizePhone(phone)
+        return if (d.length >= 11) "${d.take(4)} ${d.substring(4, 7)} ${d.substring(7, 11)}" else d
     }
 
     private fun normalizePhone(input: String): String {

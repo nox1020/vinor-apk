@@ -14,8 +14,8 @@
 
     <ImageView
         android:id="@+id/drawerRowIcon"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
+        android:layout_width="17dp"
+        android:layout_height="17dp"
         android:contentDescription=""
         app:tint="#8E8E93" />
 
@@ -26,6 +26,7 @@
         android:layout_marginStart="14dp"
         android:layout_weight="1"
         android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
         android:maxLines="1"
         android:textColor="#ECECEC"
         android:textSize="17sp" />
