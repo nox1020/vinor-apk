@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private var drawerOtpPending = false
     private var drawerSmsReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
     private var otpSubmitting = false
+    private var pendingOpenVinorChat = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -188,12 +189,37 @@ class MainActivity : AppCompatActivity() {
 
     fun openPartnerHome() {
         closeDrawer()
+        pendingOpenVinorChat = false
         if (::binding.isInitialized) syncDrawerSession()
         val nav = navController
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
             nav.navigate(R.id.dashboardFragment)
         }
         findDashboard()?.reload()
+    }
+
+    fun openVinorChat() {
+        closeDrawer()
+        val nav = navController
+        val dash = findDashboard()
+        if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
+            dash.openVinorChat()
+            return
+        }
+        pendingOpenVinorChat = true
+        if (!nav.popBackStack(R.id.dashboardFragment, false)) {
+            nav.navigate(R.id.dashboardFragment)
+        }
+        binding.root.post {
+            findDashboard()?.openVinorChat()
+            pendingOpenVinorChat = false
+        }
+    }
+
+    fun consumePendingVinorChat(): Boolean {
+        val pending = pendingOpenVinorChat
+        pendingOpenVinorChat = false
+        return pending
     }
 
     fun openLogin() {
@@ -255,7 +281,7 @@ class MainActivity : AppCompatActivity() {
     private fun wireDrawer() {
         bindNavRows()
         binding.drawerBackdrop.setOnClickListener { closeDrawer() }
-        binding.drawerVinorChat.setOnClickListener { openPartnerHome() }
+        binding.drawerVinorChat.setOnClickListener { openVinorChat() }
         binding.drawerPostchi.setOnClickListener { openNotifications() }
         binding.drawerTraining.root.setOnClickListener { openTraining() }
         binding.drawerTrainingStart.root.setOnClickListener { openTraining() }

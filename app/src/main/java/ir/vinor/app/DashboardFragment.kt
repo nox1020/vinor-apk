@@ -58,6 +58,9 @@ class DashboardFragment : Fragment() {
     private var pendingAttachment: JSONObject? = null
     private var attachUploading = false
     private var cameraOutput: Uri? = null
+    private var cachedHistory: JSONObject? = null
+    private var chatLayerOpen = false
+    private var wantChatLayer = false
     private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
@@ -106,7 +109,10 @@ class DashboardFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.dashboardMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
-        binding.dashboardBrand.setOnClickListener { (activity as? MainActivity)?.closeDrawer() }
+        binding.dashboardBrand.setOnClickListener {
+            (activity as? MainActivity)?.closeDrawer()
+            showHomeEntry()
+        }
         binding.dashboardChatSend.setOnClickListener { sendChat() }
         binding.dashboardChatPlus.setOnClickListener { toggleAttach() }
         binding.dashboardAttachScrim.setOnClickListener { closeAttach() }
@@ -150,6 +156,9 @@ class DashboardFragment : Fragment() {
         (binding.dashboardAdsAllList.parent as? View)?.viewTreeObserver?.addOnScrollChangedListener(adsAllScrollListener)
         syncSendEnabled()
         loadAll()
+        if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
+            openVinorChat()
+        }
     }
 
     override fun onDestroyView() {
@@ -166,7 +175,30 @@ class DashboardFragment : Fragment() {
 
     fun reload() {
         if (_binding == null) return
+        showHomeEntry()
         loadAll()
+    }
+
+    /** بدو ورود خانه — تاریخچه در کشو می‌ماند، چت باز نمی‌شود. */
+    fun showHomeEntry() {
+        wantChatLayer = false
+        showHomeEmpty()
+    }
+
+    /** کلیک «وینور» در کشو: لایهٔ چت با تاریخچه. */
+    fun openVinorChat() {
+        if (_binding == null) return
+        wantChatLayer = true
+        chatLayerOpen = true
+        val hist = cachedHistory
+        if (hist != null) {
+            bindChat(hist)
+            return
+        }
+        binding.dashboardEmpty.isVisible = false
+        binding.dashboardAdsScroll.isVisible = false
+        newsHandler.removeCallbacks(newsTick)
+        fetchHistory(bindIfWanted = true)
     }
 
     fun setHeaderVisible(visible: Boolean) {
@@ -179,7 +211,12 @@ class DashboardFragment : Fragment() {
     fun closeOverlays(): Boolean {
         if (closeAttach()) return true
         if (closeCustomer()) return true
-        return closeAdsAll()
+        if (closeAdsAll()) return true
+        if (chatLayerOpen) {
+            showHomeEntry()
+            return true
+        }
+        return false
     }
 
     fun closeAdsAll(): Boolean {
@@ -488,26 +525,70 @@ class DashboardFragment : Fragment() {
             }
             if (_binding == null) return@launch
             bindHome(home)
+            if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
             if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
                 Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
             }
+            if (!wantChatLayer) binding.dashboardProgress.isVisible = false
+            if (PartnerApi.hasSession()) {
+                fetchHistory(bindIfWanted = wantChatLayer)
+            } else {
+                cachedHistory = null
+                threadId = null
+                if (wantChatLayer) bindChat(JSONObject())
+                binding.dashboardProgress.isVisible = false
+            }
+        }
+    }
+
+    private fun showHomeEmpty() {
+        val b = _binding ?: return
+        chatLayerOpen = false
+        b.dashboardChatList.removeAllViews()
+        b.dashboardEmpty.isVisible = true
+        b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
+        newsHandler.removeCallbacks(newsTick)
+        if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
+    }
+
+    private fun fetchHistory(bindIfWanted: Boolean) {
+        scope.launch {
             try {
-                if (PartnerApi.hasSession()) {
-                    val hist = withContext(Dispatchers.IO) {
-                        PartnerApi.get("/express/partner/ai/history", requireContext())
-                    }
-                    if (_binding == null) return@launch
-                    val status = hist.optInt("http_status")
-                    if (status != 401 && status != 403) bindChat(hist)
-                } else if (_binding != null) {
-                    bindChat(JSONObject())
+                val hist = withContext(Dispatchers.IO) {
+                    PartnerApi.get("/express/partner/ai/history", requireContext())
                 }
+                if (_binding == null) return@launch
+                val status = hist.optInt("http_status")
+                if (status == 401 || status == 403) {
+                    cachedHistory = null
+                    threadId = null
+                    return@launch
+                }
+                rememberHistory(hist)
+                if (bindIfWanted && wantChatLayer) bindChat(hist)
             } catch (_: Exception) {
-                if (_binding != null) bindChat(JSONObject())
+                if (_binding != null && bindIfWanted && wantChatLayer) bindChat(JSONObject())
             } finally {
                 if (_binding != null) binding.dashboardProgress.isVisible = false
             }
         }
+    }
+
+    private fun rememberHistory(obj: JSONObject) {
+        cachedHistory = obj
+        var tid = obj.optString("thread_id").takeIf { it.isNotBlank() }
+        if (tid.isNullOrBlank()) {
+            val threads = obj.optJSONArray("threads") ?: JSONArray()
+            for (i in 0 until threads.length()) {
+                val th = threads.optJSONObject(i) ?: continue
+                val kind = th.optString("kind")
+                if (kind == "postchi" || kind == "lawyer") continue
+                val id = th.optString("id").takeIf { it.isNotBlank() } ?: continue
+                if (th.optBoolean("is_active") || tid.isNullOrBlank()) tid = id
+                if (th.optBoolean("is_active")) break
+            }
+        }
+        if (!tid.isNullOrBlank()) threadId = tid
     }
 
     private fun bindHome(obj: JSONObject) {
@@ -996,8 +1077,10 @@ class DashboardFragment : Fragment() {
         pendingAttachment = null
         binding.dashboardAttachPreview.isVisible = false
         syncSendEnabled()
+        chatLayerOpen = true
         binding.dashboardEmpty.isVisible = false
         binding.dashboardAdsScroll.isVisible = false
+        newsHandler.removeCallbacks(newsTick)
         addBubble("user", text, null, toSend)
         scope.launch {
             try {
