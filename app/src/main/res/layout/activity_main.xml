@@ -66,8 +66,11 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/drawerBrand"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
             android:letterSpacing="-0.02"
             android:paddingStart="16dp"
             android:paddingTop="16dp"

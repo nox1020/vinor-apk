@@ -172,6 +172,13 @@ object VinorCachePolicy {
         "/express/partner/dashboard/data",
         "/express/partner/home/data",
         "/express/partner/ai/history",
+        "/express/partner/api/training/data",
+        "/express/partner/api/levels/data",
+        "/express/partner/api/invite/data",
+        "/express/partner/api/apply/data",
+        "/express/partner/api/requests/data",
+        "/express/partner/api/listings/data",
+        "/express/partner/api/legal/data",
         "/api/menu",
     )
 
@@ -179,6 +186,13 @@ object VinorCachePolicy {
         "/express/partner/api/notes",
         "/express/partner/api/notifications",
         "/express/partner/api/public-lands",
+        "/express/partner/api/training",
+        "/express/partner/api/levels",
+        "/express/partner/api/invite",
+        "/express/partner/api/apply",
+        "/express/partner/api/requests",
+        "/express/partner/api/listings",
+        "/express/partner/api/legal",
         "/api/express/",
     )
 

@@ -113,6 +113,17 @@
     </fragment>
 
     <fragment
+        android:id="@+id/nativePartnerFragment"
+        android:name="ir.vinor.app.NativePartnerFragment"
+        android:label="وینور"
+        tools:layout="@layout/fragment_native_partner">
+        <argument
+            android:name="page"
+            app:argType="string"
+            android:defaultValue="training" />
+    </fragment>
+
+    <fragment
         android:id="@+id/partnerPageFragment"
         android:name="ir.vinor.app.PartnerPageFragment"
         android:label="وینور"

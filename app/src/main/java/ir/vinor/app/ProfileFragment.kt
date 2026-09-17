@@ -333,6 +333,11 @@ class ProfileFragment : Fragment() {
             url.startsWith("/") -> "$BASE$url"
             else -> url
         }
+        val act = activity as? MainActivity
+        if (act != null && (absolute.contains("vinor.ir") || absolute.startsWith("/"))) {
+            act.openPath(absolute)
+            return
+        }
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(absolute)))
         } catch (e: Exception) {

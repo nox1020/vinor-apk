@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.widget.Toast
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private var drawerSmsReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
     private var otpSubmitting = false
     private var pendingOpenVinorChat = false
+    private var edgeStartX = -1f
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -238,6 +240,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun openProfileEdit() {
+        closeDrawer()
+        if (navController.currentDestination?.id != R.id.profileEditFragment) {
+            navController.navigate(R.id.profileEditFragment)
+        }
+    }
+
+    fun openNativePage(page: String) {
+        closeDrawer()
+        val args = Bundle().apply { putString(NativePartnerFragment.ARG_PAGE, page) }
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        val current = host?.childFragmentManager?.primaryNavigationFragment as? NativePartnerFragment
+        if (current != null &&
+            current.page == page &&
+            navController.currentDestination?.id == R.id.nativePartnerFragment
+        ) {
+            return
+        }
+        navController.navigate(R.id.nativePartnerFragment, args)
+    }
+
     fun openNotifications() {
         closeDrawer()
         if (navController.currentDestination?.id != R.id.notificationsFragment) {
@@ -280,6 +303,26 @@ class MainActivity : AppCompatActivity() {
         binding.drawerPanel.layoutParams = lp
     }
 
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (::binding.isInitialized && !isDrawerOpen()) {
+            val edge = 28f * resources.displayMetrics.density
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    edgeStartX = if (ev.x > binding.root.width - edge) ev.x else -1f
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (edgeStartX >= 0f && edgeStartX - ev.x > edge) {
+                        edgeStartX = -1f
+                        openDrawer()
+                        return true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> edgeStartX = -1f
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     private fun wireDrawer() {
         bindNavRows()
         binding.drawerBackdrop.setOnClickListener { closeDrawer() }
@@ -302,12 +345,8 @@ class MainActivity : AppCompatActivity() {
         }
         binding.drawerFavorites.root.setOnClickListener { openPath("/express/partner/favorites") }
         binding.drawerListings.root.setOnClickListener { openPath("/express/partner/listings") }
-        binding.drawerUserCard.setOnClickListener {
-            closeDrawer()
-            if (navController.currentDestination?.id != R.id.profileEditFragment) {
-                navController.navigate(R.id.profileEditFragment)
-            }
-        }
+        binding.drawerBrand.setOnClickListener { openPartnerHome() }
+        binding.drawerUserCard.setOnClickListener { openProfileEdit() }
         binding.drawerUserRole.setOnClickListener { openPath("/express/partner/levels") }
         binding.drawerUserMore.setOnClickListener {
             binding.drawerUserMenu.isVisible = !binding.drawerUserMenu.isVisible
@@ -353,13 +392,42 @@ class MainActivity : AppCompatActivity() {
         closeDrawer()
         val uri = Uri.parse(if (path.startsWith("http")) path else "${PartnerApi.BASE}$path")
         val p = (uri.path ?: "/").trimEnd('/').ifBlank { "/" }
-        if (p == "/express/partner/home" || p == "/express/partner") {
-            val land = uri.getQueryParameter("land")
-            if (!land.isNullOrBlank()) openLand(land) else openPartnerHome()
-            return
+        val low = p.lowercase()
+        when {
+            p == "/express/partner/home" || p == "/express/partner" -> {
+                val land = uri.getQueryParameter("land")
+                if (!land.isNullOrBlank()) openLand(land) else openPartnerHome()
+            }
+            low.endsWith("/training") -> openNativePage(NativePartnerFragment.PAGE_TRAINING)
+            low.endsWith("/levels") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)
+            low.endsWith("/invite") -> openNativePage(NativePartnerFragment.PAGE_INVITE)
+            low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
+            low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
+            low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+            low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
+                openNativePage(NativePartnerFragment.PAGE_APPLY)
+            low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
+                openNativePage(NativePartnerFragment.PAGE_TERMS)
+            low == "/privacy" || low.contains("/legal/privacy") ->
+                openNativePage(NativePartnerFragment.PAGE_PRIVACY)
+            low.contains("/notifications") -> openNotifications()
+            low.contains("/commissions") -> {
+                if (navController.currentDestination?.id != R.id.commissionsFragment) {
+                    navController.navigate(R.id.commissionsFragment)
+                }
+            }
+            low.contains("/profile/edit") -> openProfileEdit()
+            low.endsWith("/routine") -> {
+                if (navController.currentDestination?.id != R.id.routineFragment) {
+                    navController.navigate(R.id.routineFragment)
+                }
+            }
+            else -> {
+                val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
+                navController.navigate(R.id.partnerPageFragment, args)
+            }
         }
-        val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
-        navController.navigate(R.id.partnerPageFragment, args)
     }
 
     fun consumePendingDeepLink(): Boolean {
@@ -587,7 +655,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun logoutFromDrawer() {
+    fun logoutFromDrawer() {
         binding.drawerUserMenu.isVisible = false
         lifecycleScope.launch {
             VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)

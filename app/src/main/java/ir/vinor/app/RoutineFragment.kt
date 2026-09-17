@@ -1,7 +1,5 @@
 package ir.vinor.app
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -340,11 +338,7 @@ class RoutineFragment : Fragment() {
     }
 
     private fun openTraining() {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$BASE/express/partner/training")))
-        } catch (e: Exception) {
-            context?.let { Toast.makeText(it, "خطا در باز کردن لینک", Toast.LENGTH_SHORT).show() }
-        }
+        (activity as? MainActivity)?.openPath("/express/partner/training")
     }
 
     override fun onResume() {

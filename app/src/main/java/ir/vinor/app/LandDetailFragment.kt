@@ -44,7 +44,20 @@ class LandDetailFragment : Fragment() {
             binding.landDetailError.text = "کد فایل نامعتبر است."
             return
         }
+        syncFav(code)
+        binding.landDetailFav.setOnClickListener {
+            VinorFavoritesStore.toggle(requireContext(), code)
+            syncFav(code)
+        }
         load(code)
+    }
+
+    private fun syncFav(code: String) {
+        val on = VinorFavoritesStore.contains(requireContext(), code)
+        binding.landDetailFav.imageTintList =
+            android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.parseColor(if (on) "#FBBF24" else "#A1A1AA"),
+            )
     }
 
     override fun onDestroyView() {
