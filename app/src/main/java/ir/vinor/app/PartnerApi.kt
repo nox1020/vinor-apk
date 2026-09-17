@@ -122,8 +122,28 @@ object PartnerApi {
     }
 
     fun get(path: String, context: Context? = null): JSONObject {
-        val req = requestBuilder(path, context).get().build()
-        return execute(req)
+        val url = if (path.startsWith("http")) path else "$BASE$path"
+        return try {
+            val req = requestBuilder(path, context).get().build()
+            val obj = execute(req)
+            val code = obj.optInt("http_status")
+            if (context != null && code in 200..299) {
+                VinorApiCacheStore.put(
+                    context.applicationContext,
+                    url,
+                    obj.toString().toByteArray(Charsets.UTF_8),
+                    "application/json",
+                )
+            }
+            obj
+        } catch (e: Exception) {
+            val cached = context?.let { VinorApiCacheStore.readJson(it.applicationContext, url) }
+            if (cached != null) {
+                cached.put("from_cache", true)
+                return cached
+            }
+            throw e
+        }
     }
 
     fun getHtml(path: String, context: Context? = null): String {
@@ -137,10 +157,20 @@ object PartnerApi {
             b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
             VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
         }
-        client.newCall(b.get().build()).execute().use { resp ->
-            saveCookies(resp)
-            if (!resp.isSuccessful) return ""
-            return resp.body?.string().orEmpty()
+        return try {
+            client.newCall(b.get().build()).execute().use { resp ->
+                saveCookies(resp)
+                if (!resp.isSuccessful) {
+                    return context?.let { VinorOfflinePageStore.read(it.applicationContext, url) }.orEmpty()
+                }
+                val html = resp.body?.string().orEmpty()
+                if (html.isNotBlank() && context != null) {
+                    VinorOfflinePageStore.save(context.applicationContext, url, html)
+                }
+                html
+            }
+        } catch (_: Exception) {
+            context?.let { VinorOfflinePageStore.read(it.applicationContext, url) }.orEmpty()
         }
     }
 

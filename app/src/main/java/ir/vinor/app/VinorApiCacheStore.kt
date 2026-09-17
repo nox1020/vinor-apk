@@ -62,6 +62,20 @@ object VinorApiCacheStore {
     }
 
     fun asResponse(context: Context, url: String?, allowExpired: Boolean = false): WebResourceResponse? {
+        val hit = load(context, url, allowExpired) ?: return null
+        return jsonResponse(hit.first, hit.second)
+    }
+
+    fun readJson(context: Context, url: String?, allowExpired: Boolean = true): JSONObject? {
+        val hit = load(context, url, allowExpired) ?: return null
+        return runCatching { JSONObject(String(hit.first, Charsets.UTF_8)) }.getOrNull()
+    }
+
+    private fun load(
+        context: Context,
+        url: String?,
+        allowExpired: Boolean,
+    ): Pair<ByteArray, String>? {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return null
         val dir = root(context)
@@ -80,16 +94,16 @@ object VinorApiCacheStore {
         touch(meta)
         val ct = obj?.optString("ct").orEmpty().ifBlank { "application/json; charset=utf-8" }
         VinorCacheLog.event("CACHE_HIT", "api stale=${age > VinorCachePolicy.API_STALE_MS}")
-        return jsonResponse(bytes, ct)
+        return bytes to ct
     }
 
-    private fun missNoQuery(context: Context, url: String, allowExpired: Boolean): WebResourceResponse? {
+    private fun missNoQuery(context: Context, url: String, allowExpired: Boolean): Pair<ByteArray, String>? {
         val noQuery = runCatching {
             val uri = URI(url)
             URI(uri.scheme, uri.authority, uri.path, null, null).toString()
         }.getOrNull() ?: return null
         if (noQuery == url) return null
-        return asResponse(context, noQuery, allowExpired)
+        return load(context, noQuery, allowExpired)
     }
 
     fun warmup(context: Context) {
@@ -104,6 +118,8 @@ object VinorApiCacheStore {
                 "${VinorPartnerUrls.BASE}/express/partner/profile/data",
                 "${VinorPartnerUrls.BASE}/express/partner/routine/data",
                 "${VinorPartnerUrls.BASE}/express/partner/commissions/data",
+                "${VinorPartnerUrls.BASE}/express/partner/home/data",
+                "${VinorPartnerUrls.BASE}/express/partner/ai/history",
             )
             io.execute {
                 urls.forEach { fetchAndStore(context.applicationContext, it, cookie) }
