@@ -3,6 +3,8 @@ package ir.vinor.app
 import android.content.Context
 import android.net.Uri
 import android.webkit.CookieManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -77,7 +79,16 @@ object PartnerApi {
     /** ورود قطعی (user_phone)، نه کوکی موقت OTP. */
     fun hasSession(): Boolean = loggedIn && hasVinorCookie()
 
-    fun markLoggedIn() = setLoggedIn(true)
+    fun markLoggedIn() {
+        setLoggedIn(true)
+        val ctx = appCtx
+        if (ctx != null) {
+            VinorSafe.onMain {
+                VinorCacheSession.fingerprint(ctx)
+                VinorApiCacheStore.warmup(ctx)
+            }
+        }
+    }
 
     fun markLoggedOut() = setLoggedIn(false)
 
@@ -121,28 +132,55 @@ object PartnerApi {
         }
     }
 
+    fun absoluteUrl(path: String): String =
+        if (path.startsWith("http")) path else "$BASE$path"
+
+    fun peekJson(path: String, context: Context?): JSONObject? {
+        if (context == null) return null
+        val obj = VinorApiCacheStore.readJson(context.applicationContext, absoluteUrl(path), allowExpired = true)
+            ?: return null
+        obj.put("from_cache", true)
+        return obj
+    }
+
+    fun remember(path: String, obj: JSONObject, context: Context?) {
+        if (context == null || obj.optBoolean("from_cache")) return
+        val code = obj.optInt("http_status", 200)
+        if (code != 0 && code !in 200..299) return
+        VinorApiCacheStore.put(
+            context.applicationContext,
+            absoluteUrl(path),
+            obj.toString().toByteArray(Charsets.UTF_8),
+            "application/json",
+        )
+    }
+
+    /** اول کش را روی Main می‌دهد، بعد پاسخ تازهٔ شبکه را. */
+    suspend fun loadDisplay(
+        path: String,
+        context: Context,
+        bind: (JSONObject) -> Unit,
+    ): JSONObject {
+        val stale = withContext(Dispatchers.IO) { peekJson(path, context) }
+        if (stale != null) bind(stale)
+        val fresh = withContext(Dispatchers.IO) { get(path, context) }
+        if (!fresh.optBoolean("from_cache") || stale == null) bind(fresh)
+        return fresh
+    }
+
     fun get(path: String, context: Context? = null): JSONObject {
-        val url = if (path.startsWith("http")) path else "$BASE$path"
         return try {
             val req = requestBuilder(path, context).get().build()
             val obj = execute(req)
             val code = obj.optInt("http_status")
-            if (context != null && code in 200..299) {
-                VinorApiCacheStore.put(
-                    context.applicationContext,
-                    url,
-                    obj.toString().toByteArray(Charsets.UTF_8),
-                    "application/json",
-                )
+            if (code in 200..299) {
+                remember(path, obj, context)
+                obj
+            } else {
+                peekJson(path, context) ?: obj
             }
-            obj
         } catch (e: Exception) {
-            val cached = context?.let { VinorApiCacheStore.readJson(it.applicationContext, url) }
-            if (cached != null) {
-                cached.put("from_cache", true)
-                return cached
-            }
-            throw e
+            peekJson(path, context) ?: throw e
         }
     }
 
@@ -214,15 +252,24 @@ object PartnerApi {
 
     fun bytes(url: String, context: Context? = null): ByteArray? {
         val abs = if (url.startsWith("http")) url else if (url.startsWith("/")) "$BASE$url" else "$BASE/$url"
-        val b = Request.Builder().url(abs).addHeader("Accept", "*/*")
-        val cookie = cookieHeader()
-        if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
-        if (context != null) {
-            b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
-        }
-        client.newCall(b.build()).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            return resp.body?.bytes()
+        val disk = context?.let { VinorImageDiskCache.read(it.applicationContext, abs) }
+        return try {
+            val b = Request.Builder().url(abs).addHeader("Accept", "*/*")
+            val cookie = cookieHeader()
+            if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
+            if (context != null) {
+                b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+            }
+            client.newCall(b.build()).execute().use { resp ->
+                if (!resp.isSuccessful) return disk
+                val body = resp.body?.bytes() ?: return disk
+                if (body.isNotEmpty() && context != null) {
+                    VinorImageDiskCache.write(context.applicationContext, abs, body)
+                }
+                body
+            }
+        } catch (_: Exception) {
+            disk
         }
     }
 

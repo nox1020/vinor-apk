@@ -110,6 +110,8 @@ class MainActivity : AppCompatActivity() {
         })
 
         handleDeepLink(intent)
+        runCatching { VinorCacheSession.fingerprint(this) }
+        runCatching { VinorApiCacheStore.warmup(this) }
         runCatching { VinorAppUpdateChecker.check(this, webView = null) }
         runCatching { VinorFcmRegistrar.requestTokenAndRegister(this) }
         keepSystemSplash = false
@@ -430,10 +432,12 @@ class MainActivity : AppCompatActivity() {
             var special = false
             var tier = ""
             var wallet = 0
-            try {
-                val profile = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/profile/data", this@MainActivity)
-                }
+            fun applyHome(home: JSONObject) {
+                if (home.has("is_approved")) approved = home.optBoolean("is_approved")
+                pending = home.optBoolean("has_pending_app")
+                wallet = home.optInt("withdrawable_balance")
+            }
+            fun applyProfile(profile: JSONObject) {
                 if (profile.optString("me_phone").isNotBlank()) {
                     phone = profile.optString("me_phone")
                     name = profile.optString("me_name").ifBlank { "همکار وینور" }
@@ -442,67 +446,94 @@ class MainActivity : AppCompatActivity() {
                     special = profile.optBoolean("is_special")
                     tier = profile.optString("partner_tier")
                 }
+            }
+            PartnerApi.peekJson("/express/partner/profile/data", this@MainActivity)?.let { applyProfile(it) }
+            PartnerApi.peekJson("/express/partner/home/data", this@MainActivity)?.let { applyHome(it) }
+            if (phone.isNotBlank() && ::binding.isInitialized) bindDrawerProfileUi(
+                approved, pending, name, phone, avatar, special, tier, wallet,
+            )
+            try {
+                val profile = withContext(Dispatchers.IO) {
+                    PartnerApi.get("/express/partner/profile/data", this@MainActivity)
+                }
+                applyProfile(profile)
             } catch (_: Exception) {
             }
             try {
                 val home = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/home/data", this@MainActivity)
                 }
-                if (home.has("is_approved")) approved = home.optBoolean("is_approved")
-                pending = home.optBoolean("has_pending_app")
-                wallet = home.optInt("withdrawable_balance")
+                applyHome(home)
             } catch (_: Exception) {
             }
             if (!::binding.isInitialized) return@launch
-            val loggedIn = phone.isNotBlank() && PartnerApi.hasSession()
-            if (!loggedIn) {
-                if (drawerOtpPending) return@launch
-                binding.drawerGuestLogin.isVisible = true
-                binding.drawerUserFoot.isVisible = false
-                binding.drawerPostchi.isVisible = false
-                binding.drawerNavGuest.isVisible = true
-                binding.drawerNavStart.isVisible = false
-                binding.drawerNavApproved.isVisible = false
-                binding.drawerNavPlus.isVisible = false
-                binding.drawerChatLabel.text = "گفتگو"
-                return@launch
-            }
-            drawerApproved = approved
-            drawerPendingApp = pending
-            binding.drawerNavStart.isVisible = !approved
-            binding.drawerNavApproved.isVisible = approved
-            binding.drawerNavPlus.isVisible = special
-            binding.drawerApply.drawerRowTitle.text = if (pending) "وضعیت درخواست" else "درخواست همکاری"
-            binding.drawerApply.drawerRowIcon.setImageResource(
-                if (pending) R.drawable.ic_clock else R.drawable.ic_person_add
-            )
-            binding.drawerWallet.drawerRowMeta.isVisible = true
-            binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet) + " تومان"
-            binding.drawerUserName.text = name
-            binding.drawerUserPhone.text = phone
-            val initials = when {
-                name.isNotBlank() && name != "همکار وینور" -> name.take(1)
-                phone.length >= 2 -> phone.takeLast(2)
-                else -> "و"
-            }
-            binding.drawerUserInitials.text = initials
-            val role = when {
-                special || tier.contains("پلاس") -> Triple("پلاس", R.drawable.bg_drawer_role_plus, "#FBBF24")
-                approved || tier.contains("بازاریاب") -> Triple("بازاریاب", R.drawable.bg_drawer_role_marketer, "#2DD4BF")
-                else -> Triple("عادی", R.drawable.bg_drawer_role_normal, "#9EFFFFFF")
-            }
-            binding.drawerUserRole.text = role.first
-            binding.drawerUserRole.setBackgroundResource(role.second)
-            binding.drawerUserRole.setTextColor(Color.parseColor(role.third))
-            if (avatar.isNotBlank()) {
-                PartnerImages.roundClip(binding.drawerUserAvatar, 19f)
-                PartnerImages.bind(lifecycleScope, binding.drawerUserAvatar, avatar)
-                binding.drawerUserAvatar.isVisible = true
-                binding.drawerUserInitials.isVisible = false
-            } else {
-                binding.drawerUserAvatar.isVisible = false
-                binding.drawerUserInitials.isVisible = true
-            }
+            bindDrawerProfileUi(approved, pending, name, phone, avatar, special, tier, wallet)
+        }
+    }
+
+    private fun bindDrawerProfileUi(
+        approved: Boolean,
+        pending: Boolean,
+        name: String,
+        phone: String,
+        avatar: String,
+        special: Boolean,
+        tier: String,
+        wallet: Int,
+    ) {
+        val loggedIn = phone.isNotBlank() && PartnerApi.hasSession()
+        if (!loggedIn) {
+            if (drawerOtpPending) return
+            binding.drawerGuestLogin.isVisible = true
+            binding.drawerUserFoot.isVisible = false
+            binding.drawerPostchi.isVisible = false
+            binding.drawerNavGuest.isVisible = true
+            binding.drawerNavStart.isVisible = false
+            binding.drawerNavApproved.isVisible = false
+            binding.drawerNavPlus.isVisible = false
+            binding.drawerChatLabel.text = "گفتگو"
+            return
+        }
+        drawerApproved = approved
+        drawerPendingApp = pending
+        binding.drawerGuestLogin.isVisible = false
+        binding.drawerUserFoot.isVisible = true
+        binding.drawerPostchi.isVisible = true
+        binding.drawerNavGuest.isVisible = false
+        binding.drawerChatLabel.text = "گفتگوها"
+        binding.drawerNavStart.isVisible = !approved
+        binding.drawerNavApproved.isVisible = approved
+        binding.drawerNavPlus.isVisible = special
+        binding.drawerApply.drawerRowTitle.text = if (pending) "وضعیت درخواست" else "درخواست همکاری"
+        binding.drawerApply.drawerRowIcon.setImageResource(
+            if (pending) R.drawable.ic_clock else R.drawable.ic_person_add
+        )
+        binding.drawerWallet.drawerRowMeta.isVisible = true
+        binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet) + " تومان"
+        binding.drawerUserName.text = name
+        binding.drawerUserPhone.text = phone
+        val initials = when {
+            name.isNotBlank() && name != "همکار وینور" -> name.take(1)
+            phone.length >= 2 -> phone.takeLast(2)
+            else -> "و"
+        }
+        binding.drawerUserInitials.text = initials
+        val role = when {
+            special || tier.contains("پلاس") -> Triple("پلاس", R.drawable.bg_drawer_role_plus, "#FBBF24")
+            approved || tier.contains("بازاریاب") -> Triple("بازاریاب", R.drawable.bg_drawer_role_marketer, "#2DD4BF")
+            else -> Triple("عادی", R.drawable.bg_drawer_role_normal, "#9EFFFFFF")
+        }
+        binding.drawerUserRole.text = role.first
+        binding.drawerUserRole.setBackgroundResource(role.second)
+        binding.drawerUserRole.setTextColor(Color.parseColor(role.third))
+        if (avatar.isNotBlank()) {
+            PartnerImages.roundClip(binding.drawerUserAvatar, 19f)
+            PartnerImages.bind(lifecycleScope, binding.drawerUserAvatar, avatar)
+            binding.drawerUserAvatar.isVisible = true
+            binding.drawerUserInitials.isVisible = false
+        } else {
+            binding.drawerUserAvatar.isVisible = false
+            binding.drawerUserInitials.isVisible = true
         }
     }
 
@@ -648,6 +679,8 @@ class MainActivity : AppCompatActivity() {
                     PartnerApi.markLoggedIn()
                     drawerOtpPending = false
                     stopDrawerSmsListen()
+                    VinorCacheSession.fingerprint(this@MainActivity)
+                    VinorApiCacheStore.warmup(this@MainActivity)
                     VinorFcmRegistrar.registerAfterLogin(this@MainActivity)
                     requestNotificationPermission()
                     showDrawerPhoneStep()

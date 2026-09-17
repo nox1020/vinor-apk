@@ -103,48 +103,33 @@ class NotificationsFragment : Fragment() {
     }
 
     private fun loadNotifications() {
+        val ctx = context ?: return
         if (_binding == null) return
         binding.notificationsProgress.visibility = View.VISIBLE
         binding.notificationsEmpty.visibility = View.GONE
-        binding.notificationsList.removeAllViews()
 
         scope.launch {
             try {
-                val req = Request.Builder()
-                    .url("$BASE$API_LIST")
-                    .addHeader("Cookie", cookieHeader())
-                    .addHeader("Accept", "application/json")
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) {
-                    withContext(Dispatchers.Main) { showError() }
-                    return@launch
-                }
-                val body = resp.body?.string() ?: ""
-                val obj = try {
-                    JSONObject(body)
-                } catch (e: Exception) {
-                    Log.e(TAG, "notifications not JSON: ${body.take(200)}", e)
-                    withContext(Dispatchers.Main) { showError() }
-                    return@launch
-                }
-                if (!obj.optBoolean("success", false)) {
-                    withContext(Dispatchers.Main) { showError() }
-                    return@launch
-                }
-                val arr = obj.optJSONArray("notifications") ?: org.json.JSONArray()
-                val items = mutableListOf<JSONObject>()
-                for (i in 0 until arr.length()) {
-                    arr.optJSONObject(i)?.let { items.add(it) }
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
+                val obj = PartnerApi.loadDisplay(API_LIST, ctx) { data ->
+                    if (_binding == null) return@loadDisplay
+                    if (!data.optBoolean("success", false) && data.optJSONArray("notifications") == null) {
+                        return@loadDisplay
+                    }
                     binding.notificationsProgress.visibility = View.GONE
+                    val arr = data.optJSONArray("notifications") ?: org.json.JSONArray()
+                    val items = mutableListOf<JSONObject>()
+                    for (i in 0 until arr.length()) {
+                        arr.optJSONObject(i)?.let { items.add(it) }
+                    }
                     bind(items)
+                }
+                if (_binding == null) return@launch
+                if (!obj.optBoolean("success", false) && obj.optJSONArray("notifications") == null) {
+                    showError()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadNotifications error", e)
-                withContext(Dispatchers.Main) { showError() }
+                if (_binding != null) showError()
             }
         }
     }

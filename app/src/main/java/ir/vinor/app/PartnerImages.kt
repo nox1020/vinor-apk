@@ -51,6 +51,18 @@ object PartnerImages {
         }
     }
 
+    fun prefetch(scope: CoroutineScope, context: android.content.Context, urls: Iterable<String>) {
+        val unique = urls.map { resolve(it) }.filter { it.isNotBlank() }.distinct().take(48)
+        if (unique.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            unique.forEach { resolved ->
+                if (mem.get(resolved) != null) return@forEach
+                val bmp = decode(resolved, context, 480)
+                if (bmp != null) mem.put(resolved, bmp)
+            }
+        }
+    }
+
     fun bind(scope: CoroutineScope, view: ImageView, url: String?, fallback: View? = null) {
         val resolved = resolve(url)
         if (resolved.isBlank()) {

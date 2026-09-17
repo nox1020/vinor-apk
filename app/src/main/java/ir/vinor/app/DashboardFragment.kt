@@ -491,21 +491,35 @@ class DashboardFragment : Fragment() {
     }
 
     private fun loadAll() {
-        binding.dashboardProgress.isVisible = true
+        val ctx = context ?: return
         scope.launch {
+            var shownCache = false
+            val cached = withContext(Dispatchers.IO) {
+                PartnerApi.peekJson("/express/partner/home/data", ctx)
+            }
+            if (_binding == null) return@launch
+            if (cached != null) {
+                bindHome(cached)
+                if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
+                binding.dashboardProgress.isVisible = false
+                shownCache = true
+            } else {
+                binding.dashboardProgress.isVisible = true
+            }
             var home = JSONObject()
             var loadError: String? = null
             try {
                 home = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/home/data", requireContext())
+                    PartnerApi.get("/express/partner/home/data", ctx)
                 }
             } catch (e: Exception) {
                 loadError = e.message ?: "خطا در بارگذاری"
+                if (shownCache) home = cached ?: JSONObject()
             }
             if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
                 try {
                     val html = withContext(Dispatchers.IO) {
-                        PartnerApi.getHtml("/express/partner/home", requireContext())
+                        PartnerApi.getHtml("/express/partner/home", ctx)
                     }
                     val ads = HomeAdsHtml.parse(html)
                     if (ads.length() > 0) {
@@ -519,14 +533,20 @@ class DashboardFragment : Fragment() {
                         val newsHtml = HomeAdsHtml.parseNews(html)
                         if (newsHtml.length() > 0) home.put("home_news_items", newsHtml)
                     }
+                    if (ads.length() > 0) {
+                        home.remove("from_cache")
+                        PartnerApi.remember("/express/partner/home/data", home, ctx)
+                    }
                 } catch (e: Exception) {
-                    if (loadError == null) loadError = e.message
+                    if (loadError == null && !shownCache) loadError = e.message
                 }
             }
             if (_binding == null) return@launch
-            bindHome(home)
+            if (!home.optBoolean("from_cache") || !shownCache) {
+                bindHome(home)
+            }
             if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
-            if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
+            if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0 && !shownCache) {
                 Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
             }
             if (!wantChatLayer) binding.dashboardProgress.isVisible = false
@@ -635,6 +655,15 @@ class DashboardFragment : Fragment() {
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         val reqCount = obj.optInt("home_requests_pipeline_count")
         bindPrompts(obj, adsCount, reqCount)
+        val imageUrls = mutableListOf<String>()
+        for (i in 0 until ads.length()) {
+            val url = ads.optJSONObject(i)?.optString("image_url").orEmpty()
+            if (url.isNotBlank()) imageUrls.add(url)
+        }
+        val ctx = context
+        if (ctx != null && imageUrls.isNotEmpty()) {
+            PartnerImages.prefetch(scope, ctx, imageUrls)
+        }
     }
 
     private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {

@@ -111,46 +111,40 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun loadData() {
+        val ctx = context ?: return
         binding.commissionsProgress.visibility = View.VISIBLE
         binding.commissionsList.visibility = View.VISIBLE
         binding.commissionsEmpty.visibility = View.GONE
 
         scope.launch {
             try {
-                val req = Request.Builder()
-                    .url("$BASE$COMMISSIONS_DATA")
-                    .addHeader("Cookie", cookieHeader())
-                    .addHeader("Accept", "application/json")
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) {
-                    withContext(Dispatchers.Main) { showError() }
-                    return@launch
+                val obj = PartnerApi.loadDisplay(COMMISSIONS_DATA, ctx) { data ->
+                    if (_binding == null) return@loadDisplay
+                    if (!data.optBoolean("success", false) && !data.has("total_commission")) return@loadDisplay
+                    bindCommissionPayload(data)
                 }
-                val body = resp.body?.string() ?: ""
-                val obj = JSONObject(body)
-                if (!obj.optBoolean("success", false)) {
-                    withContext(Dispatchers.Main) { showError() }
-                    return@launch
-                }
-                val total = obj.optInt("total_commission", 0)
-                val pending = obj.optInt("pending_commission", 0)
-                val paid = obj.optInt("paid_commission", 0)
-                val soldCount = obj.optInt("sold_count", 0)
-                val itemsArr = obj.optJSONArray("items") ?: org.json.JSONArray()
-                val items = mutableListOf<JSONObject>()
-                for (i in 0 until itemsArr.length()) {
-                    items.add(itemsArr.getJSONObject(i))
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    bind(total, pending, paid, soldCount, items)
+                if (_binding == null) return@launch
+                if (!obj.optBoolean("success", false) && !obj.has("total_commission")) {
+                    showError()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadData error", e)
-                withContext(Dispatchers.Main) { showError() }
+                if (_binding != null) showError()
             }
         }
+    }
+
+    private fun bindCommissionPayload(obj: JSONObject) {
+        val total = obj.optInt("total_commission", 0)
+        val pending = obj.optInt("pending_commission", 0)
+        val paid = obj.optInt("paid_commission", 0)
+        val soldCount = obj.optInt("sold_count", 0)
+        val itemsArr = obj.optJSONArray("items") ?: org.json.JSONArray()
+        val items = mutableListOf<JSONObject>()
+        for (i in 0 until itemsArr.length()) {
+            items.add(itemsArr.getJSONObject(i))
+        }
+        bind(total, pending, paid, soldCount, items)
     }
 
     private fun showError() {

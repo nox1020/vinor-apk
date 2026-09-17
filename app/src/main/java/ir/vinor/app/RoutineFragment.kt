@@ -181,20 +181,16 @@ class RoutineFragment : Fragment() {
     }
 
     private fun loadTodayDetail() {
+        val ctx = context ?: return
+        val path = "$ROUTINE_STEPS_DETAIL?date=${URLEncoder.encode(todayStr, "UTF-8")}"
         scope.launch {
             try {
-                val url = "$BASE$ROUTINE_STEPS_DETAIL?date=${URLEncoder.encode(todayStr, "UTF-8")}"
-                val req = Request.Builder().url(url).addHeader("Cookie", cookieHeader()).build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) return@launch
-                val body = resp.body?.string() ?: return@launch
-                val obj = JSONObject(body)
-                val arr = obj.optJSONArray("detail")
-                stepsDetail = mutableListOf<String>().apply {
-                    if (arr != null) for (i in 0 until arr.length()) add(arr.optString(i, ""))
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
+                PartnerApi.loadDisplay(path, ctx) { obj ->
+                    if (_binding == null) return@loadDisplay
+                    val arr = obj.optJSONArray("detail")
+                    stepsDetail = mutableListOf<String>().apply {
+                        if (arr != null) for (i in 0 until arr.length()) add(arr.optString(i, ""))
+                    }
                     binding.step1.isChecked = stepsDetail.contains("1")
                     binding.step2.isChecked = stepsDetail.contains("2")
                     binding.step3.isChecked = stepsDetail.contains("3")
@@ -207,38 +203,33 @@ class RoutineFragment : Fragment() {
     }
 
     private fun loadMonthData() {
+        val ctx = context ?: return
         val month = String.format(Locale.US, "%04d-%02d", currentMonth.get(Calendar.YEAR), currentMonth.get(Calendar.MONTH) + 1)
+        val path = "$ROUTINE_DATA?month=${URLEncoder.encode(month, "UTF-8")}"
         scope.launch {
             try {
-                val url = "$BASE$ROUTINE_DATA?month=${URLEncoder.encode(month, "UTF-8")}"
-                val req = Request.Builder().url(url).addHeader("Cookie", cookieHeader()).build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) return@launch
-                val body = resp.body?.string() ?: return@launch
-                val obj = JSONObject(body)
-                val daysArr = obj.optJSONArray("days")
-                completedDays = mutableListOf<String>().apply {
-                    if (daysArr != null) for (i in 0 until daysArr.length()) add(daysArr.optString(i, ""))
-                }
-                val stepsObj = obj.optJSONObject("steps")
-                monthSteps = mutableMapOf<String, Int>().apply {
-                    if (stepsObj != null) {
-                        stepsObj.keys().forEach { key ->
-                            put(key, stepsObj.optInt(key, 0).coerceIn(0, 3))
+                PartnerApi.loadDisplay(path, ctx) { obj ->
+                    if (_binding == null) return@loadDisplay
+                    val daysArr = obj.optJSONArray("days")
+                    completedDays = mutableListOf<String>().apply {
+                        if (daysArr != null) for (i in 0 until daysArr.length()) add(daysArr.optString(i, ""))
+                    }
+                    val stepsObj = obj.optJSONObject("steps")
+                    monthSteps = mutableMapOf<String, Int>().apply {
+                        if (stepsObj != null) {
+                            stepsObj.keys().forEach { key ->
+                                put(key, stepsObj.optInt(key, 0).coerceIn(0, 3))
+                            }
                         }
                     }
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
                     setStatus("روزهای انجام‌شده از سرور بارگذاری شد.")
                     updateMonthLabel()
                     fillCalendar()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadMonthData error", e)
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    completedDays = emptyList()
+                if (_binding == null) return@launch
+                if (completedDays.isEmpty()) {
                     monthSteps = emptyMap()
                     setStatus("")
                     updateMonthLabel()

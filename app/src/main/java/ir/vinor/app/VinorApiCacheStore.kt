@@ -110,17 +110,22 @@ object VinorApiCacheStore {
         VinorSafe.onMain {
             VinorCacheSession.fingerprint(context)
             val cookie = VinorSafe.cookieOrEmpty(VinorPartnerUrls.BASE)
-            if (cookie.length < 12) return@onMain
-            val urls = listOf(
-                "${VinorPartnerUrls.BASE}/express/partner/api/notifications",
-                "${VinorPartnerUrls.BASE}/express/partner/api/notes",
-                "${VinorPartnerUrls.BASE}/express/partner/api/public-lands",
-                "${VinorPartnerUrls.BASE}/express/partner/profile/data",
-                "${VinorPartnerUrls.BASE}/express/partner/routine/data",
-                "${VinorPartnerUrls.BASE}/express/partner/commissions/data",
+            val urls = mutableListOf(
                 "${VinorPartnerUrls.BASE}/express/partner/home/data",
-                "${VinorPartnerUrls.BASE}/express/partner/ai/history",
             )
+            if (cookie.length >= 12) {
+                urls.addAll(
+                    listOf(
+                        "${VinorPartnerUrls.BASE}/express/partner/api/notifications",
+                        "${VinorPartnerUrls.BASE}/express/partner/api/notes",
+                        "${VinorPartnerUrls.BASE}/express/partner/api/public-lands",
+                        "${VinorPartnerUrls.BASE}/express/partner/profile/data",
+                        "${VinorPartnerUrls.BASE}/express/partner/routine/data",
+                        "${VinorPartnerUrls.BASE}/express/partner/commissions/data",
+                        "${VinorPartnerUrls.BASE}/express/partner/ai/history",
+                    ),
+                )
+            }
             io.execute {
                 urls.forEach { fetchAndStore(context.applicationContext, it, cookie) }
             }

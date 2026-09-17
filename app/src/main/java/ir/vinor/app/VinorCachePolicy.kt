@@ -170,6 +170,8 @@ object VinorCachePolicy {
         "/express/partner/routine/steps/detail",
         "/express/partner/commissions/data",
         "/express/partner/dashboard/data",
+        "/express/partner/home/data",
+        "/express/partner/ai/history",
         "/api/menu",
     )
 
@@ -177,6 +179,7 @@ object VinorCachePolicy {
         "/express/partner/api/notes",
         "/express/partner/api/notifications",
         "/express/partner/api/public-lands",
+        "/api/express/",
     )
 
     private val QUEUEABLE_POST_EXACT = setOf(

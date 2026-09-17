@@ -82,6 +82,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun loadData() {
+        val ctx = context ?: return
         if (_binding == null) return
         binding.profileProgress.visibility = View.VISIBLE
         binding.profileGuest.visibility = View.GONE
@@ -90,55 +91,46 @@ class ProfileFragment : Fragment() {
 
         scope.launch {
             try {
-                val req = Request.Builder()
-                    .url("$BASE$PROFILE_DATA")
-                    .addHeader("Cookie", cookieHeader())
-                    .addHeader("Accept", "application/json")
-                    .addHeader("X-Vinor-App-Version", appVersionName())
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) {
-                    withContext(Dispatchers.Main) { showGuest() }
-                    return@launch
+                val obj = PartnerApi.loadDisplay(PROFILE_DATA, ctx) { data ->
+                    if (_binding == null) return@loadDisplay
+                    bindProfilePayload(data)
                 }
-                val body = resp.body?.string() ?: ""
-                val obj = JSONObject(body)
-                if (!obj.optBoolean("success", false)) {
-                    withContext(Dispatchers.Main) { showGuest() }
-                    return@launch
-                }
-                val mePhone = obj.optString("me_phone", "").trim()
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    binding.profileProgress.visibility = View.GONE
-                    if (mePhone.isEmpty()) {
-                        showGuest()
-                    } else {
-                        val apkUrl = obj.optString("android_apk_url", "").trim()
-                        val apkVersion = obj.optString("android_apk_version", "").trim()
-                        val showUpdate = obj.optBoolean("show_app_update", false) ||
-                            (apkUrl.isNotEmpty() && apkVersion.isNotEmpty() &&
-                                ApkVersionUtils.isServerNewer(apkVersion, appVersionName()))
-                        bindProfile(
-                            mePhone = mePhone,
-                            meName = obj.optString("me_name", "همکار وینور"),
-                            avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() },
-                            isApproved = obj.optBoolean("is_approved", false),
-                            showAppUpdate = showUpdate,
-                            androidApkUrl = if (showUpdate) apkUrl else "",
-                            androidApkVersion = if (showUpdate) apkVersion else ""
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "loadData error", e)
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
+                if (_binding == null) return@launch
+                if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
                     binding.profileProgress.visibility = View.GONE
                     showGuest()
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadData error", e)
+                if (_binding == null) return@launch
+                binding.profileProgress.visibility = View.GONE
+                showGuest()
             }
         }
+    }
+
+    private fun bindProfilePayload(obj: JSONObject) {
+        if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) return
+        binding.profileProgress.visibility = View.GONE
+        val mePhone = obj.optString("me_phone", "").trim()
+        if (mePhone.isEmpty()) {
+            showGuest()
+            return
+        }
+        val apkUrl = obj.optString("android_apk_url", "").trim()
+        val apkVersion = obj.optString("android_apk_version", "").trim()
+        val showUpdate = obj.optBoolean("show_app_update", false) ||
+            (apkUrl.isNotEmpty() && apkVersion.isNotEmpty() &&
+                ApkVersionUtils.isServerNewer(apkVersion, appVersionName()))
+        bindProfile(
+            mePhone = mePhone,
+            meName = obj.optString("me_name", "همکار وینور"),
+            avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() },
+            isApproved = obj.optBoolean("is_approved", false),
+            showAppUpdate = showUpdate,
+            androidApkUrl = if (showUpdate) apkUrl else "",
+            androidApkVersion = if (showUpdate) apkVersion else "",
+        )
     }
 
     private fun showGuest() {

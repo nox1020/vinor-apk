@@ -13,7 +13,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class LandDetailFragment : Fragment() {
@@ -55,33 +54,19 @@ class LandDetailFragment : Fragment() {
     }
 
     private fun load(code: String) {
+        val ctx = context ?: return
         binding.landDetailProgress.isVisible = true
         scope.launch {
             try {
-                val obj = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/api/express/$code", requireContext())
+                val obj = PartnerApi.loadDisplay("/api/express/$code", ctx) { data ->
+                    if (_binding == null) return@loadDisplay
+                    bindLand(code, data)
                 }
                 if (_binding == null) return@launch
-                if (!obj.optBoolean("success")) {
+                if (!obj.optBoolean("success") && obj.optJSONObject("land") == null) {
                     binding.landDetailError.isVisible = true
                     binding.landDetailError.text = obj.optString("error", "فایل پیدا نشد.")
-                    return@launch
                 }
-                val land = obj.optJSONObject("land") ?: JSONObject()
-                binding.landDetailTitle.text = land.optString("title", "—")
-                val price = land.optInt("price_total").takeIf { it > 0 } ?: land.optInt("price")
-                binding.landDetailPrice.text = PartnerFormat.toman(price) + " تومان"
-                val meta = listOf(
-                    land.optString("city"),
-                    land.optString("location"),
-                    land.optString("size"),
-                    land.optString("category"),
-                    code,
-                ).filter { it.isNotBlank() }.joinToString(" · ")
-                binding.landDetailMeta.text = meta
-                val body = land.optString("description").ifBlank { land.optString("body") }
-                binding.landDetailBody.text = body
-                PartnerImages.bind(scope, binding.landDetailImage, PartnerImages.coverUrl(land))
             } catch (e: Exception) {
                 if (_binding != null) {
                     binding.landDetailError.isVisible = true
@@ -92,5 +77,25 @@ class LandDetailFragment : Fragment() {
                 if (_binding != null) binding.landDetailProgress.isVisible = false
             }
         }
+    }
+
+    private fun bindLand(code: String, obj: JSONObject) {
+        if (!obj.optBoolean("success") && obj.optJSONObject("land") == null) return
+        val land = obj.optJSONObject("land") ?: JSONObject()
+        binding.landDetailError.isVisible = false
+        binding.landDetailTitle.text = land.optString("title", "—")
+        val price = land.optInt("price_total").takeIf { it > 0 } ?: land.optInt("price")
+        binding.landDetailPrice.text = PartnerFormat.toman(price) + " تومان"
+        val meta = listOf(
+            land.optString("city"),
+            land.optString("location"),
+            land.optString("size"),
+            land.optString("category"),
+            code,
+        ).filter { it.isNotBlank() }.joinToString(" · ")
+        binding.landDetailMeta.text = meta
+        val body = land.optString("description").ifBlank { land.optString("body") }
+        binding.landDetailBody.text = body
+        PartnerImages.bind(scope, binding.landDetailImage, PartnerImages.coverUrl(land))
     }
 }

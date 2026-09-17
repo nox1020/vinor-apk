@@ -146,102 +146,79 @@ class ProfileEditFragment : Fragment() {
     }
 
     private fun loadData() {
+        val ctx = context ?: return
         if (_binding == null) return
         binding.profileEditProgress.visibility = View.VISIBLE
         scope.launch {
             try {
-                val req = Request.Builder()
-                    .url("$BASE$PROFILE_EDIT_DATA")
-                    .addHeader("Cookie", cookieHeader())
-                    .addHeader("Accept", "application/json")
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) {
-                    withContext(Dispatchers.Main) {
-                        if (_binding != null) {
-                            binding.profileEditProgress.visibility = View.GONE
-                            context?.let { Toast.makeText(it, "خطا در بارگذاری", Toast.LENGTH_SHORT).show() }
-                            findNavController().navigateUp()
-                        }
-                    }
-                    return@launch
+                val obj = PartnerApi.loadDisplay(PROFILE_EDIT_DATA, ctx) { data ->
+                    if (_binding == null) return@loadDisplay
+                    if (!data.optBoolean("success", false) && data.optString("me_phone").isBlank()) return@loadDisplay
+                    bindEditPayload(data)
                 }
-                val body = resp.body?.string() ?: ""
-                val obj = JSONObject(body)
-                if (!obj.optBoolean("success", false)) {
-                    withContext(Dispatchers.Main) {
-                        if (_binding != null) {
-                            binding.profileEditProgress.visibility = View.GONE
-                            findNavController().navigateUp()
-                        }
-                    }
-                    return@launch
-                }
-                val meName = obj.optString("me_name", "")
-                mePhone = obj.optString("me_phone", "").trim()
-                val meCity = obj.optString("me_city", "")
-                val meBio = obj.optString("me_bio", "")
-                val avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() }
-                val citiesArr = obj.optJSONArray("cities") ?: org.json.JSONArray()
-                val cities = mutableListOf<String>().apply {
-                    add("انتخاب شهر")
-                    for (i in 0 until citiesArr.length()) {
-                        val c = citiesArr.optString(i, "").trim()
-                        if (c.isNotEmpty()) add(c)
-                    }
-                }
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
+                if (_binding == null) return@launch
+                if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
                     binding.profileEditProgress.visibility = View.GONE
-                    binding.profileEditName.setText(meName)
-                    binding.profileEditBio.setText(meBio)
-                    binding.profileEditBioCount.text = "${meBio.length}/200"
-                    val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, cities).apply {
-                        setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                    }
-                    binding.profileEditCity.adapter = adapter
-                    val cityIndex = cities.indexOf(meCity).takeIf { it >= 0 } ?: 0
-                    binding.profileEditCity.setSelection(cityIndex)
-                    bindInitials(meName)
-                    currentAvatarUrl = avatarUrl
-                    if (!avatarUrl.isNullOrEmpty()) {
-                        loadAvatar("$BASE$avatarUrl")
-                    } else {
-                        binding.profileEditAvatar.visibility = View.GONE
-                        binding.profileEditInitials.visibility = View.VISIBLE
-                    }
+                    Toast.makeText(ctx, "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
+                    findNavController().navigateUp()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadData error", e)
-                withContext(Dispatchers.Main) {
-                    if (_binding != null) {
-                        binding.profileEditProgress.visibility = View.GONE
-                        context?.let { Toast.makeText(it, "خطا در بارگذاری", Toast.LENGTH_SHORT).show() }
-                        findNavController().navigateUp()
-                    }
+                if (_binding != null) {
+                    binding.profileEditProgress.visibility = View.GONE
+                    Toast.makeText(ctx, "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
+                    findNavController().navigateUp()
                 }
             }
         }
     }
 
+    private fun bindEditPayload(obj: JSONObject) {
+        val meName = obj.optString("me_name", "")
+        mePhone = obj.optString("me_phone", "").trim()
+        val meCity = obj.optString("me_city", "")
+        val meBio = obj.optString("me_bio", "")
+        val avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() }
+        val citiesArr = obj.optJSONArray("cities") ?: org.json.JSONArray()
+        val cities = mutableListOf<String>().apply {
+            add("انتخاب شهر")
+            for (i in 0 until citiesArr.length()) {
+                val c = citiesArr.optString(i, "").trim()
+                if (c.isNotEmpty()) add(c)
+            }
+        }
+        binding.profileEditProgress.visibility = View.GONE
+        binding.profileEditName.setText(meName)
+        binding.profileEditBio.setText(meBio)
+        binding.profileEditBioCount.text = "${meBio.length}/200"
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, cities).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        binding.profileEditCity.adapter = adapter
+        val cityIndex = cities.indexOf(meCity).takeIf { it >= 0 } ?: 0
+        binding.profileEditCity.setSelection(cityIndex)
+        bindInitials(meName)
+        currentAvatarUrl = avatarUrl
+        if (!avatarUrl.isNullOrEmpty()) {
+            loadAvatar(if (avatarUrl.startsWith("http")) avatarUrl else "$BASE$avatarUrl")
+        } else {
+            binding.profileEditAvatar.visibility = View.GONE
+            binding.profileEditInitials.visibility = View.VISIBLE
+        }
+    }
+
     private fun loadAvatar(fullUrl: String) {
+        val ctx = context ?: return
         scope.launch {
             try {
-                val req = Request.Builder()
-                    .url(fullUrl)
-                    .addHeader("Cookie", cookieHeader())
-                    .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) return@launch
-                val bytes = resp.body?.bytes() ?: return@launch
+                val bytes = withContext(Dispatchers.IO) { PartnerApi.bytes(fullUrl, ctx) } ?: return@launch
                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@launch
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    binding.profileEditAvatar.setImageBitmap(bmp)
-                    binding.profileEditAvatar.visibility = View.VISIBLE
-                    binding.profileEditInitials.visibility = View.GONE
-                }
-            } catch (_: Exception) { }
+                if (_binding == null) return@launch
+                binding.profileEditAvatar.setImageBitmap(bmp)
+                binding.profileEditAvatar.visibility = View.VISIBLE
+                binding.profileEditInitials.visibility = View.GONE
+            } catch (_: Exception) {
+            }
         }
     }
 
