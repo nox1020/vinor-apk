@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentCommissionsBinding
 import ir.vinor.app.databinding.ItemCommissionBinding
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +56,11 @@ class CommissionsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.commissionsMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+        binding.commissionsBack.setOnClickListener {
+            if (!findNavController().navigateUp()) {
+                (activity as? MainActivity)?.openPartnerHome()
+            }
+        }
         loadData()
     }
 

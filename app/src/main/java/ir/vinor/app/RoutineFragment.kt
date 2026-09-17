@@ -15,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentRoutineBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +88,12 @@ class RoutineFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.routineMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+        binding.routineHeader.pageTitle.text = "روتین"
+        binding.routineHeader.pageBack.setOnClickListener {
+            if (!findNavController().navigateUp()) {
+                (activity as? MainActivity)?.openPartnerHome()
+            }
+        }
         todayStr = todayDateString()
         setupStepsReadOnly()
         setupCalendarNav()

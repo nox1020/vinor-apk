@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextAppearance.Vinor" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="fontFamily">@font/vazirmatn</item>
+    </style>
+
+    <style name="Widget.Vinor.TextView" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="fontFamily">@font/vazirmatn</item>
+        <item name="android:textAppearance">@style/TextAppearance.Vinor</item>
+    </style>
+
+    <style name="Widget.Vinor.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="fontFamily">@font/vazirmatn</item>
+        <item name="android:textAppearance">@style/TextAppearance.Vinor</item>
+    </style>
+
+    <style name="Widget.Vinor.Button" parent="Widget.AppCompat.Button">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="fontFamily">@font/vazirmatn</item>
+        <item name="android:textAppearance">@style/TextAppearance.Vinor</item>
+    </style>
+</resources>

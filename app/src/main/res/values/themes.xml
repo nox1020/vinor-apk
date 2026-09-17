@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Vinor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:fontFamily">@font/vazirmatn</item>
+        <item name="fontFamily">@font/vazirmatn</item>
+        <item name="android:textViewStyle">@style/Widget.Vinor.TextView</item>
+        <item name="android:editTextStyle">@style/Widget.Vinor.EditText</item>
+        <item name="editTextStyle">@style/Widget.Vinor.EditText</item>
+        <item name="android:buttonStyle">@style/Widget.Vinor.Button</item>
+        <item name="buttonStyle">@style/Widget.Vinor.Button</item>
+        <item name="android:textAppearance">@style/TextAppearance.Vinor</item>
+        <item name="textAppearance">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceButton">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.Vinor</item>
+        <item name="textAppearanceSubtitle2">@style/TextAppearance.Vinor</item>
         <item name="android:windowBackground">@color/vinor_bg</item>
         <item name="android:colorBackground">@color/vinor_bg</item>
         <item name="android:navigationBarColor">@color/vinor_bg</item>

@@ -1,5 +1,7 @@
 package ir.vinor.app
 
+import android.text.Editable
+import android.text.TextWatcher
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -14,7 +16,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentNativePartnerBinding
+import ir.vinor.app.databinding.ItemHelpStepBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
 import ir.vinor.app.databinding.ItemNativeCardBinding
 import ir.vinor.app.databinding.ItemNativeRequestBinding
@@ -35,6 +39,7 @@ class NativePartnerFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var activeTab = ""
     private var lastPayload = JSONObject()
+    private var searchQuery = ""
 
     val page: String
         get() = arguments?.getString(ARG_PAGE).orEmpty().ifBlank { PAGE_TRAINING }
@@ -50,14 +55,26 @@ class NativePartnerFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.nativeMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
-        binding.nativeTitle.text = titleFor(page)
+        binding.nativeHeader.pageBack.setOnClickListener { goBack() }
+        binding.nativeHeader.pageTitle.text = titleFor(page)
         binding.nativeRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.nativeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.nativeRefresh.setOnRefreshListener { load(forceNet = true) }
         binding.nativeApplySubmit.setOnClickListener { submitApply() }
         binding.nativeInviteCopy.setOnClickListener { copyInvite() }
         binding.nativeInviteShare.setOnClickListener { shareInvite() }
+        binding.nativeSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                searchQuery = s?.toString().orEmpty().trim()
+                if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
+            }
+        })
+        binding.nativeSearchBtn.setOnClickListener {
+            searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
+            if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
+        }
         load()
     }
 
@@ -65,6 +82,16 @@ class NativePartnerFragment : Fragment() {
         job.cancel()
         super.onDestroyView()
         _binding = null
+    }
+
+    private fun goBack() {
+        if (!findNavController().navigateUp()) {
+            (activity as? MainActivity)?.openPartnerHome()
+        }
+    }
+
+    private fun setTitle(text: String) {
+        binding.nativeHeader.pageTitle.text = text
     }
 
     private fun load(forceNet: Boolean = false) {
@@ -177,28 +204,56 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindTraining(obj: JSONObject) {
-        binding.nativeLeadBox.isVisible = true
-        binding.nativeLead.text = obj.optString("hero_sub").ifBlank { "آموزش ۳ مرحله‌ای همکاری." }
-        bindTabs(obj.optJSONArray("steps") ?: JSONArray(), idKey = "id", titleKey = "title") { tab ->
-            activeTab = tab
-            renderFaqs(obj, tab)
-        }
+        binding.nativeHero.isVisible = true
+        binding.nativeHeroTitle.text = obj.optString("hero_title").ifBlank { "چطور می‌تونم کمکت کنم؟" }
+        binding.nativeHeroSub.text = obj.optString("hero_sub").ifBlank { "آموزش ۳ مرحله‌ای جذب مشتری، بازدید و بستن معامله." }
+        binding.nativeSectionTitle.isVisible = true
+        binding.nativeFaqTitle.isVisible = true
+        binding.nativeSteps.isVisible = true
+        renderTrainingSteps(obj)
         if (activeTab.isBlank()) activeTab = "market"
         renderFaqs(obj, activeTab)
+    }
+
+    private fun renderTrainingSteps(obj: JSONObject) {
+        binding.nativeSteps.removeAllViews()
+        val steps = obj.optJSONArray("steps") ?: JSONArray()
+        for (i in 0 until steps.length()) {
+            val step = steps.optJSONObject(i) ?: continue
+            val id = step.optString("id")
+            val row = ItemHelpStepBinding.inflate(layoutInflater, binding.nativeSteps, false)
+            row.helpStepNum.text = step.optString("num").ifBlank { "${i + 1}" }
+            row.helpStepTitle.text = step.optString("title")
+            row.helpStepSub.text = step.optString("sub")
+            val on = id == activeTab || (activeTab.isBlank() && i == 0)
+            row.root.setBackgroundResource(if (on) R.drawable.bg_help_step_active else R.drawable.bg_help_step)
+            row.root.setOnClickListener {
+                activeTab = id
+                renderTrainingSteps(obj)
+                renderFaqs(obj, id)
+            }
+            binding.nativeSteps.addView(row.root)
+        }
     }
 
     private fun renderFaqs(obj: JSONObject, tab: String) {
         binding.nativeList.removeAllViews()
         val faqs = obj.optJSONArray("faqs") ?: JSONArray()
+        val q = searchQuery
         var shown = 0
         for (i in 0 until faqs.length()) {
             val faq = faqs.optJSONObject(i) ?: continue
-            if (tab.isNotBlank() && faq.optString("tab") != tab) continue
-            addCard(faq.optString("q"), faq.optString("a"))
+            if (tab.isNotBlank() && q.isBlank() && faq.optString("tab") != tab) continue
+            val question = faq.optString("q")
+            val answer = faq.optString("a")
+            if (q.isNotBlank() && !question.contains(q, ignoreCase = true) && !answer.contains(q, ignoreCase = true)) {
+                continue
+            }
+            addCard(question, answer, expanded = shown == 0)
             shown++
         }
         binding.nativeEmpty.isVisible = shown == 0
-        if (shown == 0) binding.nativeEmpty.text = "موردی پیدا نشد."
+        if (shown == 0) binding.nativeEmpty.text = if (q.isBlank()) "موردی پیدا نشد." else "نتیجه‌ای برای این جستجو نیست."
     }
 
     private fun bindLevels(obj: JSONObject) {
@@ -238,6 +293,7 @@ class NativePartnerFragment : Fragment() {
         binding.nativeLeadBox.isVisible = true
         val approved = obj.optBoolean("is_approved")
         val bonus = obj.optInt("bonus_per_invite")
+        setTitle(if (approved) "دعوت از همکاران" else "دعوت از دوستان")
         binding.nativeLead.text = if (approved) {
             "هر همکار تأییدشده، ${PartnerFormat.toman(bonus)} تومان به موجودی شما اضافه می‌شود."
         } else {
@@ -306,7 +362,7 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindLegal(obj: JSONObject) {
-        binding.nativeTitle.text = obj.optString("title").ifBlank { titleFor(page) }
+        setTitle(obj.optString("title").ifBlank { titleFor(page) })
         val sections = obj.optJSONArray("sections") ?: JSONArray()
         for (i in 0 until sections.length()) {
             val s = sections.optJSONObject(i) ?: continue
@@ -364,13 +420,18 @@ class NativePartnerFragment : Fragment() {
         }
     }
 
-    private fun addCard(title: String, body: String, kicker: String = "") {
+    private fun addCard(title: String, body: String, kicker: String = "", expanded: Boolean = true) {
         val card = ItemNativeCardBinding.inflate(layoutInflater, binding.nativeList, false)
         card.nativeCardTitle.text = title
         card.nativeCardBody.text = body
-        card.nativeCardBody.isVisible = body.isNotBlank()
+        card.nativeCardBody.isVisible = body.isNotBlank() && expanded
         card.nativeCardKicker.isVisible = kicker.isNotBlank()
         card.nativeCardKicker.text = kicker
+        if (body.isNotBlank()) {
+            card.root.setOnClickListener {
+                card.nativeCardBody.isVisible = !card.nativeCardBody.isVisible
+            }
+        }
         binding.nativeList.addView(card.root)
     }
 
@@ -503,6 +564,11 @@ class NativePartnerFragment : Fragment() {
         binding.nativeCta.isVisible = false
         binding.nativeTabsScroll.isVisible = false
         binding.nativeEmpty.isVisible = false
+        binding.nativeHero.isVisible = false
+        binding.nativeSectionTitle.isVisible = false
+        binding.nativeFaqTitle.isVisible = false
+        binding.nativeSteps.isVisible = false
+        binding.nativeSteps.removeAllViews()
     }
 
     private fun bindEmpty(msg: String) {

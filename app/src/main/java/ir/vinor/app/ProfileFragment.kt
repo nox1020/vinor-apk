@@ -58,7 +58,11 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.profileMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+        binding.profileBack.setOnClickListener {
+            if (!findNavController().navigateUp()) {
+                (activity as? MainActivity)?.openPartnerHome()
+            }
+        }
         loadData()
     }
 

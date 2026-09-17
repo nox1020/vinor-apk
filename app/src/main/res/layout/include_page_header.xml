@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="8dp">
+
+    <ImageButton
+        android:id="@+id/pageBack"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:background="@drawable/bg_header_orb"
+        android:contentDescription="بازگشت"
+        android:padding="11dp"
+        android:src="@drawable/ic_chevron_right"
+        app:tint="#ECECEC" />
+
+    <TextView
+        android:id="@+id/pageTitle"
+        android:layout_width="0dp"
+        android:layout_height="42dp"
+        android:layout_marginHorizontal="8dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_header_title_pill"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <FrameLayout
+        android:id="@+id/pageHeaderEnd"
+        android:layout_width="42dp"
+        android:layout_height="42dp" />
+</LinearLayout>

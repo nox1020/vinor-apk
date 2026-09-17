@@ -1,39 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/vinor_bg"
     android:layoutDirection="rtl"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp">
-
-        <TextView
-            android:id="@+id/nativeTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="وینور"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/nativeMenu"
-            android:layout_width="41dp"
-            android:layout_height="41dp"
-            android:background="@drawable/bg_menu_orb"
-            android:contentDescription="منو"
-            android:padding="11dp"
-            android:src="@drawable/ic_menu_stroke" />
-    </LinearLayout>
+    <include
+        android:id="@+id/nativeHeader"
+        layout="@layout/include_page_header" />
 
     <HorizontalScrollView
         android:id="@+id/nativeTabsScroll"
@@ -67,180 +43,310 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="16dp"
                 android:paddingBottom="24dp">
 
-                <ProgressBar
-                    android:id="@+id/nativeProgress"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center"
-                    android:layout_marginTop="24dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/nativeEmpty"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_routine_card"
-                    android:gravity="center"
-                    android:padding="24dp"
-                    android:textColor="#A1A1AA"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
-
                 <LinearLayout
-                    android:id="@+id/nativeLeadBox"
+                    android:id="@+id/nativeHero"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@drawable/bg_training_hero"
                     android:orientation="vertical"
+                    android:paddingHorizontal="18dp"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="26dp"
                     android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/nativeLead"
-                        android:layout_width="match_parent"
+                        android:id="@+id/nativeHeroBadge"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:lineSpacingMultiplier="1.4"
-                        android:textColor="#A1A1AA"
-                        android:textSize="13sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/nativeApplyForm"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="بازاریاب وینور شوید"
+                        android:background="@drawable/bg_help_badge"
+                        android:paddingHorizontal="11dp"
+                        android:paddingVertical="5dp"
+                        android:text="راهنمای همکاری وینور"
                         android:textColor="#FFFFFF"
-                        android:textSize="17sp"
+                        android:textSize="11.5sp"
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/nativeHeroTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:letterSpacing="-0.02"
+                        android:text="چطور می‌تونم کمکت کنم؟"
+                        android:textColor="#FFFFFF"
+                        android:textSize="25sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/nativeHeroSub"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:layout_marginBottom="16dp"
-                        android:gravity="center"
-                        android:text="نام، نام خانوادگی و کد ملی — تأیید خودکار پس از ارسال"
-                        android:textColor="#71717A"
-                        android:textSize="12sp" />
-
-                    <EditText
-                        android:id="@+id/nativeApplyFirst"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
-                        android:background="@drawable/bg_auth_input"
-                        android:hint="نام"
-                        android:inputType="textPersonName"
-                        android:padding="14dp"
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#52525B"
+                        android:lineSpacingMultiplier="1.55"
+                        android:text="آموزش ۳ مرحله‌ای جذب مشتری، بازدید و بستن معامله."
+                        android:textColor="#DBFFFFFF"
                         android:textSize="14sp" />
 
-                    <EditText
-                        android:id="@+id/nativeApplyLast"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="10dp"
-                        android:background="@drawable/bg_auth_input"
-                        android:hint="نام خانوادگی"
-                        android:inputType="textPersonName"
-                        android:padding="14dp"
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#52525B"
-                        android:textSize="14sp" />
-
-                    <EditText
-                        android:id="@+id/nativeApplyNational"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:background="@drawable/bg_auth_input"
-                        android:hint="کد ملی ۱۰ رقمی"
-                        android:inputType="number"
-                        android:maxLength="10"
-                        android:padding="14dp"
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#52525B"
-                        android:textDirection="ltr"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/nativeApplySubmit"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
-                        android:background="@drawable/bg_button_primary"
-                        android:gravity="center"
-                        android:text="ارسال و فعال‌سازی"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="18dp"
+                        android:background="@drawable/bg_help_search"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="6dp">
+
+                        <EditText
+                            android:id="@+id/nativeSearch"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@android:color/transparent"
+                            android:hint="مثلاً آگهی را کجا منتشر کنم؟"
+                            android:imeOptions="actionSearch"
+                            android:inputType="text"
+                            android:maxLines="1"
+                            android:textColor="#111827"
+                            android:textColorHint="#9CA3AF"
+                            android:textSize="15sp" />
+
+                        <ImageButton
+                            android:id="@+id/nativeSearchBtn"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/bg_help_search_btn"
+                            android:contentDescription="جستجو"
+                            android:padding="9dp"
+                            android:src="@drawable/ic_search"
+                            app:tint="#374151" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/nativeHeroHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="11dp"
+                        android:text="سؤال‌های پرتکرار را بخوان؛ مسیر فروش از بازاریابی تا قرارداد همین‌جاست."
+                        android:textColor="#C7FFFFFF"
+                        android:textSize="11.5sp" />
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/nativeInviteBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone">
+                    android:paddingHorizontal="16dp">
+
+                    <ProgressBar
+                        android:id="@+id/nativeProgress"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:layout_marginTop="24dp"
+                        android:visibility="gone" />
 
                     <TextView
-                        android:id="@+id/nativeInviteUrl"
+                        android:id="@+id/nativeEmpty"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_auth_input"
-                        android:padding="14dp"
-                        android:textColor="#E4E4E7"
-                        android:textDirection="ltr"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/nativeInviteCopy"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_button_primary"
-                        android:gravity="center"
-                        android:text="کپی لینک"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/nativeInviteShare"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="8dp"
                         android:background="@drawable/bg_routine_card"
                         android:gravity="center"
-                        android:text="اشتراک‌گذاری"
+                        android:padding="24dp"
+                        android:textColor="#A1A1AA"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/nativeLeadBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="8dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/nativeLead"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:lineSpacingMultiplier="1.4"
+                            android:textColor="#A1A1AA"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/nativeSectionTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:layout_marginBottom="12dp"
+                        android:gravity="center"
+                        android:text="مسیر موفقیت در همکاری"
+                        android:textColor="#F9FAFB"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/nativeSteps"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/nativeFaqTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:layout_marginBottom="10dp"
+                        android:gravity="center"
+                        android:text="پرتکرارترین سؤال‌ها"
+                        android:textColor="#F9FAFB"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/nativeApplyForm"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="8dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="بازاریاب وینور شوید"
+                            android:textColor="#FFFFFF"
+                            android:textSize="17sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:layout_marginBottom="16dp"
+                            android:gravity="center"
+                            android:text="نام، نام خانوادگی و کد ملی — تأیید خودکار پس از ارسال"
+                            android:textColor="#71717A"
+                            android:textSize="12sp" />
+
+                        <EditText
+                            android:id="@+id/nativeApplyFirst"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="10dp"
+                            android:background="@drawable/bg_auth_input"
+                            android:hint="نام"
+                            android:inputType="textPersonName"
+                            android:padding="14dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#52525B"
+                            android:textSize="14sp" />
+
+                        <EditText
+                            android:id="@+id/nativeApplyLast"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="10dp"
+                            android:background="@drawable/bg_auth_input"
+                            android:hint="نام خانوادگی"
+                            android:inputType="textPersonName"
+                            android:padding="14dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#52525B"
+                            android:textSize="14sp" />
+
+                        <EditText
+                            android:id="@+id/nativeApplyNational"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="16dp"
+                            android:background="@drawable/bg_auth_input"
+                            android:hint="کد ملی ۱۰ رقمی"
+                            android:inputType="number"
+                            android:maxLength="10"
+                            android:padding="14dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#52525B"
+                            android:textDirection="ltr"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/nativeApplySubmit"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:background="@drawable/bg_button_primary"
+                            android:gravity="center"
+                            android:text="ارسال و فعال‌سازی"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/nativeInviteBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/nativeInviteUrl"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_auth_input"
+                            android:padding="14dp"
+                            android:textColor="#E4E4E7"
+                            android:textDirection="ltr"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/nativeInviteCopy"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:layout_marginTop="10dp"
+                            android:background="@drawable/bg_button_primary"
+                            android:gravity="center"
+                            android:text="کپی لینک"
+                            android:textColor="#FFFFFF"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/nativeInviteShare"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_routine_card"
+                            android:gravity="center"
+                            android:text="اشتراک‌گذاری"
+                            android:textColor="#FFFFFF"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/nativeList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/nativeCta"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_button_primary"
+                        android:gravity="center"
                         android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
                 </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/nativeList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <TextView
-                    android:id="@+id/nativeCta"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_button_primary"
-                    android:gravity="center"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
             </LinearLayout>
         </ScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

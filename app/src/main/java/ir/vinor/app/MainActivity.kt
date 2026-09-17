@@ -327,6 +327,11 @@ class MainActivity : AppCompatActivity() {
         bindNavRows()
         binding.drawerBackdrop.setOnClickListener { closeDrawer() }
         binding.drawerVinorChat.setOnClickListener { openVinorChat() }
+        binding.drawerLawyer.setOnClickListener {
+            if (PartnerApi.hasSession()) openVinorChat()
+        }
+        binding.drawerPlusCta.setOnClickListener { openNativePage(NativePartnerFragment.PAGE_LEVELS) }
+        binding.drawerPlusHeader.setOnClickListener { openNativePage(NativePartnerFragment.PAGE_LISTINGS) }
         binding.drawerPostchi.setOnClickListener { openNotifications() }
         binding.drawerTraining.root.setOnClickListener { openTraining() }
         binding.drawerTrainingStart.root.setOnClickListener { openTraining() }
@@ -400,6 +405,7 @@ class MainActivity : AppCompatActivity() {
             }
             low.endsWith("/training") -> openNativePage(NativePartnerFragment.PAGE_TRAINING)
             low.endsWith("/levels") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)
+            low.endsWith("/plus") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)
             low.endsWith("/invite") -> openNativePage(NativePartnerFragment.PAGE_INVITE)
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
@@ -459,6 +465,14 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLegal.highlightColor = Color.TRANSPARENT
     }
 
+    private fun applyGuestDrawerChrome() {
+        binding.drawerPlusHeader.isVisible = false
+        binding.drawerPlusCta.isVisible = true
+        binding.drawerLawyer.alpha = 0.48f
+        binding.drawerLawyerSub.text = "برای استفاده وارد شوید"
+        binding.drawerLawyerEnd.setImageResource(R.drawable.ic_lock)
+    }
+
     private fun syncDrawerSession() {
         val session = PartnerApi.hasSession()
         binding.drawerUserMenu.isVisible = false
@@ -470,7 +484,7 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavGuest.isVisible = true
             binding.drawerNavStart.isVisible = false
             binding.drawerNavApproved.isVisible = false
-            binding.drawerNavPlus.isVisible = false
+            applyGuestDrawerChrome()
             return
         }
         binding.drawerGuestLogin.isVisible = !session
@@ -483,6 +497,7 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavApproved.isVisible = false
             binding.drawerNavPlus.isVisible = false
             if (!drawerOtpPending) showDrawerPhoneStep()
+            applyGuestDrawerChrome()
             return
         }
         binding.drawerNavGuest.isVisible = false
@@ -500,10 +515,13 @@ class MainActivity : AppCompatActivity() {
             var special = false
             var tier = ""
             var wallet = 0
+            var lawyerOn = true
             fun applyHome(home: JSONObject) {
                 if (home.has("is_approved")) approved = home.optBoolean("is_approved")
                 pending = home.optBoolean("has_pending_app")
                 wallet = home.optInt("withdrawable_balance")
+                if (home.has("is_special")) special = home.optBoolean("is_special")
+                if (home.has("lawyer_feature_on")) lawyerOn = home.optBoolean("lawyer_feature_on")
             }
             fun applyProfile(profile: JSONObject) {
                 if (profile.optString("me_phone").isNotBlank()) {
@@ -517,9 +535,12 @@ class MainActivity : AppCompatActivity() {
             }
             PartnerApi.peekJson("/express/partner/profile/data", this@MainActivity)?.let { applyProfile(it) }
             PartnerApi.peekJson("/express/partner/home/data", this@MainActivity)?.let { applyHome(it) }
-            if (phone.isNotBlank() && ::binding.isInitialized) bindDrawerProfileUi(
-                approved, pending, name, phone, avatar, special, tier, wallet,
-            )
+            if (phone.isNotBlank() && ::binding.isInitialized) {
+                bindDrawerProfileUi(
+                    approved, pending, name, phone, avatar, special, tier, wallet,
+                )
+                binding.drawerLawyer.isVisible = lawyerOn
+            }
             try {
                 val profile = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/profile/data", this@MainActivity)
@@ -536,6 +557,7 @@ class MainActivity : AppCompatActivity() {
             }
             if (!::binding.isInitialized) return@launch
             bindDrawerProfileUi(approved, pending, name, phone, avatar, special, tier, wallet)
+            binding.drawerLawyer.isVisible = lawyerOn
         }
     }
 
@@ -560,6 +582,7 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavApproved.isVisible = false
             binding.drawerNavPlus.isVisible = false
             binding.drawerChatLabel.text = "گفتگو"
+            applyGuestDrawerChrome()
             return
         }
         drawerApproved = approved
@@ -572,12 +595,17 @@ class MainActivity : AppCompatActivity() {
         binding.drawerNavStart.isVisible = !approved
         binding.drawerNavApproved.isVisible = approved
         binding.drawerNavPlus.isVisible = special
+        binding.drawerPlusHeader.isVisible = special
+        binding.drawerPlusCta.isVisible = !special
+        binding.drawerLawyer.alpha = 1f
+        binding.drawerLawyerSub.text = "مشاوره حقوقی املاک ایران"
+        binding.drawerLawyerEnd.setImageResource(R.drawable.ic_chevron_left)
         binding.drawerApply.drawerRowTitle.text = if (pending) "وضعیت درخواست" else "درخواست همکاری"
         binding.drawerApply.drawerRowIcon.setImageResource(
             if (pending) R.drawable.ic_clock else R.drawable.ic_person_add
         )
         binding.drawerWallet.drawerRowMeta.isVisible = true
-        binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet) + " تومان"
+        binding.drawerWallet.drawerRowMeta.text = PartnerFormat.toman(wallet)
         binding.drawerUserName.text = name
         binding.drawerUserPhone.text = phone
         val initials = when {

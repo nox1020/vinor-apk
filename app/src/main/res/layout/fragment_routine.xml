@@ -13,33 +13,9 @@
         android:padding="16dp"
         android:layoutDirection="rtl">
 
-        <!-- هدر صفحه روتین (مشابه وب: عنوان ثابت بالا) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layoutDirection="rtl"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="روتین"
-                android:textColor="#FFFFFF"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/routineMenu"
-                android:layout_width="41dp"
-                android:layout_height="41dp"
-                android:background="@drawable/bg_menu_orb"
-                android:contentDescription="منو"
-                android:padding="11dp"
-                android:src="@drawable/ic_menu_stroke" />
-        </LinearLayout>
+        <include
+            android:id="@+id/routineHeader"
+            layout="@layout/include_page_header" />
 
         <!-- پیشرفت امروز -->
         <FrameLayout

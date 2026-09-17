@@ -16,30 +16,35 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
 
             <ImageButton
                 android:id="@+id/profileEditBack"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_header_orb"
                 android:contentDescription="بازگشت"
+                android:padding="11dp"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="#9CA3AF" />
+                app:tint="#ECECEC" />
+
             <TextView
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
+                android:layout_marginHorizontal="8dp"
                 android:layout_weight="1"
+                android:background="@drawable/bg_header_title_pill"
                 android:gravity="center"
                 android:text="ویرایش پروفایل"
-                android:textColor="#F9FAFB"
-                android:textSize="18sp"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
                 android:textStyle="bold" />
+
             <View
-                android:layout_width="40dp"
-                android:layout_height="40dp" />
+                android:layout_width="42dp"
+                android:layout_height="42dp" />
         </LinearLayout>
 
         <ProgressBar
