@@ -132,6 +132,11 @@ class DashboardFragment : Fragment() {
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
         binding.dashboardNewsDot.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.news_dot_pulse))
+        val headerPad = (56 * resources.displayMetrics.density).toInt()
+        binding.dashboardRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
+        binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
+        binding.dashboardRefresh.setProgressViewOffset(true, headerPad / 2, headerPad + (36 * resources.displayMetrics.density).toInt())
+        binding.dashboardRefresh.setOnRefreshListener { onPullRefresh() }
         binding.dashboardChatInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -143,10 +148,18 @@ class DashboardFragment : Fragment() {
                 true
             } else false
         }
+        val adsOrigin = FloatArray(2)
         binding.dashboardAdsScroll.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE ->
-                    v.parent.requestDisallowInterceptTouchEvent(true)
+                MotionEvent.ACTION_DOWN -> {
+                    adsOrigin[0] = event.x
+                    adsOrigin[1] = event.y
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = kotlin.math.abs(event.x - adsOrigin[0])
+                    val dy = kotlin.math.abs(event.y - adsOrigin[1])
+                    v.parent.requestDisallowInterceptTouchEvent(dx > dy + 8f)
+                }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
                     v.parent.requestDisallowInterceptTouchEvent(false)
             }
@@ -177,6 +190,21 @@ class DashboardFragment : Fragment() {
         if (_binding == null) return
         showHomeEntry()
         loadAll()
+    }
+
+    private fun onPullRefresh() {
+        val b = _binding ?: return
+        if (b.dashboardAdsAll.isVisible || b.dashboardCustomer.isVisible || b.dashboardAttachSheet.isVisible) {
+            b.dashboardRefresh.isRefreshing = false
+            return
+        }
+        loadAll(fromPull = true)
+    }
+
+    private fun finishRefreshUi() {
+        val b = _binding ?: return
+        b.dashboardProgress.isVisible = false
+        b.dashboardRefresh.isRefreshing = false
     }
 
     /** بدو ورود خانه — تاریخچه در کشو می‌ماند، چت باز نمی‌شود. */
@@ -490,21 +518,26 @@ class DashboardFragment : Fragment() {
         )
     }
 
-    private fun loadAll() {
+    private fun loadAll(fromPull: Boolean = false) {
         val ctx = context ?: return
         scope.launch {
             var shownCache = false
-            val cached = withContext(Dispatchers.IO) {
-                PartnerApi.peekJson("/express/partner/home/data", ctx)
-            }
-            if (_binding == null) return@launch
-            if (cached != null) {
-                bindHome(cached)
-                if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
-                binding.dashboardProgress.isVisible = false
-                shownCache = true
+            if (!fromPull) {
+                val cached = withContext(Dispatchers.IO) {
+                    PartnerApi.peekJson("/express/partner/home/data", ctx)
+                }
+                if (_binding == null) return@launch
+                if (cached != null) {
+                    bindHome(cached)
+                    if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
+                    binding.dashboardProgress.isVisible = false
+                    shownCache = true
+                } else {
+                    binding.dashboardProgress.isVisible = true
+                }
             } else {
-                binding.dashboardProgress.isVisible = true
+                shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
+                binding.dashboardProgress.isVisible = false
             }
             var home = JSONObject()
             var loadError: String? = null
@@ -514,7 +547,9 @@ class DashboardFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 loadError = e.message ?: "خطا در بارگذاری"
-                if (shownCache) home = cached ?: JSONObject()
+                if (shownCache) {
+                    home = PartnerApi.peekJson("/express/partner/home/data", ctx) ?: JSONObject()
+                }
             }
             if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
                 try {
@@ -541,7 +576,10 @@ class DashboardFragment : Fragment() {
                     if (loadError == null && !shownCache) loadError = e.message
                 }
             }
-            if (_binding == null) return@launch
+            if (_binding == null) {
+                finishRefreshUi()
+                return@launch
+            }
             if (!home.optBoolean("from_cache") || !shownCache) {
                 bindHome(home)
             }
@@ -549,14 +587,13 @@ class DashboardFragment : Fragment() {
             if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0 && !shownCache) {
                 Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
             }
-            if (!wantChatLayer) binding.dashboardProgress.isVisible = false
             if (PartnerApi.hasSession()) {
                 fetchHistory(bindIfWanted = wantChatLayer)
             } else {
                 cachedHistory = null
                 threadId = null
                 if (wantChatLayer) bindChat(JSONObject())
-                binding.dashboardProgress.isVisible = false
+                finishRefreshUi()
             }
         }
     }
@@ -589,7 +626,7 @@ class DashboardFragment : Fragment() {
             } catch (_: Exception) {
                 if (_binding != null && bindIfWanted && wantChatLayer) bindChat(JSONObject())
             } finally {
-                if (_binding != null) binding.dashboardProgress.isVisible = false
+                finishRefreshUi()
             }
         }
     }

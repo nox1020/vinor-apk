@@ -15,6 +15,11 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/dashboardRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
         <ScrollView
             android:id="@+id/dashboardScroll"
             android:layout_width="match_parent"
@@ -311,6 +316,8 @@
                     android:paddingTop="8dp" />
             </LinearLayout>
         </ScrollView>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <View
                 android:id="@+id/dashboardAttachScrim"
