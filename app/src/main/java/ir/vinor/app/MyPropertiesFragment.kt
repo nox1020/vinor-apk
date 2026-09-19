@@ -27,6 +27,7 @@ class MyPropertiesFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var history = JSONArray()
+    private var rangeMonths = 12
     private var openedForm = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
