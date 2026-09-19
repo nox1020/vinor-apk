@@ -51,6 +51,8 @@ class MainActivity : AppCompatActivity() {
     private var otpSubmitting = false
     private var pendingOpenVinorChat = false
     private var edgeStartX = -1f
+    private var drawerPlusOn = false
+    private var drawerLawyerOn = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -337,10 +339,14 @@ class MainActivity : AppCompatActivity() {
         binding.drawerBackdrop.setOnClickListener { closeDrawer() }
         binding.drawerVinorChat.setOnClickListener { openVinorChat() }
         binding.drawerLawyer.setOnClickListener {
-            if (PartnerApi.hasSession()) openVinorChat()
+            if (drawerLawyerOn && PartnerApi.hasSession()) openVinorChat()
         }
-        binding.drawerPlusCta.setOnClickListener { openNativePage(NativePartnerFragment.PAGE_LEVELS) }
-        binding.drawerPlusHeader.setOnClickListener { openNativePage(NativePartnerFragment.PAGE_LISTINGS) }
+        binding.drawerPlusCta.setOnClickListener {
+            if (drawerPlusOn) openNativePage(NativePartnerFragment.PAGE_LEVELS)
+        }
+        binding.drawerPlusHeader.setOnClickListener {
+            if (drawerPlusOn) openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+        }
         binding.drawerPostchi.setOnClickListener { openNotifications() }
         binding.drawerTraining.root.setOnClickListener { openTraining() }
         binding.drawerTrainingStart.root.setOnClickListener { openTraining() }
@@ -476,7 +482,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyGuestDrawerChrome() {
         binding.drawerPlusHeader.isVisible = false
-        binding.drawerPlusCta.isVisible = true
+        binding.drawerPlusCta.isVisible = drawerPlusOn
+        binding.drawerLawyer.isVisible = drawerLawyerOn
         binding.drawerLawyer.alpha = 0.48f
         binding.drawerLawyerSub.text = "برای استفاده وارد شوید"
         binding.drawerLawyerEnd.setImageResource(R.drawable.ic_lock)
@@ -494,6 +501,7 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavStart.isVisible = false
             binding.drawerNavApproved.isVisible = false
             applyGuestDrawerChrome()
+            refreshDrawerProfile()
             return
         }
         binding.drawerGuestLogin.isVisible = !session
@@ -507,11 +515,17 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavPlus.isVisible = false
             if (!drawerOtpPending) showDrawerPhoneStep()
             applyGuestDrawerChrome()
+            refreshDrawerProfile()
             return
         }
         binding.drawerNavGuest.isVisible = false
         stopDrawerSmsListen()
         refreshDrawerProfile()
+    }
+
+    private fun applyDrawerFeatureFlags(obj: JSONObject) {
+        if (obj.has("lawyer_feature_on")) drawerLawyerOn = obj.optBoolean("lawyer_feature_on")
+        if (obj.has("plus_system_enabled")) drawerPlusOn = obj.optBoolean("plus_system_enabled")
     }
 
     private fun refreshDrawerProfile() {
@@ -524,15 +538,15 @@ class MainActivity : AppCompatActivity() {
             var special = false
             var tier = ""
             var wallet = 0
-            var lawyerOn = true
             fun applyHome(home: JSONObject) {
+                applyDrawerFeatureFlags(home)
                 if (home.has("is_approved")) approved = home.optBoolean("is_approved")
                 pending = home.optBoolean("has_pending_app")
                 wallet = home.optInt("withdrawable_balance")
                 if (home.has("is_special")) special = home.optBoolean("is_special")
-                if (home.has("lawyer_feature_on")) lawyerOn = home.optBoolean("lawyer_feature_on")
             }
             fun applyProfile(profile: JSONObject) {
+                applyDrawerFeatureFlags(profile)
                 if (profile.optString("me_phone").isNotBlank()) {
                     phone = profile.optString("me_phone")
                     name = profile.optString("me_name").ifBlank { "همکار وینور" }
@@ -544,11 +558,10 @@ class MainActivity : AppCompatActivity() {
             }
             PartnerApi.peekJson("/express/partner/profile/data", this@MainActivity)?.let { applyProfile(it) }
             PartnerApi.peekJson("/express/partner/home/data", this@MainActivity)?.let { applyHome(it) }
-            if (phone.isNotBlank() && ::binding.isInitialized) {
+            if (::binding.isInitialized) {
                 bindDrawerProfileUi(
                     approved, pending, name, phone, avatar, special, tier, wallet,
                 )
-                binding.drawerLawyer.isVisible = lawyerOn
             }
             try {
                 val profile = withContext(Dispatchers.IO) {
@@ -566,7 +579,6 @@ class MainActivity : AppCompatActivity() {
             }
             if (!::binding.isInitialized) return@launch
             bindDrawerProfileUi(approved, pending, name, phone, avatar, special, tier, wallet)
-            binding.drawerLawyer.isVisible = lawyerOn
         }
     }
 
@@ -582,6 +594,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val loggedIn = phone.isNotBlank() && PartnerApi.hasSession()
         if (!loggedIn) {
+            applyGuestDrawerChrome()
             if (drawerOtpPending) return
             binding.drawerGuestLogin.isVisible = true
             binding.drawerUserFoot.isVisible = false
@@ -591,7 +604,6 @@ class MainActivity : AppCompatActivity() {
             binding.drawerNavApproved.isVisible = false
             binding.drawerNavPlus.isVisible = false
             binding.drawerChatLabel.text = "گفتگو"
-            applyGuestDrawerChrome()
             return
         }
         drawerApproved = approved
@@ -604,8 +616,9 @@ class MainActivity : AppCompatActivity() {
         binding.drawerNavStart.isVisible = !approved
         binding.drawerNavApproved.isVisible = approved
         binding.drawerNavPlus.isVisible = special
-        binding.drawerPlusHeader.isVisible = special
-        binding.drawerPlusCta.isVisible = !special
+        binding.drawerPlusHeader.isVisible = drawerPlusOn && special
+        binding.drawerPlusCta.isVisible = drawerPlusOn && !special
+        binding.drawerLawyer.isVisible = drawerLawyerOn
         binding.drawerLawyer.alpha = 1f
         binding.drawerLawyerSub.text = "مشاوره حقوقی املاک ایران"
         binding.drawerLawyerEnd.setImageResource(R.drawable.ic_chevron_left)
