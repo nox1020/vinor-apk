@@ -410,6 +410,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun openTraining() = openPath("/express/partner/training")
 
+    fun openOwnerHomeForm() {
+        closeDrawer()
+        val url = "${PartnerApi.BASE}/express/partner/my-property?register=1"
+        val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, url) }
+        navController.navigate(R.id.partnerPageFragment, args)
+    }
+
     fun openPath(path: String) {
         closeDrawer()
         val uri = Uri.parse(if (path.startsWith("http")) path else "${PartnerApi.BASE}$path")
@@ -429,7 +436,9 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
-                if (navController.currentDestination?.id != R.id.myPropertiesFragment) {
+                if (uri.getQueryParameter("register") == "1") {
+                    openOwnerHomeForm()
+                } else if (navController.currentDestination?.id != R.id.myPropertiesFragment) {
                     navController.navigate(R.id.myPropertiesFragment)
                 }
             }

@@ -27,7 +27,7 @@ class MyPropertiesFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var history = JSONArray()
-    private var rangeMonths = 12
+    private var openedForm = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -93,7 +93,18 @@ class MyPropertiesFragment : Fragment() {
     }
 
     private fun bind(obj: JSONObject) {
-        val prop = obj.optJSONObject("property") ?: return
+        val prop = obj.optJSONObject("property")
+        val has = obj.optBoolean("has_property", false) &&
+            prop != null &&
+            !prop.optBoolean("is_demo")
+        if (!has || prop == null) {
+            if (!openedForm) {
+                openedForm = true
+                (activity as? MainActivity)?.openOwnerHomeForm()
+            }
+            return
+        }
+        openedForm = false
         binding.mpContent.isVisible = true
         binding.mpAddress.text = prop.optString("address")
         val city = prop.optString("city")

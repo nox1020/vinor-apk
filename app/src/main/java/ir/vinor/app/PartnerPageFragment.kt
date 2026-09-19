@@ -35,6 +35,13 @@ class PartnerPageFragment : BaseWebViewFragment() {
                 if (code.isNotBlank()) hostAct?.openLand(code)
                 true
             }
+            path.endsWith("/my-property") || path.endsWith("/my-properties") -> {
+                if (uri.getQueryParameter("register") == "1") false
+                else {
+                    hostAct?.openPath("/express/partner/my-property")
+                    true
+                }
+            }
             path.matches(Regex("^/express/[^/]+$")) && path != "/express/partner" -> {
                 val code = path.substringAfterLast('/')
                 if (code.isNotBlank() && !code.equals("partner", ignoreCase = true)) {
