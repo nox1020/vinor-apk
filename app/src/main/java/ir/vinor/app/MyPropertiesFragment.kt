@@ -114,33 +114,30 @@ class MyPropertiesFragment : Fragment() {
         binding.mpCity.text = listOf(city, state, zip).filter { it.isNotBlank() }.joinToString("، ")
         binding.mpMeta.text = "${fa(prop.optInt("beds"))} تخت · ${fa(prop.optInt("baths"))} حمام · ${fa(prop.optInt("sqm"))} متر مربع · ساخت ${fa(prop.optInt("built_year"))}"
         binding.mpGalleryCount.text = "${fa(prop.optInt("gallery_count"))} عکس"
-        binding.mpClaimed.isVisible = prop.optBoolean("is_claimed")
-        binding.mpDemo.isVisible = prop.optBoolean("is_demo")
+        binding.mpClaimed.isVisible = true
+        binding.mpClaimed.text = prop.optString("badge_label").ifBlank { "خصوصی" }
+        binding.mpDemo.isVisible = true
+        binding.mpDemo.text = prop.optString("privacy_note").ifBlank { "فقط شما این قیمت را می‌بینید" } + " · برای آگهی منتشر نمی‌شود"
         PartnerImages.bind(scope, binding.mpCover, prop.optString("cover_image"))
         binding.mpValue.text = PartnerFormat.toman(prop.optLong("estimated_value")) + " تومان"
         val monthly = prop.optDouble("monthly_change_pct")
+        val yearly = prop.optDouble("yearly_change_pct")
         val label = prop.optString("monthly_change_label").ifBlank { faPct(monthly) }
+        val yearlyLabel = prop.optString("yearly_change_label").ifBlank { faPct(yearly) }
         binding.mpChange.text = (if (monthly >= 0) "↑ " else "↓ ") + label + "٪ نسبت به ماه گذشته"
         binding.mpChange.setTextColor(Color.parseColor(if (monthly >= 0) "#6EE7B7" else "#FDA4AF"))
         binding.mpPpm.text = PartnerFormat.toman(prop.optLong("price_per_sqm"))
-        binding.mpYearly.text = prop.optString("yearly_change_label").ifBlank { faPct(prop.optDouble("yearly_change_pct")) } + "٪"
-        binding.mpViews.text = fa(prop.optInt("weekly_views"))
+        binding.mpYearly.text = yearlyLabel + "٪"
+        binding.mpViews.text = PartnerFormat.toman(prop.optLong("neighborhood_avg"))
         binding.mpLegend.text = "خط‌چین: میانگین محله " + PartnerFormat.toman(prop.optLong("neighborhood_avg")) + " تومان"
-        binding.mpTrend.text = "محله شما $label٪ سریع‌تر از میانگین رشد کرده."
-        val equity = prop.optJSONObject("equity") ?: JSONObject()
-        binding.mpEquity.text = PartnerFormat.toman(equity.optLong("total")) + " تومان — " + fa(equity.optInt("paid_off_pct")) + "٪ از ملک پرداخت شده است."
-        binding.mpEquityBar.progress = equity.optInt("paid_off_pct")
+        binding.mpTrend.text = "نسبت به ماه گذشته $label٪ و نسبت به سال گذشته $yearlyLabel٪ تغییر کرده است."
         history = prop.optJSONArray("price_history") ?: JSONArray()
         bindRangeTabs()
         drawChart()
-        bindNearby(prop.optJSONArray("nearby_listings") ?: JSONArray())
         bindActivity(prop.optJSONArray("activity") ?: JSONArray())
         val act = activity as? MainActivity
-        binding.mpEdit.setOnClickListener { act?.openPath("/express/partner/settings") }
-        binding.mpPhotos.setOnClickListener { act?.openPath("/express/partner/settings") }
-        binding.mpSettings.setOnClickListener { act?.openPath("/express/partner/settings") }
-        binding.mpNearbyAll.setOnClickListener { act?.openPartnerHome() }
-        binding.mpSellCta.setOnClickListener { act?.openPath("/express/partner/listings") }
+        binding.mpEdit.setOnClickListener { act?.openPath("/express/partner/my-property") }
+        binding.mpPhotos.setOnClickListener { act?.openPath("/express/partner/my-property") }
     }
 
     private fun bindRangeTabs() {
@@ -175,19 +172,6 @@ class MyPropertiesFragment : Fragment() {
             neigh.add(row.optDouble("neighborhood").toFloat())
         }
         binding.mpChart.setSeries(values, neigh)
-    }
-
-    private fun bindNearby(arr: JSONArray) {
-        binding.mpNearby.removeAllViews()
-        for (i in 0 until minOf(3, arr.length())) {
-            val row = arr.optJSONObject(i) ?: continue
-            val tv = TextView(requireContext())
-            tv.setTextColor(Color.parseColor("#ECECEC"))
-            tv.textSize = 12.5f
-            tv.setPadding(0, dp(6), 0, dp(6))
-            tv.text = "${row.optString("address")} · ${row.optDouble("distance_km")} کیلومتر  ${PartnerFormat.toman(row.optLong("price"))}"
-            binding.mpNearby.addView(tv)
-        }
     }
 
     private fun bindActivity(arr: JSONArray) {
