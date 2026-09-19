@@ -23,6 +23,7 @@ class OnboardingActivity : AppCompatActivity() {
     private val pages = listOf(
         Page(R.drawable.vinor_splash_mark, R.drawable.bg_onboard_icon_brand, R.string.onboard_title_1, R.string.onboard_body_1, tint = false),
         Page(R.drawable.ic_sparkle, R.drawable.bg_onboard_icon_chat, R.string.onboard_title_2, R.string.onboard_body_2),
+        Page(R.drawable.ic_home, R.drawable.bg_onboard_icon_home, R.string.onboard_title_home, R.string.onboard_body_home),
         Page(R.drawable.ic_building, R.drawable.bg_onboard_icon_sale, R.string.onboard_title_3, R.string.onboard_body_3),
         Page(R.drawable.ic_wallet, R.drawable.bg_onboard_icon_wallet, R.string.onboard_title_4, R.string.onboard_body_4),
         Page(R.drawable.ic_graduation, R.drawable.bg_onboard_icon_learn, R.string.onboard_title_5, R.string.onboard_body_5),
