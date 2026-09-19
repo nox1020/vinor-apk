@@ -302,6 +302,10 @@
                         app:tint="#71717A" />
                 </LinearLayout>
 
+                <include
+                    android:id="@+id/drawerMyProperty"
+                    layout="@layout/item_drawer_nav" />
+
                 <LinearLayout
                     android:id="@+id/drawerNavGuest"
                     android:layout_width="match_parent"

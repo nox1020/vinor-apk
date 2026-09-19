@@ -99,7 +99,7 @@
         android:id="@+id/myPropertiesFragment"
         android:name="ir.vinor.app.MyPropertiesFragment"
         android:label="ملک من"
-        tools:layout="@layout/fragment_webview" />
+        tools:layout="@layout/fragment_my_property" />
 
     <fragment
         android:id="@+id/landDetailFragment"

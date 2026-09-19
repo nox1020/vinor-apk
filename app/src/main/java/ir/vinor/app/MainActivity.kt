@@ -365,6 +365,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.drawerFavorites.root.setOnClickListener { openPath("/express/partner/favorites") }
         binding.drawerListings.root.setOnClickListener { openPath("/express/partner/listings") }
+        binding.drawerMyProperty.root.setOnClickListener { openPath("/express/partner/my-property") }
         binding.drawerBrand.setOnClickListener { openPartnerHome() }
         binding.drawerUserCard.setOnClickListener { openProfileEdit() }
         binding.drawerUserRole.setOnClickListener { openPath("/express/partner/levels") }
@@ -401,6 +402,7 @@ class MainActivity : AppCompatActivity() {
         row(binding.drawerInvite, R.drawable.ic_person_add, "دعوت همکار")
         row(binding.drawerRoutine, R.drawable.ic_routine, "پیگیری")
         row(binding.drawerListings, R.drawable.ic_building, "آگهی‌های من")
+        row(binding.drawerMyProperty, R.drawable.ic_home, "ملک من")
         binding.drawerNavPlus.isVisible = false
         row(binding.drawerWallet, R.drawable.ic_wallet, "کیف پول")
         row(binding.drawerFavorites, R.drawable.ic_bookmark, "نشان‌ها")
@@ -426,6 +428,11 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+            low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
+                if (navController.currentDestination?.id != R.id.myPropertiesFragment) {
+                    navController.navigate(R.id.myPropertiesFragment)
+                }
+            }
             low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
                 openNativePage(NativePartnerFragment.PAGE_APPLY)
             low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
