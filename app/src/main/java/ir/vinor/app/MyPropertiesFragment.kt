@@ -28,6 +28,7 @@ class MyPropertiesFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var history = JSONArray()
     private var rangeMonths = 12
+    private var skipNextResumeLoad = true
     private var openedForm = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -35,6 +36,7 @@ class MyPropertiesFragment : Fragment() {
             job = Job()
             scope = CoroutineScope(Dispatchers.Main + job)
         }
+        skipNextResumeLoad = true
         _binding = FragmentMyPropertyBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -51,6 +53,9 @@ class MyPropertiesFragment : Fragment() {
         binding.mpRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.mpRefresh.setOnRefreshListener { load(true) }
         PartnerImages.roundClip(binding.mpCover, 16f)
+        binding.mpEmptyCta.setOnClickListener {
+            (activity as? MainActivity)?.openOwnerHomeForm()
+        }
         load(false)
     }
 
@@ -58,6 +63,15 @@ class MyPropertiesFragment : Fragment() {
         job.cancel()
         super.onDestroyView()
         _binding = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResumeLoad) {
+            skipNextResumeLoad = false
+            return
+        }
+        if (_binding != null && PartnerApi.hasSession()) load(true)
     }
 
     private fun load(forceNet: Boolean) {
@@ -99,13 +113,18 @@ class MyPropertiesFragment : Fragment() {
             prop != null &&
             !prop.optBoolean("is_demo")
         if (!has || prop == null) {
+            binding.mpContent.isVisible = false
+            binding.mpEmpty.isVisible = true
             if (!openedForm) {
                 openedForm = true
-                (activity as? MainActivity)?.openOwnerHomeForm()
+                binding.root.post {
+                    if (_binding == null) return@post
+                    (activity as? MainActivity)?.openOwnerHomeForm()
+                }
             }
             return
         }
-        openedForm = false
+        binding.mpEmpty.isVisible = false
         binding.mpContent.isVisible = true
         binding.mpAddress.text = prop.optString("address")
         val city = prop.optString("city")

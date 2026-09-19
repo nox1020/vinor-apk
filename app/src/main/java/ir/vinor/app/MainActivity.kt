@@ -412,9 +412,9 @@ class MainActivity : AppCompatActivity() {
 
     fun openOwnerHomeForm() {
         closeDrawer()
-        val url = "${PartnerApi.BASE}/express/partner/my-property?register=1"
-        val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, url) }
-        navController.navigate(R.id.partnerPageFragment, args)
+        if (navController.currentDestination?.id != R.id.myPropertyFormFragment) {
+            navController.navigate(R.id.myPropertyFormFragment)
+        }
     }
 
     fun openPath(path: String) {

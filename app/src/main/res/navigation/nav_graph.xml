@@ -102,6 +102,12 @@
         tools:layout="@layout/fragment_my_property" />
 
     <fragment
+        android:id="@+id/myPropertyFormFragment"
+        android:name="ir.vinor.app.MyPropertyFormFragment"
+        android:label="ثبت ملک من"
+        tools:layout="@layout/fragment_my_property_form" />
+
+    <fragment
         android:id="@+id/landDetailFragment"
         android:name="ir.vinor.app.LandDetailFragment"
         android:label="فایل"

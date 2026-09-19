@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="72dp"
+    android:layout_height="72dp"
+    android:layout_marginEnd="8dp">
+
+    <ImageView
+        android:id="@+id/mpPhotoThumb"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_attach_thumb"
+        android:contentDescription=""
+        android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/mpPhotoRemove"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="4dp"
+        android:background="@drawable/bg_mp_submit"
+        android:gravity="center"
+        android:text="×"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+</FrameLayout>
