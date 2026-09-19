@@ -111,7 +111,6 @@ jobs:
       (github.ref == 'refs/heads/main' && needs.changes.outputs.app == 'true')
     permissions:
       contents: read
-      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -130,80 +129,30 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Ensure signing secrets (bootstrap if missing)
+      - name: Require signing secrets
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
         run: |
           set -euo pipefail
-          need_bootstrap=0
-          [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] && need_bootstrap=1
-          [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] && need_bootstrap=1
-          [ -z "${ANDROID_KEY_ALIAS:-}" ] && need_bootstrap=1
-          [ -z "${ANDROID_KEY_PASSWORD:-}" ] && need_bootstrap=1
-
-          if [ "$need_bootstrap" = "0" ]; then
-            {
-              echo "ANDROID_KEYSTORE_BASE64=$ANDROID_KEYSTORE_BASE64"
-              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
-              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
-              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
-            } >> "$GITHUB_ENV"
-            exit 0
+          missing=0
+          [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] && { echo "ANDROID_KEYSTORE_BASE64 is empty."; missing=1; }
+          [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] && { echo "ANDROID_KEYSTORE_PASSWORD is empty."; missing=1; }
+          [ -z "${ANDROID_KEY_ALIAS:-}" ] && { echo "ANDROID_KEY_ALIAS is empty."; missing=1; }
+          [ -z "${ANDROID_KEY_PASSWORD:-}" ] && { echo "ANDROID_KEY_PASSWORD is empty."; missing=1; }
+          if [ "$missing" = "1" ]; then
+            echo "Release signing secrets are required. Refusing to generate an ephemeral keystore."
+            exit 1
           fi
-
-          echo "Signing secrets missing; generating ephemeral keystore for this run."
-          rand() { tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 ; echo ; }
-          PASS="$(rand)"
-          STORE_PASS="$PASS"
-          # Use same password for key and store to avoid decryption mismatch on some JDKs
-          KEY_PASS="$PASS"
-          KEY_ALIAS_VALUE="${ANDROID_KEY_ALIAS:-vinor_release}"
-
-          mkdir -p app/keystore
-          keytool -genkeypair -v \
-            -keystore app/keystore/vinor-release.jks \
-            -storetype JKS \
-            -alias "$KEY_ALIAS_VALUE" \
-            -keyalg RSA -keysize 2048 -validity 36500 \
-            -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
-            -dname "CN=vinor,O=vinor,L=Tehran,C=IR"
-
-          B64="$(base64 -w 0 app/keystore/vinor-release.jks)"
-
-          # Export to this job's environment
           {
-            echo "ANDROID_KEYSTORE_BASE64=$B64"
-            echo "ANDROID_KEYSTORE_PASSWORD=$STORE_PASS"
-            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS_VALUE"
-            echo "ANDROID_KEY_PASSWORD=$KEY_PASS"
+            echo "ANDROID_KEYSTORE_BASE64=$ANDROID_KEYSTORE_BASE64"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-
-          # If admin token exists, persist into repo secrets for future runs (optional)
-          if [ -n "$GH_ADMIN_TOKEN" ]; then
-            echo "Persisting secrets into repository via GH_ADMIN_TOKEN..."
-            sudo apt-get update -y >/dev/null 2>&1 || true
-            if ! command -v gh >/dev/null 2>&1; then
-              type -p curl >/dev/null || sudo apt-get install curl -y
-              curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-              sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-              sudo apt-get update -y && sudo apt-get install gh -y
-            fi
-            echo "$GH_ADMIN_TOKEN" | gh auth login --with-token || true
-            { \
-              gh secret set ANDROID_KEYSTORE_BASE64 -b"$B64" && \
-              gh secret set ANDROID_KEYSTORE_PASSWORD -b"$STORE_PASS" && \
-              gh secret set ANDROID_KEY_ALIAS -b"$KEY_ALIAS_VALUE" && \
-              gh secret set ANDROID_KEY_PASSWORD -b"$KEY_PASS"; \
-            } || echo "WARN: Unable to persist repository secrets; continuing with ephemeral secrets."
-          else
-            echo "GH_ADMIN_TOKEN not set; continuing with ephemeral secrets only."
-          fi
 
       - name: Prepare keystore directory
         run: mkdir -p app/keystore
