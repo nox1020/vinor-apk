@@ -77,8 +77,17 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         val splash = installSplashScreen()
-        splash.setKeepOnScreenCondition { keepSystemSplash }
+        val fromOnboarding = intent?.getBooleanExtra(OnboardingActivity.EXTRA_FROM_ONBOARDING, false) == true
+        splash.setKeepOnScreenCondition { keepSystemSplash && !fromOnboarding }
         super.onCreate(savedInstanceState)
+        if (fromOnboarding) keepSystemSplash = false
+        if (!fromOnboarding && VinorOnboardingStore.shouldShow(this, intent)) {
+            keepSystemSplash = false
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            overridePendingTransition(0, 0)
+            finish()
+            return
+        }
         SystemUi.apply(this)
         runCatching { CookieManager.getInstance().setAcceptCookie(true) }
         binding = ActivityMainBinding.inflate(layoutInflater)

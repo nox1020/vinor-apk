@@ -28,5 +28,19 @@
     <string name="login_resend_fail">خطا در ارسال مجدد.</string>
     <string name="login_sms_permission_denied">بدون دسترسی پیامک، خواندن خودکار کد ممکن نیست؛ کد را دستی وارد کنید.</string>
     <string name="login_otp_auto_filled">کد از پیامک خوانده شد.</string>
+
+    <string name="onboard_skip">رد کردن</string>
+    <string name="onboard_next">بعدی</string>
+    <string name="onboard_start">شروع وینور</string>
+    <string name="onboard_title_1">وینور</string>
+    <string name="onboard_body_1">اپ هوشمند املاک ایران. از جستجوی فایل تا بستن معامله، همه در یک گفتگو.</string>
+    <string name="onboard_title_2">با وینور حرف بزن</string>
+    <string name="onboard_body_2">بگو دنبال چه ملکی هستی؛ وینور فایل مناسب را پیدا می‌کند و مسیر بازدید را می‌سازد.</string>
+    <string name="onboard_title_3">فروش و همکاری</string>
+    <string name="onboard_body_3">بازاریاب شو، مشتری را به بازدید ببر و بعد از معاملهٔ تأییدشده پورسانت بگیر.</string>
+    <string name="onboard_title_4">کیف پول شفاف</string>
+    <string name="onboard_body_4">درآمدت را ببین، پیگیری فروش را دنبال کن و موجودی قابل برداشت را در منو داشته باش.</string>
+    <string name="onboard_title_5">آموزش و رشد</string>
+    <string name="onboard_body_5">مسیر فروش را یاد بگیر، همکاران را دعوت کن و سطح همکاری‌ات را بالا ببر.</string>
 </resources>
 
