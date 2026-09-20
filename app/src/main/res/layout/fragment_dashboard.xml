@@ -610,7 +610,8 @@
             android:background="@drawable/bg_menu_orb"
             android:contentDescription="منو"
             android:padding="11dp"
-            android:src="@drawable/ic_menu_stroke" />
+            android:src="@drawable/ic_menu_stroke"
+            android:visibility="gone" />
     </LinearLayout>
 
     <ProgressBar

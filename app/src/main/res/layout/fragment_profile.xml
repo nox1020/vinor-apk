@@ -29,6 +29,7 @@
                 android:contentDescription="بازگشت"
                 android:padding="11dp"
                 android:src="@drawable/ic_chevron_right"
+                android:visibility="gone"
                 app:tint="#ECECEC" />
 
             <TextView
@@ -39,7 +40,7 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_header_title_pill"
                 android:gravity="center"
-                android:text="پروفایل"
+                android:text="وینور من"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
