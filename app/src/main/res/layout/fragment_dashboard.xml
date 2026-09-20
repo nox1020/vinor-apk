@@ -337,7 +337,8 @@
             android:paddingStart="18dp"
             android:paddingEnd="18dp"
             android:paddingTop="6dp"
-            android:paddingBottom="10dp">
+            android:paddingBottom="10dp"
+            android:visibility="gone">
 
             <LinearLayout
                 android:id="@+id/dashboardAttachSheet"
