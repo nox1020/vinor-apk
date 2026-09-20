@@ -104,8 +104,13 @@
     <fragment
         android:id="@+id/myPropertyFormFragment"
         android:name="ir.vinor.app.MyPropertyFormFragment"
-        android:label="ثبت ملک من"
-        tools:layout="@layout/fragment_my_property_form" />
+        android:label="ثبت آگهی"
+        tools:layout="@layout/fragment_my_property_form">
+        <argument
+            android:name="publicListing"
+            app:argType="boolean"
+            android:defaultValue="false" />
+    </fragment>
 
     <fragment
         android:id="@+id/landDetailFragment"

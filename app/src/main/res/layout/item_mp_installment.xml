@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_routine_card"
+    android:gravity="bottom"
+    android:orientation="horizontal"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ماه"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="10sp" />
+
+        <EditText
+            android:id="@+id/mpInstMonths"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_drawer_input"
+            android:hint="۱۲"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:padding="8dp"
+            android:textAlignment="viewStart"
+            android:textColor="#F3F4F6"
+            android:textColorHint="#6B7280"
+            android:textDirection="ltr"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مبلغ"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="10sp" />
+
+        <EditText
+            android:id="@+id/mpInstAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_drawer_input"
+            android:hint="تومان"
+            android:importantForAutofill="no"
+            android:inputType="number"
+            android:padding="8dp"
+            android:textAlignment="viewStart"
+            android:textColor="#F3F4F6"
+            android:textColorHint="#6B7280"
+            android:textDirection="ltr"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/mpInstRemove"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_routine_card"
+        android:gravity="center"
+        android:text="×"
+        android:textColor="#FDA4AF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+</LinearLayout>

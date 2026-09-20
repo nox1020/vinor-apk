@@ -52,6 +52,9 @@ class MyPropertyFormFragment : Fragment() {
     private var uploading = 0
     private var mapOpen = false
     private var mapConfirmed = false
+    private var publicListing = false
+    private val paymentMethods = mutableListOf("انتخاب کنید")
+    private val installmentRows = mutableListOf<View>()
 
     private val pickPhotos = registerForActivityResult(
         ActivityResultContracts.GetMultipleContents()
@@ -84,10 +87,17 @@ class MyPropertyFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.mpFormHeader.pageTitle.text = "ثبت ملک من"
+        publicListing = arguments?.getBoolean(ARG_PUBLIC) == true
+        if (publicListing) {
+            binding.mpFormHeader.pageTitle.text = "ثبت آگهی"
+            binding.mpFormSubtitle.text = "اطلاعات ملک را وارد و منتشر کنید"
+            binding.mpFormSubmit.text = "ثبت و انتشار آگهی"
+        } else {
+            binding.mpFormHeader.pageTitle.text = "ثبت ملک من"
+        }
         binding.mpFormHeader.pageBack.setOnClickListener {
             if (!findNavController().navigateUp()) {
-                (activity as? MainActivity)?.openPath("/express/partner/my-property")
+                (activity as? MainActivity)?.openPartnerHome()
             }
         }
         binding.mpFormDropzone.setOnClickListener {
@@ -125,6 +135,15 @@ class MyPropertyFormFragment : Fragment() {
         }
         binding.mpFormMapConfirm.setOnClickListener { confirmMap() }
         binding.mpFormSubmit.setOnClickListener { submit() }
+        binding.mpFormAddInstallment.setOnClickListener { addInstallmentRow() }
+        binding.mpFormPayment.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val installments = selectedPayment() == "اقساطی"
+                binding.mpFormInstallments.isVisible = installments
+                if (installments && installmentRows.isEmpty()) addInstallmentRow()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
         attachIntFormat(binding.mpFormSize)
         attachIntFormat(binding.mpFormPrice)
         loadForm()
@@ -146,7 +165,8 @@ class MyPropertyFormFragment : Fragment() {
         binding.mpFormProgress.isVisible = true
         scope.launch {
             try {
-                val obj = withContext(Dispatchers.IO) { PartnerApi.get(FORM_PATH, ctx) }
+                val path = if (publicListing) "$FORM_PATH?mode=listing" else FORM_PATH
+                val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null) return@launch
                 binding.mpFormProgress.isVisible = false
                 if (obj.optInt("http_status") == 401) {
@@ -170,6 +190,31 @@ class MyPropertyFormFragment : Fragment() {
         if (sub.isNotBlank()) binding.mpFormSubtitle.text = sub
         val submit = obj.optString("submit_label")
         if (submit.isNotBlank()) binding.mpFormSubmit.text = submit
+        publicListing = obj.optBoolean("public_listing", publicListing)
+        val hideCommission = obj.optBoolean("hide_commission", !publicListing)
+        val hidePayment = obj.optBoolean("hide_payment", !publicListing)
+        val hideBroadcast = obj.optBoolean("hide_broadcast", !publicListing)
+        binding.mpFormSpecialBlock.isVisible = !hideCommission || !hideBroadcast
+        binding.mpFormCommissionRow.isVisible = !hideCommission
+        binding.mpFormBroadcast.isVisible = !hideBroadcast
+        binding.mpFormBroadcastDivider.isVisible = !hideCommission && !hideBroadcast
+        binding.mpFormPaymentBlock.isVisible = !hidePayment
+        if (!hideCommission) {
+            val d = obj.optString("default_commission_pct").ifBlank { "2" }
+            if (binding.mpFormCommission.text.isNullOrBlank()) binding.mpFormCommission.setText(d)
+        }
+        paymentMethods.clear()
+        paymentMethods.add("انتخاب کنید")
+        val pmArr = obj.optJSONArray("payment_methods") ?: JSONArray()
+        if (pmArr.length() == 0) {
+            paymentMethods.addAll(listOf("نقدی", "اقساطی", "معاوضه", "توافقی"))
+        } else {
+            for (i in 0 until pmArr.length()) {
+                val m = pmArr.optString(i).trim()
+                if (m.isNotBlank()) paymentMethods.add(m)
+            }
+        }
+        binding.mpFormPayment.adapter = spinnerAdapter(paymentMethods)
         specSchema = obj.optJSONObject("spec_schema") ?: JSONObject()
         catKind = obj.optJSONObject("cat_kind") ?: JSONObject()
         sizeLabels = obj.optJSONObject("size_labels") ?: JSONObject()
@@ -214,6 +259,41 @@ class MyPropertyFormFragment : Fragment() {
     private fun selectedCity(): String {
         val pos = binding.mpFormCity.selectedItemPosition
         return if (pos <= 0) "" else cities.getOrNull(pos).orEmpty()
+    }
+
+    private fun selectedPayment(): String {
+        val pos = binding.mpFormPayment.selectedItemPosition
+        return if (pos <= 0) "" else paymentMethods.getOrNull(pos).orEmpty()
+    }
+
+    private fun addInstallmentRow() {
+        val b = _binding ?: return
+        val row = layoutInflater.inflate(R.layout.item_mp_installment, b.mpFormInstallmentRows, false)
+        val amount = row.findViewById<EditText>(R.id.mpInstAmount)
+        attachIntFormat(amount)
+        row.findViewById<View>(R.id.mpInstRemove).setOnClickListener {
+            b.mpFormInstallmentRows.removeView(row)
+            installmentRows.remove(row)
+            if (installmentRows.isEmpty() && selectedPayment() == "اقساطی") addInstallmentRow()
+        }
+        b.mpFormInstallmentRows.addView(row)
+        installmentRows.add(row)
+    }
+
+    private fun collectInstallments(): Pair<JSONArray, JSONArray>? {
+        val months = JSONArray()
+        val amounts = JSONArray()
+        var valid = 0
+        installmentRows.forEach { row ->
+            val m = longDigits(row.findViewById<EditText>(R.id.mpInstMonths).text?.toString().orEmpty())
+            val a = longDigits(row.findViewById<EditText>(R.id.mpInstAmount).text?.toString().orEmpty())
+            if (m > 0L && a > 0L) {
+                months.put(m.toString())
+                amounts.put(a.toString())
+                valid += 1
+            }
+        }
+        return if (valid > 0) months to amounts else null
     }
 
     private fun kindFor(category: String): String = catKind.optString(category)
@@ -473,8 +553,22 @@ class MyPropertyFormFragment : Fragment() {
                 showError("عنوان باید حداقل ۱۰ کاراکتر باشد.")
                 return
             }
+            publicListing && selectedPayment().isBlank() -> {
+                showError("نحوه پرداخت را انتخاب کنید.")
+                return
+            }
+            publicListing && selectedPayment() == "اقساطی" && collectInstallments() == null -> {
+                showError("برای پرداخت اقساطی حداقل یک قسط معتبر وارد کنید.")
+                return
+            }
+            publicListing && commissionPct() == null -> {
+                showError("درصد پورسانت الزامی است.")
+                return
+            }
         }
         val ppm = if (size > 0L) price / size else 0L
+        val payment = if (publicListing) selectedPayment() else "توافقی"
+        val commission = if (publicListing) commissionPct()?.toString() ?: "0" else "0"
         val body = JSONObject()
             .put("title", title)
             .put("city", city)
@@ -484,8 +578,17 @@ class MyPropertyFormFragment : Fragment() {
             .put("price_per_meter", ppm.toString())
             .put("category", selectedCategory())
             .put("description", binding.mpFormDesc.text?.toString()?.trim().orEmpty())
-            .put("express_commission_pct", "0")
-            .put("payment_method", "توافقی")
+            .put("express_commission_pct", commission)
+            .put("payment_method", payment)
+        if (publicListing) {
+            if (binding.mpFormBroadcast.isChecked) body.put("auto_send_all_partners", "1")
+            if (payment == "اقساطی") {
+                collectInstallments()?.let { (months, amounts) ->
+                    body.put("installment_months[]", months)
+                    body.put("installment_amounts[]", amounts)
+                }
+            }
+        }
         val images = JSONArray()
         photos.forEach { images.put(it.path) }
         body.put("images", images)
@@ -504,7 +607,13 @@ class MyPropertyFormFragment : Fragment() {
         val ctx = context ?: return
         scope.launch {
             try {
-                val obj = withContext(Dispatchers.IO) { PartnerApi.postJson(SUBMIT_PATH, body, ctx) }
+                val obj = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(
+                        if (publicListing) SUBMIT_LISTING else SUBMIT_PATH,
+                        body,
+                        ctx,
+                    )
+                }
                 if (_binding == null) return@launch
                 if (obj.optInt("http_status") == 401) {
                     toast("برای ثبت ملک وارد شوید.")
@@ -512,12 +621,18 @@ class MyPropertyFormFragment : Fragment() {
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {
-                    toast(obj.optString("message").ifBlank { "ملک شما ثبت شد." })
-                    if (!findNavController().navigateUp()) {
-                        (activity as? MainActivity)?.openPath("/express/partner/my-property")
+                    toast(obj.optString("message").ifBlank {
+                        if (publicListing) "آگهی ثبت شد." else "ملک شما ثبت شد."
+                    })
+                    val act = activity as? MainActivity
+                    findNavController().navigateUp()
+                    if (publicListing || obj.optString("next") == "listings") {
+                        act?.openPath("/express/partner/listings")
                     }
                 } else {
-                    showError(obj.optString("error").ifBlank { "ثبت ملک ناموفق بود." })
+                    showError(obj.optString("error").ifBlank {
+                        if (publicListing) "ثبت آگهی ناموفق بود." else "ثبت ملک ناموفق بود."
+                    })
                 }
             } catch (e: Exception) {
                 if (_binding != null) showError(e.message ?: "خطای شبکه")
@@ -566,6 +681,12 @@ class MyPropertyFormFragment : Fragment() {
         if (digits.isBlank()) return ""
         val n = digits.toLongOrNull() ?: return ""
         return PartnerFormat.toman(n)
+    }
+
+    private fun commissionPct(): Double? {
+        val n = parseCoord(binding.mpFormCommission.text?.toString().orEmpty()) ?: return null
+        if (n <= 0.0 || n > 100.0) return null
+        return n
     }
 
     private fun longDigits(raw: String): Long = PartnerApi.asciiDigits(raw).toLongOrNull() ?: 0L
@@ -628,9 +749,11 @@ class MyPropertyFormFragment : Fragment() {
     private data class MediaSlot(val path: String, val url: String, val name: String)
 
     companion object {
+        const val ARG_PUBLIC = "publicListing"
         private const val MAX_PHOTOS = 12
         private const val FORM_PATH = "/express/partner/api/my-property/form"
         private const val SUBMIT_PATH = "/express/partner/api/my-property/submit"
+        private const val SUBMIT_LISTING = "/express/partner/api/listings/submit"
         private const val UPLOAD_IMAGE = "/express/partner/api/my-property/upload-image"
         private const val UPLOAD_VIDEO = "/express/partner/api/my-property/upload-video"
         private const val UPLOAD_DOC = "/express/partner/api/my-property/upload-document"

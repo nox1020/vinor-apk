@@ -149,8 +149,13 @@ class MainActivity : AppCompatActivity() {
             R.drawable.ic_tab_bookmark,
             R.drawable.ic_bookmark,
         )
-        binding.divarTabbar.tabPostLabel.setTextColor(Color.parseColor(if (postOn) "#FFFFFF" else "#A3A3A3"))
-        binding.divarTabbar.tabPostLabel.setTypeface(null, if (postOn) Typeface.BOLD else Typeface.NORMAL)
+        paintTab(
+            binding.divarTabbar.tabPostIcon,
+            binding.divarTabbar.tabPostLabel,
+            postOn,
+            R.drawable.ic_tab_add,
+            R.drawable.ic_add,
+        )
         paintTab(
             binding.divarTabbar.tabChatIcon,
             binding.divarTabbar.tabChatLabel,
@@ -309,7 +314,7 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        if (drawerIsSpecial) openPath("/express/partner/listings/new")
+        if (drawerIsSpecial) openListingForm()
         else openOwnerHomeForm()
     }
 
@@ -363,8 +368,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openOwnerHomeForm() {
+        openListingCompose(publicListing = false)
+    }
+
+    fun openListingForm() {
+        openListingCompose(publicListing = true)
+    }
+
+    private fun openListingCompose(publicListing: Boolean) {
+        val args = Bundle().apply {
+            putBoolean(MyPropertyFormFragment.ARG_PUBLIC, publicListing)
+        }
         if (navController.currentDestination?.id != R.id.myPropertyFormFragment) {
-            navController.navigate(R.id.myPropertyFormFragment)
+            navController.navigate(R.id.myPropertyFormFragment, args)
         }
     }
 
@@ -384,10 +400,7 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
-            low.endsWith("/listings/new") -> {
-                val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
-                navController.navigate(R.id.partnerPageFragment, args)
-            }
+            low.endsWith("/listings/new") -> openListingForm()
             low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
                 if (uri.getQueryParameter("register") == "1") {
