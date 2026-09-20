@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private var drawerIsSpecial = false
     private var drawerLawyerOn = false
     private var tabbarForcedHidden = false
+    private var tabbarImeHidden = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -101,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         sizeDrawer()
         wireDrawer()
         wireDivarTabbar()
+        wireChatImeTabbar()
 
         notifyHelper = VinorNotifyHelper(
             this,
@@ -249,14 +251,26 @@ class MainActivity : AppCompatActivity() {
             return
         }
         pendingOpenVinorChat = true
-        if (!nav.popBackStack(R.id.dashboardFragment, false)) {
-            nav.navigate(R.id.dashboardFragment)
+        if (nav.currentDestination?.id != R.id.dashboardFragment) {
+            if (!nav.popBackStack(R.id.dashboardFragment, false)) {
+                nav.navigate(R.id.dashboardFragment)
+            }
         }
-        binding.root.post {
-            findDashboard()?.openVinorChat()
-            pendingOpenVinorChat = false
-            syncDivarTab()
+        fun tryOpen(left: Int) {
+            if (!pendingOpenVinorChat) {
+                syncDivarTab()
+                return
+            }
+            val live = findDashboard()
+            if (live != null) {
+                live.openVinorChat()
+                pendingOpenVinorChat = false
+                syncDivarTab()
+                return
+            }
+            if (left > 0) binding.root.post { tryOpen(left - 1) }
         }
+        binding.root.post { tryOpen(12) }
     }
 
     fun consumePendingVinorChat(): Boolean {
@@ -367,7 +381,24 @@ class MainActivity : AppCompatActivity() {
             dest == R.id.landDetailFragment ||
             dest == R.id.myPropertyFormFragment ||
             dest == R.id.partnerPageFragment
-        binding.divarTabbar.root.isVisible = !tabbarForcedHidden && !hideDest
+        val chatOpen = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
+        if (!chatOpen) tabbarImeHidden = false
+        binding.divarTabbar.root.isVisible = !tabbarForcedHidden && !hideDest && !tabbarImeHidden
+    }
+
+    private fun wireChatImeTabbar() {
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener {
+            if (!::binding.isInitialized) return@addOnGlobalLayoutListener
+            val rect = android.graphics.Rect()
+            binding.root.getWindowVisibleDisplayFrame(rect)
+            val keypad = binding.root.rootView.height - rect.bottom
+            val imeOpen = keypad > (120 * resources.displayMetrics.density)
+            val hide = imeOpen && findDashboard()?.isChatOpen() == true
+            if (hide != tabbarImeHidden) {
+                tabbarImeHidden = hide
+                applyTabbarVisibility()
+            }
+        }
     }
 
     private fun paintTab(icon: android.widget.ImageView, label: android.widget.TextView, on: Boolean) {

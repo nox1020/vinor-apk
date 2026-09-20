@@ -199,6 +199,10 @@ class DashboardFragment : Fragment() {
             b.dashboardRefresh.isRefreshing = false
             return
         }
+        if (chatLayerOpen || wantChatLayer) {
+            fetchHistory(bindIfWanted = true)
+            return
+        }
         loadAll(fromPull = true)
     }
 
@@ -214,6 +218,28 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         b.dashboardComposer.isVisible = chatLayerOpen
         if (!chatLayerOpen) closeAttach()
+        syncChatListInset()
+    }
+
+    private fun syncChatListInset() {
+        val b = _binding ?: return
+        val topDp = if (chatLayerOpen) 56f else 8f
+        val top = (topDp * resources.displayMetrics.density).toInt()
+        b.dashboardChatList.setPadding(
+            b.dashboardChatList.paddingLeft,
+            top,
+            b.dashboardChatList.paddingRight,
+            b.dashboardChatList.paddingBottom,
+        )
+    }
+
+    private fun hideKeyboard() {
+        val b = _binding ?: return
+        b.dashboardChatInput.clearFocus()
+        val imm = context?.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+            as? android.view.inputmethod.InputMethodManager
+        val token = view?.windowToken ?: b.root.windowToken
+        imm?.hideSoftInputFromWindow(token, 0)
     }
 
     private fun hideHomeDashboardWidgets() {
@@ -233,17 +259,22 @@ class DashboardFragment : Fragment() {
     /** کلیک «وینور» در کشو: لایهٔ چت با تاریخچه. */
     fun openVinorChat() {
         if (_binding == null) return
+        val alreadyOpen = chatLayerOpen && wantChatLayer
         wantChatLayer = true
         chatLayerOpen = true
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
-        binding.dashboardChatInput.requestFocus()
+        if (alreadyOpen && binding.dashboardChatList.childCount > 0) {
+            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+            return
+        }
         val hist = cachedHistory
         if (hist != null) {
             bindChat(hist)
             return
         }
+        binding.dashboardProgress.isVisible = true
         fetchHistory(bindIfWanted = true)
     }
 
@@ -624,6 +655,7 @@ class DashboardFragment : Fragment() {
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
         newsHandler.removeCallbacks(newsTick)
         if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
+        hideKeyboard()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
     }
@@ -639,6 +671,7 @@ class DashboardFragment : Fragment() {
                 if (status == 401 || status == 403) {
                     cachedHistory = null
                     threadId = null
+                    if (bindIfWanted && wantChatLayer) bindChat(JSONObject())
                     return@launch
                 }
                 rememberHistory(hist)
@@ -682,22 +715,28 @@ class DashboardFragment : Fragment() {
         binding.dashboardNewsText.alpha = 1f
         binding.dashboardNewsText.text = newsItems.first()
         newsHandler.removeCallbacks(newsTick)
-        if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
+        val inChat = chatLayerOpen || wantChatLayer
+        if (!inChat && newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
 
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
         allAds = ads
         binding.dashboardAds.removeAllViews()
         val showCarousel = ads.length() > 0
-        binding.dashboardAdsScroll.isVisible = showCarousel
         for (i in 0 until ads.length()) {
             val ad = ads.optJSONObject(i) ?: continue
             binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
         }
-        if (showCarousel) {
-            binding.dashboardAds.post {
-                val b = _binding ?: return@post
-                b.dashboardAdsScroll.fullScroll(View.FOCUS_RIGHT)
-                bindVisibleCarouselImages()
+        if (inChat) {
+            binding.dashboardAdsScroll.isVisible = false
+            binding.dashboardEmpty.isVisible = false
+        } else {
+            binding.dashboardAdsScroll.isVisible = showCarousel
+            if (showCarousel) {
+                binding.dashboardAds.post {
+                    val b = _binding ?: return@post
+                    b.dashboardAdsScroll.fullScroll(View.FOCUS_RIGHT)
+                    bindVisibleCarouselImages()
+                }
             }
         }
 
@@ -1073,9 +1112,7 @@ class DashboardFragment : Fragment() {
         if (chatLayerOpen) {
             hideHomeDashboardWidgets()
             syncComposerVisible()
-            if (hasUser) {
-                binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
-            }
+            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             return
         }
         val empty = !hasUser
