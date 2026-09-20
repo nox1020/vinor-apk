@@ -132,16 +132,39 @@ class MainActivity : AppCompatActivity() {
         val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         val favsOn = dest == R.id.nativePartnerFragment &&
             findNativePage() == NativePartnerFragment.PAGE_FAVORITES
-        val postOn = dest == R.id.myPropertyFormFragment ||
-            (dest == R.id.nativePartnerFragment && findNativePage() == NativePartnerFragment.PAGE_LISTINGS)
+        val postOn = dest == R.id.myPropertyFormFragment
         val meOn = dest == R.id.profileFragment
         val adsOn = dest == R.id.dashboardFragment && !chatOn
-        paintTab(binding.divarTabbar.tabAdsIcon, binding.divarTabbar.tabAdsLabel, adsOn)
-        paintTab(binding.divarTabbar.tabFavsIcon, binding.divarTabbar.tabFavsLabel, favsOn)
-        binding.divarTabbar.tabPostLabel.setTextColor(Color.parseColor(if (postOn) "#FFFFFF" else "#8E8E93"))
+        paintTab(
+            binding.divarTabbar.tabAdsIcon,
+            binding.divarTabbar.tabAdsLabel,
+            adsOn,
+            R.drawable.ic_tab_home,
+            R.drawable.ic_home,
+        )
+        paintTab(
+            binding.divarTabbar.tabFavsIcon,
+            binding.divarTabbar.tabFavsLabel,
+            favsOn,
+            R.drawable.ic_tab_bookmark,
+            R.drawable.ic_bookmark,
+        )
+        binding.divarTabbar.tabPostLabel.setTextColor(Color.parseColor(if (postOn) "#FFFFFF" else "#A3A3A3"))
         binding.divarTabbar.tabPostLabel.setTypeface(null, if (postOn) Typeface.BOLD else Typeface.NORMAL)
-        paintTab(binding.divarTabbar.tabChatIcon, binding.divarTabbar.tabChatLabel, chatOn)
-        paintTab(binding.divarTabbar.tabMeIcon, binding.divarTabbar.tabMeLabel, meOn)
+        paintTab(
+            binding.divarTabbar.tabChatIcon,
+            binding.divarTabbar.tabChatLabel,
+            chatOn,
+            R.drawable.ic_tab_chat,
+            R.drawable.ic_messages,
+        )
+        paintTab(
+            binding.divarTabbar.tabMeIcon,
+            binding.divarTabbar.tabMeLabel,
+            meOn,
+            R.drawable.ic_tab_me,
+            R.drawable.ic_profile,
+        )
     }
 
     fun isDrawerOpen(): Boolean = false
@@ -155,11 +178,16 @@ class MainActivity : AppCompatActivity() {
     fun openPartnerHome() {
         pendingOpenVinorChat = false
         val nav = navController
+        val dash = findDashboard()
+        if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
+            if (dash.isChatOpen()) dash.showHomeEntry()
+            syncDivarTab()
+            return
+        }
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
             nav.navigate(R.id.dashboardFragment)
         }
         findDashboard()?.showHomeEntry()
-        findDashboard()?.reload()
         syncDivarTab()
     }
 
@@ -281,7 +309,7 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        if (drawerIsSpecial) openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+        if (drawerIsSpecial) openPath("/express/partner/listings/new")
         else openOwnerHomeForm()
     }
 
@@ -315,8 +343,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun paintTab(icon: android.widget.ImageView, label: android.widget.TextView, on: Boolean) {
-        val c = Color.parseColor(if (on) "#FFFFFF" else "#8E8E93")
+    private fun paintTab(
+        icon: android.widget.ImageView,
+        label: android.widget.TextView,
+        on: Boolean,
+        outline: Int,
+        fill: Int,
+    ) {
+        icon.setImageResource(if (on) fill else outline)
+        val c = Color.parseColor(if (on) "#FFFFFF" else "#A3A3A3")
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
         label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
@@ -349,6 +384,10 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/listings/new") -> {
+                val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
+                navController.navigate(R.id.partnerPageFragment, args)
+            }
             low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
                 if (uri.getQueryParameter("register") == "1") {
