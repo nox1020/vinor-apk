@@ -207,10 +207,13 @@ class DashboardFragment : Fragment() {
         b.dashboardRefresh.isRefreshing = false
     }
 
+    fun isChatOpen(): Boolean = chatLayerOpen
+
     /** بدو ورود خانه — تاریخچه در کشو می‌ماند، چت باز نمی‌شود. */
     fun showHomeEntry() {
         wantChatLayer = false
         showHomeEmpty()
+        (activity as? MainActivity)?.syncDivarTab()
     }
 
     /** کلیک «وینور» در کشو: لایهٔ چت با تاریخچه. */
@@ -218,6 +221,7 @@ class DashboardFragment : Fragment() {
         if (_binding == null) return
         wantChatLayer = true
         chatLayerOpen = true
+        (activity as? MainActivity)?.syncDivarTab()
         val hist = cachedHistory
         if (hist != null) {
             bindChat(hist)
@@ -606,6 +610,7 @@ class DashboardFragment : Fragment() {
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
         newsHandler.removeCallbacks(newsTick)
         if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
+        (activity as? MainActivity)?.syncDivarTab()
     }
 
     private fun fetchHistory(bindIfWanted: Boolean) {

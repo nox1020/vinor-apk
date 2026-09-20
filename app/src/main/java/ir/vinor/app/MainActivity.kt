@@ -3,6 +3,8 @@ package ir.vinor.app
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.Typeface
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextPaint
@@ -36,7 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/** شِل نیتیو همکار: خانه مثل وب + کشوی GPT — بدون تب پایین. */
+/** شِل نیتیو همکار: خانه مثل وب + فوتر دیوار‌مانند. */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -52,7 +54,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingOpenVinorChat = false
     private var edgeStartX = -1f
     private var drawerPlusOn = false
+    private var drawerIsSpecial = false
     private var drawerLawyerOn = false
+    private var tabbarForcedHidden = false
     private val resendHandler = Handler(Looper.getMainLooper())
     private val resendTick = object : Runnable {
         override fun run() {
@@ -94,9 +98,9 @@ class MainActivity : AppCompatActivity() {
         runCatching { CookieManager.getInstance().setAcceptCookie(true) }
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.bottomNav.visibility = View.GONE
         sizeDrawer()
         wireDrawer()
+        wireDivarTabbar()
 
         notifyHelper = VinorNotifyHelper(
             this,
@@ -159,7 +163,27 @@ class MainActivity : AppCompatActivity() {
 
     fun setBottomNavVisible(visible: Boolean) {
         if (!::binding.isInitialized) return
-        binding.bottomNav.visibility = View.GONE
+        tabbarForcedHidden = !visible
+        applyTabbarVisibility()
+    }
+
+    fun syncDivarTab() {
+        if (!::binding.isInitialized) return
+        applyTabbarVisibility()
+        val dest = runCatching { navController.currentDestination?.id }.getOrNull()
+        val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
+        val favsOn = dest == R.id.nativePartnerFragment &&
+            findNativePage() == NativePartnerFragment.PAGE_FAVORITES
+        val postOn = dest == R.id.myPropertyFormFragment ||
+            (dest == R.id.nativePartnerFragment && findNativePage() == NativePartnerFragment.PAGE_LISTINGS)
+        val meOn = dest == R.id.profileFragment
+        val adsOn = dest == R.id.dashboardFragment && !chatOn
+        paintTab(binding.divarTabbar.tabAdsIcon, binding.divarTabbar.tabAdsLabel, adsOn)
+        paintTab(binding.divarTabbar.tabFavsIcon, binding.divarTabbar.tabFavsLabel, favsOn)
+        binding.divarTabbar.tabPostLabel.setTextColor(Color.parseColor(if (postOn) "#FFFFFF" else "#8E8E93"))
+        binding.divarTabbar.tabPostLabel.setTypeface(null, if (postOn) Typeface.BOLD else Typeface.NORMAL)
+        paintTab(binding.divarTabbar.tabChatIcon, binding.divarTabbar.tabChatLabel, chatOn)
+        paintTab(binding.divarTabbar.tabMeIcon, binding.divarTabbar.tabMeLabel, meOn)
     }
 
     fun isDrawerOpen(): Boolean = ::binding.isInitialized && binding.drawerPanel.isVisible
@@ -210,7 +234,9 @@ class MainActivity : AppCompatActivity() {
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
             nav.navigate(R.id.dashboardFragment)
         }
+        findDashboard()?.showHomeEntry()
         findDashboard()?.reload()
+        syncDivarTab()
     }
 
     fun openVinorChat() {
@@ -219,6 +245,7 @@ class MainActivity : AppCompatActivity() {
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
             dash.openVinorChat()
+            syncDivarTab()
             return
         }
         pendingOpenVinorChat = true
@@ -228,6 +255,7 @@ class MainActivity : AppCompatActivity() {
         binding.root.post {
             findDashboard()?.openVinorChat()
             pendingOpenVinorChat = false
+            syncDivarTab()
         }
     }
 
@@ -292,6 +320,61 @@ class MainActivity : AppCompatActivity() {
     private fun findDashboard(): DashboardFragment? {
         val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
         return host?.childFragmentManager?.primaryNavigationFragment as? DashboardFragment
+    }
+
+    private fun findNativePage(): String? {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        return (host?.childFragmentManager?.primaryNavigationFragment as? NativePartnerFragment)?.page
+    }
+
+    private fun wireDivarTabbar() {
+        binding.divarTabbar.tabAds.setOnClickListener { openPartnerHome() }
+        binding.divarTabbar.tabFavs.setOnClickListener {
+            if (!PartnerApi.hasSession()) {
+                openDrawer()
+                return@setOnClickListener
+            }
+            openNativePage(NativePartnerFragment.PAGE_FAVORITES)
+        }
+        binding.divarTabbar.tabPost.setOnClickListener { openPostAd() }
+        binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
+        binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
+        binding.root.post {
+            navController.addOnDestinationChangedListener { _, _, _ ->
+                binding.root.post { syncDivarTab() }
+            }
+            syncDivarTab()
+        }
+    }
+
+    private fun openPostAd() {
+        closeDrawer()
+        if (!PartnerApi.hasSession()) {
+            openDrawer()
+            return
+        }
+        if (drawerIsSpecial) openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+        else openOwnerHomeForm()
+    }
+
+    private fun applyTabbarVisibility() {
+        if (!::binding.isInitialized) return
+        val dest = runCatching { navController.currentDestination?.id }.getOrNull()
+        val hideDest = dest == R.id.loginStep1Fragment ||
+            dest == R.id.loginStep2Fragment ||
+            dest == R.id.loginWebFragment ||
+            dest == R.id.profileEditFragment ||
+            dest == R.id.landDetailFragment ||
+            dest == R.id.myPropertyFormFragment ||
+            dest == R.id.partnerPageFragment
+        binding.divarTabbar.root.isVisible = !tabbarForcedHidden && !hideDest
+    }
+
+    private fun paintTab(icon: android.widget.ImageView, label: android.widget.TextView, on: Boolean) {
+        val c = Color.parseColor(if (on) "#FFFFFF" else "#8E8E93")
+        icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
+        label.setTextColor(c)
+        label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
     }
 
     private fun findWebPage(): BaseWebViewFragment? {
@@ -610,6 +693,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val loggedIn = phone.isNotBlank() && PartnerApi.hasSession()
         if (!loggedIn) {
+            drawerIsSpecial = false
             applyGuestDrawerChrome()
             if (drawerOtpPending) return
             binding.drawerGuestLogin.isVisible = true
@@ -624,6 +708,7 @@ class MainActivity : AppCompatActivity() {
         }
         drawerApproved = approved
         drawerPendingApp = pending
+        drawerIsSpecial = special
         binding.drawerGuestLogin.isVisible = false
         binding.drawerUserFoot.isVisible = true
         binding.drawerPostchi.isVisible = true
