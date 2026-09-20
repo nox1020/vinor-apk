@@ -116,9 +116,11 @@ class ProfileFragment : Fragment() {
     private fun bindProfilePayload(obj: JSONObject) {
         if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) return
         binding.profileProgress.visibility = View.GONE
+        val plusOn = obj.optBoolean("plus_system_enabled", false)
+        val lawyerOn = obj.optBoolean("lawyer_feature_on", false)
         val mePhone = obj.optString("me_phone", "").trim()
         if (mePhone.isEmpty()) {
-            showGuest()
+            showGuest(plusOn = plusOn, lawyerOn = lawyerOn)
             return
         }
         val apkUrl = obj.optString("android_apk_url", "").trim()
@@ -131,17 +133,21 @@ class ProfileFragment : Fragment() {
             meName = obj.optString("me_name", "همکار وینور"),
             avatarUrl = obj.optString("avatar_url", "").takeIf { it.isNotEmpty() },
             isApproved = obj.optBoolean("is_approved", false),
+            isSpecial = obj.optBoolean("is_special", false),
+            hasPendingApp = obj.optBoolean("has_pending_app", false),
+            plusOn = plusOn,
+            lawyerOn = lawyerOn,
             showAppUpdate = showUpdate,
             androidApkUrl = if (showUpdate) apkUrl else "",
             androidApkVersion = if (showUpdate) apkVersion else "",
         )
     }
 
-    private fun showGuest() {
+    private fun showGuest(plusOn: Boolean = false, lawyerOn: Boolean = false) {
         if (_binding == null) return
         binding.profileGuest.visibility = View.VISIBLE
         binding.profileCard.visibility = View.GONE
-        binding.profileLinks.visibility = View.GONE
+        binding.profileLinks.visibility = View.VISIBLE
         binding.profileNotifications.visibility = View.GONE
         binding.profileGuestLogin.setOnClickListener {
             try {
@@ -151,6 +157,12 @@ class ProfileFragment : Fragment() {
             }
         }
         binding.profileGuestApply.setOnClickListener { openUrl("$BASE/express/partner/apply/step1") }
+        binding.profileLinks.removeAllViews()
+        addMenuRow("ملک من", "ارزش، نمودار و بینش ملک", R.drawable.ic_home, "$BASE/express/partner/my-property")
+        addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
+        addMenuRow("درخواست همکاری", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+        if (plusOn) addMenuRow("وینور پلاس", "دریافت اشتراک", R.drawable.ic_sparkle, "login")
+        if (lawyerOn) addMenuRow("وکیل ملکی", "برای استفاده وارد شوید", R.drawable.ic_scale, "login")
     }
 
     private fun bindProfile(
@@ -158,6 +170,10 @@ class ProfileFragment : Fragment() {
         meName: String,
         avatarUrl: String?,
         isApproved: Boolean,
+        isSpecial: Boolean,
+        hasPendingApp: Boolean,
+        plusOn: Boolean,
+        lawyerOn: Boolean,
         showAppUpdate: Boolean,
         androidApkUrl: String,
         androidApkVersion: String
@@ -170,7 +186,11 @@ class ProfileFragment : Fragment() {
 
         binding.profileName.text = meName
         binding.profilePhone.text = mePhone
-        binding.profileStatus.text = if (isApproved) "همکار تایید شده" else "کاربر عادی"
+        binding.profileStatus.text = when {
+            isSpecial -> "پلاس"
+            isApproved -> "بازاریاب"
+            else -> "عادی"
+        }
         val initials = when {
             meName.length >= 2 -> meName.take(2)
             mePhone.length >= 4 -> mePhone.takeLast(4).take(2)
@@ -200,70 +220,74 @@ class ProfileFragment : Fragment() {
         }
 
         binding.profileLinks.removeAllViews()
-        val links = mutableListOf<Triple<String, String, String>>()
-        if (!isApproved) {
-            links.add(Triple("درخواست همکاری", "برای تبدیل به همکار اکسپرس درخواست دهید", "$BASE/express/partner/apply/step1"))
+        addMenuRow("ملک من", "ارزش، نمودار و بینش ملک", R.drawable.ic_home, "$BASE/express/partner/my-property")
+        if (isApproved) {
+            if (isSpecial) {
+                addMenuRow("آگهی‌های من", "", R.drawable.ic_building, "$BASE/express/partner/listings")
+            }
+            addMenuRow("پیگیری", "درخواست، بازدید و معامله", R.drawable.ic_routine, "$BASE/express/partner/requests")
+            addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
+            addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")
+            addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
+            addMenuRow("دعوت همکار", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
+        } else {
+            if (hasPendingApp) {
+                addMenuRow("وضعیت درخواست", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
+            } else {
+                addMenuRow("درخواست همکاری", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+            }
+            addMenuRow("دعوت دوستان", "", R.drawable.ic_share_nodes, "$BASE/express/partner/invite")
+            addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
         }
-        links.add(Triple("یادداشت‌ها", "یادداشت‌های خصوصی", "notes_native"))
+        if (plusOn) {
+            addMenuRow(
+                if (isSpecial) "وینور پلاس" else "دریافت وینور پلاس",
+                "",
+                R.drawable.ic_sparkle,
+                "$BASE/express/partner/plus",
+            )
+        }
+        if (lawyerOn) {
+            addMenuRow("وکیل ملکی", "مشاوره حقوقی املاک ایران", R.drawable.ic_scale, "lawyer")
+        }
         if (showAppUpdate && androidApkUrl.isNotEmpty()) {
             val appUpdateSub = if (androidApkVersion.isNotEmpty()) {
                 "نسخه جدید برای دانلود آماده است (نسخه $androidApkVersion)"
             } else {
                 "نسخه جدید برای دانلود آماده است"
             }
-            links.add(
-                Triple(
-                    "بروزرسانی اپلیکیشن",
-                    appUpdateSub,
-                    "apk_update:$androidApkUrl|$androidApkVersion",
-                ),
+            addMenuRow(
+                "بروزرسانی اپلیکیشن",
+                appUpdateSub,
+                R.drawable.ic_help,
+                "apk_update:$androidApkUrl|$androidApkVersion",
             )
         }
-        links.add(Triple("فروشنده‌های برتر", "رتبه‌بندی همکاران", "$BASE/express/partner/top-sellers"))
-        links.add(Triple("راهنما", "راهنمای استفاده از پلتفرم", "$BASE/express/partner/help"))
-        links.add(Triple("تماس با پشتیبانی", "راهنمایی و پشتیبانی", "$BASE/express/partner/support"))
-        links.add(Triple("اجرای مجدد تور راهنما", "مشاهده دوباره آموزش‌ها", "restart_tour"))
+        addMenuRow("تنظیمات", "", R.drawable.ic_settings, "$BASE/express/partner/settings")
+    }
 
-        val iconRes = mapOf(
-            "درخواست همکاری" to R.drawable.ic_add,
-            "یادداشت‌ها" to R.drawable.ic_help,
-            "بروزرسانی اپلیکیشن" to R.drawable.ic_help,
-            "فروشنده‌های برتر" to R.drawable.ic_commissions,
-            "راهنما" to R.drawable.ic_help,
-            "تماس با پشتیبانی" to R.drawable.ic_messages,
-            "اجرای مجدد تور راهنما" to R.drawable.ic_help
-        )
-        for ((title, subtitle, url) in links) {
-            val item = ItemProfileLinkBinding.inflate(layoutInflater, binding.profileLinks, false)
-            item.itemProfileLinkTitle.text = title
-            item.itemProfileLinkSubtitle.text = subtitle
-            item.itemProfileLinkIcon.setImageResource(iconRes[title] ?: R.drawable.ic_help)
-            item.root.setOnClickListener {
-                when {
-                    url == "restart_tour" -> {
-                        context?.getSharedPreferences("vinor", 0)?.edit()?.putBoolean("restart_tour", true)?.apply()
-                        context?.let { Toast.makeText(it, "برای اجرای تور به تب وینور بروید", Toast.LENGTH_SHORT).show() }
-                    }
-                    url == "notes_native" -> {
-                        try {
-                            findNavController().navigate(R.id.notesFragment)
-                        } catch (_: Exception) {
-                            openUrl("$BASE/express/partner/notes")
-                        }
-                    }
-                    url.startsWith("apk_update:") -> {
-                        val payload = url.removePrefix("apk_update:")
-                        val sep = payload.indexOf('|')
-                        val apkUrl = if (sep >= 0) payload.substring(0, sep) else payload
-                        val ver = if (sep >= 0) payload.substring(sep + 1) else androidApkVersion
-                        startApkUpdate(apkUrl, ver)
-                    }
-                    url.isBlank() -> { }
-                    else -> openUrl(url)
+    private fun addMenuRow(title: String, subtitle: String, icon: Int, url: String) {
+        val item = ItemProfileLinkBinding.inflate(layoutInflater, binding.profileLinks, false)
+        item.itemProfileLinkTitle.text = title
+        item.itemProfileLinkSubtitle.text = subtitle
+        item.itemProfileLinkSubtitle.visibility = if (subtitle.isBlank()) View.GONE else View.VISIBLE
+        item.itemProfileLinkIcon.setImageResource(icon)
+        item.root.setOnClickListener {
+            when {
+                url == "login" -> (activity as? MainActivity)?.openLogin()
+                url == "lawyer" -> (activity as? MainActivity)?.openVinorChat()
+                url.startsWith("apk_update:") -> {
+                    val payload = url.removePrefix("apk_update:")
+                    val sep = payload.indexOf('|')
+                    val apkUrl = if (sep >= 0) payload.substring(0, sep) else payload
+                    val ver = if (sep >= 0) payload.substring(sep + 1) else ""
+                    startApkUpdate(apkUrl, ver)
                 }
+                url.isBlank() -> { }
+                else -> openUrl(url)
             }
-            binding.profileLinks.addView(item.root)
         }
+        binding.profileLinks.addView(item.root)
     }
 
     private fun loadAvatar(fullUrl: String) {
