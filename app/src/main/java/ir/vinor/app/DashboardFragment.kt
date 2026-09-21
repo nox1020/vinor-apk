@@ -36,6 +36,9 @@ import ir.vinor.app.databinding.ItemLandCardBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -62,6 +65,7 @@ class DashboardFragment : Fragment() {
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
+    private var boundMessageCount = 0
     private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
@@ -225,8 +229,10 @@ class DashboardFragment : Fragment() {
 
     private fun syncComposerVisible() {
         val b = _binding ?: return
-        b.dashboardComposer.isVisible = chatLayerOpen && wantChatLayer
-        if (!chatLayerOpen) closeAttach()
+        val inChat = chatLayerOpen && wantChatLayer
+        b.dashboardComposer.isVisible = inChat
+        b.dashboardChatList.isVisible = inChat
+        if (!inChat) closeAttach()
         syncChatListInset()
     }
 
@@ -263,25 +269,27 @@ class DashboardFragment : Fragment() {
         b.dashboardScroll.post { b.dashboardScroll.scrollTo(0, 0) }
     }
 
-    /** کلیک «وینور» در کشو: لایهٔ چت با تاریخچه. */
+    /** کلیک تب چت / «وینور»: اول پیام‌ها، فایل‌ها بعداً. */
     fun openVinorChat() {
         if (_binding == null) return
-        val alreadyOpen = chatLayerOpen && wantChatLayer
         wantChatLayer = true
         chatLayerOpen = true
-        chatBindGen += 1
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
-        if (alreadyOpen && binding.dashboardChatList.childCount > 0) {
+        if (binding.dashboardChatList.childCount > 0) {
             binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+            finishRefreshUi()
+            fetchHistory(bindIfWanted = true)
             return
         }
         val hist = cachedHistory
         if (hist != null) {
             bindChat(hist)
+            fetchHistory(bindIfWanted = true)
             return
         }
+        chatBindGen += 1
         binding.dashboardProgress.isVisible = true
         fetchHistory(bindIfWanted = true)
     }
@@ -577,6 +585,13 @@ class DashboardFragment : Fragment() {
 
     private fun loadAll(fromPull: Boolean = false) {
         val ctx = context ?: return
+        if (PartnerApi.hasSession()) {
+            fetchHistory(bindIfWanted = wantChatLayer)
+        } else {
+            cachedHistory = null
+            threadId = null
+            if (wantChatLayer) bindChat(JSONObject())
+        }
         scope.launch {
             var shownCache = false
             if (!fromPull) {
@@ -589,12 +604,12 @@ class DashboardFragment : Fragment() {
                     if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
                     binding.dashboardProgress.isVisible = false
                     shownCache = true
-                } else {
+                } else if (!wantChatLayer) {
                     binding.dashboardProgress.isVisible = true
                 }
             } else {
                 shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
-                binding.dashboardProgress.isVisible = false
+                if (!wantChatLayer) binding.dashboardProgress.isVisible = false
             }
             var home = JSONObject()
             var loadError: String? = null
@@ -634,7 +649,7 @@ class DashboardFragment : Fragment() {
                 }
             }
             if (_binding == null) {
-                finishRefreshUi()
+                if (!wantChatLayer) finishRefreshUi()
                 return@launch
             }
             if (!home.optBoolean("from_cache") || !shownCache) {
@@ -644,21 +659,13 @@ class DashboardFragment : Fragment() {
             if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0 && !shownCache) {
                 Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
             }
-            if (PartnerApi.hasSession()) {
-                fetchHistory(bindIfWanted = wantChatLayer)
-            } else {
-                cachedHistory = null
-                threadId = null
-                if (wantChatLayer) bindChat(JSONObject())
-                finishRefreshUi()
-            }
+            if (!wantChatLayer) finishRefreshUi()
         }
     }
 
     private fun showHomeEmpty() {
         val b = _binding ?: return
         chatLayerOpen = false
-        b.dashboardChatList.removeAllViews()
         b.dashboardEmpty.isVisible = true
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
         newsHandler.removeCallbacks(newsTick)
@@ -669,10 +676,19 @@ class DashboardFragment : Fragment() {
     }
 
     private fun fetchHistory(bindIfWanted: Boolean) {
+        val ctx = context ?: return
         scope.launch {
             try {
+                val peeked = withContext(Dispatchers.IO) {
+                    PartnerApi.peekJson("/express/partner/ai/history", ctx)
+                }
+                if (_binding == null) return@launch
+                if (peeked != null) {
+                    rememberHistory(peeked)
+                    if (bindIfWanted && wantChatLayer) bindChatIfNeeded(peeked)
+                }
                 val hist = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/ai/history", requireContext())
+                    PartnerApi.get("/express/partner/ai/history", ctx)
                 }
                 if (_binding == null) return@launch
                 val status = hist.optInt("http_status")
@@ -683,13 +699,30 @@ class DashboardFragment : Fragment() {
                     return@launch
                 }
                 rememberHistory(hist)
-                if (bindIfWanted && wantChatLayer) bindChat(hist)
+                if (bindIfWanted && wantChatLayer) bindChatIfNeeded(hist)
             } catch (_: Exception) {
-                if (_binding != null && bindIfWanted && wantChatLayer) bindChat(JSONObject())
+                if (_binding != null && bindIfWanted && wantChatLayer &&
+                    binding.dashboardChatList.childCount == 0
+                ) {
+                    bindChat(JSONObject())
+                }
             } finally {
-                finishRefreshUi()
+                if (wantChatLayer || _binding?.dashboardProgress?.isVisible == true) {
+                    finishRefreshUi()
+                }
             }
         }
+    }
+
+    private fun bindChatIfNeeded(obj: JSONObject) {
+        val incoming = obj.optJSONArray("messages")?.length() ?: 0
+        if (boundMessageCount > 0 &&
+            incoming == boundMessageCount &&
+            (_binding?.dashboardChatList?.childCount ?: 0) > 0
+        ) {
+            return
+        }
+        bindChat(obj)
     }
 
     private fun rememberHistory(obj: JSONObject) {
@@ -1075,16 +1108,23 @@ class DashboardFragment : Fragment() {
         if (!wantChatLayer) return
         threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
         val messages = obj.optJSONArray("messages") ?: JSONArray()
+        boundMessageCount = messages.length()
         val gen = chatBindGen
+        renderMessages(messages)
+        finishRefreshUi()
         scope.launch {
-            prefetchLandCodes(messages)
+            val missing = landCodesIn(messages).filter { !landsByCode.containsKey(it) }
+            if (missing.isEmpty()) return@launch
+            coroutineScope {
+                missing.map { code -> async { prefetchLand(code) } }.awaitAll()
+            }
             if (_binding == null) return@launch
             if (gen != chatBindGen || !wantChatLayer) return@launch
             renderMessages(messages)
         }
     }
 
-    private suspend fun prefetchLandCodes(messages: JSONArray) {
+    private fun landCodesIn(messages: JSONArray): List<String> {
         val codes = linkedSetOf<String>()
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
@@ -1094,7 +1134,7 @@ class DashboardFragment : Fragment() {
                 if (code.isNotBlank()) codes.add(code)
             }
         }
-        codes.forEach { prefetchLand(it) }
+        return codes.toList()
     }
 
     private suspend fun prefetchLand(code: String) {

@@ -313,7 +313,8 @@
                     android:layoutDirection="rtl"
                     android:orientation="vertical"
                     android:paddingHorizontal="12dp"
-                    android:paddingTop="8dp" />
+                    android:paddingTop="8dp"
+                    android:visibility="gone" />
             </LinearLayout>
         </ScrollView>
 
