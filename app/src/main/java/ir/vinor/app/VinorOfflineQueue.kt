@@ -101,6 +101,7 @@ object VinorOfflineQueue {
                 .put("payload", payload)
                 .put("createdAt", now)
                 .put("retryCount", 0)
+                .put("nextRetryAt", now)
                 .put("status", "pending")
                 .put("lastError", "")
             items.put(item)
@@ -141,6 +142,7 @@ object VinorOfflineQueue {
                 val retries = it.optInt("retryCount", 0) + 1
                 it.put("retryCount", retries)
                 it.put("lastError", error.take(80))
+                it.put("nextRetryAt", System.currentTimeMillis() + VinorCachePolicy.queueBackoffMs(retries))
                 it.put("status", if (retries >= VinorCachePolicy.QUEUE_MAX_RETRY) "failed" else "pending")
             }
             persist(context, items)
@@ -203,11 +205,14 @@ object VinorOfflineQueue {
 
     private fun flushOnce(context: Context, cookie: String) {
         val pending = synchronized(this) {
+            val now = System.currentTimeMillis()
             val items = load(context)
             buildList {
                 for (i in 0 until items.length()) {
                     val it = items.optJSONObject(i) ?: continue
-                    if (it.optString("status") == "pending") add(it)
+                    if (it.optString("status") != "pending") continue
+                    if (it.optLong("nextRetryAt", 0L) > now) continue
+                    add(it)
                 }
             }
         }

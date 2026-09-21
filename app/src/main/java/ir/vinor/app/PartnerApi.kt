@@ -169,6 +169,14 @@ object PartnerApi {
     }
 
     fun get(path: String, context: Context? = null): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return peekJson(path, ctx) ?: JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("from_cache", false)
+                .put("error", "آفلاین است و نسخه‌ای ذخیره نشده")
+        }
         return try {
             val req = requestBuilder(path, context).get().build()
             val obj = execute(req)
@@ -213,11 +221,32 @@ object PartnerApi {
     }
 
     fun postJson(path: String, body: JSONObject, context: Context? = null): JSONObject {
-        val req = requestBuilder(path, context)
-            .post(body.toString().toRequestBody(jsonType))
-            .addHeader("Content-Type", "application/json; charset=utf-8")
-            .build()
-        return execute(req)
+        val ctx = context ?: appCtx
+        val url = absoluteUrl(path)
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return enqueueOrOffline(ctx, url, body)
+        }
+        return try {
+            val req = requestBuilder(path, context)
+                .post(body.toString().toRequestBody(jsonType))
+                .addHeader("Content-Type", "application/json; charset=utf-8")
+                .build()
+            execute(req)
+        } catch (e: Exception) {
+            if (ctx != null) enqueueOrOffline(ctx, url, body) else throw e
+        }
+    }
+
+    private fun enqueueOrOffline(ctx: Context, url: String, body: JSONObject): JSONObject {
+        if (VinorCachePolicy.isQueueablePost(url)) {
+            return VinorOfflineQueue.enqueue(ctx, "post", url, "POST", body.toString())
+        }
+        return JSONObject()
+            .put("ok", false)
+            .put("queued", false)
+            .put("offline", true)
+            .put("http_status", 0)
+            .put("error", "برای انجام این عملیات اینترنت لازم است")
     }
 
     fun postUpload(

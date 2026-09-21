@@ -173,7 +173,10 @@ abstract class BaseWebViewFragment : Fragment() {
                 if (VinorWebViewErrorShield.shouldInterceptChromeErrorMainFrame(request)) {
                     return VinorWebViewErrorShield.silentHtmlResponse()
                 }
-                return super.shouldInterceptRequest(view, request)
+                val ctx = view?.context?.applicationContext ?: return super.shouldInterceptRequest(view, request)
+                val cacheFirst = VinorNetworkStatus.useCacheFirst(ctx)
+                return VinorWebResourceInterceptor.intercept(ctx, request, cacheFirst)
+                    ?: super.shouldInterceptRequest(view, request)
             }
 
             @Suppress("DEPRECATION")
@@ -182,6 +185,11 @@ abstract class BaseWebViewFragment : Fragment() {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
                     if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
                         return VinorWebViewErrorShield.silentHtmlResponse()
+                    }
+                    val ctx = view?.context?.applicationContext
+                    if (ctx != null) {
+                        val cacheFirst = VinorNetworkStatus.useCacheFirst(ctx)
+                        VinorWebResourceInterceptor.interceptLegacyUrl(ctx, url, cacheFirst)?.let { return it }
                     }
                 }
                 return super.shouldInterceptRequest(view, url)
@@ -287,6 +295,7 @@ abstract class BaseWebViewFragment : Fragment() {
             VinorDownloadBridge.enqueueDownload(ctx, url, filename, showToast = true)
         }
         webView.webChromeClient = fileChooser?.createChromeClient() ?: WebChromeClient()
+        VinorWebViewBridges.attach(this, webView)
     }
 
     /**
@@ -299,13 +308,26 @@ abstract class BaseWebViewFragment : Fragment() {
      */
     protected open fun getUrlToLoad(): String = dynamicUrl ?: targetUrl
 
+    fun peekWebView(): WebView? = if (::webView.isInitialized) webView else null
+
     private fun loadUrl() {
+        val urlToLoad = getUrlToLoad()
+        val ctx = context
+        if (!isOnline() && ctx != null && ::webView.isInitialized) {
+            val html = VinorOfflinePageStore.read(ctx, urlToLoad)
+            if (!html.isNullOrBlank()) {
+                hideOffline()
+                webView.loadDataWithBaseURL(urlToLoad, html, "text/html", "utf-8", urlToLoad)
+                return
+            }
+            showOfflineOverlayOnly()
+            return
+        }
         if (!isOnline()) {
             showOfflineOverlayOnly()
             return
         }
         hideOffline()
-        val urlToLoad = getUrlToLoad()
         Log.d(fragmentTag, "Loading URL: $urlToLoad")
         if (::webView.isInitialized) {
             webView.loadUrl(urlToLoad)
@@ -439,10 +461,6 @@ abstract class BaseWebViewFragment : Fragment() {
             showOfflineOverlayOnly()
             return
         }
-        if (!isOnline()) {
-            showOfflineOverlayOnly()
-            return
-        }
         val curUrl = webView.url
         if (VinorWebViewErrorShield.looksLikeChromeErrorPage(curUrl)) {
             showOffline()
@@ -452,10 +470,20 @@ abstract class BaseWebViewFragment : Fragment() {
             if (!isOnline()) showOfflineOverlayOnly()
             return
         }
+        if (!isOnline()) {
+            if (VinorWebOfflineSession.isPartnerBrowsableUrl(curUrl)) {
+                hideLoader()
+                binding.webView.visibility = View.VISIBLE
+                return
+            }
+            showOfflineOverlayOnly()
+            return
+        }
         hideLoader()
         binding.webView.visibility = View.VISIBLE
         canGoBack = webView.canGoBack()
         Log.d(fragmentTag, "Page revealed OK: $curUrl")
+        snapshotCurrentPage(curUrl)
 
         val urlStr = curUrl ?: ""
         val isFileDetail =
@@ -470,6 +498,18 @@ abstract class BaseWebViewFragment : Fragment() {
             hideFooterMenu()
         }
         enableDarkMode()
+    }
+
+    private fun snapshotCurrentPage(url: String?) {
+        val ctx = context ?: return
+        if (!VinorWebOfflineSession.isPartnerBrowsableUrl(url)) return
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript("(function(){return document.documentElement.outerHTML})();") { raw ->
+            val html = runCatching {
+                org.json.JSONTokener(raw ?: "null").nextValue() as? String
+            }.getOrNull()
+            if (!html.isNullOrBlank()) VinorOfflinePageStore.save(ctx, url, html)
+        }
     }
 
     /**

@@ -36,6 +36,9 @@ class MainActivity : AppCompatActivity() {
     private var drawerIsSpecial = false
     private var tabbarForcedHidden = false
     private var tabbarImeHidden = false
+    private var connectivityCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    fun notifyHelperOrNull(): VinorNotifyHelper? = notifyHelper
 
     private val navController: NavController
         get() = (supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment).navController
@@ -68,7 +71,7 @@ class MainActivity : AppCompatActivity() {
 
         notifyHelper = VinorNotifyHelper(
             this,
-            webViewProvider = { null },
+            webViewProvider = { findWebPage()?.peekWebView() },
             onOpenNotifications = { openNotifications() },
         ).also { helper ->
             helper.attach(this)
@@ -93,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         runCatching { VinorFcmRegistrar.requestTokenAndRegister(this) }
         keepSystemSplash = false
         updateOfflineBanner()
+        registerConnectivityCallback()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -111,6 +115,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        unregisterConnectivityCallback()
         notifyHelper?.destroy()
         super.onDestroy()
     }
@@ -520,15 +525,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateOfflineBanner() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val online = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val net = cm.activeNetwork
-            val caps = net?.let { cm.getNetworkCapabilities(it) }
-            caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-        } else {
-            @Suppress("DEPRECATION")
-            cm.activeNetworkInfo?.isConnected == true
-        }
+        if (!::binding.isInitialized) return
+        val online = VinorNetworkStatus.isOnline(this)
         binding.offlineBanner.visibility = if (online) android.view.View.GONE else android.view.View.VISIBLE
+    }
+
+    private fun registerConnectivityCallback() {
+        if (connectivityCallback != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                runOnUiThread {
+                    updateOfflineBanner()
+                    VinorOfflineQueue.onNetworkRestored(this@MainActivity) { remaining ->
+                        val wv = findWebPage()?.peekWebView()
+                        VinorCacheBridge.dispatchSync(
+                            wv,
+                            remaining,
+                            VinorWebOfflineSession.lastCachedAt(this@MainActivity),
+                        )
+                        if (wv != null) {
+                            VinorConnectivityBridge.syncToWeb(
+                                wv,
+                                VinorNetworkStatus.current(this@MainActivity),
+                                VinorWebOfflineSession.lastCachedAt(this@MainActivity),
+                            )
+                        }
+                    }
+                }
+            }
+
+            override fun onLost(network: android.net.Network) {
+                runOnUiThread { updateOfflineBanner() }
+            }
+        }
+        connectivityCallback = cb
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                cm.registerDefaultNetworkCallback(cb)
+            } else {
+                cm.registerNetworkCallback(
+                    android.net.NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build(),
+                    cb,
+                )
+            }
+        } catch (_: Exception) {
+            connectivityCallback = null
+        }
+    }
+
+    private fun unregisterConnectivityCallback() {
+        val cb = connectivityCallback ?: return
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.unregisterNetworkCallback(cb)
+        } catch (_: Exception) {
+        }
+        connectivityCallback = null
     }
 }

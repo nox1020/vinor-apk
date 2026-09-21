@@ -14,7 +14,7 @@ import java.util.Locale
  */
 object VinorCachePolicy {
 
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = 3
     const val ROOT_DIR = "vinor_cache"
 
     const val MAX_HTML_BYTES = 1_500_000
@@ -43,6 +43,14 @@ object VinorCachePolicy {
 
     const val QUEUE_TTL_MS = 7L * 24 * 60 * 60 * 1000
     const val QUEUE_MAX_RETRY = 6
+    const val QUEUE_BACKOFF_BASE_MS = 2_000L
+    const val QUEUE_BACKOFF_MAX_MS = 15L * 60 * 1000
+
+    /** Exponential backoff for outbox flush. retryCount 0 → 2s, then 4s … capped at 15m. */
+    fun queueBackoffMs(retryCount: Int): Long {
+        val exp = 1L shl retryCount.coerceIn(0, 8)
+        return (QUEUE_BACKOFF_BASE_MS * exp).coerceAtMost(QUEUE_BACKOFF_MAX_MS)
+    }
 
     fun normalizeUrl(raw: String?): String {
         val trimmed = raw?.trim().orEmpty()
@@ -179,6 +187,8 @@ object VinorCachePolicy {
         "/express/partner/api/requests/data",
         "/express/partner/api/listings/data",
         "/express/partner/api/legal/data",
+        "/express/partner/api/my-property/data",
+        "/express/partner/api/my-property/form",
         "/api/menu",
     )
 
@@ -193,6 +203,7 @@ object VinorCachePolicy {
         "/express/partner/api/requests",
         "/express/partner/api/listings",
         "/express/partner/api/legal",
+        "/express/partner/api/my-property",
         "/api/express/",
     )
 

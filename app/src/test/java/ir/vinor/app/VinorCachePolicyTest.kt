@@ -86,6 +86,21 @@ class VinorCachePolicyTest {
     }
 
     @Test
+    fun queueBackoff_growsThenCaps() {
+        assertEquals(2_000L, VinorCachePolicy.queueBackoffMs(0))
+        assertEquals(4_000L, VinorCachePolicy.queueBackoffMs(1))
+        assertEquals(8_000L, VinorCachePolicy.queueBackoffMs(2))
+        assertEquals(VinorCachePolicy.QUEUE_BACKOFF_MAX_MS, VinorCachePolicy.queueBackoffMs(20))
+    }
+
+    @Test
+    fun myPropertyForm_isSafeGet_notSensitive() {
+        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/my-property/form"))
+        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/my-property/data"))
+        assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/api/my-property/submit"))
+    }
+
+    @Test
     fun lruTrim_respectsCount() {
         val dir = File(System.getProperty("java.io.tmpdir"), "vinor-lru-test")
         dir.mkdirs()
