@@ -138,13 +138,12 @@ class MainActivity : AppCompatActivity() {
         val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         val favsOn = dest == R.id.nativePartnerFragment &&
             findNativePage() == NativePartnerFragment.PAGE_FAVORITES
-        val postOn = dest == R.id.myPropertyFormFragment
+        val postOn = dest == R.id.myPropertyFormFragment || dest == R.id.myPropertiesFragment
         val meOn = dest == R.id.profileFragment ||
             dest == R.id.commissionsFragment ||
             dest == R.id.routineFragment ||
             dest == R.id.notesFragment ||
             dest == R.id.notificationsFragment ||
-            dest == R.id.myPropertiesFragment ||
             (dest == R.id.nativePartnerFragment &&
                 findNativePage() != NativePartnerFragment.PAGE_FAVORITES)
         val adsOn = dest == R.id.dashboardFragment && !chatOn
@@ -338,8 +337,7 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        if (drawerIsSpecial) openListingForm()
-        else openOwnerHomeForm()
+        openMyProperty()
     }
 
     private fun applyTabbarVisibility() {
@@ -391,12 +389,17 @@ class MainActivity : AppCompatActivity() {
         return host?.childFragmentManager?.primaryNavigationFragment as? BaseWebViewFragment
     }
 
+    fun openMyProperty() {
+        if (navController.currentDestination?.id == R.id.myPropertiesFragment) return
+        navigateTab(R.id.myPropertiesFragment)
+    }
+
     fun openOwnerHomeForm() {
         openListingCompose(publicListing = false)
     }
 
     fun openListingForm() {
-        openListingCompose(publicListing = true)
+        openMyProperty()
     }
 
     private fun openListingCompose(publicListing: Boolean) {
@@ -446,8 +449,8 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
-            low.endsWith("/listings/new") -> openListingForm()
-            low.endsWith("/listings") -> openNativePage(NativePartnerFragment.PAGE_LISTINGS)
+            low.endsWith("/listings/new") -> openMyProperty()
+            low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
                 if (uri.getQueryParameter("register") == "1") {
                     openOwnerHomeForm()

@@ -158,7 +158,7 @@ class ProfileFragment : Fragment() {
         }
         binding.profileGuestApply.setOnClickListener { openUrl("$BASE/express/partner/apply/step1") }
         binding.profileLinks.removeAllViews()
-        addMenuRow("ملک من", "ارزش، نمودار و بینش ملک", R.drawable.ic_home, "$BASE/express/partner/my-property")
+        addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
         addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
         addMenuRow("درخواست همکاری", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
         if (plusOn) addMenuRow("وینور پلاس", "دریافت اشتراک", R.drawable.ic_sparkle, "login")
@@ -220,11 +220,8 @@ class ProfileFragment : Fragment() {
         }
 
         binding.profileLinks.removeAllViews()
-        addMenuRow("ملک من", "ارزش، نمودار و بینش ملک", R.drawable.ic_home, "$BASE/express/partner/my-property")
+        addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
         if (isApproved) {
-            if (isSpecial) {
-                addMenuRow("آگهی‌های من", "", R.drawable.ic_building, "$BASE/express/partner/listings")
-            }
             addMenuRow("پیگیری", "درخواست، بازدید و معامله", R.drawable.ic_routine, "$BASE/express/partner/requests")
             addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
             addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")

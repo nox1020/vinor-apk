@@ -621,14 +621,8 @@ class MyPropertyFormFragment : Fragment() {
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {
-                    toast(obj.optString("message").ifBlank {
-                        if (publicListing) "آگهی ثبت شد." else "ملک شما ثبت شد."
-                    })
-                    val act = activity as? MainActivity
-                    findNavController().navigateUp()
-                    if (publicListing || obj.optString("next") == "listings") {
-                        act?.openPath("/express/partner/listings")
-                    }
+                    toast(obj.optString("message").ifBlank { "ملک شما ثبت شد." })
+                    (activity as? MainActivity)?.openMyProperty()
                 } else {
                     showError(obj.optString("error").ifBlank {
                         if (publicListing) "ثبت آگهی ناموفق بود." else "ثبت ملک ناموفق بود."

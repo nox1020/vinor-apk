@@ -277,13 +277,13 @@ class NativePartnerFragment : Fragment() {
         val special = obj.optBoolean("is_special")
         val logged = obj.optBoolean("logged_in")
         binding.nativeCta.isVisible = !approved || !special
-        binding.nativeCta.text = if (!approved) "بازاریاب شو" else "آگهی‌های من"
+        binding.nativeCta.text = if (!approved) "بازاریاب شو" else "ملک من"
         binding.nativeCta.setOnClickListener {
             val act = activity as? MainActivity ?: return@setOnClickListener
             when {
                 !approved && !logged -> act.openDrawer()
                 !approved -> act.openNativePage(PAGE_APPLY)
-                else -> act.openNativePage(PAGE_LISTINGS)
+                else -> act.openMyProperty()
             }
         }
     }
@@ -603,7 +603,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_FAVORITES -> "نشان‌ها"
             PAGE_REQUESTS -> "پیگیری"
             PAGE_APPLY -> "درخواست همکاری"
-            PAGE_LISTINGS -> "آگهی‌های من"
+            PAGE_LISTINGS -> "ملک من"
             PAGE_TERMS -> "قوانین استفاده"
             PAGE_PRIVACY -> "حریم خصوصی"
             else -> "وینور"

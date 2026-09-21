@@ -30,6 +30,9 @@ class MyPropertiesFragment : Fragment() {
     private var rangeMonths = 12
     private var skipNextResumeLoad = true
     private var openedForm = false
+    private var selectedPayment = "نقدی"
+    private var publishing = false
+    private var propertyCode = ""
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -85,7 +88,7 @@ class MyPropertiesFragment : Fragment() {
         scope.launch {
             if (!forceNet) {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(PATH, ctx) }
-                if (_binding != null && cached != null) bind(cached)
+                if (_binding != null && cached != null) bind(cached, fromNetwork = false)
                 else _binding?.mpRefresh?.isRefreshing = true
             }
             try {
@@ -107,7 +110,7 @@ class MyPropertiesFragment : Fragment() {
         }
     }
 
-    private fun bind(obj: JSONObject) {
+    private fun bind(obj: JSONObject, fromNetwork: Boolean = true) {
         val prop = obj.optJSONObject("property")
         val has = obj.optBoolean("has_property", false) &&
             prop != null &&
@@ -115,7 +118,7 @@ class MyPropertiesFragment : Fragment() {
         if (!has || prop == null) {
             binding.mpContent.isVisible = false
             binding.mpEmpty.isVisible = true
-            if (!openedForm) {
+            if (fromNetwork && !openedForm) {
                 openedForm = true
                 binding.root.post {
                     if (_binding == null) return@post
@@ -136,7 +139,13 @@ class MyPropertiesFragment : Fragment() {
         binding.mpClaimed.isVisible = true
         binding.mpClaimed.text = prop.optString("badge_label").ifBlank { "خصوصی" }
         binding.mpDemo.isVisible = true
-        binding.mpDemo.text = prop.optString("privacy_note").ifBlank { "فقط شما این قیمت را می‌بینید" } + " · برای آگهی منتشر نمی‌شود"
+        binding.mpDemo.text = prop.optString("privacy_note").ifBlank {
+            if (prop.optBoolean("published_for_sale")) {
+                "این ملک برای فروش در آگهی‌های وینور منتشر شده است"
+            } else {
+                "فقط شما این قیمت را می‌بینید · برای فروش هنوز منتشر نشده"
+            }
+        }
         PartnerImages.bind(scope, binding.mpCover, prop.optString("cover_image"))
         binding.mpValue.text = PartnerFormat.toman(prop.optLong("estimated_value")) + " تومان"
         val monthly = prop.optDouble("monthly_change_pct")
@@ -155,8 +164,104 @@ class MyPropertiesFragment : Fragment() {
         drawChart()
         bindActivity(prop.optJSONArray("activity") ?: JSONArray())
         val act = activity as? MainActivity
-        binding.mpEdit.setOnClickListener { act?.openPath("/express/partner/my-property") }
-        binding.mpPhotos.setOnClickListener { act?.openPath("/express/partner/my-property") }
+        binding.mpEdit.setOnClickListener { act?.openOwnerHomeForm() }
+        binding.mpPhotos.setOnClickListener { act?.openOwnerHomeForm() }
+        propertyCode = prop.optString("code").ifBlank { prop.optString("id") }
+        bindPublish(obj, prop)
+        bindExtra(obj.optJSONArray("listings") ?: JSONArray())
+    }
+
+    private fun bindPublish(obj: JSONObject, prop: JSONObject) {
+        val published = prop.optBoolean("published_for_sale") || obj.optBoolean("published_for_sale")
+        binding.mpSellCard.isVisible = true
+        binding.mpPayRow.isVisible = !published
+        binding.mpCommissionRow.isVisible = !published
+        binding.mpSendAll.isVisible = !published
+        if (published) {
+            binding.mpSellTitle.text = "برای فروش منتشر شده"
+            binding.mpSellHint.text = "این ملک در آگهی‌های وینور نمایش داده می‌شود."
+            binding.mpSellCta.text = "مشاهده آگهی"
+            binding.mpSellCta.setOnClickListener {
+                if (propertyCode.isNotBlank()) (activity as? MainActivity)?.openLand(propertyCode)
+            }
+            return
+        }
+        binding.mpSellTitle.text = "انتشار برای فروش"
+        binding.mpSellHint.text = "بعد از انتشار، ملک در آگهی‌های وینور دیده می‌شود."
+        binding.mpSellCta.text = "انتشار برای فروش"
+        paintPayChips()
+        binding.mpPayCash.setOnClickListener { selectedPayment = "نقدی"; paintPayChips() }
+        binding.mpPayDeal.setOnClickListener { selectedPayment = "توافقی"; paintPayChips() }
+        binding.mpPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paintPayChips() }
+        if (binding.mpCommission.text.isNullOrBlank()) {
+            binding.mpCommission.setText(obj.optString("default_commission_pct").ifBlank { "2" })
+        }
+        binding.mpSellCta.setOnClickListener { publish() }
+    }
+
+    private fun paintPayChips() {
+        fun paint(tv: TextView, on: Boolean) {
+            tv.setBackgroundColor(Color.parseColor(if (on) "#10B981" else "#2F2F2F"))
+            tv.setTextColor(Color.parseColor(if (on) "#052E16" else "#ECECEC"))
+        }
+        paint(binding.mpPayCash, selectedPayment == "نقدی")
+        paint(binding.mpPayDeal, selectedPayment == "توافقی")
+        paint(binding.mpPaySwap, selectedPayment == "معاوضه")
+    }
+
+    private fun publish() {
+        val ctx = context ?: return
+        if (publishing) return
+        val pct = binding.mpCommission.text?.toString()?.trim().orEmpty().ifBlank { "2" }
+        val body = JSONObject()
+            .put("payment_method", selectedPayment)
+            .put("commission_pct", pct)
+            .put("auto_send_all_partners", binding.mpSendAll.isChecked)
+        publishing = true
+        binding.mpSellCta.alpha = 0.6f
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson("/express/partner/api/my-property/publish", body, ctx)
+                }
+                if (_binding == null) return@launch
+                if (fresh.optBoolean("ok", false)) {
+                    Toast.makeText(ctx, fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." }, Toast.LENGTH_SHORT).show()
+                    bind(fresh, fromNetwork = true)
+                } else {
+                    Toast.makeText(ctx, fresh.optString("error").ifBlank { "انتشار ناموفق بود." }, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } finally {
+                publishing = false
+                _binding?.mpSellCta?.alpha = 1f
+            }
+        }
+    }
+
+    private fun bindExtra(arr: JSONArray) {
+        binding.mpExtraList.removeAllViews()
+        binding.mpExtraBox.isVisible = arr.length() > 0
+        for (i in 0 until arr.length()) {
+            val row = arr.optJSONObject(i) ?: continue
+            val code = row.optString("code")
+            val tv = TextView(requireContext())
+            tv.setTextColor(Color.parseColor("#ECECEC"))
+            tv.textSize = 13f
+            tv.setPadding(0, dp(8), 0, dp(8))
+            val city = row.optString("city")
+            val title = row.optString("title")
+            tv.text = buildString {
+                append(title)
+                if (city.isNotBlank()) append(" · ").append(city)
+                append("\n").append(PartnerFormat.toman(row.optLong("price_total"))).append(" تومان")
+            }
+            tv.setOnClickListener {
+                if (code.isNotBlank()) (activity as? MainActivity)?.openLand(code)
+            }
+            binding.mpExtraList.addView(tv)
+        }
     }
 
     private fun bindRangeTabs() {
