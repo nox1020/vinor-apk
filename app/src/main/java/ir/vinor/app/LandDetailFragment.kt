@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,6 +30,9 @@ class LandDetailFragment : Fragment() {
     private val binding get() = _binding!!
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
+    private var publishing = false
+    private var selectedPayment = "نقدی"
+    private var listingCode = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -47,6 +51,7 @@ class LandDetailFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.landDetailBack.setOnClickListener { findNavController().navigateUp() }
         val code = arguments?.getString("code").orEmpty().trim()
+        listingCode = code
         if (code.isBlank()) {
             binding.landDetailError.isVisible = true
             binding.landDetailError.text = "کد فایل نامعتبر است."
@@ -118,7 +123,13 @@ class LandDetailFragment : Fragment() {
         binding.landDetailError.isVisible = false
         val source = obj.optString("source")
         val isDivar = source == "divar" || code.startsWith("divar:", ignoreCase = true)
-        binding.landDetailBadge.isVisible = isDivar
+        val badge = obj.optString("owner_badge")
+        binding.landDetailBadge.isVisible = isDivar || badge.isNotBlank()
+        binding.landDetailBadge.text = when {
+            isDivar -> "دیوار"
+            badge.isNotBlank() -> badge
+            else -> "دیوار"
+        }
         binding.landDetailTitle.text = obj.optString("title").ifBlank { "آگهی" }
         val priceText = obj.optString("price").trim()
         val priceToman = obj.optLong("price_toman")
@@ -157,6 +168,72 @@ class LandDetailFragment : Fragment() {
                     "https://divar.ir/v/${code.substringAfter(':')}"
                 }
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        }
+        bindPublish(code, obj)
+    }
+
+    private fun bindPublish(code: String, obj: JSONObject) {
+        val canPublish = obj.optBoolean("can_publish")
+        val published = obj.optBoolean("published_for_sale") && obj.optBoolean("is_mine")
+        binding.landDetailPublish.isVisible = canPublish || published
+        binding.landDetailPayRow.isVisible = canPublish
+        binding.landDetailCommissionRow.isVisible = canPublish
+        binding.landDetailSendAll.isVisible = canPublish
+        if (!canPublish) {
+            binding.landDetailPublishTitle.text = "برای فروش منتشر شده"
+            binding.landDetailPublishHint.text = "این ملک در آگهی‌های وینور نمایش داده می‌شود."
+            binding.landDetailPublishCta.isVisible = false
+            return
+        }
+        binding.landDetailPublishTitle.text = "انتشار برای فروش"
+        binding.landDetailPublishHint.text = "بعد از انتشار، این ملک در آگهی‌های وینور دیده می‌شود."
+        binding.landDetailPublishCta.isVisible = true
+        paintPayChips()
+        binding.landDetailPayCash.setOnClickListener { selectedPayment = "نقدی"; paintPayChips() }
+        binding.landDetailPayDeal.setOnClickListener { selectedPayment = "توافقی"; paintPayChips() }
+        binding.landDetailPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paintPayChips() }
+        binding.landDetailPublishCta.setOnClickListener { publish(code) }
+    }
+
+    private fun paintPayChips() {
+        fun paint(tv: TextView, on: Boolean) {
+            tv.setBackgroundColor(Color.parseColor(if (on) "#10B981" else "#2F2F2F"))
+            tv.setTextColor(Color.parseColor(if (on) "#052E16" else "#ECECEC"))
+        }
+        paint(binding.landDetailPayCash, selectedPayment == "نقدی")
+        paint(binding.landDetailPayDeal, selectedPayment == "توافقی")
+        paint(binding.landDetailPaySwap, selectedPayment == "معاوضه")
+    }
+
+    private fun publish(code: String) {
+        val ctx = context ?: return
+        if (publishing) return
+        val pct = binding.landDetailCommissionPct.text?.toString()?.trim().orEmpty().ifBlank { "2" }
+        val body = JSONObject()
+            .put("code", code)
+            .put("payment_method", selectedPayment)
+            .put("commission_pct", pct)
+            .put("auto_send_all_partners", binding.landDetailSendAll.isChecked)
+        publishing = true
+        binding.landDetailPublishCta.alpha = 0.6f
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson("/express/partner/api/my-property/publish", body, ctx)
+                }
+                if (_binding == null) return@launch
+                if (fresh.optBoolean("ok", false)) {
+                    Toast.makeText(ctx, fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." }, Toast.LENGTH_SHORT).show()
+                    load(code)
+                } else {
+                    Toast.makeText(ctx, fresh.optString("error").ifBlank { "انتشار ناموفق بود." }, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } finally {
+                publishing = false
+                _binding?.landDetailPublishCta?.alpha = 1f
             }
         }
     }
