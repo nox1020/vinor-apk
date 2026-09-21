@@ -1005,7 +1005,7 @@ class DashboardFragment : Fragment() {
         when {
             source == "vinor" && token.isNotBlank() -> (activity as? MainActivity)?.openLand(token)
             source == "divar" && token.isNotBlank() ->
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://divar.ir/v/$token")))
+                (activity as? MainActivity)?.openLand("divar:$token")
             url.isNotBlank() -> openVinorOrExternal(url)
         }
     }

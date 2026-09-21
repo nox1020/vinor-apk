@@ -86,6 +86,12 @@ object DeepLinkRouter {
                 if (id.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "land_missing_id")
                 else propertyRoute(id, raw, partnerPath = true)
             }
+            path.matches(Regex("^/express/partner/divar/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
+                val token = Regex("^/express/partner/divar/([^/]+)$", RegexOption.IGNORE_CASE)
+                    .find(path)?.groupValues?.getOrNull(1)
+                if (token.isNullOrBlank()) fallback.copy(originalUri = raw, logLabel = "divar_missing_token")
+                else propertyRoute("divar:$token", raw, partnerPath = true)
+            }
             path.matches(Regex("^/express/([^/]+)$", RegexOption.IGNORE_CASE)) -> {
                 val code = Regex("^/express/([^/]+)$", RegexOption.IGNORE_CASE)
                     .find(path)?.groupValues?.getOrNull(1)
@@ -197,7 +203,11 @@ object DeepLinkRouter {
     }
 
     private fun propertyRoute(id: String, raw: String, partnerPath: Boolean = false): Route {
-        val target = "https://$HOST/express/partner/lands/$id"
+        val target = if (id.startsWith("divar:")) {
+            "https://$HOST/express/partner/divar/${id.removePrefix("divar:")}"
+        } else {
+            "https://$HOST/express/partner/lands/$id"
+        }
         return Route(
             type = DestinationType.PROPERTY_DETAIL,
             targetUrl = target,
@@ -212,6 +222,10 @@ object DeepLinkRouter {
         val land = queryParam(uri, "land")
         if (!land.isNullOrBlank()) {
             return propertyRoute(land, raw, partnerPath = true)
+        }
+        val divar = queryParam(uri, "divar")
+        if (!divar.isNullOrBlank()) {
+            return propertyRoute("divar:$divar", raw, partnerPath = true)
         }
         return Route(
             type = DestinationType.PARTNER_HOME,

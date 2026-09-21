@@ -27,7 +27,13 @@ class PartnerPageFragment : BaseWebViewFragment() {
             }
             path.startsWith("/express/partner/lands/") -> {
                 val code = path.substringAfterLast('/')
-                if (code.isNotBlank()) hostAct?.openLand(code) else hostAct?.openPartnerHome()
+                if (code.isNotBlank() && code != "chat-detail") hostAct?.openLand(code) else hostAct?.openPartnerHome()
+                true
+            }
+            path.startsWith("/express/partner/divar/") -> {
+                val token = path.substringAfterLast('/')
+                if (token.isNotBlank() && token != "chat-detail") hostAct?.openLand("divar:$token")
+                else hostAct?.openPartnerHome()
                 true
             }
             path.startsWith("/property/") -> {

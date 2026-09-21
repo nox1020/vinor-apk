@@ -30,7 +30,7 @@
             android:layout_weight="1"
             android:background="@drawable/bg_header_title_pill"
             android:gravity="center"
-            android:text="جزئیات فایل"
+            android:text="جزئیات آگهی"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -72,11 +72,26 @@
                 android:scaleType="centerCrop" />
 
             <TextView
+                android:id="@+id/landDetailBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_header_title_pill"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:text="دیوار"
+                android:textColor="#BAE6FD"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/landDetailTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -91,6 +106,17 @@
                 android:textSize="16sp" />
 
             <TextView
+                android:id="@+id/landDetailCommission"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="4dp"
+                android:textColor="#34D399"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/landDetailMeta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -98,6 +124,15 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#8E8E93"
                 android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/landDetailRows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/landDetailBody"
@@ -108,6 +143,21 @@
                 android:lineSpacingExtra="4dp"
                 android:textColor="#E4E4E7"
                 android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/landDetailDivar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_header_title_pill"
+                android:gravity="center"
+                android:padding="14dp"
+                android:text="دیدن در دیوار"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/landDetailError"

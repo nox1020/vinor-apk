@@ -289,7 +289,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLand(code: String) {
-        val args = Bundle().apply { putString("code", code) }
+        val trimmed = code.trim()
+        if (trimmed.isBlank()) return
+        val currentCode = navController.currentBackStackEntry?.arguments?.getString("code")
+        if (navController.currentDestination?.id == R.id.landDetailFragment && currentCode == trimmed) {
+            return
+        }
+        val args = Bundle().apply { putString("code", trimmed) }
         navController.navigate(R.id.landDetailFragment, args)
     }
 
@@ -418,7 +424,20 @@ class MainActivity : AppCompatActivity() {
         when {
             p == "/express/partner/home" || p == "/express/partner" -> {
                 val land = uri.getQueryParameter("land")
-                if (!land.isNullOrBlank()) openLand(land) else openPartnerHome()
+                val divar = uri.getQueryParameter("divar")
+                when {
+                    !land.isNullOrBlank() -> openLand(land)
+                    !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    else -> openPartnerHome()
+                }
+            }
+            p.matches(Regex("^/express/partner/lands/[^/]+$")) -> {
+                val code = p.substringAfterLast('/')
+                if (code.isNotBlank()) openLand(code) else openPartnerHome()
+            }
+            p.matches(Regex("^/express/partner/divar/[^/]+$")) -> {
+                val token = p.substringAfterLast('/')
+                if (token.isNotBlank()) openLand("divar:$token") else openPartnerHome()
             }
             low.endsWith("/training") -> openNativePage(NativePartnerFragment.PAGE_TRAINING)
             low.endsWith("/levels") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)
