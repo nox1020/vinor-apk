@@ -61,6 +61,7 @@ class DashboardFragment : Fragment() {
     private var cachedHistory: JSONObject? = null
     private var chatLayerOpen = false
     private var wantChatLayer = false
+    private var chatBindGen = 0
     private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
@@ -212,11 +213,19 @@ class DashboardFragment : Fragment() {
         b.dashboardRefresh.isRefreshing = false
     }
 
-    fun isChatOpen(): Boolean = chatLayerOpen
+    fun isChatOpen(): Boolean = chatLayerOpen && wantChatLayer
+
+    /** تب آگهی‌ها: لایهٔ چت را ببند، آگهی‌ها را نشان بده. */
+    fun showHomeEntry() {
+        wantChatLayer = false
+        chatBindGen += 1
+        showHomeEmpty()
+        (activity as? MainActivity)?.syncDivarTab()
+    }
 
     private fun syncComposerVisible() {
         val b = _binding ?: return
-        b.dashboardComposer.isVisible = chatLayerOpen
+        b.dashboardComposer.isVisible = chatLayerOpen && wantChatLayer
         if (!chatLayerOpen) closeAttach()
         syncChatListInset()
     }
@@ -249,13 +258,6 @@ class DashboardFragment : Fragment() {
         newsHandler.removeCallbacks(newsTick)
     }
 
-    /** بدو ورود خانه — تاریخچه در کشو می‌ماند، چت باز نمی‌شود. */
-    fun showHomeEntry() {
-        wantChatLayer = false
-        showHomeEmpty()
-        (activity as? MainActivity)?.syncDivarTab()
-    }
-
     fun scrollHomeToTop() {
         val b = _binding ?: return
         b.dashboardScroll.post { b.dashboardScroll.scrollTo(0, 0) }
@@ -267,6 +269,7 @@ class DashboardFragment : Fragment() {
         val alreadyOpen = chatLayerOpen && wantChatLayer
         wantChatLayer = true
         chatLayerOpen = true
+        chatBindGen += 1
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
@@ -720,7 +723,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardNewsText.alpha = 1f
         binding.dashboardNewsText.text = newsItems.first()
         newsHandler.removeCallbacks(newsTick)
-        val inChat = chatLayerOpen || wantChatLayer
+        val inChat = chatLayerOpen && wantChatLayer
         if (!inChat && newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
 
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
@@ -1069,11 +1072,14 @@ class DashboardFragment : Fragment() {
     }
 
     private fun bindChat(obj: JSONObject) {
+        if (!wantChatLayer) return
         threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
         val messages = obj.optJSONArray("messages") ?: JSONArray()
+        val gen = chatBindGen
         scope.launch {
             prefetchLandCodes(messages)
             if (_binding == null) return@launch
+            if (gen != chatBindGen || !wantChatLayer) return@launch
             renderMessages(messages)
         }
     }
@@ -1105,29 +1111,24 @@ class DashboardFragment : Fragment() {
     }
 
     private fun renderMessages(messages: JSONArray) {
+        if (!wantChatLayer || !chatLayerOpen) {
+            showHomeEmpty()
+            return
+        }
         binding.dashboardChatList.removeAllViews()
-        var hasUser = false
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
-            if (msg.optString("role") == "user") hasUser = true
             val att = msg.optJSONObject("attachment")
                 ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
             addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
         }
-        if (chatLayerOpen) {
+        if (chatLayerOpen && wantChatLayer) {
             hideHomeDashboardWidgets()
             syncComposerVisible()
             binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             return
         }
-        val empty = !hasUser
-        binding.dashboardEmpty.isVisible = empty
-        binding.dashboardAdsScroll.isVisible = empty && binding.dashboardAds.childCount > 0
-        if (!empty) newsHandler.removeCallbacks(newsTick)
-        syncComposerVisible()
-        if (hasUser) {
-            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
-        }
+        showHomeEmpty()
     }
 
     private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null) {
@@ -1216,6 +1217,7 @@ class DashboardFragment : Fragment() {
         syncSendEnabled()
         wantChatLayer = true
         chatLayerOpen = true
+        chatBindGen += 1
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
@@ -1229,6 +1231,7 @@ class DashboardFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
                 if (_binding == null) return@launch
+                if (!wantChatLayer || !chatLayerOpen) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
                     if (toSend != null) {

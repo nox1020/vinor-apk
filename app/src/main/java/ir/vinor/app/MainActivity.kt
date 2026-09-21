@@ -197,8 +197,8 @@ class MainActivity : AppCompatActivity() {
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
-            if (dash.isChatOpen()) dash.showHomeEntry()
-            else dash.scrollHomeToTop()
+            dash.showHomeEntry()
+            dash.scrollHomeToTop()
             syncDivarTab()
             return
         }
