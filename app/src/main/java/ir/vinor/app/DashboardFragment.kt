@@ -879,7 +879,8 @@ class DashboardFragment : Fragment() {
                     .put("subtitle", "درخواست، بازدید و معامله")
                     .put("variant", "tile")
                     .put("icon", "clipboard")
-                    .put("href", "/express/partner/requests"),
+                    .put("prompt", "قدم بعدی فروش من چیست؟ از همین چت جلو ببر.")
+                    .put("intent", "next_action"),
             )
             return out
         }
@@ -940,7 +941,7 @@ class DashboardFragment : Fragment() {
                 !PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1") ->
                     (activity as? MainActivity)?.openDrawer()
                 href.isNotBlank() -> openVinorOrExternal(href)
-                else -> onHero()
+                else -> runPromptOr(prompt) { onHero() }
             }
         }
     }
@@ -965,7 +966,8 @@ class DashboardFragment : Fragment() {
         val href = prompt?.optString("href").orEmpty()
         val action = prompt?.optString("ui_action").orEmpty()
         val showAds = action == "open_divar_ads_all"
-        val showReq = prompt?.optString("intent") == "followup" || href.contains("/requests")
+        val intent = prompt?.optString("intent").orEmpty()
+        val showReq = intent == "followup" || intent == "next_action" || href.contains("/requests")
         val n = when {
             showAds -> adsCount
             showReq -> reqCount
@@ -978,7 +980,7 @@ class DashboardFragment : Fragment() {
                 action == "open_divar_ads_all" -> openAdsAll()
                 action == "open_customer_modal" -> openCustomer()
                 href.isNotBlank() -> openVinorOrExternal(href)
-                else -> fallbackAction()
+                else -> runPromptOr(prompt, fallbackAction)
             }
         }
     }
@@ -1241,8 +1243,22 @@ class DashboardFragment : Fragment() {
         return card
     }
 
-    private fun sendChat() {
-        val text = binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
+    private fun runPromptOr(prompt: JSONObject?, fallback: () -> Unit) {
+        val text = prompt?.optString("prompt").orEmpty().ifBlank {
+            prompt?.optString("label").orEmpty()
+        }
+        val intent = prompt?.optString("intent").orEmpty()
+        if (text.isNotBlank() && intent.isNotBlank()) {
+            sendChat(prefill = text, chipIntent = intent)
+        } else {
+            fallback()
+        }
+    }
+
+    private fun sendChat(prefill: String? = null, chipIntent: String = "") {
+        val text = prefill?.trim().orEmpty().ifBlank {
+            binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
+        }
         val attach = pendingAttachment
         if (attachUploading) {
             Toast.makeText(requireContext(), "صبر کنید تا آپلود تمام شود.", Toast.LENGTH_SHORT).show()
@@ -1266,6 +1282,7 @@ class DashboardFragment : Fragment() {
             try {
                 val body = JSONObject().put("message", text)
                 threadId?.let { body.put("thread_id", it) }
+                if (chipIntent.isNotBlank()) body.put("intent", chipIntent)
                 if (toSend != null) body.put("attachment", toSend)
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
