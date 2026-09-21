@@ -256,6 +256,11 @@ class DashboardFragment : Fragment() {
         (activity as? MainActivity)?.syncDivarTab()
     }
 
+    fun scrollHomeToTop() {
+        val b = _binding ?: return
+        b.dashboardScroll.post { b.dashboardScroll.scrollTo(0, 0) }
+    }
+
     /** کلیک «وینور» در کشو: لایهٔ چت با تاریخچه. */
     fun openVinorChat() {
         if (_binding == null) return

@@ -19,6 +19,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import ir.vinor.app.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
@@ -138,7 +139,14 @@ class MainActivity : AppCompatActivity() {
         val favsOn = dest == R.id.nativePartnerFragment &&
             findNativePage() == NativePartnerFragment.PAGE_FAVORITES
         val postOn = dest == R.id.myPropertyFormFragment
-        val meOn = dest == R.id.profileFragment
+        val meOn = dest == R.id.profileFragment ||
+            dest == R.id.commissionsFragment ||
+            dest == R.id.routineFragment ||
+            dest == R.id.notesFragment ||
+            dest == R.id.notificationsFragment ||
+            dest == R.id.myPropertiesFragment ||
+            (dest == R.id.nativePartnerFragment &&
+                findNativePage() != NativePartnerFragment.PAGE_FAVORITES)
         val adsOn = dest == R.id.dashboardFragment && !chatOn
         paintTab(
             binding.divarTabbar.tabAdsIcon,
@@ -191,6 +199,7 @@ class MainActivity : AppCompatActivity() {
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
             if (dash.isChatOpen()) dash.showHomeEntry()
+            else dash.scrollHomeToTop()
             syncDivarTab()
             return
         }
@@ -245,9 +254,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openProfile() {
-        if (navController.currentDestination?.id != R.id.profileFragment) {
-            navController.navigate(R.id.profileFragment)
-        }
+        if (navController.currentDestination?.id == R.id.profileFragment) return
+        navigateTab(R.id.profileFragment)
     }
 
     fun openProfileEdit() {
@@ -257,6 +265,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openNativePage(page: String) {
+        openNativePage(page, asTab = page == NativePartnerFragment.PAGE_FAVORITES)
+    }
+
+    private fun openNativePage(page: String, asTab: Boolean) {
         val args = Bundle().apply { putString(NativePartnerFragment.ARG_PAGE, page) }
         val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
         val current = host?.childFragmentManager?.primaryNavigationFragment as? NativePartnerFragment
@@ -266,7 +278,8 @@ class MainActivity : AppCompatActivity() {
         ) {
             return
         }
-        navController.navigate(R.id.nativePartnerFragment, args)
+        if (asTab) navigateTab(R.id.nativePartnerFragment, args)
+        else navController.navigate(R.id.nativePartnerFragment, args)
     }
 
     fun openNotifications() {
@@ -384,9 +397,18 @@ class MainActivity : AppCompatActivity() {
         val args = Bundle().apply {
             putBoolean(MyPropertyFormFragment.ARG_PUBLIC, publicListing)
         }
-        if (navController.currentDestination?.id != R.id.myPropertyFormFragment) {
-            navController.navigate(R.id.myPropertyFormFragment, args)
-        }
+        if (navController.currentDestination?.id == R.id.myPropertyFormFragment) return
+        navigateTab(R.id.myPropertyFormFragment, args)
+    }
+
+    private fun navigateTab(dest: Int, args: Bundle? = null) {
+        val opts = NavOptions.Builder()
+            .setLaunchSingleTop(true)
+            .setRestoreState(true)
+            .setPopUpTo(R.id.dashboardFragment, false, true)
+            .build()
+        runCatching { navController.navigate(dest, args, opts) }
+            .onFailure { navController.navigate(dest, args) }
     }
 
     fun openPath(path: String) {
