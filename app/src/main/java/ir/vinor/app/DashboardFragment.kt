@@ -905,14 +905,6 @@ class DashboardFragment : Fragment() {
         }
         out.put(
             JSONObject()
-                .put("label", "خرید ملک")
-                .put("subtitle", "جستجوی فایل و ملک")
-                .put("variant", "tile")
-                .put("icon", "search")
-                .put("ui_action", "open_divar_ads_all"),
-        )
-        out.put(
-            JSONObject()
                 .put("label", "سطوح همکاری")
                 .put("subtitle", "شرایط و پورسانت")
                 .put("variant", "tile")
@@ -933,7 +925,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardHero.setOnClickListener {
             when {
                 action == "open_customer_modal" -> openCustomer()
-                action == "open_divar_ads_all" -> openAdsAll()
+                action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
                 !PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1") ->
                     (activity as? MainActivity)?.openDrawer()
                 href.isNotBlank() -> openVinorOrExternal(href)
@@ -973,7 +965,7 @@ class DashboardFragment : Fragment() {
         if (n > 0) count.text = PartnerFormat.toman(n)
         tile.setOnClickListener {
             when {
-                action == "open_divar_ads_all" -> openAdsAll()
+                action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
                 action == "open_customer_modal" -> openCustomer()
                 href.isNotBlank() -> openVinorOrExternal(href)
                 else -> runPromptOr(prompt, fallbackAction)
@@ -1044,41 +1036,9 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun openAdsAll() {
-        binding.dashboardAdsAllList.removeAllViews()
-        for (i in 0 until allAds.length()) {
-            val ad = allAds.optJSONObject(i) ?: continue
-            val row = ItemAdsAllRowBinding.inflate(layoutInflater, binding.dashboardAdsAllList, false)
-            row.adsAllTitle.text = ad.optString("title")
-            row.adsAllPrice.text = ad.optString("price")
-            val loc = ad.optString("location")
-            row.adsAllLoc.text = when {
-                loc.isBlank() -> ""
-                loc.startsWith("در ") -> loc
-                else -> "در $loc"
-            }
-            PartnerImages.roundClip(row.adsAllThumb, 8f)
-            row.adsAllThumb.tag = ad.optString("image_url")
-            row.root.setOnClickListener {
-                closeAdsAll()
-                openAd(ad)
-            }
-            binding.dashboardAdsAllList.addView(row.root)
-        }
-        binding.dashboardAdsAll.isVisible = true
-        binding.dashboardAdsAllList.post { bindVisibleAdsAllImages() }
-    }
-
     private fun bindVisibleCarouselImages() {
         val b = _binding ?: return
         bindVisibleRowImages(b.dashboardAdsScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
-    }
-
-    private fun bindVisibleAdsAllImages() {
-        val b = _binding ?: return
-        if (!b.dashboardAdsAll.isVisible) return
-        val host = b.dashboardAdsAllList.parent as? View ?: return
-        bindVisibleRowImages(host, b.dashboardAdsAllList) { it.findViewById(R.id.adsAllThumb) }
     }
 
     private fun bindVisibleRowImages(

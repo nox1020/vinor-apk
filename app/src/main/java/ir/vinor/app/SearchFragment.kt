@@ -129,7 +129,6 @@ class SearchFragment : Fragment() {
         }
         b.searchEmpty.isVisible = emptyText.isNotEmpty()
         b.searchEmpty.text = emptyText
-        b.searchRefresh.isVisible = shown > 0 || allAds.length() > 0
         b.searchList.post { bindVisibleImages() }
     }
 

@@ -176,6 +176,7 @@
                             android:layout_weight="1"
                             android:clickable="true"
                             android:focusable="true"
+                            android:visibility="gone"
                             android:gravity="top"
                             android:orientation="horizontal"
                             android:padding="8dp">
@@ -235,9 +236,11 @@
                         </LinearLayout>
 
                         <View
+                            android:id="@+id/dashboardTilesDivider"
                             android:layout_width="1dp"
                             android:layout_height="36dp"
-                            android:background="#1FFFFFFF" />
+                            android:background="#1FFFFFFF"
+                            android:visibility="gone" />
 
                         <LinearLayout
                             android:id="@+id/dashboardTileLevels"
@@ -246,6 +249,7 @@
                             android:layout_weight="1"
                             android:clickable="true"
                             android:focusable="true"
+                            android:visibility="gone"
                             android:gravity="top"
                             android:orientation="horizontal"
                             android:padding="8dp">
@@ -622,84 +626,6 @@
         android:layout_gravity="center"
         android:indeterminateTint="#8E8E93"
         android:visibility="gone" />
-
-    <FrameLayout
-        android:id="@+id/dashboardAdsAll"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone">
-
-        <View
-            android:id="@+id/dashboardAdsAllBackdrop"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#B8000000"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="bottom"
-            android:layout_marginTop="80dp"
-            android:background="@drawable/bg_ads_all_panel"
-            android:clickable="true"
-            android:orientation="vertical">
-
-            <View
-                android:layout_width="40dp"
-                android:layout_height="4dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="9dp"
-                android:background="#33FFFFFF" />
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="آگهی‌ها"
-                    android:textColor="#F4F4F5"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/dashboardAdsAllClose"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="start|center_vertical"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="بستن"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_close" />
-            </FrameLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#14FFFFFF" />
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:fillViewport="true"
-                android:overScrollMode="never">
-
-                <LinearLayout
-                    android:id="@+id/dashboardAdsAllList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
-        </LinearLayout>
-    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/dashboardCustomer"
