@@ -29,7 +29,6 @@ import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentDashboardBinding
-import ir.vinor.app.databinding.ItemAdsAllRowBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
 import ir.vinor.app.databinding.ItemHomeAdBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
@@ -56,7 +55,6 @@ class DashboardFragment : Fragment() {
     private val landsByCode = linkedMapOf<String, JSONObject>()
     private val newsItems = mutableListOf<String>()
     private var newsIndex = 0
-    private var allAds = JSONArray()
     private var lastAdsKey = ""
     private var isApproved = false
     private var pendingAttachment: JSONObject? = null
@@ -69,7 +67,6 @@ class DashboardFragment : Fragment() {
     private var boundMessageCount = 0
     private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
-    private val adsAllScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleAdsAllImages() }
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
     }
@@ -128,12 +125,9 @@ class DashboardFragment : Fragment() {
         binding.dashboardAttachFile.setOnClickListener { onAttachKind("file") }
         binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
-        binding.dashboardTileBuy.setOnClickListener { openAdsAll() }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
-        binding.dashboardAdsAllBackdrop.setOnClickListener { closeAdsAll() }
-        binding.dashboardAdsAllClose.setOnClickListener { closeAdsAll() }
         binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
@@ -172,7 +166,6 @@ class DashboardFragment : Fragment() {
             false
         }
         binding.dashboardAdsScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
-        (binding.dashboardAdsAllList.parent as? View)?.viewTreeObserver?.addOnScrollChangedListener(adsAllScrollListener)
         syncSendEnabled()
         syncComposerVisible()
         loadAll()
@@ -183,10 +176,6 @@ class DashboardFragment : Fragment() {
 
     override fun onDestroyView() {
         runCatching { binding.dashboardAdsScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
-        runCatching {
-            (binding.dashboardAdsAllList.parent as? View)?.viewTreeObserver
-                ?.removeOnScrollChangedListener(adsAllScrollListener)
-        }
         newsHandler.removeCallbacks(newsTick)
         job.cancel()
         super.onDestroyView()
@@ -201,7 +190,7 @@ class DashboardFragment : Fragment() {
 
     private fun onPullRefresh() {
         val b = _binding ?: return
-        if (b.dashboardAdsAll.isVisible || b.dashboardCustomer.isVisible || b.dashboardAttachSheet.isVisible) {
+        if (b.dashboardCustomer.isVisible || b.dashboardAttachSheet.isVisible) {
             b.dashboardRefresh.isRefreshing = false
             return
         }
@@ -305,19 +294,11 @@ class DashboardFragment : Fragment() {
     fun closeOverlays(): Boolean {
         if (closeAttach()) return true
         if (closeCustomer()) return true
-        if (closeAdsAll()) return true
         if (chatLayerOpen) {
             showHomeEntry()
             return true
         }
         return false
-    }
-
-    fun closeAdsAll(): Boolean {
-        val b = _binding ?: return false
-        if (!b.dashboardAdsAll.isVisible) return false
-        b.dashboardAdsAll.isVisible = false
-        return true
     }
 
     private fun closeCustomer(): Boolean {
@@ -768,7 +749,6 @@ class DashboardFragment : Fragment() {
         if (!inChat && newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
 
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
-        allAds = ads
         val adsKey = adsFingerprint(ads)
         val sameCards = adsKey.isNotEmpty() &&
             adsKey == lastAdsKey &&
@@ -825,6 +805,7 @@ class DashboardFragment : Fragment() {
         val tiles = mutableListOf<JSONObject>()
         for (i in 0 until prompts.length()) {
             val p = prompts.optJSONObject(i) ?: continue
+            if (p.optString("ui_action") == "open_divar_ads_all") continue
             if (p.optString("variant") == "hero") {
                 if (hero == null) hero = p
             } else {
@@ -832,36 +813,44 @@ class DashboardFragment : Fragment() {
             }
         }
         bindHeroPrompt(hero)
-        bindTilePrompt(
-            tile = binding.dashboardTileBuy,
-            icon = binding.dashboardTileBuyIcon,
-            title = binding.dashboardTileBuyTitle,
-            sub = binding.dashboardTileBuySub,
-            count = binding.dashboardTileBuyCount,
-            prompt = tiles.getOrNull(0),
-            fallbackTitle = "خرید ملک",
-            fallbackSub = "جستجوی فایل و ملک",
-            fallbackIcon = R.drawable.ic_search_stroke,
-            fallbackAction = { openAdsAll() },
-            adsCount = adsCount,
-            reqCount = reqCount,
+        val slots = listOf(
+            arrayOf(
+                binding.dashboardTileBuy,
+                binding.dashboardTileBuyIcon,
+                binding.dashboardTileBuyTitle,
+                binding.dashboardTileBuySub,
+                binding.dashboardTileBuyCount,
+            ),
+            arrayOf(
+                binding.dashboardTileLevels,
+                binding.dashboardTileLevelsIcon,
+                binding.dashboardTileLevelsTitle,
+                binding.dashboardTileLevelsSub,
+                binding.dashboardTileLevelsCount,
+            ),
         )
-        bindTilePrompt(
-            tile = binding.dashboardTileLevels,
-            icon = binding.dashboardTileLevelsIcon,
-            title = binding.dashboardTileLevelsTitle,
-            sub = binding.dashboardTileLevelsSub,
-            count = binding.dashboardTileLevelsCount,
-            prompt = tiles.getOrNull(1),
-            fallbackTitle = "سطوح همکاری",
-            fallbackSub = "شرایط و پورسانت",
-            fallbackIcon = R.drawable.ic_users_stroke,
-            fallbackAction = {
-                (activity as? MainActivity)?.openPath("/express/partner/levels")
-            },
-            adsCount = adsCount,
-            reqCount = reqCount,
-        )
+        val icons = intArrayOf(R.drawable.ic_clipboard, R.drawable.ic_users_stroke)
+        slots.forEachIndexed { index, slot ->
+            val prompt = tiles.getOrNull(index)
+            (slot[0] as View).isVisible = prompt != null
+            if (prompt == null) return@forEachIndexed
+            bindTilePrompt(
+                tile = slot[0] as View,
+                icon = slot[1] as ImageView,
+                title = slot[2] as android.widget.TextView,
+                sub = slot[3] as android.widget.TextView,
+                count = slot[4] as android.widget.TextView,
+                prompt = prompt,
+                fallbackTitle = prompt.optString("label"),
+                fallbackSub = prompt.optString("subtitle"),
+                fallbackIcon = icons[index],
+                fallbackAction = {},
+                adsCount = adsCount,
+                reqCount = reqCount,
+            )
+        }
+        binding.dashboardTilesDivider.isVisible = tiles.size > 1
+        binding.dashboardTiles.isVisible = tiles.isNotEmpty()
     }
 
     private fun defaultPrompts(obj: JSONObject): JSONArray {
@@ -879,14 +868,6 @@ class DashboardFragment : Fragment() {
                     .put("variant", "hero")
                     .put("icon", "user_plus")
                     .put("ui_action", "open_customer_modal"),
-            )
-            out.put(
-                JSONObject()
-                    .put("label", "لیست ملک‌ها")
-                    .put("subtitle", "جستجوی فایل و ملک")
-                    .put("variant", "tile")
-                    .put("icon", "search")
-                    .put("ui_action", "open_divar_ads_all"),
             )
             out.put(
                 JSONObject()

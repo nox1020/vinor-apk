@@ -136,16 +136,14 @@ class MainActivity : AppCompatActivity() {
         applyTabbarVisibility()
         val dest = runCatching { navController.currentDestination?.id }.getOrNull()
         val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
-        val favsOn = dest == R.id.nativePartnerFragment &&
-            findNativePage() == NativePartnerFragment.PAGE_FAVORITES
+        val searchOn = dest == R.id.searchFragment
         val postOn = dest == R.id.myPropertyFormFragment || dest == R.id.myPropertiesFragment
         val meOn = dest == R.id.profileFragment ||
             dest == R.id.commissionsFragment ||
             dest == R.id.routineFragment ||
             dest == R.id.notesFragment ||
             dest == R.id.notificationsFragment ||
-            (dest == R.id.nativePartnerFragment &&
-                findNativePage() != NativePartnerFragment.PAGE_FAVORITES)
+            dest == R.id.nativePartnerFragment
         val adsOn = dest == R.id.dashboardFragment && !chatOn
         paintTab(
             binding.divarTabbar.tabAdsIcon,
@@ -155,11 +153,11 @@ class MainActivity : AppCompatActivity() {
             R.drawable.ic_home,
         )
         paintTab(
-            binding.divarTabbar.tabFavsIcon,
-            binding.divarTabbar.tabFavsLabel,
-            favsOn,
-            R.drawable.ic_tab_bookmark,
-            R.drawable.ic_bookmark,
+            binding.divarTabbar.tabSearchIcon,
+            binding.divarTabbar.tabSearchLabel,
+            searchOn,
+            R.drawable.ic_tab_search,
+            R.drawable.ic_search,
         )
         paintTab(
             binding.divarTabbar.tabPostIcon,
@@ -264,7 +262,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openNativePage(page: String) {
-        openNativePage(page, asTab = page == NativePartnerFragment.PAGE_FAVORITES)
+        openNativePage(page, asTab = false)
+    }
+
+    fun openSearch() {
+        if (navController.currentDestination?.id == R.id.searchFragment) return
+        navigateTab(R.id.searchFragment)
     }
 
     private fun openNativePage(page: String, asTab: Boolean) {
@@ -307,20 +310,9 @@ class MainActivity : AppCompatActivity() {
         return host?.childFragmentManager?.primaryNavigationFragment as? DashboardFragment
     }
 
-    private fun findNativePage(): String? {
-        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
-        return (host?.childFragmentManager?.primaryNavigationFragment as? NativePartnerFragment)?.page
-    }
-
     private fun wireDivarTabbar() {
         binding.divarTabbar.tabAds.setOnClickListener { openPartnerHome() }
-        binding.divarTabbar.tabFavs.setOnClickListener {
-            if (!PartnerApi.hasSession()) {
-                openLogin()
-                return@setOnClickListener
-            }
-            openNativePage(NativePartnerFragment.PAGE_FAVORITES)
-        }
+        binding.divarTabbar.tabSearch.setOnClickListener { openSearch() }
         binding.divarTabbar.tabPost.setOnClickListener { openPostAd() }
         binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
         binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
@@ -448,6 +440,7 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/invite") -> openNativePage(NativePartnerFragment.PAGE_INVITE)
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
+            low.endsWith("/search") -> openSearch()
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings/new") -> openMyProperty()
             low.endsWith("/listings") -> openMyProperty()
