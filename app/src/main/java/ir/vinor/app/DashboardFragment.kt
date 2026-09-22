@@ -806,6 +806,7 @@ class DashboardFragment : Fragment() {
         for (i in 0 until prompts.length()) {
             val p = prompts.optJSONObject(i) ?: continue
             if (p.optString("ui_action") == "open_divar_ads_all") continue
+            if (p.optString("label") == "پیگیری") continue
             if (p.optString("variant") == "hero") {
                 if (hero == null) hero = p
             } else {
@@ -868,15 +869,6 @@ class DashboardFragment : Fragment() {
                     .put("variant", "hero")
                     .put("icon", "user_plus")
                     .put("ui_action", "open_customer_modal"),
-            )
-            out.put(
-                JSONObject()
-                    .put("label", "پیگیری")
-                    .put("subtitle", "درخواست، بازدید و معامله")
-                    .put("variant", "tile")
-                    .put("icon", "clipboard")
-                    .put("prompt", "قدم بعدی فروش من چیست؟ از همین چت جلو ببر.")
-                    .put("intent", "next_action"),
             )
             return out
         }
