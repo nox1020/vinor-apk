@@ -98,6 +98,10 @@ class MyPropertiesFragment : Fragment() {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(PATH, ctx) }
                 if (_binding != null && cached != null) bind(cached, fromNetwork = false)
                 else _binding?.mpRefresh?.isRefreshing = true
+                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }) {
+                    _binding?.mpRefresh?.isRefreshing = false
+                    return@launch
+                }
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(PATH, ctx) }

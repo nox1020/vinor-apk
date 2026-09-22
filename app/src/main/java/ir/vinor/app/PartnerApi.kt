@@ -143,6 +143,11 @@ object PartnerApi {
         return obj
     }
 
+    fun isFresh(path: String, context: Context?): Boolean {
+        if (context == null) return false
+        return VinorApiCacheStore.isFresh(context.applicationContext, absoluteUrl(path))
+    }
+
     fun remember(path: String, obj: JSONObject, context: Context?) {
         if (context == null || obj.optBoolean("from_cache")) return
         val code = obj.optInt("http_status", 200)
@@ -155,7 +160,7 @@ object PartnerApi {
         )
     }
 
-    /** اول کش را روی Main می‌دهد، بعد پاسخ تازهٔ شبکه را. */
+    /** اول کش را روی Main می‌دهد؛ اگر تازه باشد شبکه را نمی‌زند. */
     suspend fun loadDisplay(
         path: String,
         context: Context,
@@ -163,6 +168,9 @@ object PartnerApi {
     ): JSONObject {
         val stale = withContext(Dispatchers.IO) { peekJson(path, context) }
         if (stale != null) bind(stale)
+        if (stale != null && withContext(Dispatchers.IO) { isFresh(path, context) }) {
+            return stale
+        }
         val fresh = withContext(Dispatchers.IO) { get(path, context) }
         if (!fresh.optBoolean("from_cache") || stale == null) bind(fresh)
         return fresh
@@ -282,6 +290,9 @@ object PartnerApi {
     fun bytes(url: String, context: Context? = null): ByteArray? {
         val abs = if (url.startsWith("http")) url else if (url.startsWith("/")) "$BASE$url" else "$BASE/$url"
         val disk = context?.let { VinorImageDiskCache.read(it.applicationContext, abs) }
+        if (disk != null) return disk
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) return null
         return try {
             val b = Request.Builder().url(abs).addHeader("Accept", "*/*")
             val cookie = cookieHeader()
@@ -290,15 +301,15 @@ object PartnerApi {
                 b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
             }
             client.newCall(b.build()).execute().use { resp ->
-                if (!resp.isSuccessful) return disk
-                val body = resp.body?.bytes() ?: return disk
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.bytes() ?: return null
                 if (body.isNotEmpty() && context != null) {
                     VinorImageDiskCache.write(context.applicationContext, abs, body)
                 }
                 body
             }
         } catch (_: Exception) {
-            disk
+            null
         }
     }
 

@@ -101,6 +101,21 @@ class VinorCachePolicyTest {
     }
 
     @Test
+    fun landAndDivarCardApis_areSafeGet() {
+        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/lands/A1/data"))
+        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/divar/TOKEN123/data"))
+        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/api/express/A1"))
+        assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/lands/A1/visit"))
+    }
+
+    @Test
+    fun landCardCache_roundTrip() {
+        val land = JSONObject().put("code", "A1").put("title", "جابان")
+        VinorLandCardCache.put("A1", land)
+        assertEquals("جابان", VinorLandCardCache.get("A1")?.optString("title"))
+    }
+
+    @Test
     fun lruTrim_respectsCount() {
         val dir = File(System.getProperty("java.io.tmpdir"), "vinor-lru-test")
         dir.mkdirs()

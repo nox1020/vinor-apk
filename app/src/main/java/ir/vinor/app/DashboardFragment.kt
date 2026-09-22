@@ -57,6 +57,7 @@ class DashboardFragment : Fragment() {
     private val newsItems = mutableListOf<String>()
     private var newsIndex = 0
     private var allAds = JSONArray()
+    private var lastAdsKey = ""
     private var isApproved = false
     private var pendingAttachment: JSONObject? = null
     private var attachUploading = false
@@ -604,6 +605,13 @@ class DashboardFragment : Fragment() {
                     if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
                     binding.dashboardProgress.isVisible = false
                     shownCache = true
+                    if (withContext(Dispatchers.IO) {
+                            PartnerApi.isFresh("/express/partner/home/data", ctx)
+                        }
+                    ) {
+                        if (!wantChatLayer) finishRefreshUi()
+                        return@launch
+                    }
                 } else if (!wantChatLayer) {
                     binding.dashboardProgress.isVisible = true
                 }
@@ -761,11 +769,18 @@ class DashboardFragment : Fragment() {
 
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
         allAds = ads
-        binding.dashboardAds.removeAllViews()
+        val adsKey = adsFingerprint(ads)
+        val sameCards = adsKey.isNotEmpty() &&
+            adsKey == lastAdsKey &&
+            binding.dashboardAds.childCount == ads.length()
         val showCarousel = ads.length() > 0
-        for (i in 0 until ads.length()) {
-            val ad = ads.optJSONObject(i) ?: continue
-            binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
+        if (!sameCards) {
+            lastAdsKey = adsKey
+            binding.dashboardAds.removeAllViews()
+            for (i in 0 until ads.length()) {
+                val ad = ads.optJSONObject(i) ?: continue
+                binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
+            }
         }
         if (inChat) {
             binding.dashboardAdsScroll.isVisible = false
@@ -1112,10 +1127,15 @@ class DashboardFragment : Fragment() {
         val messages = obj.optJSONArray("messages") ?: JSONArray()
         boundMessageCount = messages.length()
         val gen = chatBindGen
+        val codes = landCodesIn(messages)
+        for (code in codes) {
+            if (landsByCode.containsKey(code)) continue
+            VinorLandCardCache.get(code)?.let { landsByCode[code] = it }
+        }
         renderMessages(messages)
         finishRefreshUi()
         scope.launch {
-            val missing = landCodesIn(messages).filter { !landsByCode.containsKey(it) }
+            val missing = codes.filter { !landsByCode.containsKey(it) }
             if (missing.isEmpty()) return@launch
             coroutineScope {
                 missing.map { code -> async { prefetchLand(code) } }.awaitAll()
@@ -1140,16 +1160,41 @@ class DashboardFragment : Fragment() {
     }
 
     private suspend fun prefetchLand(code: String) {
-        if (code.isBlank() || landsByCode.containsKey(code)) return
+        if (code.isBlank()) return
+        if (landsByCode.containsKey(code)) return
+        VinorLandCardCache.get(code)?.let {
+            landsByCode[code] = it
+            return
+        }
+        val path = "/api/express/$code"
+        val ctx = context ?: return
         try {
-            val obj = withContext(Dispatchers.IO) {
-                PartnerApi.get("/api/express/$code", requireContext())
+            val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
+            val fromCache = cached?.optJSONObject("land")
+            if (fromCache != null) {
+                if (!fromCache.has("code")) fromCache.put("code", code)
+                landsByCode[code] = fromCache
+                VinorLandCardCache.put(code, fromCache)
+                if (withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) return
             }
+            val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
             val land = obj.optJSONObject("land") ?: return
             if (!land.has("code")) land.put("code", code)
             landsByCode[code] = land
+            VinorLandCardCache.put(code, land)
         } catch (_: Exception) {
         }
+    }
+
+    private fun adsFingerprint(ads: JSONArray): String {
+        val b = StringBuilder(ads.length() * 24)
+        for (i in 0 until ads.length()) {
+            val ad = ads.optJSONObject(i) ?: continue
+            b.append(ad.optString("token")).append('\u0001')
+                .append(ad.optString("image_url")).append('\u0001')
+                .append(ad.optString("price")).append('\u0002')
+        }
+        return b.toString()
     }
 
     private fun renderMessages(messages: JSONArray) {

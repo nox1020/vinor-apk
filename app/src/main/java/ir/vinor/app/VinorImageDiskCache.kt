@@ -13,8 +13,21 @@ object VinorImageDiskCache {
     private const val MAX_FILES = 220
     private const val MAX_TOTAL_BYTES = 48L * 1024 * 1024
 
+    private const val MAX_MEM = 16
+    private val memLock = Any()
+    private val mem = object : LinkedHashMap<String, ByteArray>(MAX_MEM + 2, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean =
+            size > MAX_MEM
+    }
+
     private val io = Executors.newSingleThreadExecutor { r ->
         Thread(r, "vinor-image-cache").apply { isDaemon = true }
+    }
+
+    private fun memGet(url: String): ByteArray? = synchronized(memLock) { mem[url] }
+
+    private fun memPut(url: String, bytes: ByteArray) {
+        synchronized(memLock) { mem[url] = bytes }
     }
 
     private fun dir(context: Context): File {
@@ -35,6 +48,7 @@ object VinorImageDiskCache {
     fun read(context: Context, url: String): ByteArray? {
         val u = url.trim()
         if (u.isEmpty() || !u.startsWith("http")) return null
+        memGet(u)?.let { return it }
         val d = dir(context)
         val id = key(u)
         val bin = File(d, "$id.bin")
@@ -44,6 +58,7 @@ object VinorImageDiskCache {
             VinorCacheIo.deleteQuiet(File(d, "$id.json"))
             return null
         }
+        memPut(u, bytes)
         File(d, "$id.json").setLastModified(System.currentTimeMillis())
         bin.setLastModified(System.currentTimeMillis())
         return bytes
@@ -53,6 +68,7 @@ object VinorImageDiskCache {
         val u = url.trim()
         if (u.isEmpty() || !u.startsWith("http")) return
         if (bytes.isEmpty() || bytes.size > MAX_FILE_BYTES) return
+        memPut(u, bytes)
         val app = context.applicationContext
         io.execute {
             runCatching {
@@ -72,6 +88,7 @@ object VinorImageDiskCache {
     }
 
     fun clear(context: Context) {
+        synchronized(memLock) { mem.clear() }
         runCatching { dir(context).deleteRecursively() }
     }
 

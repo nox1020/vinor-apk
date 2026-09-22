@@ -113,6 +113,13 @@ class NativePartnerFragment : Fragment() {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
                 if (_binding != null && cached != null) bindPayload(cached)
                 else if (_binding != null) binding.nativeProgress.isVisible = true
+                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) {
+                    if (_binding != null) {
+                        binding.nativeProgress.isVisible = false
+                        binding.nativeRefresh.isRefreshing = false
+                    }
+                    return@launch
+                }
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }

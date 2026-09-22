@@ -204,6 +204,8 @@ object VinorCachePolicy {
         "/express/partner/api/listings",
         "/express/partner/api/legal",
         "/express/partner/api/my-property",
+        "/express/partner/api/lands/",
+        "/express/partner/api/divar/",
         "/api/express/",
     )
 

@@ -13,6 +13,14 @@ import java.util.concurrent.Executors
 /** کش GETهای نمایشی همکار — نه POST و نه مسیرهای مالی. */
 object VinorApiCacheStore {
 
+    private data class MemEntry(val bytes: ByteArray, val ct: String, val createdAt: Long)
+
+    private val memLock = Any()
+    private val mem = object : LinkedHashMap<String, MemEntry>(VinorCachePolicy.MAX_API_ENTRIES + 2, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MemEntry>?): Boolean =
+            size > VinorCachePolicy.MAX_API_ENTRIES
+    }
+
     private val io = Executors.newSingleThreadExecutor { r ->
         Thread(r, "vinor-api-cache").apply { isDaemon = true }
     }
@@ -40,22 +48,27 @@ object VinorApiCacheStore {
     fun put(context: Context, url: String, body: ByteArray, contentType: String) {
         if (!VinorCachePolicy.isSafeGetApi(url)) return
         if (body.isEmpty() || body.size > VinorCachePolicy.MAX_API_BODY_BYTES) return
+        val n = VinorCachePolicy.normalizeUrl(url)
+        val ct = contentType.ifBlank { "application/json" }
+        val copy = body.copyOf()
+        val now = System.currentTimeMillis()
+        synchronized(memLock) { mem[n] = MemEntry(copy, ct, now) }
         io.execute {
             runCatching {
                 val dir = root(context, forWrite = false)
                 val id = key(url)
                 val bin = File(dir, "$id.bin")
                 val meta = File(dir, "$id.json")
-                if (!VinorCacheIo.writeAtomic(bin, body)) return@runCatching
+                if (!VinorCacheIo.writeAtomic(bin, copy)) return@runCatching
                 val json = JSONObject()
-                    .put("url", VinorCachePolicy.normalizeUrl(url))
-                    .put("ct", contentType.ifBlank { "application/json" })
-                    .put("createdAt", System.currentTimeMillis())
-                    .put("lastAccessedAt", System.currentTimeMillis())
-                    .put("size", body.size)
+                    .put("url", n)
+                    .put("ct", ct)
+                    .put("createdAt", now)
+                    .put("lastAccessedAt", now)
+                    .put("size", copy.size)
                     .put("session", VinorCacheSession.scopeForRead(context))
                 VinorCacheIo.writeAtomicText(meta, json.toString())
-                VinorCacheLog.event("CACHE_WRITE", "api size=${body.size}")
+                VinorCacheLog.event("CACHE_WRITE", "api size=${copy.size}")
                 trim(dir)
             }
         }
@@ -71,6 +84,24 @@ object VinorApiCacheStore {
         return runCatching { JSONObject(String(hit.first, Charsets.UTF_8)) }.getOrNull()
     }
 
+    fun isFresh(context: Context, url: String?): Boolean {
+        val raw = (url ?: "").trim()
+        if (!VinorCachePolicy.isSafeGetApi(raw)) return false
+        val n = VinorCachePolicy.normalizeUrl(raw)
+        val memCreated = synchronized(memLock) { mem[n]?.createdAt }
+        if (memCreated != null) {
+            val age = System.currentTimeMillis() - memCreated
+            return age in 0 until VinorCachePolicy.API_STALE_MS
+        }
+        val dir = root(context)
+        val id = key(raw)
+        val bin = File(dir, "$id.bin")
+        if (!bin.exists() || bin.length() <= 0L) return false
+        val created = VinorCacheIo.readJson(File(dir, "$id.json"))?.optLong("createdAt") ?: return false
+        val age = System.currentTimeMillis() - created
+        return age in 0 until VinorCachePolicy.API_STALE_MS
+    }
+
     private fun load(
         context: Context,
         url: String?,
@@ -78,6 +109,17 @@ object VinorApiCacheStore {
     ): Pair<ByteArray, String>? {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return null
+        val n = VinorCachePolicy.normalizeUrl(raw)
+        val memHit = synchronized(memLock) { mem[n] }
+        if (memHit != null) {
+            val age = System.currentTimeMillis() - memHit.createdAt
+            if (age > VinorCachePolicy.API_KEEP_MS && !allowExpired) {
+                synchronized(memLock) { mem.remove(n) }
+            } else {
+                VinorCacheLog.event("CACHE_HIT", "api mem stale=${age > VinorCachePolicy.API_STALE_MS}")
+                return memHit.bytes to memHit.ct
+            }
+        }
         val dir = root(context)
         val id = key(raw)
         val bin = File(dir, "$id.bin")
@@ -93,6 +135,8 @@ object VinorApiCacheStore {
         }
         touch(meta)
         val ct = obj?.optString("ct").orEmpty().ifBlank { "application/json; charset=utf-8" }
+        val created = obj?.optLong("createdAt") ?: System.currentTimeMillis()
+        synchronized(memLock) { mem[n] = MemEntry(bytes, ct, created) }
         VinorCacheLog.event("CACHE_HIT", "api stale=${age > VinorCachePolicy.API_STALE_MS}")
         return bytes to ct
     }
@@ -159,6 +203,7 @@ object VinorApiCacheStore {
     }
 
     fun clearUser(context: Context) {
+        synchronized(memLock) { mem.clear() }
         runCatching { root(context).deleteRecursively() }
     }
 
