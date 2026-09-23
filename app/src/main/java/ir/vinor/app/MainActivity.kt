@@ -370,7 +370,7 @@ class MainActivity : AppCompatActivity() {
         fill: Int,
     ) {
         icon.setImageResource(if (on) fill else outline)
-        val c = Color.parseColor(if (on) "#FFFFFF" else "#A3A3A3")
+        val c = Color.parseColor(if (on) "#4ADE80" else "#A3A3A3")
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
         label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)

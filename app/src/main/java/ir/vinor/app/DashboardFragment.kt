@@ -21,6 +21,7 @@ import android.view.ViewTreeObserver
 import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -54,6 +55,7 @@ class DashboardFragment : Fragment() {
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
     private val newsItems = mutableListOf<String>()
+    private val newsTimes = mutableListOf<String>()
     private var newsIndex = 0
     private var lastAdsKey = ""
     private var isApproved = false
@@ -90,10 +92,13 @@ class DashboardFragment : Fragment() {
             if (newsItems.isEmpty() || !b.dashboardEmpty.isVisible) return
             newsIndex = (newsIndex + 1) % newsItems.size
             val next = newsItems[newsIndex]
+            val nextTime = newsTimes.getOrNull(newsIndex).orEmpty()
             b.dashboardNewsText.animate().cancel()
             b.dashboardNewsText.animate().alpha(0f).setDuration(180).withEndAction {
                 val live = _binding ?: return@withEndAction
                 live.dashboardNewsText.text = next
+                live.dashboardNewsTime.text = nextTime
+                live.dashboardNewsTime.isVisible = nextTime.isNotBlank()
                 live.dashboardNewsText.animate().alpha(1f).setDuration(220).start()
             }.start()
             newsHandler.postDelayed(this, 4000)
@@ -749,16 +754,33 @@ class DashboardFragment : Fragment() {
     private fun bindHome(obj: JSONObject) {
         isApproved = obj.optBoolean("is_approved")
         newsItems.clear()
+        newsTimes.clear()
         val news = obj.optJSONArray("home_news_items") ?: JSONArray()
         for (i in 0 until news.length()) {
-            val line = news.optString(i)
-            if (line.isNotBlank()) newsItems.add(line)
+            val raw = news.opt(i)
+            val line: String
+            val time: String
+            if (raw is JSONObject) {
+                line = raw.optString("text")
+                time = raw.optString("time")
+            } else {
+                line = news.optString(i)
+                time = ""
+            }
+            if (line.isNotBlank()) {
+                newsItems.add(line)
+                newsTimes.add(time)
+            }
         }
         if (newsItems.isEmpty()) {
             newsItems.add("زمین جابان فروش رفت و پورسانت رسید")
+            newsTimes.add("")
         }
         binding.dashboardNewsText.alpha = 1f
         binding.dashboardNewsText.text = newsItems.first()
+        val firstTime = newsTimes.firstOrNull().orEmpty()
+        binding.dashboardNewsTime.text = firstTime
+        binding.dashboardNewsTime.isVisible = firstTime.isNotBlank()
         newsHandler.removeCallbacks(newsTick)
         val inChat = chatLayerOpen && wantChatLayer
         if (!inChat && newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
@@ -909,7 +931,7 @@ class DashboardFragment : Fragment() {
             out.put(
                 JSONObject()
                     .put("label", "مشتری دارم")
-                    .put("subtitle", "فایل مناسب پیدا کن و بازدید بگیر")
+                    .put("subtitle", "برای مشتری فایل مناسب پیدا کن")
                     .put("variant", "hero")
                     .put("icon", "user_plus")
                     .put("ui_action", "open_customer_modal"),
@@ -955,7 +977,7 @@ class DashboardFragment : Fragment() {
         val action = prompt?.optString("ui_action").orEmpty()
         val followUps = if (action == "open_customer_modal") reqCount else 0
         val sub = if (followUps > 0) {
-            "نیاز به پیگیری"
+            "${PartnerFormat.toman(followUps)} مشتری نیاز به پیگیری"
         } else {
             prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
         }
@@ -963,8 +985,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardHeroStart.text = if (action == "open_customer_modal") "شروع کنید" else "ادامه"
         binding.dashboardHeroTitle.text = label
         binding.dashboardHeroSub.text = sub
-        binding.dashboardHeroCount.isVisible = followUps > 0
-        if (followUps > 0) binding.dashboardHeroCount.text = PartnerFormat.toman(followUps)
+        binding.dashboardHeroCount.isVisible = false
         binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
         val href = prompt?.optString("href").orEmpty()
         binding.dashboardHero.setOnClickListener {
@@ -1046,14 +1067,36 @@ class DashboardFragment : Fragment() {
 
     private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
         val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
+        val cardW = (resources.displayMetrics.widthPixels * 0.86f).toInt()
+        val lp = (card.root.layoutParams as? ViewGroup.MarginLayoutParams)
+            ?: LinearLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.width = cardW
+        val gap = (10 * resources.displayMetrics.density).toInt()
+        lp.marginEnd = gap
+        card.root.layoutParams = lp
         card.homeAdTitle.text = ad.optString("title")
-        card.homeAdPrice.text = ad.optString("price")
+        val price = ad.optString("price")
+        card.homeAdPrice.isVisible = price.isNotBlank()
+        card.homeAdPrice.text = if (price.isBlank()) "" else "قیمت کل $price"
         val loc = ad.optString("location")
         card.homeAdLoc.isVisible = loc.isNotBlank()
         card.homeAdLoc.text = loc
-        val area = ad.optString("area")
-        card.homeAdArea.isVisible = area.isNotBlank()
-        card.homeAdArea.text = area
+        val listed = ad.optString("listed_label")
+        card.homeAdWhen.isVisible = listed.isNotBlank()
+        card.homeAdWhen.text = listed
+        val facts = ad.optJSONArray("facts")
+        val factLine = buildString {
+            if (facts != null) {
+                for (i in 0 until facts.length()) {
+                    val bit = facts.optString(i)
+                    if (bit.isBlank()) continue
+                    if (isNotEmpty()) append(" · ")
+                    append(bit)
+                }
+            }
+        }.ifBlank { ad.optString("area") }
+        card.homeAdArea.isVisible = factLine.isNotBlank()
+        card.homeAdArea.text = factLine
         card.homeAdIntro.isVisible = isApproved
         card.homeAdCall.setOnClickListener { openAd(ad) }
         card.homeAdIntro.setOnClickListener { openCustomer() }
