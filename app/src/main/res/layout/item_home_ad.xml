@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="212dp"
+    android:layout_width="268dp"
     android:layout_height="wrap_content"
-    android:layout_marginEnd="9dp"
-    android:background="@drawable/bg_home_ad"
+    android:layout_marginEnd="10dp"
+    android:background="@drawable/bg_hub_card"
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="159dp">
+        android:layout_height="148dp">
 
         <ImageView
             android:id="@+id/homeAdImage"
@@ -19,6 +19,21 @@
             android:background="#1A2332"
             android:contentDescription=""
             android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/homeAdLoc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_loc_chip"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:maxWidth="180dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
 
         <LinearLayout
             android:id="@+id/homeAdShots"
@@ -65,16 +80,28 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#F4F4F5"
-            android:textSize="12.5sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/homeAdArea"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#A1A1AA"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/homeAdPrice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
-            android:textColor="#D4D4D8"
-            android:textSize="10.5sp" />
+            android:textColor="#E4E4E7"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/homeAdComm"
@@ -83,19 +110,48 @@
             android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#34D399"
-            android:textSize="11sp"
+            android:textColor="#4ADE80"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/homeAdLoc"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#71717A"
-            android:textSize="10sp" />
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/homeAdCall"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_hub_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingVertical="8dp"
+                android:text="تماس"
+                android:textColor="#FAFAFA"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/homeAdIntro"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_hub_hero"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingVertical="8dp"
+                android:text="معرفی به مشتری"
+                android:textColor="#ECFDF5"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

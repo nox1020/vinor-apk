@@ -147,7 +147,7 @@
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
-            android:contentDescription="چت"
+            android:contentDescription="AI چت"
             android:focusable="true"
             android:gravity="center_horizontal"
             android:orientation="vertical"
@@ -189,7 +189,7 @@
                 android:layout_marginTop="2dp"
                 android:fontFamily="@font/vazirmatn"
                 android:includeFontPadding="false"
-                android:text="چت"
+                android:text="AI چت"
                 android:textColor="#A3A3A3"
                 android:textSize="11sp" />
         </LinearLayout>

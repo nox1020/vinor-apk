@@ -125,6 +125,18 @@ class DashboardFragment : Fragment() {
         binding.dashboardAttachFile.setOnClickListener { onAttachKind("file") }
         binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
+        binding.dashboardBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+        binding.dashboardWallet.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/commissions")
+        }
+        binding.dashboardShortcutTrain.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/training")
+        }
+        binding.dashboardShortcutChat.setOnClickListener { openVinorChat() }
+        binding.dashboardShortcutFiles.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/my-property")
+        }
+        binding.dashboardSeeAll.setOnClickListener { (activity as? MainActivity)?.openSearch() }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
@@ -251,6 +263,7 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         b.dashboardEmpty.isVisible = false
         b.dashboardAdsScroll.isVisible = false
+        b.dashboardHeader.isVisible = true
         newsHandler.removeCallbacks(newsTick)
     }
 
@@ -655,8 +668,10 @@ class DashboardFragment : Fragment() {
     private fun showHomeEmpty() {
         val b = _binding ?: return
         chatLayerOpen = false
+        b.dashboardHeader.isVisible = false
         b.dashboardEmpty.isVisible = true
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
+        b.dashboardFilesHead.isVisible = b.dashboardAds.childCount > 0
         newsHandler.removeCallbacks(newsTick)
         if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
         hideKeyboard()
@@ -764,9 +779,14 @@ class DashboardFragment : Fragment() {
         }
         if (inChat) {
             binding.dashboardAdsScroll.isVisible = false
+            binding.dashboardFilesHead.isVisible = false
             binding.dashboardEmpty.isVisible = false
+            binding.dashboardHeader.isVisible = true
         } else {
+            binding.dashboardHeader.isVisible = false
+            binding.dashboardEmpty.isVisible = true
             binding.dashboardAdsScroll.isVisible = showCarousel
+            binding.dashboardFilesHead.isVisible = showCarousel
             if (showCarousel) {
                 binding.dashboardAds.post {
                     val b = _binding ?: return@post
@@ -776,17 +796,41 @@ class DashboardFragment : Fragment() {
             }
         }
 
-        val emptyPad = if (showCarousel) 6 else 56
-        binding.dashboardEmpty.setPadding(
-            binding.dashboardEmpty.paddingLeft,
-            (emptyPad * resources.displayMetrics.density).toInt(),
-            binding.dashboardEmpty.paddingRight,
-            binding.dashboardEmpty.paddingBottom,
-        )
+        val name = obj.optString("me_name")
+        binding.dashboardGreetName.text = if (name.isBlank()) "سلام، همکار عزیز" else "سلام، $name"
+        binding.dashboardGreetSub.text = when {
+            isApproved -> "آماده‌ای بفروشی؟"
+            obj.optBoolean("has_pending_app") -> "درخواستت در حال بررسی است"
+            else -> "آماده‌ای همکاری کنی؟"
+        }
+        binding.dashboardWallet.isVisible = isApproved
+        binding.dashboardPerf.isVisible = isApproved
+        val reqCount = obj.optInt("home_requests_pipeline_count")
+        if (isApproved) {
+            binding.dashboardWalletAmount.text = PartnerFormat.toman(obj.optLong("withdrawable_balance")) + " تومان"
+            val hasGrowth = obj.has("home_month_growth_pct") && !obj.isNull("home_month_growth_pct")
+            binding.dashboardWalletGrowth.isVisible = hasGrowth
+            if (hasGrowth) binding.dashboardWalletGrowth.text = monthGrowthLabel(obj.optInt("home_month_growth_pct"))
+            binding.dashboardPerfDeals.text = PartnerFormat.toman(obj.optInt("home_deals_done"))
+            binding.dashboardPerfVisits.text = PartnerFormat.toman(obj.optInt("home_visits_done"))
+            binding.dashboardPerfCustomers.text = PartnerFormat.toman(obj.optInt("home_active_customers"))
+            binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
+            binding.dashboardFollowBadge.isVisible = reqCount > 0
+            if (reqCount > 0) binding.dashboardFollowBadge.text = PartnerFormat.toman(reqCount)
+            binding.dashboardShortcutFollow.setOnClickListener {
+                (activity as? MainActivity)?.openPath("/express/partner/requests")
+            }
+        } else {
+            binding.dashboardShortcutFollowTitle.text = "سطوح همکاری"
+            binding.dashboardFollowBadge.isVisible = false
+            binding.dashboardShortcutFollow.setOnClickListener {
+                (activity as? MainActivity)?.openPath("/express/partner/levels")
+            }
+        }
 
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
-        val reqCount = obj.optInt("home_requests_pipeline_count")
         bindPrompts(obj, adsCount, reqCount)
+        binding.dashboardTiles.isVisible = false
         val imageUrls = mutableListOf<String>()
         for (i in 0 until ads.length()) {
             val url = ads.optJSONObject(i)?.optString("image_url").orEmpty()
@@ -865,7 +909,7 @@ class DashboardFragment : Fragment() {
             out.put(
                 JSONObject()
                     .put("label", "مشتری دارم")
-                    .put("subtitle", "برای مشتری وقت بازدید بگیرید")
+                    .put("subtitle", "فایل مناسب پیدا کن و بازدید بگیر")
                     .put("variant", "hero")
                     .put("icon", "user_plus")
                     .put("ui_action", "open_customer_modal"),
@@ -915,6 +959,8 @@ class DashboardFragment : Fragment() {
         } else {
             prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
         }
+        binding.dashboardHeroKicker.isVisible = action == "open_customer_modal"
+        binding.dashboardHeroStart.text = if (action == "open_customer_modal") "شروع کنید" else "ادامه"
         binding.dashboardHeroTitle.text = label
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = followUps > 0
@@ -988,16 +1034,29 @@ class DashboardFragment : Fragment() {
         else -> fallback
     }
 
+    private fun monthGrowthLabel(pct: Int): String {
+        val body = PartnerFormat.toman(kotlin.math.abs(pct))
+        val sign = when {
+            pct > 0 -> "+"
+            pct < 0 -> "−"
+            else -> ""
+        }
+        return "رشد این ماه\n$sign$body٪"
+    }
+
     private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
         val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
         card.homeAdTitle.text = ad.optString("title")
         card.homeAdPrice.text = ad.optString("price")
         val loc = ad.optString("location")
-        card.homeAdLoc.text = when {
-            loc.isBlank() -> ""
-            loc.startsWith("در ") -> loc
-            else -> "در $loc"
-        }
+        card.homeAdLoc.isVisible = loc.isNotBlank()
+        card.homeAdLoc.text = loc
+        val area = ad.optString("area")
+        card.homeAdArea.isVisible = area.isNotBlank()
+        card.homeAdArea.text = area
+        card.homeAdIntro.isVisible = isApproved
+        card.homeAdCall.setOnClickListener { openAd(ad) }
+        card.homeAdIntro.setOnClickListener { openCustomer() }
         val shots = ad.optInt("image_count")
         card.homeAdShots.isVisible = shots > 1
         if (shots > 1) card.homeAdShotsText.text = PartnerFormat.toman(shots)
