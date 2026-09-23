@@ -813,7 +813,7 @@ class DashboardFragment : Fragment() {
                 tiles.add(p)
             }
         }
-        bindHeroPrompt(hero)
+        bindHeroPrompt(hero, reqCount)
         val slots = listOf(
             arrayOf(
                 binding.dashboardTileBuy,
@@ -906,14 +906,21 @@ class DashboardFragment : Fragment() {
         return out
     }
 
-    private fun bindHeroPrompt(prompt: JSONObject?) {
+    private fun bindHeroPrompt(prompt: JSONObject?, reqCount: Int = 0) {
         val label = prompt?.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
-        val sub = prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        val action = prompt?.optString("ui_action").orEmpty()
+        val followUps = if (action == "open_customer_modal") reqCount else 0
+        val sub = if (followUps > 0) {
+            "نیاز به پیگیری"
+        } else {
+            prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        }
         binding.dashboardHeroTitle.text = label
         binding.dashboardHeroSub.text = sub
+        binding.dashboardHeroCount.isVisible = followUps > 0
+        if (followUps > 0) binding.dashboardHeroCount.text = PartnerFormat.toman(followUps)
         binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
         val href = prompt?.optString("href").orEmpty()
-        val action = prompt?.optString("ui_action").orEmpty()
         binding.dashboardHero.setOnClickListener {
             when {
                 action == "open_customer_modal" -> openCustomer()
