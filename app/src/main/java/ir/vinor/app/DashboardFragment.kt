@@ -734,7 +734,7 @@ class DashboardFragment : Fragment() {
                 binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
             }
         }
-        if (inChat) {
+        if (isChatOpen()) {
             binding.dashboardAdsScroll.isVisible = false
             binding.dashboardFilesHead.isVisible = false
             binding.dashboardEmpty.isVisible = false
