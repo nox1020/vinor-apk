@@ -54,6 +54,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="آماده‌ای بفروشی؟"
                     android:textColor="#A1A1AA"
                     android:textSize="12sp" />
@@ -80,8 +82,10 @@
                         android:textStyle="bold" />
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="108dp"
                         android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
                         android:text="فرصت بیشتر، درآمد بالاتر"
                         android:textColor="#71717A"
                         android:textSize="9sp" />
@@ -138,7 +142,7 @@
                         android:id="@+id/dashboardWallet"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="4dp"
                         android:minHeight="104dp"
                         android:background="@drawable/bg_hub_card"
                         android:clickable="true"
@@ -220,7 +224,7 @@
                             android:visibility="gone" />
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:gravity="center_vertical"
@@ -228,8 +232,11 @@
 
                             <TextView
                                 android:id="@+id/dashboardHeroTitle"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="2"
                                 android:text="مشتری دارم"
                                 android:textColor="#FFFFFF"
                                 android:textSize="20sp"
