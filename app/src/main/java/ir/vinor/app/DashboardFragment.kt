@@ -240,6 +240,7 @@ class DashboardFragment : Fragment() {
 
     private fun hideHomeDashboardWidgets() {
         val b = _binding ?: return
+        b.dashboardHomeHeader.isVisible = false
         b.dashboardEmpty.isVisible = false
         b.dashboardAdsScroll.isVisible = false
         b.dashboardHeader.isVisible = true
@@ -643,6 +644,7 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         chatLayerOpen = false
         b.dashboardHeader.isVisible = false
+        b.dashboardHomeHeader.isVisible = true
         b.dashboardEmpty.isVisible = true
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
         b.dashboardFilesHead.isVisible = b.dashboardAds.childCount > 0
@@ -739,8 +741,10 @@ class DashboardFragment : Fragment() {
             binding.dashboardFilesHead.isVisible = false
             binding.dashboardEmpty.isVisible = false
             binding.dashboardHeader.isVisible = true
+            binding.dashboardHomeHeader.isVisible = false
         } else {
             binding.dashboardHeader.isVisible = false
+            binding.dashboardHomeHeader.isVisible = true
             binding.dashboardEmpty.isVisible = true
             binding.dashboardAdsScroll.isVisible = showCarousel
             binding.dashboardFilesHead.isVisible = showCarousel
