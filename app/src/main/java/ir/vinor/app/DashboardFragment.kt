@@ -7,8 +7,6 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
@@ -18,7 +16,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
-import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -45,7 +42,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** خانه نیتیو — همان چیدمان وب خالی: آگهی، خبر، کارت همکاری. چت و کامپوزر در تب چت. */
+/** خانه نیتیو — همان چیدمان وب: آگهی، میانبرها، کارت همکاری. چت فقط از تب فوتر. */
 class DashboardFragment : Fragment() {
 
     private var _binding: FragmentDashboardBinding? = null
@@ -54,9 +51,6 @@ class DashboardFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
-    private val newsItems = mutableListOf<String>()
-    private val newsTimes = mutableListOf<String>()
-    private var newsIndex = 0
     private var lastAdsKey = ""
     private var isApproved = false
     private var pendingAttachment: JSONObject? = null
@@ -67,7 +61,6 @@ class DashboardFragment : Fragment() {
     private var wantChatLayer = false
     private var chatBindGen = 0
     private var boundMessageCount = 0
-    private val newsHandler = Handler(Looper.getMainLooper())
     private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
@@ -86,25 +79,6 @@ class DashboardFragment : Fragment() {
         if (granted) launchCamera()
         else Toast.makeText(requireContext(), "برای عکس اجازهٔ دوربین لازم است.", Toast.LENGTH_SHORT).show()
     }
-    private val newsTick = object : Runnable {
-        override fun run() {
-            val b = _binding ?: return
-            if (newsItems.isEmpty() || !b.dashboardEmpty.isVisible) return
-            newsIndex = (newsIndex + 1) % newsItems.size
-            val next = newsItems[newsIndex]
-            val nextTime = newsTimes.getOrNull(newsIndex).orEmpty()
-            b.dashboardNewsText.animate().cancel()
-            b.dashboardNewsText.animate().alpha(0f).setDuration(180).withEndAction {
-                val live = _binding ?: return@withEndAction
-                live.dashboardNewsText.text = next
-                live.dashboardNewsTime.text = nextTime
-                live.dashboardNewsTime.isVisible = nextTime.isNotBlank()
-                live.dashboardNewsText.animate().alpha(1f).setDuration(220).start()
-            }.start()
-            newsHandler.postDelayed(this, 4000)
-        }
-    }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
             job = Job()
@@ -137,7 +111,9 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutTrain.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/training")
         }
-        binding.dashboardShortcutChat.setOnClickListener { openVinorChat() }
+        binding.dashboardShortcutNews.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/news")
+        }
         binding.dashboardShortcutFiles.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/my-property")
         }
@@ -148,7 +124,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
-        binding.dashboardNewsDot.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.news_dot_pulse))
         val headerPad = (56 * resources.displayMetrics.density).toInt()
         binding.dashboardRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
@@ -193,7 +168,6 @@ class DashboardFragment : Fragment() {
 
     override fun onDestroyView() {
         runCatching { binding.dashboardAdsScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
-        newsHandler.removeCallbacks(newsTick)
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -269,7 +243,6 @@ class DashboardFragment : Fragment() {
         b.dashboardEmpty.isVisible = false
         b.dashboardAdsScroll.isVisible = false
         b.dashboardHeader.isVisible = true
-        newsHandler.removeCallbacks(newsTick)
     }
 
     fun scrollHomeToTop() {
@@ -643,10 +616,6 @@ class DashboardFragment : Fragment() {
                         }
                         loadError = null
                     }
-                    if ((home.optJSONArray("home_news_items")?.length() ?: 0) == 0) {
-                        val newsHtml = HomeAdsHtml.parseNews(html)
-                        if (newsHtml.length() > 0) home.put("home_news_items", newsHtml)
-                    }
                     if (ads.length() > 0) {
                         home.remove("from_cache")
                         PartnerApi.remember("/express/partner/home/data", home, ctx)
@@ -677,8 +646,6 @@ class DashboardFragment : Fragment() {
         b.dashboardEmpty.isVisible = true
         b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
         b.dashboardFilesHead.isVisible = b.dashboardAds.childCount > 0
-        newsHandler.removeCallbacks(newsTick)
-        if (newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
         hideKeyboard()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
@@ -753,38 +720,6 @@ class DashboardFragment : Fragment() {
 
     private fun bindHome(obj: JSONObject) {
         isApproved = obj.optBoolean("is_approved")
-        newsItems.clear()
-        newsTimes.clear()
-        val news = obj.optJSONArray("home_news_items") ?: JSONArray()
-        for (i in 0 until news.length()) {
-            val raw = news.opt(i)
-            val line: String
-            val time: String
-            if (raw is JSONObject) {
-                line = raw.optString("text")
-                time = raw.optString("time")
-            } else {
-                line = news.optString(i)
-                time = ""
-            }
-            if (line.isNotBlank()) {
-                newsItems.add(line)
-                newsTimes.add(time)
-            }
-        }
-        if (newsItems.isEmpty()) {
-            newsItems.add("زمین جابان فروش رفت و پورسانت رسید")
-            newsTimes.add("")
-        }
-        binding.dashboardNewsText.alpha = 1f
-        binding.dashboardNewsText.text = newsItems.first()
-        val firstTime = newsTimes.firstOrNull().orEmpty()
-        binding.dashboardNewsTime.text = firstTime
-        binding.dashboardNewsTime.isVisible = firstTime.isNotBlank()
-        newsHandler.removeCallbacks(newsTick)
-        val inChat = chatLayerOpen && wantChatLayer
-        if (!inChat && newsItems.size > 1) newsHandler.postDelayed(newsTick, 4000)
-
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
         val adsKey = adsFingerprint(ads)
         val sameCards = adsKey.isNotEmpty() &&
