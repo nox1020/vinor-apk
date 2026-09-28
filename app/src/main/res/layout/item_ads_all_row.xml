@@ -2,20 +2,21 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_search_row"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
     android:layoutDirection="rtl"
-    android:minHeight="86dp"
+    android:minHeight="92dp"
     android:orientation="horizontal"
-    android:paddingHorizontal="14dp"
+    android:paddingHorizontal="16dp"
     android:paddingVertical="10dp">
 
     <ImageView
         android:id="@+id/adsAllThumb"
-        android:layout_width="72dp"
-        android:layout_height="54dp"
-        android:background="#1A2332"
+        android:layout_width="92dp"
+        android:layout_height="72dp"
+        android:background="@color/vinor_raised_2"
         android:contentDescription=""
         android:scaleType="centerCrop" />
 
@@ -31,26 +32,32 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
             android:maxLines="2"
-            android:textColor="#F4F4F5"
-            android:textSize="13sp"
+            android:textColor="@color/vinor_text"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/adsAllPrice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:textColor="#D4D4D8"
-            android:textSize="12sp" />
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:maxLines="1"
+            android:textColor="@color/vinor_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/adsAllComm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="#34D399"
-            android:textSize="11sp"
+            android:fontFamily="@font/vazirmatn"
+            android:textColor="@color/vinor_accent_green"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
@@ -60,8 +67,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
             android:maxLines="1"
-            android:textColor="#71717A"
-            android:textSize="11sp" />
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

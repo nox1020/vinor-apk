@@ -1,7 +1,6 @@
 package ir.vinor.app
 
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
@@ -12,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.ImageView
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentSearchBinding
@@ -46,9 +46,13 @@ class SearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.searchRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
-        binding.searchRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
+        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
+        binding.searchRefresh.setProgressBackgroundColorSchemeColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
+        binding.searchClear.setOnClickListener {
+            binding.searchInput.setText("")
+            binding.searchInput.requestFocus()
+        }
         binding.searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -116,7 +120,7 @@ class SearchFragment : Fragment() {
             } else {
                 row.adsAllComm.isVisible = false
             }
-            PartnerImages.roundClip(row.adsAllThumb, 8f)
+            PartnerImages.roundClip(row.adsAllThumb, 12f)
             row.adsAllThumb.tag = ad.optString("image_url")
             row.root.setOnClickListener { openAd(ad) }
             b.searchList.addView(row.root)
@@ -129,6 +133,9 @@ class SearchFragment : Fragment() {
         }
         b.searchEmpty.isVisible = emptyText.isNotEmpty()
         b.searchEmpty.text = emptyText
+        b.searchClear.isVisible = query.isNotEmpty()
+        b.searchCount.isVisible = shown > 0
+        if (shown > 0) b.searchCount.text = "${PartnerFormat.digits(shown)} آگهی"
         b.searchList.post { bindVisibleImages() }
     }
 
