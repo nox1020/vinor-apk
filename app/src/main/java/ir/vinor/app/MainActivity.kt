@@ -470,11 +470,14 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.routineFragment)
                 }
             }
-            else -> {
-                val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
-                navController.navigate(R.id.partnerPageFragment, args)
-            }
+            low.endsWith("/customers") || low.contains("/customers/") -> openInAppPartnerPage(uri)
+            else -> openInAppPartnerPage(uri)
         }
+    }
+
+    private fun openInAppPartnerPage(uri: Uri) {
+        val args = Bundle().apply { putString(PartnerPageFragment.ARG_URL, uri.toString()) }
+        navController.navigate(R.id.partnerPageFragment, args)
     }
 
     fun consumePendingDeepLink(): Boolean {
