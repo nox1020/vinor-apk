@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        openMyProperty()
+        openOwnerHomeForm()
     }
 
     private fun applyTabbarVisibility() {
@@ -443,7 +443,7 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
             low.endsWith("/search") -> openSearch()
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
-            low.endsWith("/listings/new") -> openMyProperty()
+            low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
                 if (uri.getQueryParameter("register") == "1") {
