@@ -1,7 +1,6 @@
 package ir.vinor.app
 
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -9,9 +8,13 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -33,6 +36,9 @@ class LandDetailFragment : Fragment() {
     private var publishing = false
     private var selectedPayment = "نقدی"
     private var listingCode = ""
+    private var bodyExpanded = false
+    private var galleryCount = 0
+    private val galleryScrollListener = ViewTreeObserver.OnScrollChangedListener { updateGalleryCounter() }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,6 +56,7 @@ class LandDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.landDetailBack.setOnClickListener { findNavController().navigateUp() }
+        binding.landDetailGallery.viewTreeObserver.addOnScrollChangedListener(galleryScrollListener)
         val code = arguments?.getString("code").orEmpty().trim()
         listingCode = code
         if (code.isBlank()) {
@@ -73,11 +80,15 @@ class LandDetailFragment : Fragment() {
         val on = VinorFavoritesStore.contains(requireContext(), code)
         binding.landDetailFav.imageTintList =
             android.content.res.ColorStateList.valueOf(
-                Color.parseColor(if (on) "#FBBF24" else "#A1A1AA"),
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (on) R.color.vinor_primary_red else R.color.vinor_text,
+                ),
             )
     }
 
     override fun onDestroyView() {
+        _binding?.landDetailGallery?.viewTreeObserver?.removeOnScrollChangedListener(galleryScrollListener)
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -138,6 +149,7 @@ class LandDetailFragment : Fragment() {
             priceToman > 0L -> PartnerFormat.toman(priceToman) + " تومان"
             else -> ""
         }
+        binding.landDetailPrice.isVisible = binding.landDetailPrice.text.isNotBlank()
         val comm = obj.optInt("commission_amount")
         binding.landDetailCommission.isVisible = comm > 0
         if (comm > 0) {
@@ -153,14 +165,13 @@ class LandDetailFragment : Fragment() {
             ).filter { it.isNotBlank() }.joinToString(" · ")
         }
         binding.landDetailMeta.text = meta
-        binding.landDetailBody.text = obj.optString("description").ifBlank { obj.optString("body") }
-        val cover = obj.optString("image_url").ifBlank {
-            obj.optJSONArray("images")?.optString(0).orEmpty()
-        }
-        PartnerImages.bind(scope, binding.landDetailImage, cover)
+        binding.landDetailMeta.isVisible = meta.isNotBlank()
+        bindGallery(obj)
+        bindBody(obj.optString("description").ifBlank { obj.optString("body") })
         bindRows(obj.optJSONArray("rows") ?: JSONArray())
         val divarUrl = obj.optString("divar_url")
         val showDivar = obj.optBoolean("show_divar") || (isDivar && divarUrl.isNotBlank())
+        binding.landDetailSticky.isVisible = showDivar
         binding.landDetailDivar.isVisible = showDivar
         if (showDivar) {
             binding.landDetailDivar.setOnClickListener {
@@ -171,6 +182,97 @@ class LandDetailFragment : Fragment() {
             }
         }
         bindPublish(code, obj)
+    }
+
+    private fun bindGallery(obj: JSONObject) {
+        val urls = mutableListOf<String>()
+        val images = obj.optJSONArray("images")
+        if (images != null) {
+            for (i in 0 until images.length()) {
+                val u = images.optString(i).trim()
+                if (u.isNotBlank()) urls.add(u)
+            }
+        }
+        if (urls.isEmpty()) {
+            val cover = obj.optString("image_url").trim()
+            if (cover.isNotBlank()) urls.add(cover)
+        }
+        galleryCount = urls.size
+        binding.landDetailGalleryInner.removeAllViews()
+        if (urls.isEmpty()) {
+            binding.landDetailGallery.isVisible = false
+            binding.landDetailImage.isVisible = true
+            binding.landDetailImage.setImageDrawable(null)
+            binding.landDetailImage.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.vinor_raised_2),
+            )
+            binding.landDetailCounter.isVisible = false
+            return
+        }
+        binding.landDetailImage.isVisible = false
+        binding.landDetailGallery.isVisible = true
+        val width = resources.displayMetrics.widthPixels
+        val height = binding.landDetailGallery.layoutParams.height
+        urls.forEach { url ->
+            val img = ImageView(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(width, height)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised_2))
+            }
+            binding.landDetailGalleryInner.addView(img)
+            PartnerImages.bind(scope, img, url)
+        }
+        binding.landDetailCounter.isVisible = urls.size > 1
+        binding.landDetailGallery.post {
+            binding.landDetailGallery.scrollTo(0, 0)
+            updateGalleryCounter()
+        }
+    }
+
+    private fun updateGalleryCounter() {
+        val b = _binding ?: return
+        if (galleryCount <= 1) {
+            b.landDetailCounter.isVisible = false
+            return
+        }
+        val hsv: HorizontalScrollView = b.landDetailGallery
+        val page = hsv.width.coerceAtLeast(1)
+        val idx = ((hsv.scrollX + page / 2) / page).coerceIn(0, galleryCount - 1) + 1
+        b.landDetailCounter.isVisible = true
+        b.landDetailCounter.text = "${PartnerFormat.digits(idx)} از ${PartnerFormat.digits(galleryCount)}"
+    }
+
+    private fun bindBody(raw: String) {
+        val text = raw.trim()
+        bodyExpanded = false
+        binding.landDetailDescLabel.isVisible = text.isNotBlank()
+        binding.landDetailBody.isVisible = text.isNotBlank()
+        binding.landDetailBody.text = text
+        if (text.isBlank()) {
+            binding.landDetailMore.isVisible = false
+            return
+        }
+        binding.landDetailBody.maxLines = 5
+        binding.landDetailBody.ellipsize = android.text.TextUtils.TruncateAt.END
+        binding.landDetailBody.post {
+            val b = _binding ?: return@post
+            val layout = b.landDetailBody.layout ?: return@post
+            val needsMore = layout.lineCount >= 5 || b.landDetailBody.lineCount >= 5
+            b.landDetailMore.isVisible = needsMore
+            b.landDetailMore.text = "نمایش بیشتر"
+            b.landDetailMore.setOnClickListener {
+                bodyExpanded = !bodyExpanded
+                if (bodyExpanded) {
+                    b.landDetailBody.maxLines = Integer.MAX_VALUE
+                    b.landDetailBody.ellipsize = null
+                    b.landDetailMore.text = "نمایش کمتر"
+                } else {
+                    b.landDetailBody.maxLines = 5
+                    b.landDetailBody.ellipsize = android.text.TextUtils.TruncateAt.END
+                    b.landDetailMore.text = "نمایش بیشتر"
+                }
+            }
+        }
     }
 
     private fun bindPublish(code: String, obj: JSONObject) {
@@ -198,8 +300,13 @@ class LandDetailFragment : Fragment() {
 
     private fun paintPayChips() {
         fun paint(tv: TextView, on: Boolean) {
-            tv.setBackgroundColor(Color.parseColor(if (on) "#10B981" else "#2F2F2F"))
-            tv.setTextColor(Color.parseColor(if (on) "#052E16" else "#ECECEC"))
+            tv.setBackgroundResource(if (on) R.drawable.bg_ld_chip_on else R.drawable.bg_ld_chip)
+            tv.setTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (on) R.color.vinor_bg else R.color.vinor_text,
+                ),
+            )
         }
         paint(binding.landDetailPayCash, selectedPayment == "نقدی")
         paint(binding.landDetailPayDeal, selectedPayment == "توافقی")
@@ -247,9 +354,11 @@ class LandDetailFragment : Fragment() {
         binding.landDetailRows.isVisible = true
         val pad = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
-            8f,
+            10f,
             resources.displayMetrics,
         ).toInt()
+        val muted = ContextCompat.getColor(requireContext(), R.color.vinor_text_muted)
+        val text = ContextCompat.getColor(requireContext(), R.color.vinor_text)
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
             val label = row.optString("label").trim()
@@ -260,14 +369,14 @@ class LandDetailFragment : Fragment() {
                 setPadding(0, pad, 0, pad)
             }
             val keyView = TextView(requireContext()).apply {
-                text = label
-                setTextColor(Color.parseColor("#8E8E93"))
+                this.text = label
+                setTextColor(muted)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             }
             val valView = TextView(requireContext()).apply {
-                text = value
-                setTextColor(Color.parseColor("#ECECEC"))
+                this.text = value
+                setTextColor(text)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setTypeface(typeface, Typeface.BOLD)
             }
