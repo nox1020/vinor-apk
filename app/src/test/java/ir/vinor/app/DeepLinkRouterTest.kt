@@ -88,6 +88,27 @@ class DeepLinkRouterTest {
     }
 
     @Test
+    fun customers_isPartnerWeb_requiresAuth() {
+        val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/customers")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertTrue(r.requiresAuth)
+        assertEquals("customers", r.logLabel)
+        assertTrue(r.targetUrl.contains("/express/partner/customers"))
+    }
+
+    @Test
+    fun customersQueryAndNested_stayInApp() {
+        val query = DeepLinkRouter.resolve("https://vinor.ir/express/partner/customers?tab=active")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, query.type)
+        assertTrue(query.requiresAuth)
+        assertTrue(query.targetUrl.contains("/express/partner/customers?tab=active"))
+        val nested = DeepLinkRouter.resolve("https://www.vinor.ir/express/partner/customers/12/")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, nested.type)
+        assertTrue(nested.requiresAuth)
+        assertTrue(nested.targetUrl.contains("/express/partner/customers/12"))
+    }
+
+    @Test
     fun training_isPublicPartnerWeb() {
         val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/training")
         assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)

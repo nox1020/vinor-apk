@@ -44,8 +44,13 @@ class ProfileFragment : Fragment() {
         private const val TAG = "ProfileFragment"
         private const val BASE = "https://vinor.ir"
         private const val PROFILE_DATA = "/express/partner/profile/data"
+        private const val HOME_DATA = "/express/partner/home/data"
         private const val API_LOGOUT = "/express/partner/api/logout"
     }
+
+    private var latestProfile: JSONObject? = null
+    private var loadGen = 0
+    private var crmFetchGen = -1
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -88,6 +93,7 @@ class ProfileFragment : Fragment() {
     private fun loadData() {
         val ctx = context ?: return
         if (_binding == null) return
+        loadGen++
         binding.profileProgress.visibility = View.VISIBLE
         binding.profileGuest.visibility = View.GONE
         binding.profileCard.visibility = View.GONE
@@ -115,6 +121,7 @@ class ProfileFragment : Fragment() {
 
     private fun bindProfilePayload(obj: JSONObject) {
         if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) return
+        latestProfile = obj
         binding.profileProgress.visibility = View.GONE
         val plusOn = obj.optBoolean("plus_system_enabled", false)
         val lawyerOn = obj.optBoolean("lawyer_feature_on", false)
@@ -140,7 +147,46 @@ class ProfileFragment : Fragment() {
             showAppUpdate = showUpdate,
             androidApkUrl = if (showUpdate) apkUrl else "",
             androidApkVersion = if (showUpdate) apkVersion else "",
+            showCustomers = customersMenuVisible(obj),
         )
+    }
+
+    /** کلید حاضر در JSON؛ نبود کلید `null` است تا منبع دیگر (خانه) بررسی شود. */
+    private fun flagOrNull(obj: JSONObject?, key: String): Boolean? {
+        if (obj == null || !obj.has(key)) return null
+        return obj.optBoolean(key, false)
+    }
+
+    private fun customersMenuVisible(profile: JSONObject): Boolean {
+        if (!profile.optBoolean("is_approved", false)) return false
+        val profileFlag = flagOrNull(profile, PartnerCrm.FLAG)
+        if (profileFlag != null) return profileFlag
+        val ctx = context
+        val home = if (ctx != null) PartnerApi.peekJson(HOME_DATA, ctx) else null
+        val homeFlag = flagOrNull(home, PartnerCrm.FLAG)
+        val fresh = ctx != null && homeFlag != null && PartnerApi.isFresh(HOME_DATA, ctx)
+        if (!fresh) refreshCrmFromHome(profile, PartnerCrm.showMenu(true, null, homeFlag))
+        return PartnerCrm.showMenu(true, null, homeFlag)
+    }
+
+    private fun refreshCrmFromHome(profile: JSONObject, shown: Boolean) {
+        val ctx = context ?: return
+        val gen = loadGen
+        if (crmFetchGen == gen) return
+        crmFetchGen = gen
+        scope.launch {
+            val home = withContext(Dispatchers.IO) {
+                runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
+            } ?: return@launch
+            if (gen != loadGen || _binding == null) return@launch
+            val visible = PartnerCrm.showMenu(
+                profile.optBoolean("is_approved", false),
+                null,
+                flagOrNull(home, PartnerCrm.FLAG),
+            )
+            if (visible == shown) return@launch
+            bindProfilePayload(latestProfile ?: profile)
+        }
     }
 
     private fun showGuest(plusOn: Boolean = false, lawyerOn: Boolean = false) {
@@ -176,7 +222,8 @@ class ProfileFragment : Fragment() {
         lawyerOn: Boolean,
         showAppUpdate: Boolean,
         androidApkUrl: String,
-        androidApkVersion: String
+        androidApkVersion: String,
+        showCustomers: Boolean,
     ) {
         if (_binding == null) return
         binding.profileGuest.visibility = View.GONE
@@ -223,6 +270,9 @@ class ProfileFragment : Fragment() {
         addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
         if (isApproved) {
             addMenuRow("پیگیری", "درخواست، بازدید و معامله", R.drawable.ic_routine, "$BASE/express/partner/requests")
+            if (showCustomers) {
+                addMenuRow("مشتریان", "", R.drawable.ic_users_stroke, "$BASE${PartnerCrm.PATH}")
+            }
             addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
             addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")
             addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")

@@ -5,6 +5,7 @@ APK شِل نیتیو خانه است (نه WebView-shell)، مطابق `roadmap
 
 - **خانه / چت / ورود OTP / کیف پول / روتین / پروفایل / اعلان / جزئیات ملک:** نیتیو + همان API وب.
 - **صفحات فرعی با منطق وب (آموزش، پیگیری، دعوت، نشان‌ها، آگهی، سطوح، تنظیمات، پلاس، درخواست همکاری):** از نسخهٔ **1.0.286** داخل اپ با WebView همان HTML وب.
+- **CRM مشتریان (`/customers`):** از **1.0.319** در منوی «من» برای همکار تأییدشده وقتی `crm_ui_enabled` روشن است؛ همان HTML داخل `PartnerPageFragment`.
 - **ادمین `/admin`:** خارج از محدودهٔ APK همکار.
 - **Bottom tab وب وجود ندارد.** چیپ دانلود APK روی نیتیو نیست (عمدی).
 
@@ -58,7 +59,7 @@ Cookie جلسه: `vinor_session` (Flask). هویت: `user_phone`.
 | اعلان / پستچی | `/notifications` → `home?thread=__postchi__` | home | pending+ | همکار | Native `NotificationsFragment` | D: لیست نیتیو نه ترد پستچی داخل چت |
 | جزئیات ملک | `/lands/<code>` → `home?land=` | chat-detail | مهمان+ | همه | Native `LandDetailFragment` | D: کارت نیتیو به‌جای تزریق چت |
 | دیوار | `/divar/<token>` → `home?divar=` | chat-detail | مهمان+ | همه | ACTION_VIEW دیوار / کارت آگهی | Partial |
-| CRM مشتری | `/customers` | `customers.html` | approved+flag | همکار | Missing به‌عنوان آیتم منو | A (فلگ وب) |
+| CRM مشتری | `/customers` | `customers.html` | approved+`crm_ui_enabled` | همکار | InAppWeb `PartnerPageFragment`؛ ردیف «مشتریان» فقط اگر تأییدشده و فلگ روشن | OK از 1.0.319 |
 | آفلاین PWA | `/offline` | `offline.html` | any | — | `VinorOfflineUi` + بنر | H جدا |
 | شرایط همکاری | `/cooperation-terms` | `cooperation_terms.html` | مهمان+ | — | InAppWeb | OK |
 | شرایط استفاده | `/legal/terms` | `legal/terms.html` | any | — | InAppWeb | قبلاً Browser |
@@ -72,7 +73,7 @@ Cookie جلسه: `vinor_session` (Flask). هویت: `user_phone`.
 - هدر منو → drawer.
 - Drawer مهمان: آموزش + OTP.
 - Drawer تأییدنشده: درخواست/وضعیت، دعوت، آموزش.
-- Drawer تأییدشده: پیگیری، کیف پول، نشان‌ها، آموزش، دعوت، آگهی (پلاس)، پروفایل، سطوح، تنظیمات، خروج.
+- Drawer تأییدشده: پیگیری، مشتریان (فقط `crm_ui_enabled`)، کیف پول، نشان‌ها، آموزش، دعوت، آگهی (پلاس)، پروفایل، سطوح، تنظیمات، خروج.
 - خانه خالی: کارت همکاری → apply/login؛ خرید ملک → مدال آگهی؛ سطوح → `/levels`.
 - چت: پیوست، ارسال، تردها در drawer.
 
@@ -83,7 +84,8 @@ APK همان گراف را دنبال می‌کند؛ پیگیری از 1.0.286 
 ## APIهای مشترک (قرارداد یکسان)
 
 ورود: `POST /api/login-request`, `POST /api/verify`, `POST /otp/resend`, `POST /api/logout`.  
-خانه: `GET /home/data`, `GET /home` HTML آگهی، `POST /home/register-customer`, `GET /ai/history`, `POST /ai/chat`, `POST /ai/upload`.  
+خانه: `GET /home/data` (شامل `crm_ui_enabled`)، `GET /home` HTML آگهی، `POST /home/register-customer`, `GET /ai/history`, `POST /ai/chat`, `POST /ai/upload`.  
+مشتریان CRM: HTML `/customers` (API JSON جدا در APK نیست). فلگ منو: `crm_ui_enabled` از `home/data`، و از `profile/data` اگر همان کلید آنجا باشد.  
 ملک: `GET /api/express/{code}`, `GET /lands/{code}/chat-detail`.  
 کیف پول / روتین / پروفایل / اعلان / یادداشت: همان endpointهای وب.
 
@@ -98,6 +100,7 @@ CSRF در API JSON همکار عمدتاً session cookie است؛ APK کوکی 
 | `/property/{id}`, `/express/{code}`, `/express/partner/lands/{id}`, `home?land=` | `LandDetailFragment` — مهمان مجاز |
 | `/express/partner/home` | داشبورد نیتیو |
 | `/express/partner/requests` و بقیهٔ صفحات فرعی | `PartnerPageFragment` |
+| `/express/partner/customers` | `PartnerPageFragment` (نیاز به نشست؛ از 1.0.319) |
 | `/express/partner/commissions` | نیتیو کیف پول |
 | `/express/partner/routine` | نیتیو روتین |
 | `/express/partner/notifications` | نیتیو اعلان |
@@ -126,6 +129,6 @@ CSRF در API JSON همکار عمدتاً session cookie است؛ APK کوکی 
 | --- | --- |
 | Guest | خانه + OTP drawer + آموزش/سطوح InAppWeb |
 | Logged unapproved | apply/thanks + خانه |
-| Approved partner | پیگیری، کیف پول، مشتری، چت |
+| Approved partner | پیگیری، مشتریان (فلگ CRM)، کیف پول، چت |
 | Vinor Plus (special) | آگهی‌های من |
 | Admin | خارج از APK |

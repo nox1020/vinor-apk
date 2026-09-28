@@ -1,6 +1,6 @@
 # گزارش همگامی Web و APK — Vinor
 
-نسخهٔ APK این گزارش: **1.0.286**  
+نسخهٔ APK این گزارش: **1.0.319** (مشتریان CRM؛ جزئیات قدیمی‌تر از 1.0.286)  
 مرجع وب: `/express/partner` روی `vinor.ir`  
 جزئیات صفحه به صفحه: [`web-apk-parity.md`](web-apk-parity.md)
 
@@ -17,7 +17,7 @@
 | Redirectهای وب به خانه/مسیر دیگر | 12 |
 | Route ادمین | خارج از محدوده |
 | مقصد نیتیو در nav_graph | 12 + `partnerPageFragment` |
-| صفحات Missing به‌عنوان سطح منو | 1 (`/customers` فلگ CRM) |
+| صفحات Missing به‌عنوان سطح منو | 0 (`/customers` از 1.0.319 در منو، پشت `crm_ui_enabled`) |
 | Partial | 5 |
 | UI mismatch باقی | خانهٔ نیتیو در حد جزئیات مدال مشتری / پستچی |
 | Functional mismatch باقی | جزئیات ملک نیتیو در برابر تزریق چت وب |
@@ -27,7 +27,7 @@
 
 | کد | معنی | باقی‌مانده |
 | --- | --- | --- |
-| A Missing | `/customers` در منو نیست (وب هم پشت فلگ CRM است) | کم‌اولویت |
+| A Missing | `/customers` از 1.0.319 در منوی «من» است؛ همان فلگ وب `crm_ui_enabled` + تأیید همکار | رفع شد |
 | B Partial | مدال مشتری بدون لیست فایل/پلاس/اسلات کامل؛ کیف پول بدون لیست تراکنش جدا؛ تنظیمات/حافظه از وب | متوسط |
 | C UI | پیکسل خانه عمدتاً هم‌تراز 1.0.285 | کم |
 | D Functional | ملک نیتیو ≠ `home?land=` در چت؛ پستچی = لیست اعلان نه ترد `__postchi__` | آگاهانه / بعدی |
@@ -49,7 +49,13 @@
 | Security | HTTPS، بدون سکرت در APK، App Links بدون `/d` |
 | Performance | کاروسل آگهی lazy؛ WebView فقط صفحات فرعی |
 
-## تغییرات این دور
+## مشتریان CRM (1.0.319)
+
+ردیف «مشتریان» در تب من فقط وقتی `is_approved` و `crm_ui_enabled` هر دو روشن باشند. فلگ روی `GET /express/partner/home/data` است؛ اگر `profile/data` هم کلید را بفرستد همان مقدم است. باز شدن صفحه داخل اپ با `PartnerPageFragment` و دیپ‌لینک `/express/partner/customers` به همان WebView می‌رود. API JSON مشتریان در APK نیست؛ بک‌اند عوض نشده.
+
+فایل‌ها: `ProfileFragment.kt`, `PartnerCrm.kt`, `MainActivity.kt`, `DeepLinkRouter.kt`, `DeepLinkRouterTest.kt`, `PartnerCrmTest.kt`, `version.txt`, همین اسناد.
+
+## تغییرات دور 1.0.286
 
 1. Inventory کامل وب/APK در `docs/web-apk-parity.md`.
 2. «پیگیری» منو → `/express/partner/requests` (دیگر روتین نیست).
@@ -80,5 +86,5 @@
 | `/profile/edit` | `ProfileEditFragment` | Native | aligned | aligned | same | banner | via profile |
 | `/notifications` | `NotificationsFragment` | Native | Partial | list≠thread | same | banner | yes |
 | `/lands/<code>` | `LandDetailFragment` | Native | different chrome | D vs chat inject | same | banner | guest yes |
-| `/customers` | — | Missing menu | — | — | — | — | InAppWeb if opened |
+| `/customers` | `PartnerPageFragment` | InAppWeb | web | web؛ منو فقط approved+`crm_ui_enabled` | same HTML | overlay | yes |
 | `/admin` | — | Out of scope | — | — | — | — | no |
