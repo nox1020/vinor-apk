@@ -48,7 +48,8 @@ object VinorCachePolicy {
 
     /** Exponential backoff for outbox flush. retryCount 0 → 2s, then 4s … capped at 15m. */
     fun queueBackoffMs(retryCount: Int): Long {
-        val exp = 1L shl retryCount.coerceIn(0, 8)
+        // 2^8 * 2s stays under the 15 minute cap, so a tighter shift never applied it.
+        val exp = 1L shl retryCount.coerceIn(0, 30)
         return (QUEUE_BACKOFF_BASE_MS * exp).coerceAtMost(QUEUE_BACKOFF_MAX_MS)
     }
 
