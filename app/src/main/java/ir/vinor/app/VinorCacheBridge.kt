@@ -34,16 +34,22 @@ class VinorCacheBridge(
     }
 
     @JavascriptInterface
-    fun networkState(): String =
-        runCatching { VinorNetworkStatus.current(context).name }.getOrDefault(VinorNetState.OFFLINE.name)
+    fun networkState(): String {
+        if (!trusted()) return VinorNetState.OFFLINE.name
+        return runCatching { VinorNetworkStatus.current(context).name }.getOrDefault(VinorNetState.OFFLINE.name)
+    }
 
     @JavascriptInterface
-    fun isOnline(): Boolean =
-        runCatching { VinorNetworkStatus.isOnline(context) }.getOrDefault(false)
+    fun isOnline(): Boolean {
+        if (!trusted()) return false
+        return runCatching { VinorNetworkStatus.isOnline(context) }.getOrDefault(false)
+    }
 
     @JavascriptInterface
-    fun lastCachedAt(): Long =
-        runCatching { VinorWebOfflineSession.lastCachedAt(context) }.getOrDefault(0L)
+    fun lastCachedAt(): Long {
+        if (!trusted()) return 0L
+        return runCatching { VinorWebOfflineSession.lastCachedAt(context) }.getOrDefault(0L)
+    }
 
     @JavascriptInterface
     fun enqueue(type: String?, url: String?, body: String?): String {
@@ -64,9 +70,12 @@ class VinorCacheBridge(
     }
 
     @JavascriptInterface
-    fun pendingQueue(): String = runCatching {
-        VinorOfflineQueue.snapshotJson(context.applicationContext).toString()
-    }.getOrDefault("[]")
+    fun pendingQueue(): String {
+        if (!trusted()) return "[]"
+        return runCatching {
+            VinorOfflineQueue.snapshotJson(context.applicationContext).toString()
+        }.getOrDefault("[]")
+    }
 
     @JavascriptInterface
     fun ackQueueItem(id: String?) {
@@ -84,10 +93,5 @@ class VinorCacheBridge(
         runCatching { VinorOfflineQueue.fail(context.applicationContext, trimmed, error.orEmpty()) }
     }
 
-    private fun trusted(): Boolean {
-        val wv = webViewProvider()
-        if (VinorBridgeGate.isTrustedPage(wv)) return true
-        val last = VinorWebOfflineSession.lastPartnerUrl(context)
-        return VinorBridgeGate.isTrustedUrl(last)
-    }
+    private fun trusted(): Boolean = VinorBridgeGate.isTrustedPage(webViewProvider())
 }
