@@ -24,14 +24,17 @@ class VinorAppUpdateBridge(
 
     @JavascriptInterface
     fun getCachedState(): String {
+        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return "{}"
         return runCatching { VinorAppUpdateController.stateJson(context.applicationContext) }
             .getOrDefault("{}")
     }
 
     @JavascriptInterface
-    fun getDownloadState(): String =
-        runCatching { VinorAppUpdateController.stateJson(context.applicationContext) }
+    fun getDownloadState(): String {
+        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return "{}"
+        return runCatching { VinorAppUpdateController.stateJson(context.applicationContext) }
             .getOrDefault("{}")
+    }
 
     @JavascriptInterface
     fun ensureDownload(url: String, version: String) {

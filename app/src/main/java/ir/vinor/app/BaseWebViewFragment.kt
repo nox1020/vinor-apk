@@ -52,6 +52,8 @@ abstract class BaseWebViewFragment : Fragment() {
 
     private val revealAfterLoadDelayMs = 120L
     private val revealAfterLoadRunnable = Runnable { finishSuccessfulPageLoadIfClean() }
+    private var lastEjectedUrl: String? = null
+    private var lastRewrittenUrl: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -113,6 +115,12 @@ abstract class BaseWebViewFragment : Fragment() {
 
         // WebViewClient برای مدیریت navigation و errors
         webView.webViewClient = object : WebViewClient() {
+            @Suppress("DEPRECATION")
+            @Deprecated("API < 24")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                return handleMainFrameNavigation(view, url ?: return false)
+            }
+
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
@@ -120,50 +128,14 @@ abstract class BaseWebViewFragment : Fragment() {
                 val url = request?.url?.toString() ?: return false
 
                 if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
-                    showOffline()
+                    if (request.isForMainFrame) showOffline()
                     return true
                 }
 
-                // تماس / ایمیل / پیامک — مستقیم با Intent سیستم (نه داخل WebView)
-                if (openExternalAppUrl(url)) {
-                    return true
-                }
+                // iframe / subframe stays out of the external-browser handoff.
+                if (!request.isForMainFrame) return false
 
-                if (consumeInternalUrl(url)) {
-                    return true
-                }
-
-                // امکان محدود کردن تب به یک URL (مثلاً فقط صفحه وینور)
-                shouldOverrideUrlLoadingForFragment(url)?.let { override ->
-                    if (override) {
-                        try {
-                            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-                        } catch (e: Exception) {
-                            Log.e(fragmentTag, "Error opening link: $url", e)
-                        }
-                        return true
-                    }
-                    return false
-                }
-
-                // لینک دانلود APK (/d یا .apk) — DownloadManager؛ نه باز شدن دوباره با App Links
-                try {
-                    if (UrlUtils.isApkDownloadUrl(url)) {
-                        val ver = VinorAppUpdateChecker.readCached(requireContext()).version
-                        VinorDownloadBridge.enqueueDownload(
-                            requireContext(),
-                            url,
-                            VinorDownloadBridge.apkDownloadFilename(url, ver),
-                            showToast = true,
-                        )
-                        return true
-                    }
-                } catch (e: Exception) {
-                    Log.e(fragmentTag, "Error downloading APK link: $url", e)
-                }
-
-                // در همهٔ موارد (به‌جز APK)، لینک‌ها داخل همین WebView لود شوند
-                return false
+                return handleMainFrameNavigation(view, url)
             }
 
             override fun shouldInterceptRequest(
@@ -205,6 +177,7 @@ abstract class BaseWebViewFragment : Fragment() {
                     return
                 }
                 if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(url)) return
+                if (leaveIfUntrustedHttpCommitted(view, url)) return
 
                 mainFrameLoadFailed = false
                 canGoBack = view?.canGoBack() == true
@@ -227,9 +200,18 @@ abstract class BaseWebViewFragment : Fragment() {
                 }
             }
 
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                if (leaveIfUntrustedHttpCommitted(view, url)) return
+                if (VinorBridgeGate.isTrustedUrl(url)) {
+                    VinorBridgeGate.rememberUrl(view, url)
+                }
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d(fragmentTag, "Page finished (defer reveal): $url")
+                if (leaveIfUntrustedHttpCommitted(view, url)) return
                 if (view == null || !::webView.isInitialized) return
                 webView.removeCallbacks(revealAfterLoadRunnable)
                 webView.postDelayed(revealAfterLoadRunnable, revealAfterLoadDelayMs)
@@ -290,6 +272,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
         val fileChooser = webViewFileChooser
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            if (!VinorBridgeGate.isTrustedPage(webView)) return@setDownloadListener
             val ctx = context ?: return@setDownloadListener
             val filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, null)
             VinorDownloadBridge.enqueueDownload(ctx, url, filename, showToast = true)
@@ -313,11 +296,18 @@ abstract class BaseWebViewFragment : Fragment() {
     private fun loadUrl() {
         val urlToLoad = getUrlToLoad()
         val ctx = context
+        val trustedTarget = trustedWebViewUrl(urlToLoad)
+        if (trustedTarget == null) {
+            openExternalIfNeeded(urlToLoad)
+            hideLoader()
+            return
+        }
         if (!isOnline() && ctx != null && ::webView.isInitialized) {
-            val html = VinorOfflinePageStore.read(ctx, urlToLoad)
+            val html = VinorOfflinePageStore.read(ctx, trustedTarget)
             if (!html.isNullOrBlank()) {
                 hideOffline()
-                webView.loadDataWithBaseURL(urlToLoad, html, "text/html", "utf-8", urlToLoad)
+                VinorBridgeGate.rememberUrl(webView, trustedTarget)
+                webView.loadDataWithBaseURL(trustedTarget, html, "text/html", "utf-8", trustedTarget)
                 return
             }
             showOfflineOverlayOnly()
@@ -328,15 +318,135 @@ abstract class BaseWebViewFragment : Fragment() {
             return
         }
         hideOffline()
-        Log.d(fragmentTag, "Loading URL: $urlToLoad")
+        Log.d(fragmentTag, "Loading URL: $trustedTarget")
         if (::webView.isInitialized) {
-            webView.loadUrl(urlToLoad)
+            VinorBridgeGate.rememberUrl(webView, trustedTarget)
+            webView.loadUrl(trustedTarget)
+        }
+    }
+
+    /**
+     * https Vinor stays in this WebView. Cleartext Vinor is upgraded. Anything else is not loaded.
+     */
+    private fun trustedWebViewUrl(url: String): String? {
+        return when (val decision = VinorBridgeGate.navigationForBridgedWebView(url)) {
+            is VinorBridgeGate.BridgedNav.Allow -> url
+            is VinorBridgeGate.BridgedNav.Upgrade -> decision.url
+            else -> null
+        }
+    }
+
+    private fun openExternalIfNeeded(url: String) {
+        val decision = VinorBridgeGate.navigationForBridgedWebView(url)
+        if (decision is VinorBridgeGate.BridgedNav.OpenExternal) {
+            val ctx = context ?: return
+            VinorExternalBrowser.open(ctx, decision.url)
+        } else {
+            Log.w(fragmentTag, "Blocked non-Vinor WebView URL")
+        }
+    }
+
+    /**
+     * @return true when the navigation must not continue inside the bridged WebView.
+     */
+    private fun handleMainFrameNavigation(view: WebView?, url: String): Boolean {
+        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(url)) {
+            showOffline()
+            return true
+        }
+        if (openExternalAppUrl(url)) return true
+        if (consumeInternalUrl(url)) return true
+
+        // A fragment may send a link out; it cannot force an untrusted URL into this WebView.
+        if (shouldOverrideUrlLoadingForFragment(url) == true) {
+            val ctx = context
+            if (ctx == null || !VinorExternalBrowser.open(ctx, url)) {
+                Log.w(fragmentTag, "Unable to open external link")
+            }
+            return true
+        }
+
+        return when (val decision = VinorBridgeGate.navigationForBridgedWebView(url)) {
+            is VinorBridgeGate.BridgedNav.Allow -> {
+                if (startTrustedApkDownload(url)) true
+                else {
+                    VinorBridgeGate.rememberUrl(view, url)
+                    false
+                }
+            }
+            is VinorBridgeGate.BridgedNav.Upgrade -> {
+                if (startTrustedApkDownload(decision.url)) true
+                else {
+                    VinorBridgeGate.rememberUrl(view, decision.url)
+                    view?.loadUrl(decision.url)
+                    true
+                }
+            }
+            is VinorBridgeGate.BridgedNav.OpenExternal -> {
+                val ctx = context
+                if (ctx != null) VinorExternalBrowser.open(ctx, decision.url)
+                true
+            }
+            VinorBridgeGate.BridgedNav.Block -> true
+        }
+    }
+
+    /** Backstop if a non-Vinor http(s) document commits without shouldOverrideUrlLoading. */
+    private fun leaveIfUntrustedHttpCommitted(view: WebView?, url: String?): Boolean {
+        val raw = url?.trim().orEmpty()
+        if (raw.isEmpty()) return false
+        if (VinorWebViewErrorShield.looksLikeChromeErrorPage(raw)) return false
+        if (VinorWebViewErrorShield.isNeutralPlaceholderUrl(raw)) return false
+        return when (val decision = VinorBridgeGate.navigationForBridgedWebView(raw)) {
+            is VinorBridgeGate.BridgedNav.Allow -> {
+                lastRewrittenUrl = null
+                lastEjectedUrl = null
+                VinorBridgeGate.rememberUrl(view, raw)
+                false
+            }
+            is VinorBridgeGate.BridgedNav.Upgrade -> {
+                VinorBridgeGate.rememberUrl(view, decision.url)
+                if (lastRewrittenUrl == decision.url) true
+                else {
+                    lastRewrittenUrl = decision.url
+                    view?.stopLoading()
+                    view?.loadUrl(decision.url)
+                    true
+                }
+            }
+            is VinorBridgeGate.BridgedNav.OpenExternal -> {
+                VinorBridgeGate.rememberUrl(view, raw)
+                if (lastEjectedUrl == raw) return true
+                lastEjectedUrl = raw
+                context?.let { VinorExternalBrowser.open(it, decision.url) }
+                view?.stopLoading()
+                if (view?.canGoBack() == true) view.goBack()
+                true
+            }
+            VinorBridgeGate.BridgedNav.Block -> false
+        }
+    }
+
+    private fun startTrustedApkDownload(url: String): Boolean {
+        if (!UrlUtils.isTrustedVinorHttps(url) || !UrlUtils.isApkDownloadUrl(url)) return false
+        return try {
+            val ver = VinorAppUpdateChecker.readCached(requireContext()).version
+            VinorDownloadBridge.enqueueDownload(
+                requireContext(),
+                url,
+                VinorDownloadBridge.apkDownloadFilename(url, ver),
+                showToast = true,
+            )
+            true
+        } catch (e: Exception) {
+            Log.e(fragmentTag, "Error downloading APK link", e)
+            true
         }
     }
     
     /**
-     * امکان کنترل بارگذاری لینک در همین WebView یا باز کردن در مرورگر.
-     * @return true = در مرورگر باز شود، false = در WebView لود شود، null = رفتار پیش‌فرض
+     * امکان فرستادن یک لینک به مرورگر.
+     * @return true = در مرورگر باز شود، null/false = سیاست اعتماد WebView (فقط https وینور داخل WebView)
      */
     protected open fun shouldOverrideUrlLoadingForFragment(url: String): Boolean? = null
 
@@ -376,15 +486,21 @@ abstract class BaseWebViewFragment : Fragment() {
      * open است تا بتوان در Fragmentهای فرزند override کرد
      */
     open fun reloadWithUrl(url: String) {
-        dynamicUrl = url
+        val trustedTarget = trustedWebViewUrl(url)
+        if (trustedTarget == null) {
+            openExternalIfNeeded(url)
+            return
+        }
+        dynamicUrl = trustedTarget
         if (::webView.isInitialized) {
             if (!isOnline()) {
                 showOfflineOverlayOnly()
                 return
             }
             hideOffline()
-            Log.d(fragmentTag, "Reloading with new URL: $url")
-            webView.loadUrl(url)
+            Log.d(fragmentTag, "Reloading with new URL: $trustedTarget")
+            VinorBridgeGate.rememberUrl(webView, trustedTarget)
+            webView.loadUrl(trustedTarget)
         }
     }
 
@@ -822,6 +938,7 @@ abstract class BaseWebViewFragment : Fragment() {
     override fun onDestroyView() {
         if (::webView.isInitialized) {
             runCatching { webView.removeCallbacks(revealAfterLoadRunnable) }
+            VinorBridgeGate.forget(webView)
             runCatching { webView.destroy() }
         }
         super.onDestroyView()

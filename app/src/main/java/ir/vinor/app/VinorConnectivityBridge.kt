@@ -7,6 +7,7 @@ import org.json.JSONObject
 /** پل JS — همگام‌سازی وضعیت آنلاین/آفلاین/محدود با بنر وب */
 class VinorConnectivityBridge(
     private val stateProvider: () -> VinorNetState,
+    private val webViewProvider: () -> WebView? = { null },
 ) {
     companion object {
         const val JS_INTERFACE_NAME = "VinorConnectivity"
@@ -52,8 +53,14 @@ class VinorConnectivityBridge(
     }
 
     @JavascriptInterface
-    fun isOnline(): Boolean = runCatching { stateProvider() != VinorNetState.OFFLINE }.getOrDefault(false)
+    fun isOnline(): Boolean {
+        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return false
+        return runCatching { stateProvider() != VinorNetState.OFFLINE }.getOrDefault(false)
+    }
 
     @JavascriptInterface
-    fun networkState(): String = runCatching { stateProvider().name }.getOrDefault(VinorNetState.OFFLINE.name)
+    fun networkState(): String {
+        if (!VinorBridgeGate.isTrustedPage(webViewProvider())) return VinorNetState.OFFLINE.name
+        return runCatching { stateProvider().name }.getOrDefault(VinorNetState.OFFLINE.name)
+    }
 }

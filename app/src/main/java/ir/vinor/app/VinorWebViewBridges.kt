@@ -16,7 +16,10 @@ object VinorWebViewBridges {
             VinorCacheBridge.JS_INTERFACE_NAME,
         )
         webView.addJavascriptInterface(
-            VinorConnectivityBridge { VinorNetworkStatus.current(ctx) },
+            VinorConnectivityBridge(
+                stateProvider = { VinorNetworkStatus.current(ctx) },
+                webViewProvider = { webView },
+            ),
             VinorConnectivityBridge.JS_INTERFACE_NAME,
         )
         val act = fragment.activity as? ComponentActivity
@@ -33,12 +36,13 @@ object VinorWebViewBridges {
         val host = fragment.activity as? MainActivity
         host?.notifyHelperOrNull()?.let { helper ->
             webView.addJavascriptInterface(
-                VinorNotifyBridge(helper),
+                VinorNotifyBridge(helper) { webView },
                 VinorNotifyBridge.JS_INTERFACE_NAME,
             )
         }
         webView.addJavascriptInterface(
             VinorShellBridge(
+                webViewProvider = { webView },
                 onReady = {},
                 onLogout = { host?.logoutFromDrawer() },
             ),
