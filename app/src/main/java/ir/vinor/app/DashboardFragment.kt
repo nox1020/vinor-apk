@@ -45,6 +45,10 @@ import java.io.File
 /** خانه نیتیو — همان چیدمان وب: آگهی، میانبرها، کارت همکاری. چت فقط از تب فوتر. */
 class DashboardFragment : Fragment() {
 
+    companion object {
+        private var rememberedHome: JSONObject? = null
+    }
+
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
     private var job = Job()
@@ -160,6 +164,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardAdsScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
         syncSendEnabled()
         syncComposerVisible()
+        paintRememberedHome()
         loadAll()
         if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
             openVinorChat()
@@ -567,7 +572,7 @@ class DashboardFragment : Fragment() {
             if (wantChatLayer) bindChat(JSONObject())
         }
         scope.launch {
-            var shownCache = false
+            var shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
             if (!fromPull) {
                 val cached = withContext(Dispatchers.IO) {
                     PartnerApi.peekJson("/express/partner/home/data", ctx)
@@ -585,7 +590,7 @@ class DashboardFragment : Fragment() {
                         if (!wantChatLayer) finishRefreshUi()
                         return@launch
                     }
-                } else if (!wantChatLayer) {
+                } else if (!wantChatLayer && !shownCache) {
                     binding.dashboardProgress.isVisible = true
                 }
             } else {
@@ -638,6 +643,13 @@ class DashboardFragment : Fragment() {
             }
             if (!wantChatLayer) finishRefreshUi()
         }
+    }
+
+    /** آخرین خانهٔ دیده‌شده — ورود بعدی به تب آگهی‌ها منتظر شبکه نمی‌ماند. */
+    private fun paintRememberedHome() {
+        val snap = rememberedHome ?: return
+        bindHome(snap)
+        if (!wantChatLayer) showHomeEmpty()
     }
 
     private fun showHomeEmpty() {
@@ -736,6 +748,7 @@ class DashboardFragment : Fragment() {
                 binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
             }
         }
+        rememberHome(obj)
         if (isChatOpen()) {
             binding.dashboardAdsScroll.isVisible = false
             binding.dashboardFilesHead.isVisible = false
@@ -748,12 +761,14 @@ class DashboardFragment : Fragment() {
             binding.dashboardEmpty.isVisible = true
             binding.dashboardAdsScroll.isVisible = showCarousel
             binding.dashboardFilesHead.isVisible = showCarousel
-            if (showCarousel) {
+            if (showCarousel && !sameCards) {
                 binding.dashboardAds.post {
                     val b = _binding ?: return@post
-                    b.dashboardAdsScroll.fullScroll(View.FOCUS_RIGHT)
+                    alignAdsToStart(b)
                     bindVisibleCarouselImages()
                 }
+            } else if (showCarousel) {
+                bindVisibleCarouselImages()
             }
         }
 
@@ -1074,6 +1089,22 @@ class DashboardFragment : Fragment() {
                 (activity as? MainActivity)?.openLand("divar:$token")
             url.isNotBlank() -> openVinorOrExternal(url)
         }
+    }
+
+    private fun alignAdsToStart(b: FragmentDashboardBinding) {
+        val range = (b.dashboardAds.width - b.dashboardAdsScroll.width).coerceAtLeast(0)
+        val start = if (b.dashboardAdsScroll.layoutDirection == View.LAYOUT_DIRECTION_RTL) range else 0
+        if (b.dashboardAdsScroll.scrollX != start) {
+            b.dashboardAdsScroll.scrollTo(start, 0)
+        }
+    }
+
+    private fun rememberHome(obj: JSONObject) {
+        val ads = obj.optJSONArray("divar_pro_ads")?.length() ?: 0
+        val prompts = obj.optJSONArray("ai_quick_prompts")?.length() ?: 0
+        if (obj.optBoolean("offline") && ads == 0) return
+        if (!obj.has("is_approved") && ads == 0 && prompts == 0 && obj.optString("me_name").isBlank()) return
+        rememberedHome = JSONObject(obj.toString())
     }
 
     private fun bindVisibleCarouselImages() {
