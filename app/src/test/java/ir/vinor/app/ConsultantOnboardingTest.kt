@@ -21,15 +21,20 @@ class ConsultantOnboardingTest {
         assertFalse(ConsultantOnboarding.isLiveConsultantPath("/api/consultant/apply?simulate=approved"))
         assertFalse(ConsultantOnboarding.isLiveConsultantPath("/api/consultant/status?dry_run=1"))
         assertFalse(ConsultantOnboarding.isLiveConsultantPath("/express/partner/api/apply/submit"))
+        listOf(
+            ConsultantOnboarding.PATH_APPLY,
+            ConsultantOnboarding.PATH_PROFILE,
+            ConsultantOnboarding.PATH_DOCUMENTS,
+            ConsultantOnboarding.PATH_AVAILABILITY,
+        ).forEach { path ->
+            assertFalse(ConsultantOnboarding.requiresCsrf(path))
+        }
     }
 
     @Test
-    fun citiesPreferServerListAndFallBackToLockedMetroEnum() {
-        assertEquals(15, ConsultantOnboarding.phase1Cities.size)
-        assertEquals("tehran", ConsultantOnboarding.phase1Cities.first().id)
-        assertEquals("andisheh", ConsultantOnboarding.phase1Cities.last().id)
-        assertEquals(ConsultantOnboarding.phase1Cities, ConsultantOnboarding.parseCities(null))
-        assertEquals(ConsultantOnboarding.phase1Cities, ConsultantOnboarding.parseCities(JSONObject().put("ok", true)))
+    fun cityIdsComeOnlyFromGetCities() {
+        assertTrue(ConsultantOnboarding.parseCities(null).isEmpty())
+        assertTrue(ConsultantOnboarding.parseCities(JSONObject().put("ok", true)).isEmpty())
 
         val remote = JSONObject().put(
             "cities",
@@ -39,11 +44,23 @@ class ConsultantOnboardingTest {
         )
         val parsed = ConsultantOnboarding.parseCities(remote)
         assertEquals(listOf("tehran", "rey"), parsed.map { it.id })
+        assertEquals(
+            "city",
+            (ConsultantOnboarding.profileBody("مریم", "pardis", listOf("buy"), parsed) as ConsultantOnboarding.Draft.Invalid).error.field,
+        )
     }
 
     @Test
     fun profileAcceptsBuySellOnlyInsideLoadedCities() {
-        val ok = ConsultantOnboarding.profileBody("مریم رضایی", "pardis", listOf("sell", "buy", "buy"))
+        val cities = ConsultantOnboarding.parseCities(
+            JSONObject().put(
+                "cities",
+                JSONArray()
+                    .put(JSONObject().put("id", "pardis").put("label", "پردیس"))
+                    .put(JSONObject().put("id", "tehran").put("label", "تهران")),
+            ),
+        )
+        val ok = ConsultantOnboarding.profileBody("مریم رضایی", "pardis", listOf("sell", "buy", "buy"), cities)
         assertTrue(ok is ConsultantOnboarding.Draft.Ok)
         val json = (ok as ConsultantOnboarding.Draft.Ok).json
         assertEquals("مریم رضایی", json.getString("name"))
@@ -52,19 +69,19 @@ class ConsultantOnboardingTest {
             json.getJSONArray("specialties").getString(it)
         })
 
-        assertEquals("name", (ConsultantOnboarding.profileBody("ا", "tehran", listOf("buy")) as ConsultantOnboarding.Draft.Invalid).error.field)
-        assertEquals("city", (ConsultantOnboarding.profileBody("مریم", "karaj", listOf("buy")) as ConsultantOnboarding.Draft.Invalid).error.field)
+        assertEquals("name", (ConsultantOnboarding.profileBody("ا", "tehran", listOf("buy"), cities) as ConsultantOnboarding.Draft.Invalid).error.field)
+        assertEquals("city", (ConsultantOnboarding.profileBody("مریم", "karaj", listOf("buy"), cities) as ConsultantOnboarding.Draft.Invalid).error.field)
         assertEquals(
             "specialties",
-            (ConsultantOnboarding.profileBody("مریم", "tehran", listOf("rent")) as ConsultantOnboarding.Draft.Invalid).error.field,
+            (ConsultantOnboarding.profileBody("مریم", "tehran", listOf("rent"), cities) as ConsultantOnboarding.Draft.Invalid).error.field,
         )
         assertEquals(
             "specialties",
-            (ConsultantOnboarding.profileBody("مریم", "tehran", emptyList()) as ConsultantOnboarding.Draft.Invalid).error.field,
+            (ConsultantOnboarding.profileBody("مریم", "tehran", listOf("lease"), cities) as ConsultantOnboarding.Draft.Invalid).error.field,
         )
-        val serverOnly = listOf(ConsultantOnboarding.City("custom_town", "شهر آزمایشی"))
-        assertTrue(
-            ConsultantOnboarding.profileBody("مریم", "custom_town", listOf("sell"), serverOnly) is ConsultantOnboarding.Draft.Ok,
+        assertEquals(
+            "specialties",
+            (ConsultantOnboarding.profileBody("مریم", "tehran", emptyList(), cities) as ConsultantOnboarding.Draft.Invalid).error.field,
         )
     }
 
@@ -87,14 +104,14 @@ class ConsultantOnboardingTest {
     }
 
     @Test
-    fun screenFollowsServerStepThenShowsTipsOnceAfterApproval() {
+    fun screenFollowsNextStepWhileStatusStaysPending() {
         assertEquals(
             ConsultantOnboarding.Screen.PROFILE,
-            ConsultantOnboarding.resolveScreen("profile", "pending_profile", false),
+            ConsultantOnboarding.resolveScreen("profile", "pending", false),
         )
         assertEquals(
             ConsultantOnboarding.Screen.DOCUMENTS,
-            ConsultantOnboarding.resolveScreen("documents", "pending_documents", false),
+            ConsultantOnboarding.resolveScreen("documents", "pending", false),
         )
         assertEquals(
             ConsultantOnboarding.Screen.STATUS,
@@ -103,6 +120,14 @@ class ConsultantOnboardingTest {
         assertEquals(
             ConsultantOnboarding.Screen.STATUS,
             ConsultantOnboarding.resolveScreen("status", "rejected", false),
+        )
+        assertEquals(
+            ConsultantOnboarding.Screen.PROFILE,
+            ConsultantOnboarding.resolveScreen("", "pending", false),
+        )
+        assertEquals(
+            ConsultantOnboarding.Screen.DASHBOARD,
+            ConsultantOnboarding.resolveScreen("dashboard", "pending", false),
         )
         assertEquals(
             ConsultantOnboarding.Screen.TIPS,

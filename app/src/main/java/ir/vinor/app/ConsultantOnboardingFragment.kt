@@ -190,9 +190,10 @@ class ConsultantOnboardingFragment : Fragment() {
                 null
             }
             if (_binding == null) return@launch
-            val parsed = ConsultantOnboarding.parseCities(
-                if (payload != null && payload.optBoolean("ok")) payload else null,
-            )
+            val parsed = ConsultantOnboarding.parseCities(payload)
+            if (parsed.isEmpty()) {
+                showError("فهرست شهرها دریافت نشد.")
+            }
             cities = parsed
             val labels = ArrayList<String>()
             val ids = ArrayList<String>()
@@ -223,11 +224,15 @@ class ConsultantOnboardingFragment : Fragment() {
         val specs = ArrayList<String>()
         if (binding.consultantBuy.isChecked) specs.add("buy")
         if (binding.consultantSell.isChecked) specs.add("sell")
+        if (cities.isEmpty()) {
+            showError("فهرست شهرها دریافت نشد.")
+            return
+        }
         when (val draft = ConsultantOnboarding.profileBody(
             binding.consultantName.text?.toString().orEmpty(),
             cityId,
             specs,
-            if (cities.isEmpty()) ConsultantOnboarding.phase1Cities else cities,
+            cities,
         )) {
             is ConsultantOnboarding.Draft.Invalid -> showError(draft.error.message)
             is ConsultantOnboarding.Draft.Ok -> {
@@ -322,10 +327,9 @@ class ConsultantOnboardingFragment : Fragment() {
             return
         }
         context?.let { ConsultantResume.markSlidesSeen(it) }
-        latestStatus = "approved"
         show(
             ConsultantOnboarding.Screen.DASHBOARD,
-            JSONObject().put("status", "approved").put("online", binding.consultantOnline.isChecked),
+            JSONObject().put("status", latestStatus).put("online", binding.consultantOnline.isChecked),
         )
     }
 

@@ -42,25 +42,6 @@ object ConsultantOnboarding {
         data class Invalid(val error: FieldError) : Draft()
     }
 
-    /** Enum قفل فاز ۱ — فقط وقتی GET cities خالی یا ناموفق باشد. */
-    val phase1Cities: List<City> = listOf(
-        City("tehran", "تهران"),
-        City("rey", "شهرری"),
-        City("eslamshahr", "اسلامشهر"),
-        City("baharestan", "بهارستان"),
-        City("shahriar", "شهریار"),
-        City("malard", "ملارد"),
-        City("qods", "قدس"),
-        City("robat_karim", "رباط‌کریم"),
-        City("pakdasht", "پاکدشت"),
-        City("varamin", "ورامین"),
-        City("qarchak", "قرچک"),
-        City("pardis", "پردیس"),
-        City("shemiranat", "شمیرانات"),
-        City("damavand", "دماوند"),
-        City("andisheh", "اندیشه"),
-    )
-
     val tips: List<Tip> = listOf(
         Tip(
             "مشتری را دقیق بپرس",
@@ -86,8 +67,9 @@ object ConsultantOnboarding {
         return bare in LIVE_PATHS
     }
 
+    /** شناسه شهر فقط از آرایهٔ cities در GET /cities. فهرست محلی نداریم. */
     fun parseCities(payload: JSONObject?): List<City> {
-        val arr = payload?.optJSONArray("cities") ?: return phase1Cities
+        val arr = payload?.optJSONArray("cities") ?: return emptyList()
         val out = ArrayList<City>()
         for (i in 0 until arr.length()) {
             val row = arr.optJSONObject(i) ?: continue
@@ -97,14 +79,23 @@ object ConsultantOnboarding {
             if (out.any { it.id == id }) continue
             out.add(City(id, label))
         }
-        return if (out.isEmpty()) phase1Cities else out
+        return out
+    }
+
+    /**
+     * apply / profile / documents / availability به CSRF نیاز ندارند.
+     * نشست همان کوکی vinor_session است.
+     */
+    fun requiresCsrf(path: String): Boolean {
+        val bare = path.trim().substringBefore('?').substringBefore('#')
+        return bare !in setOf(PATH_APPLY, PATH_PROFILE, PATH_DOCUMENTS, PATH_AVAILABILITY)
     }
 
     fun profileBody(
         nameRaw: String,
         cityId: String,
         specialties: Collection<String>,
-        cities: List<City> = phase1Cities,
+        cities: List<City>,
     ): Draft {
         val name = nameRaw.trim()
         if (name.length < MIN_NAME || name.length > MAX_NAME) {
@@ -150,25 +141,24 @@ object ConsultantOnboarding {
         return null
     }
 
+    /**
+     * next_step صفحه را انتخاب می‌کند.
+     * status تا تأیید واقعی ادمین pending می‌ماند و به‌تنهایی صفحهٔ بررسی را باز نمی‌کند.
+     * نکته‌ها فقط بعد از status=approved.
+     */
     fun resolveScreen(nextStep: String?, status: String?, slidesSeen: Boolean): Screen {
         val step = nextStep?.trim().orEmpty()
         val st = status?.trim().orEmpty()
         val approved = st == "approved"
-        if (approved && slidesSeen && (step.isEmpty() || step == "dashboard" || step == "status")) {
-            return Screen.DASHBOARD
-        }
-        if (approved && !slidesSeen && step != "profile" && step != "documents") {
-            return Screen.TIPS
-        }
         return when (step) {
             "profile" -> Screen.PROFILE
             "documents" -> Screen.DOCUMENTS
             "status" -> Screen.STATUS
-            "dashboard" -> if (slidesSeen) Screen.DASHBOARD else Screen.TIPS
-            else -> when (st) {
-                "pending_documents" -> Screen.DOCUMENTS
-                "pending", "rejected" -> Screen.STATUS
-                "approved" -> if (slidesSeen) Screen.DASHBOARD else Screen.TIPS
+            "dashboard" -> if (approved && !slidesSeen) Screen.TIPS else Screen.DASHBOARD
+            else -> when {
+                st == "rejected" -> Screen.STATUS
+                approved && !slidesSeen -> Screen.TIPS
+                approved -> Screen.DASHBOARD
                 else -> Screen.PROFILE
             }
         }
