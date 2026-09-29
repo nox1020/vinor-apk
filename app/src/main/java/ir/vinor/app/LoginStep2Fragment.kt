@@ -180,6 +180,9 @@ class LoginStep2Fragment : Fragment() {
                             host.requestNotificationPermission()
                             host.openPartnerHome()
                             host.consumePendingDeepLink()
+                            if (ConsultantResume.consume(host)) {
+                                host.openConsultantOnboarding()
+                            }
                             return@withContext
                         }
                         val nav = findNavController()

@@ -57,6 +57,14 @@ class NativePartnerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.nativeHeader.pageBack.setOnClickListener { goBack() }
         binding.nativeHeader.pageTitle.text = titleFor(page)
+        if (page == PAGE_APPLY) {
+            binding.root.post {
+                val act = activity as? MainActivity
+                if (!findNavController().popBackStack()) act?.openPartnerHome()
+                act?.openConsultantOnboarding()
+            }
+            return
+        }
         binding.nativeRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.nativeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.nativeRefresh.setOnRefreshListener { load(forceNet = true) }
@@ -304,14 +312,12 @@ class NativePartnerFragment : Fragment() {
         }
         val approved = obj.optBoolean("is_approved")
         val special = obj.optBoolean("is_special")
-        val logged = obj.optBoolean("logged_in")
         binding.nativeCta.isVisible = !approved || !special
-        binding.nativeCta.text = if (!approved) "بازاریاب شو" else "ملک من"
+        binding.nativeCta.text = if (!approved) ConsultantOnboarding.UI_LABEL else "ملک من"
         binding.nativeCta.setOnClickListener {
             val act = activity as? MainActivity ?: return@setOnClickListener
             when {
-                !approved && !logged -> act.openDrawer()
-                !approved -> act.openNativePage(PAGE_APPLY)
+                !approved -> act.openConsultantOnboarding()
                 else -> act.openMyProperty()
             }
         }
@@ -633,7 +639,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_SETTINGS -> "تنظیمات"
             PAGE_FAVORITES -> "نشان‌ها"
             PAGE_REQUESTS -> "پیگیری"
-            PAGE_APPLY -> "درخواست همکاری"
+            PAGE_APPLY -> ConsultantOnboarding.UI_LABEL
             PAGE_LISTINGS -> "ملک من"
             PAGE_TERMS -> "قوانین استفاده"
             PAGE_PRIVACY -> "حریم خصوصی"
