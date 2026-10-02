@@ -228,6 +228,35 @@ object PartnerApi {
         }
     }
 
+    fun patchJson(path: String, body: JSONObject, context: Context? = null): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است")
+        }
+        val req = requestBuilder(path, context)
+            .patch(body.toString().toRequestBody(jsonType))
+            .addHeader("Content-Type", "application/json; charset=utf-8")
+            .build()
+        return execute(req)
+    }
+
+    fun postMultipart(path: String, body: MultipartBody, context: Context? = null): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای ارسال مدارک اینترنت لازم است")
+        }
+        val req = requestBuilder(path, context).post(body).build()
+        return execute(req, uploadClient)
+    }
+
     fun postJson(path: String, body: JSONObject, context: Context? = null): JSONObject {
         val ctx = context ?: appCtx
         val url = absoluteUrl(path)

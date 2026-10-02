@@ -139,7 +139,7 @@
                         android:focusable="true"
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="10dp"
-                        android:text="درخواست همکاری"
+                        android:text="بازاریاب وینور"
                         android:textColor="#F9FAFB"
                         android:textSize="12sp" />
                 </LinearLayout>

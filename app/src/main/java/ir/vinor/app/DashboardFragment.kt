@@ -946,6 +946,8 @@ class DashboardFragment : Fragment() {
             when {
                 action == "open_customer_modal" -> openCustomer()
                 action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
+                href.contains("/apply") || href.contains("/thanks") ->
+                    (activity as? MainActivity)?.openConsultantOnboarding()
                 !PartnerApi.hasSession() || href.contains("login") || href.contains("menu=1") ->
                     (activity as? MainActivity)?.openDrawer()
                 href.isNotBlank() -> openVinorOrExternal(href)
@@ -987,6 +989,8 @@ class DashboardFragment : Fragment() {
             when {
                 action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
                 action == "open_customer_modal" -> openCustomer()
+                href.contains("/apply") || href.contains("/thanks") ->
+                    (activity as? MainActivity)?.openConsultantOnboarding()
                 href.isNotBlank() -> openVinorOrExternal(href)
                 else -> runPromptOr(prompt, fallbackAction)
             }

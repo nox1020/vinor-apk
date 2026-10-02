@@ -141,6 +141,12 @@
     </fragment>
 
     <fragment
+        android:id="@+id/consultantOnboardingFragment"
+        android:name="ir.vinor.app.ConsultantOnboardingFragment"
+        android:label="بازاریاب وینور"
+        tools:layout="@layout/fragment_consultant_onboarding" />
+
+    <fragment
         android:id="@+id/partnerPageFragment"
         android:name="ir.vinor.app.PartnerPageFragment"
         android:label="وینور"

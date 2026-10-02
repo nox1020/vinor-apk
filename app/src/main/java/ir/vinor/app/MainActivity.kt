@@ -265,6 +265,17 @@ class MainActivity : AppCompatActivity() {
         openNativePage(page, asTab = false)
     }
 
+    /** ورود موجود را دوباره استفاده می‌کند و فلو نیتیو مشاور را باز می‌کند. */
+    fun openConsultantOnboarding() {
+        if (!PartnerApi.hasSession()) {
+            ConsultantResume.arm(this)
+            openLogin()
+            return
+        }
+        if (navController.currentDestination?.id == R.id.consultantOnboardingFragment) return
+        navController.navigate(R.id.consultantOnboardingFragment)
+    }
+
     fun openSearch() {
         if (navController.currentDestination?.id == R.id.searchFragment) return
         navigateTab(R.id.searchFragment)
@@ -453,7 +464,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
-                openNativePage(NativePartnerFragment.PAGE_APPLY)
+                openConsultantOnboarding()
             low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
                 openNativePage(NativePartnerFragment.PAGE_TERMS)
             low == "/privacy" || low.contains("/legal/privacy") ->

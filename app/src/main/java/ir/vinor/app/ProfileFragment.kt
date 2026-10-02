@@ -206,7 +206,7 @@ class ProfileFragment : Fragment() {
         binding.profileLinks.removeAllViews()
         addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
         addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
-        addMenuRow("درخواست همکاری", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+        addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
         if (plusOn) addMenuRow("وینور پلاس", "دریافت اشتراک", R.drawable.ic_sparkle, "login")
         if (lawyerOn) addMenuRow("وکیل ملکی", "برای استفاده وارد شوید", R.drawable.ic_scale, "login")
     }
@@ -279,9 +279,9 @@ class ProfileFragment : Fragment() {
             addMenuRow("دعوت همکار", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
         } else {
             if (hasPendingApp) {
-                addMenuRow("وضعیت درخواست", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
+                addMenuRow("وضعیت بازاریاب وینور", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
             } else {
-                addMenuRow("درخواست همکاری", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+                addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
             }
             addMenuRow("دعوت دوستان", "", R.drawable.ic_share_nodes, "$BASE/express/partner/invite")
             addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")

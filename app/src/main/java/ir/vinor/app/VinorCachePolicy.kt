@@ -249,5 +249,6 @@ object VinorCachePolicy {
         "/ai/chat",
         "/api/profile/update",
         "/api/profile/avatar",
+        "/api/consultant",
     )
 }
