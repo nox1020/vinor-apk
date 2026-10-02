@@ -7,90 +7,188 @@
     android:orientation="vertical">
 
     <LinearLayout
+        android:id="@+id/searchHeader"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_search_field"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="4dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription=""
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_search_stroke"
+                android:tint="@color/vinor_text_muted" />
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="جستجو در آگهی‌ها"
+                android:fontFamily="@font/vazirmatn"
+                android:hint="جستجو در همه آگهی‌ها"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:textAlignment="viewStart"
+                android:textColor="@color/vinor_text"
+                android:textColorHint="@color/vinor_text_muted"
+                android:textDirection="rtl"
+                android:textSize="15sp" />
+
+            <ImageButton
+                android:id="@+id/searchClear"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="پاک کردن جستجو"
+                android:src="@drawable/ic_close"
+                android:tint="@color/vinor_text"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/searchCity"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_search_chip_state"
+                android:contentDescription="انتخاب شهر"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="10dp"
+                android:text="شهر ▾"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/searchChipScroll"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="12dp"
-        android:background="@drawable/bg_drawer_input"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="4dp">
+        android:overScrollMode="never"
+        android:scrollbars="none">
 
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:contentDescription=""
-            android:src="@drawable/ic_search_stroke"
-            android:tint="@color/vinor_text_muted" />
-
-        <EditText
-            android:id="@+id/searchInput"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:fontFamily="@font/vazirmatn"
-            android:hint="جستجو در آگهی‌ها"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:textAlignment="viewStart"
-            android:textColor="@color/vinor_text"
-            android:textColorHint="@color/vinor_text_muted"
-            android:textDirection="rtl"
-            android:textSize="15sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
 
-        <ImageButton
-            android:id="@+id/searchClear"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="پاک کردن"
-            android:src="@drawable/ic_close"
-            android:tint="@color/vinor_text"
-            android:visibility="gone" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/searchChipClear"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_search_chip_clear"
+                android:contentDescription="حذف فیلترها"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="حذف فیلترها ✕"
+                android:textColor="@color/vinor_text"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/searchChipSort"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_search_chip_state"
+                android:contentDescription="مرتب‌سازی، جدیدترین"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="جدیدترین ▾"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/searchChipDistrict"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_search_chip_state"
+                android:contentDescription="فیلتر محله"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="محله ▾"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/searchChipPrice"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_search_chip_state"
+                android:contentDescription="فیلتر قیمت"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="قیمت ▾"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/searchChipArea"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_search_chip_state"
+                android:contentDescription="فیلتر متراژ"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="متراژ ▾"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <View
+        android:id="@+id/searchHeaderBorder"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/vinor_border"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/searchCount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fontFamily="@font/vazirmatn"
-        android:paddingHorizontal="18dp"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:paddingHorizontal="16dp"
         android:paddingTop="8dp"
         android:paddingBottom="4dp"
         android:textColor="@color/vinor_text_muted"
         android:textSize="12sp"
         android:visibility="gone" />
 
-    <ProgressBar
-        android:id="@+id/searchProgress"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="18dp"
-        android:indeterminateTint="@color/vinor_text_muted"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/searchEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/vazirmatn"
-        android:gravity="center"
-        android:paddingHorizontal="24dp"
-        android:paddingTop="48dp"
-        android:text="ملکی برای نمایش نیست."
-        android:textColor="@color/vinor_text_muted"
-        android:textSize="14sp"
-        android:visibility="gone" />
-
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/searchRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="4dp"
         android:layout_weight="1">
 
         <ScrollView
@@ -101,12 +199,128 @@
             android:overScrollMode="never">
 
             <LinearLayout
-                android:id="@+id/searchList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:divider="@drawable/div_search_row"
-                android:orientation="vertical"
-                android:showDividers="middle" />
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/searchSkeleton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <include layout="@layout/item_search_skeleton" />
+
+                    <include layout="@layout/item_search_skeleton" />
+
+                    <include layout="@layout/item_search_skeleton" />
+
+                    <include layout="@layout/item_search_skeleton" />
+
+                    <include layout="@layout/item_search_skeleton" />
+
+                    <include layout="@layout/item_search_skeleton" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/searchEmptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="24dp"
+                    android:paddingTop="48dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:contentDescription=""
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_search_stroke"
+                        android:tint="@color/vinor_text_muted" />
+
+                    <TextView
+                        android:id="@+id/searchEmptyTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:text="فعلاً آگهی‌ای برای نمایش نیست"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/searchEmptySub"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:gravity="center"
+                        android:text="فیلترها را کمتر کنید یا محلهٔ دیگری را امتحان کنید"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/searchEmptyClear"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_search_apply"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:text="حذف فیلترها"
+                        android:textColor="@color/vinor_on_primary"
+                        android:textSize="15sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/searchErrorState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="24dp"
+                    android:paddingTop="48dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/searchErrorTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:text="اتصال برقرار نشد"
+                        android:textColor="@color/vinor_error"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/searchRetry"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_search_apply"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:text="تلاش دوباره"
+                        android:textColor="@color/vinor_on_primary"
+                        android:textSize="15sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/searchList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
         </ScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </LinearLayout>
