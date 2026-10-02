@@ -21,4 +21,8 @@
     <color name="vinor_offline_btn">#10B981</color>
     <color name="vinor_nav_selected">#FFFFFF</color>
     <color name="vinor_nav_unselected">#8E8E93</color>
+    <!-- Search page aliases. Hex values already listed in the locked search spec. -->
+    <color name="vinor_on_primary">#FFFFFF</color>
+    <color name="vinor_primary_pressed">#C91F1F</color>
+    <color name="vinor_error">#FB7185</color>
 </resources>
