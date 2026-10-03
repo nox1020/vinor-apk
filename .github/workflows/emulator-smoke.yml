@@ -1,0 +1,107 @@
+# Manual guest-mode screenshots of an already-built APK.
+# This is not a unit or instrumented test, and it does not build or publish a release.
+# workflow_dispatch only: GitHub will not run this file on push or pull_request,
+# and a dispatch is possible only after the file exists on the default branch.
+name: Emulator smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Actions run id that produced the APK
+        required: true
+        type: string
+      artifact_name:
+        description: APK artifact name (never an AAB)
+        required: false
+        default: vinor-direct-apk
+        type: string
+      api_level:
+        description: Emulator API level
+        required: false
+        default: "34"
+        type: string
+
+# contents: read — checkout this workflow and the smoke script.
+# actions: read — download an APK artifact uploaded by a different workflow run.
+# No repository secrets and no keystore.
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    name: Emulator smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SMOKE_OUT: ${{ github.workspace }}/smoke-out
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Validate inputs
+        id: cfg
+        env:
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          RUN_ID: ${{ inputs.run_id }}
+          API_LEVEL: ${{ inputs.api_level }}
+        run: bash scripts/smoke/emulator_smoke.sh validate-inputs
+
+      - name: Check smoke script
+        run: bash scripts/smoke/emulator_smoke.sh self-check
+
+      - name: Free disk space for the system image
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost || true
+          df -h
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ steps.cfg.outputs.artifact_name }}
+          run-id: ${{ steps.cfg.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: smoke-apk
+
+      - name: Select the APK
+        id: apk
+        env:
+          SMOKE_APK_DIR: ${{ github.workspace }}/smoke-apk
+        run: bash scripts/smoke/emulator_smoke.sh select-apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          fi
+
+      - name: Boot emulator and capture screens
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          SMOKE_APK: ${{ steps.apk.outputs.path }}
+          SMOKE_RUN_ID: ${{ steps.cfg.outputs.run_id }}
+          SMOKE_API_LEVEL: ${{ steps.cfg.outputs.api_level }}
+        with:
+          api-level: ${{ steps.cfg.outputs.api_level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          ram-size: 2048M
+          emulator-boot-timeout: 600
+          script: bash scripts/smoke/emulator_smoke.sh run
+
+      - name: Upload smoke output
+        if: always() && steps.cfg.outputs.run_id != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: emulator-smoke-${{ steps.cfg.outputs.run_id }}
+          path: smoke-out
+          if-no-files-found: warn
+          retention-days: 3
