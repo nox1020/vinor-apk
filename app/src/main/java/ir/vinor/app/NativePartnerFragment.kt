@@ -117,25 +117,16 @@ class NativePartnerFragment : Fragment() {
         val ctx = context ?: return
         val path = dataPath(page) ?: return bindEmpty("صفحه پیدا نشد.")
         scope.launch {
-            if (!forceNet) {
-                val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
-                if (_binding != null && cached != null) bindPayload(cached)
-                else if (_binding != null) binding.nativeProgress.isVisible = true
-                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) {
-                    if (_binding != null) {
-                        binding.nativeProgress.isVisible = false
-                        binding.nativeRefresh.isRefreshing = false
-                    }
-                    return@launch
-                }
+            val offline = !forceNet && VinorNetworkStatus.useCacheFirst(ctx)
+            if (!offline && _binding != null && binding.nativeList.childCount == 0) {
+                binding.nativeProgress.isVisible = true
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null) return@launch
                 val code = fresh.optInt("http_status")
-                if (code == 401 || fresh.optString("error") == "unauthorized") {
-                    bindEmpty("برای ادامه وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
+                if (PartnerApi.isSessionExpired(fresh) || code == 401 || fresh.optString("error") == "unauthorized") {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = fresh.optBoolean("session_expired"))
                     return@launch
                 }
                 if (code == 403) {
@@ -181,6 +172,10 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/favorites/cards", body, ctx)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
                 bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = "فایل نشان‌شده‌ای پیدا نشد.")
             } catch (e: Exception) {
                 if (_binding != null) bindEmpty(e.message ?: "خطای شبکه")
@@ -529,6 +524,10 @@ class NativePartnerFragment : Fragment() {
             try {
                 val resp = withContext(Dispatchers.IO) { PartnerApi.postJson(path, body, ctx) }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
                 if (resp.optBoolean("ok")) {
                     Toast.makeText(ctx, resp.optString("message").ifBlank { "ثبت شد." }, Toast.LENGTH_SHORT).show()
                     load(forceNet = true)
@@ -558,6 +557,10 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/apply/submit", body, requireContext())
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
                 if (resp.optBoolean("ok") || resp.optString("status") == "pending" || resp.optString("status") == "approved") {
                     bindApply(resp)
                     if (resp.optString("status") == "approved") {

@@ -169,9 +169,8 @@ class MyPropertyFormFragment : Fragment() {
                 val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null) return@launch
                 binding.mpFormProgress.isVisible = false
-                if (obj.optInt("http_status") == 401) {
-                    toast("برای ثبت ملک وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
+                if (PartnerApi.isSessionExpired(obj) || obj.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = obj.optBoolean("session_expired"))
                     return@launch
                 }
                 bindMeta(obj)
@@ -615,9 +614,8 @@ class MyPropertyFormFragment : Fragment() {
                     )
                 }
                 if (_binding == null) return@launch
-                if (obj.optInt("http_status") == 401) {
-                    toast("برای ثبت ملک وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
+                if (PartnerApi.isSessionExpired(obj) || obj.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = obj.optBoolean("session_expired"))
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {

@@ -52,6 +52,10 @@
         android:name="ir.vinor.app.LoginStep1Fragment"
         android:label="ورود"
         tools:layout="@layout/fragment_login_step1">
+        <argument
+            android:name="auth_reason"
+            app:argType="string"
+            android:defaultValue="" />
         <action
             android:id="@+id/action_loginStep1_to_loginStep2"
             app:destination="@id/loginStep2Fragment"

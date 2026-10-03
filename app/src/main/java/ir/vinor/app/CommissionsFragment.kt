@@ -129,6 +129,10 @@ class CommissionsFragment : Fragment() {
                     bindCommissionPayload(data)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(obj)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (!obj.optBoolean("success", false) && !obj.has("total_commission")) {
                     showError()
                 }

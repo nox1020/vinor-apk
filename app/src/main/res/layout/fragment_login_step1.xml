@@ -69,6 +69,16 @@
                 android:textColor="#A1A1AA"
                 android:textSize="14sp" />
 
+            <TextView
+                android:id="@+id/loginStep1ReauthHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/login_reauth_hint"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
             <EditText
                 android:id="@+id/loginStep1Phone"
                 android:layout_width="match_parent"

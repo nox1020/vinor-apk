@@ -124,6 +124,10 @@ class NotificationsFragment : Fragment() {
                     bind(items)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(obj)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (!obj.optBoolean("success", false) && obj.optJSONArray("notifications") == null) {
                     showError()
                 }

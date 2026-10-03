@@ -87,31 +87,25 @@ class MyPropertiesFragment : Fragment() {
 
     private fun load(forceNet: Boolean) {
         val ctx = context ?: return
+        if (forceNet) binding.mpRefresh.isRefreshing = true
         if (!PartnerApi.hasSession()) {
             binding.mpRefresh.isRefreshing = false
             Toast.makeText(ctx, "برای دیدن ملک من وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
         scope.launch {
-            if (!forceNet) {
-                val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(PATH, ctx) }
-                if (_binding != null && cached != null) bind(cached, fromNetwork = false)
-                else _binding?.mpRefresh?.isRefreshing = true
-                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }) {
-                    _binding?.mpRefresh?.isRefreshing = false
-                    return@launch
-                }
+            if (_binding != null && !binding.mpContent.isVisible) {
+                binding.mpRefresh.isRefreshing = true
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(PATH, ctx) }
                 if (_binding == null) return@launch
-                if (fresh.optInt("http_status") == 401) {
-                    Toast.makeText(ctx, "برای دیدن ملک من وارد شوید.", Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openDrawer()
+                if (PartnerApi.isSessionExpired(fresh) || fresh.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = fresh.optBoolean("session_expired"))
                     return@launch
                 }
-                bind(fresh, fromNetwork = true)
+                bind(fresh, fromNetwork = !fresh.optBoolean("from_cache"))
             } catch (e: Exception) {
                 if (_binding != null && !binding.mpContent.isVisible) {
                     Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()

@@ -91,6 +91,11 @@ class MainActivity : AppCompatActivity() {
         })
 
         handleDeepLink(intent)
+        PartnerApi.setSessionExpiredListener {
+            if (isFinishing || isDestroyed) return@setSessionExpiredListener
+            DashboardFragment.clearRememberedHome()
+            openLogin(sessionExpired = true)
+        }
         runCatching { VinorCacheSession.fingerprint(this) }
         runCatching { VinorApiCacheStore.warmup(this) }
         runCatching { VinorAppUpdateChecker.check(this, webView = null) }
@@ -116,6 +121,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        PartnerApi.setSessionExpiredListener(null)
         unregisterConnectivityCallback()
         notifyHelper?.destroy()
         super.onDestroy()
@@ -185,7 +191,7 @@ class MainActivity : AppCompatActivity() {
     fun isDrawerOpen(): Boolean = false
 
     fun openDrawer() {
-        openLogin()
+        openLogin(sessionExpired = false)
     }
 
     fun closeDrawer() {}
@@ -244,10 +250,105 @@ class MainActivity : AppCompatActivity() {
         return pending
     }
 
-    fun openLogin() {
-        if (navController.currentDestination?.id != R.id.loginStep1Fragment) {
-            navController.navigate(R.id.loginStep1Fragment)
+    fun openLogin(sessionExpired: Boolean = false) {
+        if (sessionExpired) captureAuthReturn()
+        val args = Bundle().apply {
+            if (sessionExpired) {
+                putString(LoginStep1Fragment.ARG_REASON, AuthReturnStore.REASON_SESSION_EXPIRED)
+            }
         }
+        val current = navController.currentDestination?.id
+        if (current == R.id.loginStep1Fragment) {
+            if (sessionExpired) findLoginStep1()?.showSessionExpiredHint()
+            return
+        }
+        navController.navigate(R.id.loginStep1Fragment, args)
+    }
+
+    /** بعد از ورود موفق؛ false یعنی مقصدی نبود. */
+    fun consumeAuthReturn(): Boolean {
+        val dest = AuthReturnStore.consume(this) ?: return false
+        if (!AuthReturnStore.isInternal(dest)) return false
+        return when (dest.kind) {
+            "home" -> {
+                openPartnerHome()
+                true
+            }
+            "chat" -> {
+                openVinorChat()
+                true
+            }
+            "search" -> {
+                openSearch()
+                true
+            }
+            "profile" -> {
+                openProfile()
+                true
+            }
+            "profile_edit" -> {
+                openProfileEdit()
+                true
+            }
+            "notifications" -> {
+                openNotifications()
+                true
+            }
+            "notes" -> {
+                if (navController.currentDestination?.id != R.id.notesFragment) {
+                    navController.navigate(R.id.notesFragment)
+                }
+                true
+            }
+            "commissions" -> {
+                if (navController.currentDestination?.id != R.id.commissionsFragment) {
+                    navController.navigate(R.id.commissionsFragment)
+                }
+                true
+            }
+            "routine" -> {
+                if (navController.currentDestination?.id != R.id.routineFragment) {
+                    navController.navigate(R.id.routineFragment)
+                }
+                true
+            }
+            "my_properties" -> {
+                openMyProperty()
+                true
+            }
+            "property_form" -> {
+                openMyPropertyForm(dest.param == "1")
+                true
+            }
+            "land" -> {
+                if (!AuthReturnStore.isSafeLandCode(dest.param)) false
+                else {
+                    openLand(dest.param)
+                    true
+                }
+            }
+            "native" -> {
+                if (!AuthReturnStore.isSafeNativePage(dest.param)) false
+                else {
+                    openNativePage(dest.param)
+                    true
+                }
+            }
+            "consultant" -> {
+                openConsultantOnboarding()
+                true
+            }
+            "partner" -> {
+                val path = AuthReturnStore.internalPartnerPath(dest.param) ?: return false
+                openPath(path)
+                true
+            }
+            else -> false
+        }
+    }
+
+    fun openMyPropertyForm(publicListing: Boolean) {
+        openListingCompose(publicListing)
     }
 
     fun openProfile() {
@@ -319,6 +420,58 @@ class MainActivity : AppCompatActivity() {
     private fun findDashboard(): DashboardFragment? {
         val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
         return host?.childFragmentManager?.primaryNavigationFragment as? DashboardFragment
+    }
+
+    private fun findLoginStep1(): LoginStep1Fragment? {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        return host?.childFragmentManager?.primaryNavigationFragment as? LoginStep1Fragment
+    }
+
+    private fun captureAuthReturn() {
+        val destId = runCatching { navController.currentDestination?.id }.getOrNull() ?: return
+        if (destId == R.id.loginStep1Fragment ||
+            destId == R.id.loginStep2Fragment ||
+            destId == R.id.loginWebFragment
+        ) {
+            return
+        }
+        val args = navController.currentBackStackEntry?.arguments
+        val dest = when (destId) {
+            R.id.dashboardFragment -> AuthReturnStore.Dest(
+                if (findDashboard()?.isChatOpen() == true) "chat" else "home",
+                "",
+            )
+            R.id.searchFragment -> AuthReturnStore.Dest("search", "")
+            R.id.profileFragment -> AuthReturnStore.Dest("profile", "")
+            R.id.profileEditFragment -> AuthReturnStore.Dest("profile_edit", "")
+            R.id.notificationsFragment -> AuthReturnStore.Dest("notifications", "")
+            R.id.notesFragment -> AuthReturnStore.Dest("notes", "")
+            R.id.commissionsFragment -> AuthReturnStore.Dest("commissions", "")
+            R.id.routineFragment -> AuthReturnStore.Dest("routine", "")
+            R.id.myPropertiesFragment -> AuthReturnStore.Dest("my_properties", "")
+            R.id.myPropertyFormFragment -> AuthReturnStore.Dest(
+                "property_form",
+                if (args?.getBoolean(MyPropertyFormFragment.ARG_PUBLIC) == true) "1" else "0",
+            )
+            R.id.landDetailFragment -> {
+                val code = args?.getString("code").orEmpty()
+                if (!AuthReturnStore.isSafeLandCode(code)) return
+                AuthReturnStore.Dest("land", code)
+            }
+            R.id.nativePartnerFragment -> {
+                val page = args?.getString(NativePartnerFragment.ARG_PAGE).orEmpty()
+                if (!AuthReturnStore.isSafeNativePage(page)) return
+                AuthReturnStore.Dest("native", page)
+            }
+            R.id.consultantOnboardingFragment -> AuthReturnStore.Dest("consultant", "")
+            R.id.partnerPageFragment -> {
+                val raw = args?.getString(PartnerPageFragment.ARG_URL).orEmpty()
+                val path = AuthReturnStore.internalPartnerPath(raw) ?: return
+                AuthReturnStore.Dest("partner", path)
+            }
+            else -> return
+        }
+        if (AuthReturnStore.isInternal(dest)) AuthReturnStore.save(this, dest)
     }
 
     private fun wireDivarTabbar() {
@@ -498,6 +651,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun logoutFromDrawer() {
+        DashboardFragment.clearRememberedHome()
         lifecycleScope.launch {
             VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
             try {

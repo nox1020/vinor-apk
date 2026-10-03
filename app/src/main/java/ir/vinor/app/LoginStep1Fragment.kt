@@ -28,6 +28,22 @@ class LoginStep1Fragment : Fragment() {
     companion object {
         private const val TAG = "LoginStep1"
         private const val API_LOGIN_REQUEST = "/express/partner/api/login-request"
+        const val ARG_REASON = "auth_reason"
+        const val REASON_SESSION_EXPIRED = AuthReturnStore.REASON_SESSION_EXPIRED
+    }
+
+    private fun bindReauthHint() {
+        val reason = arguments?.getString(ARG_REASON).orEmpty()
+        binding.loginStep1ReauthHint.visibility =
+            if (reason == REASON_SESSION_EXPIRED) View.VISIBLE else View.GONE
+    }
+
+    fun showSessionExpiredHint() {
+        if (_binding == null) return
+        arguments = (arguments ?: android.os.Bundle()).apply {
+            putString(ARG_REASON, REASON_SESSION_EXPIRED)
+        }
+        binding.loginStep1ReauthHint.visibility = View.VISIBLE
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -39,6 +55,7 @@ class LoginStep1Fragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.loginStep1Back.setOnClickListener { findNavController().navigateUp() }
         binding.loginStep1Submit.setOnClickListener { submitPhone() }
+        bindReauthHint()
         binding.loginStep1Phone.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT ||
                 actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
@@ -78,9 +95,9 @@ class LoginStep1Fragment : Fragment() {
                 val success = obj.optBoolean("success", false)
 
                 withContext(Dispatchers.Main) {
-                    binding.loginStep1Progress.visibility = View.GONE
-                    binding.loginStep1Submit.isEnabled = true
-                    if (_binding == null) return@withContext
+                    val b = _binding ?: return@withContext
+                    b.loginStep1Progress.visibility = View.GONE
+                    b.loginStep1Submit.isEnabled = true
                     if (success) {
                         if (isAdded) Toast.makeText(requireContext(), obj.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
                         val bundle = android.os.Bundle().apply { putString("phone", phone) }
@@ -98,19 +115,18 @@ class LoginStep1Fragment : Fragment() {
                             }
                         }
                     } else {
-                        binding.loginStep1Error.text = obj.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
-                        binding.loginStep1Error.visibility = View.VISIBLE
+                        b.loginStep1Error.text = obj.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
+                        b.loginStep1Error.visibility = View.VISIBLE
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "login-request error", e)
                 withContext(Dispatchers.Main) {
-                    binding.loginStep1Progress.visibility = View.GONE
-                    binding.loginStep1Submit.isEnabled = true
-                    if (_binding != null) {
-                        binding.loginStep1Error.text = "خطا در ارتباط. دوباره تلاش کنید."
-                        binding.loginStep1Error.visibility = View.VISIBLE
-                    }
+                    val b = _binding ?: return@withContext
+                    b.loginStep1Progress.visibility = View.GONE
+                    b.loginStep1Submit.isEnabled = true
+                    b.loginStep1Error.text = "خطا در ارتباط. دوباره تلاش کنید."
+                    b.loginStep1Error.visibility = View.VISIBLE
                 }
             }
         }

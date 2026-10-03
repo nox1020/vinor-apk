@@ -157,6 +157,10 @@ class ProfileEditFragment : Fragment() {
                     bindEditPayload(data)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(obj)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
                     binding.profileEditProgress.visibility = View.GONE
                     Toast.makeText(ctx, "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
