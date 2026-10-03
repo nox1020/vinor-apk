@@ -301,11 +301,24 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="$(head -n1 version.txt | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-          if [ -z "$VERSION" ]; then
-            echo "version.txt is empty; cannot derive version."
+          set -euo pipefail
+          STAMP="app/build/vinor-version-name.txt"
+          if [ ! -f "$STAMP" ]; then
+            echo "Missing $STAMP. Gradle records versionName there; version.txt is not the CI version."
             exit 1
           fi
+          VERSION="$(head -n1 "$STAMP" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ -z "$VERSION" ]; then
+            echo "$STAMP is empty; cannot name the APK."
+            exit 1
+          fi
+          case "$VERSION" in
+            1.0.*) ;;
+            *)
+              echo "versionName must stay 1.0.x so vinor-<version>.apk matches the in-app updater. Got: $VERSION"
+              exit 1
+              ;;
+          esac
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Rename APK to include version

@@ -13,47 +13,39 @@ if (hasGoogleServices) {
 import java.util.Properties
 import java.io.FileInputStream
 
-// Highest versionCode already shipped. version.txt 1.0.323 → 10323, and the
-// signed main build (Actions run 337) used max(10323, 337) = 10323.
-// vinor.ir still advertises 10322. GITHUB_RUN_NUMBER is only in the hundreds,
-// so it cannot be the versionCode by itself.
-def RELEASED_VERSION_CODE_FLOOR = 10323
+// Local builds keep main's published identity. CI adds the Actions run number
+// above 11000 so the code is always greater than 10325 (10323 shipped, 10324
+// and 10325 reserved by open PRs). versionName stays 1.0.x and matches
+// ApkVersionUtils.versionCodeFromName: 1.0.(versionCode - 10000).
+def LOCAL_VERSION_NAME = "1.0.323"
+def LOCAL_VERSION_CODE = 10323
+def CI_VERSION_CODE_BASE = 11000
+def MIN_CI_VERSION_CODE = 10325
 
-def readVersionName() {
-    def f = new File(rootDir, "version.txt")
-    if (!f.exists()) return "1.0.323"
-    def text = f.getText("UTF-8").trim()
-    return text ? text : "1.0.323"
-}
-
-def computeVersionCode(String ver) {
-    def parts = ver.split('\\.')
-    def major = parts.length > 0 ? parts[0].toInteger() : 0
-    def minor = parts.length > 1 ? parts[1].toInteger() : 0
-    def patch = parts.length > 2 ? parts[2].toInteger() : 0
-    // versionCode = major*10000 + minor*100 + patch (1.0.4 → 10004). Patch is not capped at 99.
-    return major * 10000 + minor * 100 + patch
-}
-
-def versionFileCode = computeVersionCode(readVersionName())
-def versionFloor = Math.max(RELEASED_VERSION_CODE_FLOOR, versionFileCode)
-def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")
-def ciRun = (ciRunStr != null && ciRunStr.trim().isInteger()) ? ciRunStr.trim().toInteger() : 0
-if (ciRun < 0) {
-    ciRun = 0
-}
-def resolvedVersionCode = versionFloor + ciRun
-// 1.0.PATCH stays aligned with ApkVersionUtils.versionCodeFromName.
-def resolvedVersionName = "1.0.${resolvedVersionCode - 10000}"
-if (ciRun > 0) {
-    def versionFile = new File(rootDir, "version.txt")
-    def current = versionFile.exists() ? versionFile.getText("UTF-8").replace("\r", "").trim() : ""
-    if (current != resolvedVersionName) {
-        versionFile.setText(resolvedVersionName + "\n", "UTF-8")
-        logger.lifecycle("Wrote version.txt ${resolvedVersionName} so the CI artifact name matches the APK")
+def ciRunRaw = System.getenv("GITHUB_RUN_NUMBER")
+def resolvedVersionName
+def resolvedVersionCode
+if (ciRunRaw != null && ciRunRaw.trim()) {
+    def ciRunText = ciRunRaw.trim()
+    if (!ciRunText.isInteger()) {
+        throw new GradleException("GITHUB_RUN_NUMBER is not an integer: '${ciRunText}'")
     }
+    long codeLong = CI_VERSION_CODE_BASE + ciRunText.toLong()
+    if (codeLong <= MIN_CI_VERSION_CODE || codeLong > Integer.MAX_VALUE) {
+        throw new GradleException(
+            "Refusing versionCode ${codeLong}: CI versionCode is ${CI_VERSION_CODE_BASE} + GITHUB_RUN_NUMBER and must be > ${MIN_CI_VERSION_CODE}."
+        )
+    }
+    resolvedVersionCode = (int) codeLong
+    resolvedVersionName = "1.0.${resolvedVersionCode - 10000}"
+} else {
+    resolvedVersionName = LOCAL_VERSION_NAME
+    resolvedVersionCode = LOCAL_VERSION_CODE
 }
-logger.lifecycle("Vinor versionName=${resolvedVersionName} versionCode=${resolvedVersionCode} floor=${versionFloor} run=${ciRun}")
+def versionStamp = new File(projectDir, "build/vinor-version-name.txt")
+versionStamp.parentFile.mkdirs()
+versionStamp.setText(resolvedVersionName + "\n", "UTF-8")
+logger.lifecycle("Vinor versionName=${resolvedVersionName} versionCode=${resolvedVersionCode}")
 
 // Prefer key.properties (runtime in CI); fallback to envs if needed
 def loadKeystoreProps() {
