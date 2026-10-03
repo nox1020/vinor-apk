@@ -25,4 +25,5 @@
     <color name="vinor_on_primary">#FFFFFF</color>
     <color name="vinor_primary_pressed">#C91F1F</color>
     <color name="vinor_error">#FB7185</color>
+    <color name="vinor_border_focus">#29FFFFFF</color>
 </resources>
