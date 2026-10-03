@@ -2,6 +2,7 @@ package ir.vinor.app
 
 import android.os.Bundle
 import android.util.Log
+import androidx.core.content.ContextCompat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -108,11 +109,14 @@ class CommissionsFragment : Fragment() {
         else -> "در انتظار"
     }
 
-    private fun statusColor(status: String): Int = when (status) {
-        "paid" -> 0xFF16a34a.toInt()
-        "approved" -> 0xFF2563EB.toInt()
-        "rejected" -> 0xFFDC2626.toInt()
-        else -> 0xFFD97706.toInt()
+    private fun statusColor(status: String): Int {
+        val color = when (status) {
+            "paid" -> R.color.vinor_accent_green
+            "approved" -> R.color.vinor_text
+            "rejected" -> R.color.vinor_error
+            else -> R.color.vinor_text_muted
+        }
+        return ContextCompat.getColor(requireContext(), color)
     }
 
     private fun loadData() {

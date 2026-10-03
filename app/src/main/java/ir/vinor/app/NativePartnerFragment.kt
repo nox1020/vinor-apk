@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -65,10 +66,17 @@ class NativePartnerFragment : Fragment() {
             }
             return
         }
-        binding.nativeRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
-        binding.nativeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
+        binding.nativeRefresh.setColorSchemeColors(
+            ContextCompat.getColor(requireContext(), R.color.vinor_primary_red),
+        )
+        binding.nativeRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(requireContext(), R.color.vinor_raised),
+        )
         binding.nativeRefresh.setOnRefreshListener { load(forceNet = true) }
         binding.nativeApplySubmit.setOnClickListener { submitApply() }
+        binding.nativeFavoritesCta.setOnClickListener {
+            (activity as? MainActivity)?.openSearch()
+        }
         binding.nativeInviteCopy.setOnClickListener { copyInvite() }
         binding.nativeInviteShare.setOnClickListener { shareInvite() }
         binding.nativeSearch.addTextChangedListener(object : TextWatcher {
@@ -93,6 +101,10 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun goBack() {
+        if (page == PAGE_SETTINGS || page == PAGE_FAVORITES) {
+            (activity as? MainActivity)?.returnToVinorMan() ?: findNavController().navigateUp()
+            return
+        }
         if (!findNavController().navigateUp()) {
             (activity as? MainActivity)?.openPartnerHome()
         }
@@ -143,11 +155,11 @@ class NativePartnerFragment : Fragment() {
                     return@launch
                 }
                 bindPayload(fresh)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 if (_binding != null && binding.nativeList.childCount == 0) {
-                    bindEmpty(e.message ?: "خطای شبکه")
-                } else {
-                    Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                    bindEmpty("اتصال برقرار نشد")
+                } else if (_binding != null) {
+                    Toast.makeText(requireContext(), "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
                 }
             } finally {
                 if (_binding != null) {
@@ -167,7 +179,7 @@ class NativePartnerFragment : Fragment() {
         }
         val codes = VinorFavoritesStore.codes(ctx)
         if (codes.isEmpty()) {
-            bindEmpty("هنوز فایلی نشان نکرده‌اید.")
+            bindEmpty(FAVORITES_EMPTY)
             binding.nativeRefresh.isRefreshing = false
             return
         }
@@ -181,9 +193,9 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/favorites/cards", body, ctx)
                 }
                 if (_binding == null) return@launch
-                bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = "فایل نشان‌شده‌ای پیدا نشد.")
-            } catch (e: Exception) {
-                if (_binding != null) bindEmpty(e.message ?: "خطای شبکه")
+                bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
+            } catch (_: Exception) {
+                if (_binding != null) bindEmpty("اتصال برقرار نشد")
             } finally {
                 if (_binding != null) {
                     binding.nativeProgress.isVisible = false
@@ -216,7 +228,11 @@ class NativePartnerFragment : Fragment() {
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
         addActionRow("ویرایش پروفایل") { (activity as? MainActivity)?.openProfileEdit() }
-        addActionRow("خروج", danger = true) { (activity as? MainActivity)?.logoutFromDrawer() }
+        addActionRow("خروج", danger = true) {
+            VinorLogoutSheet.show(this) { finish ->
+                (activity as? MainActivity)?.logoutFromDrawer(finish) ?: finish()
+            }
+        }
     }
 
     private fun bindNews(obj: JSONObject) {
@@ -408,9 +424,13 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindLandItems(items: JSONArray, emptyMsg: String) {
         hideSpecials()
-        binding.nativeEmpty.isVisible = items.length() == 0
-        binding.nativeEmpty.text = emptyMsg
         binding.nativeList.removeAllViews()
+        if (items.length() == 0) {
+            if (page == PAGE_FAVORITES) bindEmpty(FAVORITES_EMPTY) else bindEmpty(emptyMsg)
+            return
+        }
+        binding.nativeFavoritesEmpty.isVisible = false
+        binding.nativeEmpty.isVisible = false
         for (i in 0 until items.length()) {
             val land = items.optJSONObject(i) ?: continue
             val card = ItemLandCardBinding.inflate(layoutInflater, binding.nativeList, false)
@@ -439,7 +459,16 @@ class NativePartnerFragment : Fragment() {
             val id = tab.optString(idKey)
             val chip = TextView(requireContext()).apply {
                 text = tab.optString(titleKey)
-                setTextColor(Color.parseColor(if (id == activeTab || (activeTab.isBlank() && i == 0)) "#FFFFFF" else "#A1A1AA"))
+                setTextColor(
+                    ContextCompat.getColor(
+                        context,
+                        if (id == activeTab || (activeTab.isBlank() && i == 0)) {
+                            R.color.vinor_on_primary
+                        } else {
+                            R.color.vinor_text_muted
+                        },
+                    ),
+                )
                 textSize = 13f
                 setPadding(dp(14), dp(8), dp(14), dp(8))
                 setBackgroundResource(if (id == activeTab || (activeTab.isBlank() && i == 0)) R.drawable.bg_button_primary else R.drawable.bg_routine_card)
@@ -473,7 +502,12 @@ class NativePartnerFragment : Fragment() {
     private fun addActionRow(title: String, danger: Boolean = false, onClick: () -> Unit) {
         val row = TextView(requireContext()).apply {
             text = title
-            setTextColor(Color.parseColor(if (danger) "#FB7185" else "#FFFFFF"))
+            setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (danger) R.color.vinor_error else R.color.vinor_on_primary,
+                ),
+            )
             textSize = 15f
             setPadding(dp(16), dp(16), dp(16), dp(16))
             setBackgroundResource(R.drawable.bg_routine_card)
@@ -535,8 +569,8 @@ class NativePartnerFragment : Fragment() {
                 } else {
                     Toast.makeText(ctx, resp.optString("error").ifBlank { "ناموفق بود." }, Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(ctx, "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -566,8 +600,8 @@ class NativePartnerFragment : Fragment() {
                 } else {
                     Toast.makeText(requireContext(), resp.optString("error").ifBlank { "ثبت ناموفق بود." }, Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
             } finally {
                 if (_binding != null) binding.nativeApplySubmit.isEnabled = true
             }
@@ -593,6 +627,7 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun hideSpecials() {
+        binding.nativeFavoritesEmpty.isVisible = false
         binding.nativeApplyForm.isVisible = false
         binding.nativeInviteBox.isVisible = false
         binding.nativeLeadBox.isVisible = false
@@ -609,10 +644,16 @@ class NativePartnerFragment : Fragment() {
     private fun bindEmpty(msg: String) {
         hideSpecials()
         binding.nativeList.removeAllViews()
-        binding.nativeEmpty.isVisible = true
-        binding.nativeEmpty.text = msg
         binding.nativeProgress.isVisible = false
         binding.nativeRefresh.isRefreshing = false
+        if (page == PAGE_FAVORITES && msg == FAVORITES_EMPTY) {
+            binding.nativeEmpty.isVisible = false
+            binding.nativeFavoritesEmpty.isVisible = true
+            return
+        }
+        binding.nativeFavoritesEmpty.isVisible = false
+        binding.nativeEmpty.isVisible = true
+        binding.nativeEmpty.text = msg
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -637,7 +678,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_LEVELS -> "سطوح همکاری"
             PAGE_INVITE -> "دعوت"
             PAGE_SETTINGS -> "تنظیمات"
-            PAGE_FAVORITES -> "نشان‌ها"
+            PAGE_FAVORITES -> "نشان‌شده‌ها"
             PAGE_REQUESTS -> "پیگیری"
             PAGE_APPLY -> ConsultantOnboarding.UI_LABEL
             PAGE_LISTINGS -> "ملک من"
@@ -658,5 +699,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_PRIVACY -> "/express/partner/api/legal/data?doc=privacy"
             else -> null
         }
+
+        private const val FAVORITES_EMPTY = "هنوز آگهی‌ای نشان نکرده‌اید"
     }
 }

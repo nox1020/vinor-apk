@@ -2,16 +2,15 @@ package ir.vinor.app
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.Typeface
+import androidx.core.content.ContextCompat
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -137,13 +136,15 @@ class MainActivity : AppCompatActivity() {
         val dest = runCatching { navController.currentDestination?.id }.getOrNull()
         val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         val searchOn = dest == R.id.searchFragment
-        val postOn = dest == R.id.myPropertyFormFragment || dest == R.id.myPropertiesFragment
+        val postOn = dest == R.id.myPropertyFormFragment
         val meOn = dest == R.id.profileFragment ||
             dest == R.id.commissionsFragment ||
             dest == R.id.routineFragment ||
             dest == R.id.notesFragment ||
             dest == R.id.notificationsFragment ||
-            dest == R.id.nativePartnerFragment
+            dest == R.id.nativePartnerFragment ||
+            dest == R.id.myPropertiesFragment ||
+            dest == R.id.consultantOnboardingFragment
         val adsOn = dest == R.id.dashboardFragment && !chatOn
         paintTab(
             binding.divarTabbar.tabAdsIcon,
@@ -381,7 +382,10 @@ class MainActivity : AppCompatActivity() {
         fill: Int,
     ) {
         icon.setImageResource(if (on) fill else outline)
-        val c = Color.parseColor(if (on) "#4ADE80" else "#A3A3A3")
+        val c = ContextCompat.getColor(
+            this,
+            if (on) R.color.vinor_nav_selected else R.color.vinor_nav_unselected,
+        )
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
         label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
@@ -394,7 +398,18 @@ class MainActivity : AppCompatActivity() {
 
     fun openMyProperty() {
         if (navController.currentDestination?.id == R.id.myPropertiesFragment) return
+        if (navController.currentDestination?.id == R.id.profileFragment) {
+            navController.navigate(R.id.myPropertiesFragment)
+            return
+        }
         navigateTab(R.id.myPropertiesFragment)
+    }
+
+    /** بازگشت هدر تنظیمات، نشان‌شده‌ها و آگهی‌های من به تب وینور من. */
+    fun returnToVinorMan() {
+        if (!navController.popBackStack(R.id.profileFragment, false)) {
+            openProfile()
+        }
     }
 
     fun openOwnerHomeForm() {
@@ -434,6 +449,7 @@ class MainActivity : AppCompatActivity() {
                 when {
                     !land.isNullOrBlank() -> openLand(land)
                     !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    uri.getQueryParameter("ai") == "1" -> openVinorChat()
                     else -> openPartnerHome()
                 }
             }
@@ -463,7 +479,8 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.myPropertiesFragment)
                 }
             }
-            low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
+            low.endsWith("/consultant") || low.contains("/consultant/") ||
+                low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
                 openConsultantOnboarding()
             low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
                 openNativePage(NativePartnerFragment.PAGE_TERMS)
@@ -493,23 +510,21 @@ class MainActivity : AppCompatActivity() {
 
     fun consumePendingDeepLink(): Boolean {
         val pending = DeepLinkPendingStore.consume(this) ?: return false
+        if (VinorManMenu.isSafeInternalPath(pending)) {
+            openPath(pending)
+            return true
+        }
         handleDeepLink(Intent(Intent.ACTION_VIEW, Uri.parse(pending)))
         return true
     }
 
-    fun logoutFromDrawer() {
-        lifecycleScope.launch {
-            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
+    fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
+        VinorSessionLogout.perform(this, lifecycleScope) {
             try {
-                withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/api/logout", JSONObject(), this@MainActivity)
-                }
-            } catch (_: Exception) {
-            }
-            PartnerApi.clearCookies {
-                Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
                 refreshPartnerFlags()
                 openPartnerHome()
+            } finally {
+                onFinished?.invoke()
             }
         }
     }
