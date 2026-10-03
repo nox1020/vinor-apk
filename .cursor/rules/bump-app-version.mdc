@@ -1,25 +1,26 @@
 ---
-description: هر تغییر محصول باید نسخه اپ و وب را یک پله بالا ببرد
+description: PR فیچر version.txt را عوض نمی‌کند؛ نسخه از CI می‌آید
 alwaysApply: true
 ---
 
-# بالا بردن نسخه در هر تغییر
+# نسخه از CI، نه bump در هر PR
 
-نسخه بخشی از همان تغییر است، نه کار بعدی.
+PR فیچر هرگز `version.txt` را بالا نمی‌برد. `versionCode` و `versionName` از CI می‌آیند. این قاعده bump اجباریِ هر تغییر را برمی‌دارد.
 
-## اپ (`apk/version.txt`)
+عامل‌ها برای شماره نسخه `version.txt`، `app/build.gradle` و `.github/workflows/android.yml` را ویرایش نمی‌کنند. تغییر Gradle (اشتقاق نسخه از `GITHUB_RUN_NUMBER` با offset) و job خلاصهٔ `android-ci-ok` مال PR بک‌اند است.
 
-فرمت `MAJOR.MINOR.PATCH` مثل `1.0.308`.
-اگر فایل محصول اپ عوض شد (کد، قالب، منبع، ناوبری)، PATCH را یکی زیاد کن و در **همان commit** بگذار.
-`versionCode` از همین نام در `app/build.gradle` ساخته می‌شود؛ جدا ننویس.
+## چه چیزی امروز `version.txt` را می‌خواند
 
-## وب (`vinor/version.txt`)
+این‌ها را در PR فیچر عوض نکن؛ فقط بدان انتشار از کجا شماره می‌گیرد:
 
-یک عدد صحیح مثل `205`.
-اگر فایل محصول وب عوض شد، همان عدد را یکی زیاد کن و در **همان commit** بگذار.
+- `app/build.gradle` — `readVersionName()` کل `version.txt` را به‌عنوان `versionName` می‌خواند. `computeVersionCode()` از همان نام کد پایه را می‌سازد: `major * 10000 + minor * 100 + patch` (مثلاً `1.0.4` → `10004`). اگر `GITHUB_RUN_NUMBER` عدد باشد، `versionCode` برابر `max(baseCode, GITHUB_RUN_NUMBER)` است.
+- `.github/workflows/android.yml` — push به `main` مسیر `version.txt` را هم تریگر می‌کند؛ فیلتر `release` شامل `version.txt` است؛ گام نام APK/AAB خط اول `version.txt` را می‌خواند. این ورک‌فلو را اینجا دست نزن.
+- `app/src/main/java/ir/vinor/app/ApkVersionUtils.kt` خودِ فایل را نمی‌خواند؛ همان فرمول را روی رشتهٔ نسخه اعمال می‌کند. تست متناظر: `ApkVersionUtilsTest.kt`.
 
-## استثنا
+## انتشار
 
-فقط وقتی نسخه را دست نزن که تغییر صرفاً `.cursor/`، سند، یا پیام CI بدون تغییر رفتار کاربر باشد.
-اگر هر دو ریپو در یک نوبت عوض شدند، هر دو `version.txt` را بالا ببر.
-از `vinor_push.bat` و force-push استفاده نکن.
+نسخهٔ نصب‌شده را CI می‌سازد (`GITHUB_RUN_NUMBER` با offset، بعد از رسیدن تغییر Gradle به `main`). PR فیچر برای انتشار `version.txt` را عوض نمی‌کند و PR جداگانه‌ای فقط برای bump باز نمی‌کند.
+
+اگر نگهدارنده صریحاً یک رشتهٔ نام‌گذاری‌شده خواست، همان استثنا در یک PR مخصوص انتشار است: فقط `version.txt` در ریشه با قالب `MAJOR.MINOR.PATCH`، بدون قاطی شدن با کار فیچر، و merge فقط squash توسط عامل CI/CD. تا آن درخواست صریح نرسیده، هیچ bump دستی لازم نیست و انتشار با شمارهٔ CI ادامه دارد.
+
+`vinor/version.txt` در ریپوی وب است و این قاعده bump آن را از روی PR فیچر اپ الزام نمی‌کند.
