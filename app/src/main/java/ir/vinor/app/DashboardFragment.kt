@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -14,10 +13,8 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -27,7 +24,6 @@ import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentDashboardBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
-import ir.vinor.app.databinding.ItemHomeAdBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +50,6 @@ class DashboardFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
-    private var lastAdsKey = ""
     private var isApproved = false
     private var pendingAttachment: JSONObject? = null
     private var attachUploading = false
@@ -64,7 +59,6 @@ class DashboardFragment : Fragment() {
     private var wantChatLayer = false
     private var chatBindGen = 0
     private var boundMessageCount = 0
-    private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
     }
@@ -120,7 +114,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutFiles.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/my-property")
         }
-        binding.dashboardSeeAll.setOnClickListener { (activity as? MainActivity)?.openSearch() }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
@@ -143,7 +136,6 @@ class DashboardFragment : Fragment() {
                 true
             } else false
         }
-        binding.dashboardScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
         syncSendEnabled()
         syncComposerVisible()
         paintRememberedHome()
@@ -154,7 +146,6 @@ class DashboardFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        runCatching { binding.dashboardScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -229,7 +220,6 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         b.dashboardHomeHeader.isVisible = false
         b.dashboardEmpty.isVisible = false
-        b.dashboardAdsScroll.isVisible = false
         b.dashboardHeader.isVisible = true
     }
 
@@ -554,7 +544,7 @@ class DashboardFragment : Fragment() {
             if (wantChatLayer) bindChat(JSONObject())
         }
         scope.launch {
-            var shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
+            var shownCache = binding.dashboardEmpty.isVisible
             if (!fromPull) {
                 val cached = withContext(Dispatchers.IO) {
                     PartnerApi.peekJson("/express/partner/home/data", ctx)
@@ -576,7 +566,7 @@ class DashboardFragment : Fragment() {
                     binding.dashboardProgress.isVisible = true
                 }
             } else {
-                shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
+                shownCache = binding.dashboardEmpty.isVisible
                 if (!wantChatLayer) binding.dashboardProgress.isVisible = false
             }
             var home = JSONObject()
@@ -640,8 +630,6 @@ class DashboardFragment : Fragment() {
         b.dashboardHeader.isVisible = false
         b.dashboardHomeHeader.isVisible = true
         b.dashboardEmpty.isVisible = true
-        b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
-        b.dashboardFilesHead.isVisible = b.dashboardAds.childCount > 0
         hideKeyboard()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
@@ -717,23 +705,8 @@ class DashboardFragment : Fragment() {
     private fun bindHome(obj: JSONObject) {
         isApproved = obj.optBoolean("is_approved")
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
-        val adsKey = adsFingerprint(ads)
-        val sameCards = adsKey.isNotEmpty() &&
-            adsKey == lastAdsKey &&
-            binding.dashboardAds.childCount == ads.length()
-        val showCarousel = ads.length() > 0
-        if (!sameCards) {
-            lastAdsKey = adsKey
-            binding.dashboardAds.removeAllViews()
-            for (i in 0 until ads.length()) {
-                val ad = ads.optJSONObject(i) ?: continue
-                binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
-            }
-        }
         rememberHome(obj)
         if (isChatOpen()) {
-            binding.dashboardAdsScroll.isVisible = false
-            binding.dashboardFilesHead.isVisible = false
             binding.dashboardEmpty.isVisible = false
             binding.dashboardHeader.isVisible = true
             binding.dashboardHomeHeader.isVisible = false
@@ -741,16 +714,6 @@ class DashboardFragment : Fragment() {
             binding.dashboardHeader.isVisible = false
             binding.dashboardHomeHeader.isVisible = true
             binding.dashboardEmpty.isVisible = true
-            binding.dashboardAdsScroll.isVisible = showCarousel
-            binding.dashboardFilesHead.isVisible = showCarousel
-            if (showCarousel && !sameCards) {
-                binding.dashboardAds.post {
-                    if (_binding == null) return@post
-                    bindVisibleCarouselImages()
-                }
-            } else if (showCarousel) {
-                bindVisibleCarouselImages()
-            }
         }
 
         val name = obj.optString("me_name")
@@ -788,15 +751,6 @@ class DashboardFragment : Fragment() {
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         bindPrompts(obj, adsCount, reqCount)
         binding.dashboardTiles.isVisible = false
-        val imageUrls = mutableListOf<String>()
-        for (i in 0 until ads.length()) {
-            val url = ads.optJSONObject(i)?.optString("image_url").orEmpty()
-            if (url.isNotBlank()) imageUrls.add(url)
-        }
-        val ctx = context
-        if (ctx != null && imageUrls.isNotEmpty()) {
-            PartnerImages.prefetch(scope, ctx, imageUrls)
-        }
     }
 
     private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {
@@ -1004,56 +958,6 @@ class DashboardFragment : Fragment() {
         return "رشد این ماه\n$sign$body٪"
     }
 
-    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
-        val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
-        val lp = (card.root.layoutParams as? ViewGroup.MarginLayoutParams)
-            ?: LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-        lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-        lp.marginEnd = 0
-        card.root.layoutParams = lp
-        card.homeAdTitle.text = ad.optString("title")
-        val price = ad.optString("price")
-        card.homeAdPrice.isVisible = price.isNotBlank()
-        card.homeAdPrice.text = if (price.isBlank()) "" else "قیمت کل $price"
-        val loc = ad.optString("location")
-        card.homeAdLoc.isVisible = loc.isNotBlank()
-        card.homeAdLoc.text = loc
-        val listed = ad.optString("listed_label")
-        card.homeAdWhen.isVisible = listed.isNotBlank()
-        card.homeAdWhen.text = listed
-        val facts = ad.optJSONArray("facts")
-        val factLine = buildString {
-            if (facts != null) {
-                for (i in 0 until facts.length()) {
-                    val bit = facts.optString(i)
-                    if (bit.isBlank()) continue
-                    if (isNotEmpty()) append(" · ")
-                    append(bit)
-                }
-            }
-        }.ifBlank { ad.optString("area") }
-        card.homeAdArea.isVisible = factLine.isNotBlank()
-        card.homeAdArea.text = factLine
-        card.homeAdIntro.isVisible = isApproved
-        card.homeAdCall.setOnClickListener { openAd(ad) }
-        card.homeAdIntro.setOnClickListener { openCustomer() }
-        val shots = ad.optInt("image_count")
-        card.homeAdShots.isVisible = shots > 1
-        if (shots > 1) card.homeAdShotsText.text = PartnerFormat.toman(shots)
-        val comm = ad.optInt("commission_amount")
-        card.homeAdComm.isVisible = isApproved && comm > 0
-        if (isApproved && comm > 0) {
-            card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
-        }
-        PartnerImages.roundClip(card.homeAdImage, 12f)
-        card.homeAdImage.tag = ad.optString("image_url")
-        card.root.setOnClickListener { openAd(ad) }
-        return card
-    }
-
     private fun openVinorOrExternal(raw: String) {
         val abs = PartnerImages.resolve(raw)
         val uri = Uri.parse(abs)
@@ -1065,50 +969,12 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun openAd(ad: JSONObject) {
-        val token = ad.optString("token")
-        val source = ad.optString("source")
-        val url = ad.optString("url")
-        when {
-            source == "vinor" && token.isNotBlank() -> (activity as? MainActivity)?.openLand(token)
-            source == "divar" && token.isNotBlank() ->
-                (activity as? MainActivity)?.openLand("divar:$token")
-            url.isNotBlank() -> openVinorOrExternal(url)
-        }
-    }
-
     private fun rememberHome(obj: JSONObject) {
         val ads = obj.optJSONArray("divar_pro_ads")?.length() ?: 0
         val prompts = obj.optJSONArray("ai_quick_prompts")?.length() ?: 0
         if (obj.optBoolean("offline") && ads == 0) return
         if (!obj.has("is_approved") && ads == 0 && prompts == 0 && obj.optString("me_name").isBlank()) return
         rememberedHome = JSONObject(obj.toString())
-    }
-
-    private fun bindVisibleCarouselImages() {
-        val b = _binding ?: return
-        bindVisibleRowImages(b.dashboardScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
-    }
-
-    private fun bindVisibleRowImages(
-        host: View,
-        row: ViewGroup,
-        imageOf: (View) -> ImageView?,
-    ) {
-        val extra = (80 * resources.displayMetrics.density).toInt()
-        val vis = Rect()
-        if (!host.getGlobalVisibleRect(vis)) return
-        vis.inset(-extra, -extra)
-        val childBox = Rect()
-        for (i in 0 until row.childCount) {
-            val child = row.getChildAt(i)
-            val img = imageOf(child) ?: continue
-            if (img.getTag(R.id.homeAdImage) == true) continue
-            if (!child.getGlobalVisibleRect(childBox)) continue
-            if (!Rect.intersects(vis, childBox)) continue
-            img.setTag(R.id.homeAdImage, true)
-            PartnerImages.bind(scope, img, img.tag as? String)
-        }
     }
 
     private fun bindChat(obj: JSONObject) {
@@ -1174,17 +1040,6 @@ class DashboardFragment : Fragment() {
             VinorLandCardCache.put(code, land)
         } catch (_: Exception) {
         }
-    }
-
-    private fun adsFingerprint(ads: JSONArray): String {
-        val b = StringBuilder(ads.length() * 24)
-        for (i in 0 until ads.length()) {
-            val ad = ads.optJSONObject(i) ?: continue
-            b.append(ad.optString("token")).append('\u0001')
-                .append(ad.optString("image_url")).append('\u0001')
-                .append(ad.optString("price")).append('\u0002')
-        }
-        return b.toString()
     }
 
     private fun renderMessages(messages: JSONArray) {
