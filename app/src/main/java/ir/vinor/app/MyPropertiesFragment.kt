@@ -49,10 +49,12 @@ class MyPropertiesFragment : Fragment() {
         }
         val add = ImageButton(requireContext()).apply {
             setImageResource(R.drawable.ic_add)
-            setBackgroundResource(R.drawable.bg_header_orb)
-            imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#ECECEC"))
+            background = null
+            imageTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(context, R.color.vinor_text),
+            )
             contentDescription = "ثبت ملک"
-            setPadding(dp(11), dp(11), dp(11), dp(11))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             setOnClickListener { (activity as? MainActivity)?.openOwnerHomeForm() }
         }

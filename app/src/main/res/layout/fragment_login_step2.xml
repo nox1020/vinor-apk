@@ -1,41 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#050A0E"
+    android:background="@color/vinor_bg"
     android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp">
+        android:minHeight="56dp"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="8dp">
 
         <ImageButton
             android:id="@+id/loginStep2Back"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_menu_orb"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="بازگشت"
-            android:padding="10dp"
-            android:src="@drawable/ic_close" />
+            android:padding="12dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/vinor_text" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:gravity="center"
             android:text="تأیید کد پیامکی"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:textColor="@color/vinor_text"
+            android:textSize="17sp"
             android:textStyle="bold" />
-
-        <View
-            android:layout_width="40dp"
-            android:layout_height="40dp" />
     </LinearLayout>
 
     <ScrollView
@@ -55,7 +53,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="کد ۵ رقمی را وارد کنید"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/vinor_text"
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
@@ -64,7 +62,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textColor="#A1A1AA"
+                android:textColor="@color/vinor_text_muted"
                 android:textSize="14sp" />
 
             <EditText
@@ -80,8 +78,8 @@
                 android:inputType="number"
                 android:letterSpacing="0.28"
                 android:maxLength="5"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#52525B"
+                android:textColor="@color/vinor_text"
+                android:textColorHint="@color/vinor_text_muted"
                 android:textSize="22sp" />
 
             <TextView
@@ -89,7 +87,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:textColor="#F87171"
+                android:textColor="@color/vinor_error"
                 android:textSize="13sp"
                 android:visibility="gone" />
 
@@ -108,7 +106,7 @@
                 android:layout_gravity="center"
                 android:layout_marginTop="20dp"
                 android:text="ارسال مجدد کد تا ۶۰ ثانیه دیگر"
-                android:textColor="#A1A1AA"
+                android:textColor="@color/vinor_text_muted"
                 android:textSize="12sp" />
 
             <TextView
@@ -121,7 +119,7 @@
                 android:focusable="true"
                 android:padding="8dp"
                 android:text="ارسال مجدد کد"
-                android:textColor="#34D399"
+                android:textColor="@color/vinor_accent_green"
                 android:textSize="13sp" />
         </LinearLayout>
     </ScrollView>
@@ -132,12 +130,12 @@
         android:layout_height="52dp"
         android:layout_marginHorizontal="20dp"
         android:layout_marginBottom="16dp"
-        android:background="@drawable/bg_auth_btn"
+        android:background="@drawable/bg_hub_start"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center"
         android:text="ورود به پنل"
-        android:textColor="#FFFFFF"
+        android:textColor="#052E16"
         android:textSize="16sp"
         android:textStyle="bold" />
 </LinearLayout>

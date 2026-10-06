@@ -1,92 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/vinor_bg_dark"
-    android:layoutDirection="rtl">
+    android:background="@color/vinor_bg"
+    android:layoutDirection="rtl"
+    android:orientation="vertical">
 
-    <!-- نوار بالا -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
+        android:minHeight="56dp"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="8dp">
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="8dp">
 
         <ImageButton
             android:id="@+id/notesBack"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@drawable/bg_header_orb"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="بازگشت"
-            android:padding="11dp"
+            android:padding="12dp"
             android:src="@drawable/ic_chevron_right"
-            android:tint="#ECECEC" />
+            app:tint="@color/vinor_text" />
 
         <TextView
             android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_marginHorizontal="8dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_header_title_pill"
-            android:gravity="center"
             android:text="یادداشت‌های من"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textColor="@color/vinor_text"
+            android:textSize="17sp"
             android:textStyle="bold" />
-
-        <View
-            android:layout_width="42dp"
-            android:layout_height="42dp" />
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/vinor_border" />
 
     <ProgressBar
         android:id="@+id/notesProgress"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="12dp"
         android:visibility="gone" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="8dp">
 
-            <!-- حالت خالی -->
-            <FrameLayout
+            <TextView
                 android:id="@+id/notesEmpty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:background="@drawable/bg_routine_card"
-                android:padding="24dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="یادداشتی ثبت نشده است."
-                        android:textColor="#F9FAFB"
-                        android:textSize="13sp" />
-                </LinearLayout>
-            </FrameLayout>
+                android:gravity="center"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="32dp"
+                android:text="یادداشتی ثبت نشده است."
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="15sp"
+                android:visibility="gone" />
 
-            <!-- لیست یادداشت‌ها -->
             <LinearLayout
                 android:id="@+id/notesList"
                 android:layout_width="match_parent"
@@ -95,48 +84,50 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- فرم افزودن یادداشت -->
-    <FrameLayout
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/vinor_border" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/vinor_bg_dark"
-        android:padding="12dp">
+        android:background="@color/vinor_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <EditText
+            android:id="@+id/notesInput"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:background="@drawable/bg_routine_card"
+            android:hint="یادداشت جدید..."
+            android:maxLines="4"
+            android:minHeight="48dp"
+            android:minLines="1"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="12dp"
+            android:textColor="@color/vinor_text"
+            android:textColorHint="@color/vinor_text_muted"
+            android:textSize="15sp" />
 
-            <EditText
-                android:id="@+id/notesInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_routine_card"
-                android:hint="یادداشت جدید..."
-                android:maxLines="4"
-                android:minLines="1"
-                android:padding="10dp"
-                android:textColor="#F9FAFB"
-                android:textColorHint="#6B7280"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/notesAdd"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/bg_button_primary"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="10dp"
-                android:text="افزودن"
-                android:textColor="#F9FAFB"
-                android:textSize="13sp" />
-        </LinearLayout>
-    </FrameLayout>
-
+        <TextView
+            android:id="@+id/notesAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_hub_start"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="44dp"
+            android:paddingHorizontal="16dp"
+            android:text="افزودن"
+            android:textColor="#052E16"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 </LinearLayout>
-

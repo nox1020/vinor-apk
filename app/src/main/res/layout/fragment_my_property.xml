@@ -36,7 +36,7 @@
                     android:layout_height="48dp"
                     android:contentDescription=""
                     android:src="@drawable/ic_home"
-                    android:tint="#10B981" />
+                    android:tint="@color/vinor_accent_green" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -45,8 +45,8 @@
                     android:fontFamily="@font/vazirmatn"
                     android:gravity="center"
                     android:text="ملک شما هنوز ثبت نشده"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -56,18 +56,18 @@
                     android:gravity="center"
                     android:text="ملک را ثبت کنید؛ بعد از ثبت می‌توانید برای فروش منتشر کنید."
                     android:textColor="@color/vinor_text_muted"
-                    android:textSize="12sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/mpEmptyCta"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_mp_submit"
+                    android:background="@drawable/bg_hub_start"
                     android:gravity="center"
                     android:text="ثبت ملک من"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:textColor="#052E16"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
