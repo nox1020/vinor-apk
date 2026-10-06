@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="300dp"
+    android:layout_width="280dp"
     android:layout_height="wrap_content"
-    android:layout_marginEnd="10dp"
+    android:layout_marginEnd="8dp"
     android:background="@drawable/bg_hub_card"
+    android:baselineAligned="false"
     android:clickable="true"
     android:focusable="true"
-    android:orientation="vertical">
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="6dp">
 
     <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="148dp">
+        android:layout_width="92dp"
+        android:layout_height="92dp">
 
         <ImageView
             android:id="@+id/homeAdImage"
@@ -24,49 +27,49 @@
             android:id="@+id/homeAdWhen"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
-            android:layout_margin="8dp"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="3dp"
             android:background="@drawable/bg_loc_chip"
             android:ellipsize="end"
             android:maxLines="1"
-            android:maxWidth="120dp"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="3dp"
+            android:maxWidth="56dp"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="1dp"
             android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:textSize="8sp"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/homeAdLoc"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top|end"
-            android:layout_margin="8dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="3dp"
             android:background="@drawable/bg_loc_chip"
             android:ellipsize="end"
             android:maxLines="1"
-            android:maxWidth="180dp"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="3dp"
+            android:maxWidth="86dp"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="1dp"
             android:textColor="#FFFFFF"
-            android:textSize="11sp" />
+            android:textSize="8sp" />
 
         <LinearLayout
             android:id="@+id/homeAdShots"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="6dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="3dp"
             android:background="#8C000000"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
+            android:paddingHorizontal="3dp"
+            android:paddingVertical="1dp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="9dp"
-                android:layout_height="9dp"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
                 android:contentDescription=""
                 android:src="@drawable/ic_camera_small" />
 
@@ -74,20 +77,19 @@
                 android:id="@+id/homeAdShotsText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="3dp"
+                android:layout_marginStart="2dp"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="10dp"
-        android:paddingTop="9dp"
-        android:paddingBottom="10dp">
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/homeAdTitle"
@@ -96,47 +98,47 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:textColor="#F4F4F5"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/homeAdArea"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="1dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#A1A1AA"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/homeAdPrice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="1dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#E4E4E7"
-            android:textSize="12.5sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/homeAdComm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="1dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#4ADE80"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
             <TextView
@@ -144,15 +146,18 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
-                android:layout_weight="1"
+                android:layout_weight="1.4"
                 android:background="@drawable/bg_hub_start"
                 android:clickable="true"
                 android:focusable="true"
+                android:ellipsize="end"
                 android:gravity="center"
-                android:minHeight="44dp"
+                android:maxLines="1"
+                android:minHeight="32dp"
+                android:paddingHorizontal="4dp"
                 android:text="معرفی به مشتری"
                 android:textColor="#052E16"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -160,15 +165,17 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
-                android:layout_weight="1"
+                android:layout_weight="0.8"
                 android:background="@drawable/bg_hub_card"
                 android:clickable="true"
                 android:focusable="true"
+                android:ellipsize="end"
                 android:gravity="center"
-                android:minHeight="44dp"
+                android:maxLines="1"
+                android:minHeight="32dp"
                 android:text="تماس"
                 android:textColor="#FAFAFA"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>

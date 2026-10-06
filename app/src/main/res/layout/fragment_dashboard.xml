@@ -18,16 +18,16 @@
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="6dp">
+            android:paddingHorizontal="12dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:background="@drawable/bg_hub_avatar"
                 android:contentDescription=""
-                android:padding="10dp"
+                android:padding="6dp"
                 android:src="@drawable/ic_profile"
                 app:tint="#E4E4E7" />
 
@@ -46,14 +46,14 @@
                     android:maxLines="1"
                     android:text="سلام، همکار عزیز"
                     android:textColor="#FAFAFA"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/dashboardGreetSub"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="0dp"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="آماده‌ای بفروشی؟"
@@ -78,7 +78,7 @@
                         android:layout_height="wrap_content"
                         android:text="وینور"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -93,8 +93,8 @@
 
                 <ImageButton
                     android:id="@+id/dashboardBell"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
                     android:background="@drawable/bg_hub_avatar"
                     android:contentDescription="اعلان‌ها"
                     android:padding="8dp"
@@ -120,7 +120,7 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingTop="8dp">
+            android:paddingTop="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -134,23 +134,22 @@
                     android:layout_height="wrap_content"
                     android:layoutDirection="rtl"
                     android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="12dp">
+                    android:paddingHorizontal="12dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="6dp">
 
                     <LinearLayout
                         android:id="@+id/dashboardWallet"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="104dp"
+                        android:layout_marginTop="2dp"
                         android:background="@drawable/bg_hub_card"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="12dp"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
                         android:visibility="gone">
 
                         <LinearLayout
@@ -170,11 +169,11 @@
                                 android:id="@+id/dashboardWalletAmount"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
+                                android:layout_marginTop="1dp"
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:textColor="#FAFAFA"
-                                android:textSize="22sp"
+                                android:textSize="18sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
 
@@ -196,246 +195,58 @@
                         android:id="@+id/dashboardHero"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:minHeight="150dp"
+                        android:layout_marginTop="6dp"
                         android:background="@drawable/bg_hub_hero"
                         android:clickable="true"
                         android:focusable="true"
-                        android:orientation="vertical"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="16dp"
-                        android:paddingBottom="14dp">
-
-                        <TextView
-                            android:id="@+id/dashboardHeroKicker"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="فرصت در دستان شماست"
-                            android:textColor="#86EFAC"
-                            android:textSize="12sp"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/dashboardHeroIcon"
-                            android:layout_width="0dp"
-                            android:layout_height="0dp"
-                            android:contentDescription=""
-                            android:src="@drawable/ic_handshake"
-                            android:visibility="gone" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="8dp">
 
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_weight="1"
+                            android:orientation="vertical">
 
                             <TextView
-                                android:id="@+id/dashboardHeroTitle"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:maxLines="2"
-                                android:text="مشتری دارم"
-                                android:textColor="#FFFFFF"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/dashboardHeroCount"
+                                android:id="@+id/dashboardHeroKicker"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:background="@drawable/bg_count_badge"
-                                android:minWidth="20dp"
-                                android:paddingHorizontal="6dp"
-                                android:paddingVertical="2dp"
-                                android:textColor="#FFFFFF"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
+                                android:text="فرصت در دستان شماست"
+                                android:textColor="#86EFAC"
+                                android:textSize="11sp"
                                 android:visibility="gone" />
-                        </LinearLayout>
 
-                        <TextView
-                            android:id="@+id/dashboardHeroSub"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="برای مشتری فایل مناسب پیدا کن"
-                            android:textColor="#D1FAE5"
-                            android:textSize="13sp" />
-
-                        <TextView
-                            android:id="@+id/dashboardHeroStart"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:background="@drawable/bg_hub_start"
-                            android:gravity="center"
-                            android:minHeight="44dp"
-                            android:paddingHorizontal="16dp"
-                            android:text="شروع کنید"
-                            android:textColor="#052E16"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/dashboardShortcuts"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                            <ImageView
+                                android:id="@+id/dashboardHeroIcon"
+                                android:layout_width="0dp"
+                                android:layout_height="0dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_handshake"
+                                android:visibility="gone" />
 
                             <LinearLayout
-                                android:id="@+id/dashboardShortcutTrain"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginEnd="5dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:clickable="true"
-                                android:focusable="true"
                                 android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_graduation"
-                                    app:tint="#E4E4E7" />
+                                android:orientation="horizontal">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:text="آموزش فروش"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:id="@+id/dashboardShortcutNews"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="5dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_news"
-                                    app:tint="#E4E4E7" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:text="خبر وینور"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:orientation="horizontal">
-
-                            <LinearLayout
-                                android:id="@+id/dashboardShortcutFiles"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginEnd="5dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_home"
-                                    app:tint="#E4E4E7" />
-
-                                <TextView
+                                    android:id="@+id/dashboardHeroTitle"
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
                                     android:layout_weight="1"
                                     android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:text="فایل‌های من"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:id="@+id/dashboardShortcutFollow"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="5dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_clipboard"
-                                    app:tint="#E4E4E7" />
-
-                                <TextView
-                                    android:id="@+id/dashboardShortcutFollowTitle"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:layout_weight="1"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:text="پیگیری مشتری‌ها"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
+                                    android:maxLines="2"
+                                    android:text="مشتری دارم"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
-                                    android:id="@+id/dashboardFollowBadge"
+                                    android:id="@+id/dashboardHeroCount"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
@@ -448,6 +259,190 @@
                                     android:textStyle="bold"
                                     android:visibility="gone" />
                             </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/dashboardHeroSub"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="برای مشتری فایل مناسب پیدا کن"
+                                android:textColor="#D1FAE5"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/dashboardHeroStart"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/bg_hub_start"
+                            android:gravity="center"
+                            android:minHeight="32dp"
+                            android:paddingHorizontal="10dp"
+                            android:text="شروع کنید"
+                            android:textColor="#052E16"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/dashboardShortcuts"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/dashboardShortcutTrain"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_hub_card"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="6dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_graduation"
+                                app:tint="#E4E4E7" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="2"
+                                android:text="آموزش فروش"
+                                android:textColor="#FAFAFA"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/dashboardShortcutNews"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_hub_card"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="6dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_news"
+                                app:tint="#E4E4E7" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="2"
+                                android:text="خبر وینور"
+                                android:textColor="#FAFAFA"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/dashboardShortcutFiles"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_hub_card"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="6dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_home"
+                                app:tint="#E4E4E7" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="2"
+                                android:text="فایل‌های من"
+                                android:textColor="#FAFAFA"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/dashboardShortcutFollow"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_hub_card"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="6dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_clipboard"
+                                app:tint="#E4E4E7" />
+
+                            <TextView
+                                android:id="@+id/dashboardShortcutFollowTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="2"
+                                android:text="پیگیری مشتری‌ها"
+                                android:textColor="#FAFAFA"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/dashboardFollowBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:background="@drawable/bg_count_badge"
+                                android:minWidth="18dp"
+                                android:paddingHorizontal="5dp"
+                                android:paddingVertical="1dp"
+                                android:textColor="#FFFFFF"
+                                android:textSize="10sp"
+                                android:textStyle="bold"
+                                android:visibility="gone" />
                         </LinearLayout>
                     </LinearLayout>
 
@@ -455,7 +450,7 @@
                         android:id="@+id/dashboardFilesHead"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="6dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:visibility="gone">
@@ -466,7 +461,7 @@
                             android:layout_weight="1"
                             android:text="فایل‌های پیشنهادی برای فروش"
                             android:textColor="#FAFAFA"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -484,7 +479,7 @@
                         android:id="@+id/dashboardAdsScroll"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="4dp"
                         android:clipToPadding="false"
                         android:layoutDirection="rtl"
                         android:scrollbars="none"
@@ -503,7 +498,7 @@
                         android:id="@+id/dashboardPerf"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="6dp"
                         android:orientation="vertical"
                         android:visibility="gone">
 
@@ -512,13 +507,13 @@
                             android:layout_height="wrap_content"
                             android:text="عملکرد من"
                             android:textColor="#FAFAFA"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="4dp"
                             android:orientation="horizontal">
 
                             <LinearLayout
@@ -529,7 +524,7 @@
                                 android:background="@drawable/bg_hub_card"
                                 android:gravity="center"
                                 android:orientation="vertical"
-                                android:paddingVertical="10dp">
+                                android:paddingVertical="4dp">
 
                                 <TextView
                                     android:id="@+id/dashboardPerfCustomers"
@@ -537,7 +532,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
+                                    android:textSize="14sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -557,7 +552,7 @@
                                 android:background="@drawable/bg_hub_card"
                                 android:gravity="center"
                                 android:orientation="vertical"
-                                android:paddingVertical="10dp">
+                                android:paddingVertical="4dp">
 
                                 <TextView
                                     android:id="@+id/dashboardPerfVisits"
@@ -565,7 +560,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
+                                    android:textSize="14sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -585,7 +580,7 @@
                                 android:background="@drawable/bg_hub_card"
                                 android:gravity="center"
                                 android:orientation="vertical"
-                                android:paddingVertical="10dp">
+                                android:paddingVertical="4dp">
 
                                 <TextView
                                     android:id="@+id/dashboardPerfDeals"
@@ -593,7 +588,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
+                                    android:textSize="14sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -611,6 +606,7 @@
                         android:id="@+id/dashboardTiles"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         android:orientation="horizontal"
                         android:visibility="gone">
 
@@ -618,35 +614,53 @@
                             android:id="@+id/dashboardTileBuy"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
-                            android:orientation="vertical"
+                            android:background="@drawable/bg_hub_card"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="6dp"
                             android:visibility="gone">
 
                             <ImageView
                                 android:id="@+id/dashboardTileBuyIcon"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
                                 android:contentDescription=""
                                 android:src="@drawable/ic_search_stroke" />
 
-                            <TextView
-                                android:id="@+id/dashboardTileBuyTitle"
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:textColor="#F4F4F5"
-                                android:textSize="14sp" />
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/dashboardTileBuySub"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="#8E8E93"
-                                android:textSize="11sp" />
+                                <TextView
+                                    android:id="@+id/dashboardTileBuyTitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="#F4F4F5"
+                                    android:textSize="12sp" />
+
+                                <TextView
+                                    android:id="@+id/dashboardTileBuySub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="#8E8E93"
+                                    android:textSize="10sp" />
+                            </LinearLayout>
 
                             <TextView
                                 android:id="@+id/dashboardTileBuyCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
                                 android:visibility="gone" />
                         </LinearLayout>
 
@@ -660,35 +674,53 @@
                             android:id="@+id/dashboardTileLevels"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
                             android:layout_weight="1"
-                            android:orientation="vertical"
+                            android:background="@drawable/bg_hub_card"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="6dp"
                             android:visibility="gone">
 
                             <ImageView
                                 android:id="@+id/dashboardTileLevelsIcon"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
                                 android:contentDescription=""
                                 android:src="@drawable/ic_users_stroke" />
 
-                            <TextView
-                                android:id="@+id/dashboardTileLevelsTitle"
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:textColor="#F4F4F5"
-                                android:textSize="14sp" />
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/dashboardTileLevelsSub"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="#8E8E93"
-                                android:textSize="11sp" />
+                                <TextView
+                                    android:id="@+id/dashboardTileLevelsTitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="#F4F4F5"
+                                    android:textSize="12sp" />
+
+                                <TextView
+                                    android:id="@+id/dashboardTileLevelsSub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="#8E8E93"
+                                    android:textSize="10sp" />
+                            </LinearLayout>
 
                             <TextView
                                 android:id="@+id/dashboardTileLevelsCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
                                 android:visibility="gone" />
                         </LinearLayout>
                     </LinearLayout>
