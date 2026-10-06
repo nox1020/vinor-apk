@@ -1,182 +1,200 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="280dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginEnd="8dp"
-    android:background="@drawable/bg_hub_card"
-    android:baselineAligned="false"
+    android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="6dp">
-
-    <FrameLayout
-        android:layout_width="92dp"
-        android:layout_height="92dp">
-
-        <ImageView
-            android:id="@+id/homeAdImage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#1A2332"
-            android:contentDescription=""
-            android:scaleType="centerCrop" />
-
-        <TextView
-            android:id="@+id/homeAdWhen"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
-            android:layout_margin="3dp"
-            android:background="@drawable/bg_loc_chip"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:maxWidth="52dp"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="1dp"
-            android:textColor="#FFFFFF"
-            android:textSize="8sp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/homeAdLoc"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|start"
-            android:layout_margin="3dp"
-            android:background="@drawable/bg_loc_chip"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:maxWidth="86dp"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="1dp"
-            android:textColor="#FFFFFF"
-            android:textSize="8sp" />
-
-        <LinearLayout
-            android:id="@+id/homeAdShots"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|end"
-            android:layout_margin="3dp"
-            android:background="#8C000000"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="3dp"
-            android:paddingVertical="1dp"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="8dp"
-                android:layout_height="8dp"
-                android:contentDescription=""
-                android:src="@drawable/ic_camera_small" />
-
-            <TextView
-                android:id="@+id/homeAdShotsText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
-                android:textColor="#FFFFFF"
-                android:textSize="8sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </FrameLayout>
+    android:orientation="vertical">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/homeAdTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:textColor="#F4F4F5"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp">
 
-        <TextView
-            android:id="@+id/homeAdArea"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#A1A1AA"
-            android:textSize="11sp"
-            android:visibility="gone" />
+            <ImageView
+                android:id="@+id/homeAdImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/vinor_skeleton_bg"
+                android:contentDescription=""
+                android:scaleType="centerCrop" />
 
-        <TextView
-            android:id="@+id/homeAdPrice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#E4E4E7"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <LinearLayout
+                android:id="@+id/homeAdShots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="3dp"
+                android:background="#8C000000"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="1dp"
+                android:visibility="gone">
 
-        <TextView
-            android:id="@+id/homeAdComm"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#4ADE80"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:contentDescription=""
+                    android:src="@drawable/ic_camera_small" />
+
+                <TextView
+                    android:id="@+id/homeAdShotsText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="2dp"
+                    android:textColor="@color/vinor_on_primary"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/homeAdTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/homeAdWhen"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:maxWidth="96dp"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/homeAdIntro"
-                android:layout_width="0dp"
+                android:id="@+id/homeAdLoc"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1.4"
-                android:background="@drawable/bg_hub_start"
-                android:clickable="true"
-                android:focusable="true"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
-                android:gravity="center"
                 android:maxLines="1"
-                android:minHeight="32dp"
-                android:paddingHorizontal="4dp"
-                android:text="معرفی به مشتری"
-                android:textColor="#052E16"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
 
             <TextView
-                android:id="@+id/homeAdCall"
-                android:layout_width="0dp"
+                android:id="@+id/homeAdArea"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="0.8"
-                android:background="@drawable/bg_hub_card"
-                android:clickable="true"
-                android:focusable="true"
+                android:layout_marginTop="1dp"
                 android:ellipsize="end"
-                android:gravity="center"
                 android:maxLines="1"
-                android:minHeight="32dp"
-                android:text="تماس"
-                android:textColor="#FAFAFA"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/homeAdPrice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/homeAdComm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/vinor_accent_green"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/homeAdIntro"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.3"
+                    android:background="@drawable/bg_hub_start"
+                    android:clickable="true"
+                    android:ellipsize="end"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:minHeight="36dp"
+                    android:paddingHorizontal="8dp"
+                    android:text="معرفی به مشتری"
+                    android:textColor="#052E16"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/homeAdCall"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.7"
+                    android:background="@drawable/bg_hub_card"
+                    android:clickable="true"
+                    android:ellipsize="end"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:minHeight="36dp"
+                    android:text="تماس"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="88dp"
+        android:background="@color/vinor_border" />
 </LinearLayout>

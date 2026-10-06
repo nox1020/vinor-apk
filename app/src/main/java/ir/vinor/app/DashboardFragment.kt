@@ -12,7 +12,6 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -144,24 +143,7 @@ class DashboardFragment : Fragment() {
                 true
             } else false
         }
-        val adsOrigin = FloatArray(2)
-        binding.dashboardAdsScroll.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    adsOrigin[0] = event.x
-                    adsOrigin[1] = event.y
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = kotlin.math.abs(event.x - adsOrigin[0])
-                    val dy = kotlin.math.abs(event.y - adsOrigin[1])
-                    v.parent.requestDisallowInterceptTouchEvent(dx > dy + 8f)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                    v.parent.requestDisallowInterceptTouchEvent(false)
-            }
-            false
-        }
-        binding.dashboardAdsScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
+        binding.dashboardScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
         syncSendEnabled()
         syncComposerVisible()
         paintRememberedHome()
@@ -172,7 +154,7 @@ class DashboardFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        runCatching { binding.dashboardAdsScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
+        runCatching { binding.dashboardScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -763,8 +745,7 @@ class DashboardFragment : Fragment() {
             binding.dashboardFilesHead.isVisible = showCarousel
             if (showCarousel && !sameCards) {
                 binding.dashboardAds.post {
-                    val b = _binding ?: return@post
-                    alignAdsToStart(b)
+                    if (_binding == null) return@post
                     bindVisibleCarouselImages()
                 }
             } else if (showCarousel) {
@@ -1025,12 +1006,13 @@ class DashboardFragment : Fragment() {
 
     private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
         val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
-        val cardW = (resources.displayMetrics.widthPixels * 0.86f).toInt()
         val lp = (card.root.layoutParams as? ViewGroup.MarginLayoutParams)
-            ?: LinearLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT)
-        lp.width = cardW
-        val gap = (10 * resources.displayMetrics.density).toInt()
-        lp.marginEnd = gap
+            ?: LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+        lp.marginEnd = 0
         card.root.layoutParams = lp
         card.homeAdTitle.text = ad.optString("title")
         val price = ad.optString("price")
@@ -1066,7 +1048,7 @@ class DashboardFragment : Fragment() {
         if (isApproved && comm > 0) {
             card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
-        PartnerImages.roundClip(card.root, 15f)
+        PartnerImages.roundClip(card.homeAdImage, 12f)
         card.homeAdImage.tag = ad.optString("image_url")
         card.root.setOnClickListener { openAd(ad) }
         return card
@@ -1095,14 +1077,6 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun alignAdsToStart(b: FragmentDashboardBinding) {
-        val range = (b.dashboardAds.width - b.dashboardAdsScroll.width).coerceAtLeast(0)
-        val start = if (b.dashboardAdsScroll.layoutDirection == View.LAYOUT_DIRECTION_RTL) range else 0
-        if (b.dashboardAdsScroll.scrollX != start) {
-            b.dashboardAdsScroll.scrollTo(start, 0)
-        }
-    }
-
     private fun rememberHome(obj: JSONObject) {
         val ads = obj.optJSONArray("divar_pro_ads")?.length() ?: 0
         val prompts = obj.optJSONArray("ai_quick_prompts")?.length() ?: 0
@@ -1113,7 +1087,7 @@ class DashboardFragment : Fragment() {
 
     private fun bindVisibleCarouselImages() {
         val b = _binding ?: return
-        bindVisibleRowImages(b.dashboardAdsScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
+        bindVisibleRowImages(b.dashboardScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
     }
 
     private fun bindVisibleRowImages(
