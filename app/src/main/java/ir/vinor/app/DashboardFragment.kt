@@ -19,7 +19,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
@@ -59,7 +58,6 @@ class DashboardFragment : Fragment() {
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
-    private var homeFillGen = 0
     private var boundMessageCount = 0
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
@@ -635,47 +633,6 @@ class DashboardFragment : Fragment() {
         hideKeyboard()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
-        fillHomePage()
-    }
-
-    /** ردیف گزینه‌ها فضای خالی پایین را می‌گیرد تا خانه یک صفحهٔ پر باشد. */
-    private fun fillHomePage() {
-        val b = _binding ?: return
-        val density = resources.displayMetrics.density
-        val rowBase = (52 * density).toInt()
-        val bannerBase = (72 * density).toInt()
-        val rows = listOf(
-            b.dashboardShortcutTrain,
-            b.dashboardShortcutNews,
-            b.dashboardShortcutFiles,
-            b.dashboardShortcutFollow,
-        )
-        val gen = ++homeFillGen
-        rows.forEach { it.minimumHeight = rowBase }
-        b.dashboardPromoBanner.layoutParams = b.dashboardPromoBanner.layoutParams.apply {
-            height = bannerBase
-        }
-        b.dashboardScroll.doOnPreDraw {
-            if (gen != homeFillGen) return@doOnPreDraw
-            val current = _binding ?: return@doOnPreDraw
-            if (!current.dashboardEmpty.isVisible) return@doOnPreDraw
-            val parent = current.dashboardEmpty.parent as View
-            val slack = parent.height -
-                current.dashboardEmpty.height -
-                current.dashboardChatList.height -
-                parent.paddingTop -
-                parent.paddingBottom
-            if (slack <= 0) return@doOnPreDraw
-            val bannerExtra = slack.coerceAtMost((8 * density).toInt())
-            val rowSlack = slack - bannerExtra
-            val share = rowSlack / rows.size
-            val remainder = rowSlack % rows.size
-            rows.forEachIndexed { index, row ->
-                row.minimumHeight = rowBase + share + if (index == rows.lastIndex) remainder else 0
-            }
-            current.dashboardPromoBanner.layoutParams =
-                current.dashboardPromoBanner.layoutParams.apply { height = bannerBase + bannerExtra }
-        }
     }
 
     private fun fetchHistory(bindIfWanted: Boolean) {

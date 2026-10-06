@@ -17,24 +17,24 @@
             android:background="@color/vinor_bg"
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
-            android:minHeight="48dp"
+            android:minHeight="56dp"
             android:orientation="horizontal"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
 
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/bg_hub_avatar"
                 android:contentDescription=""
-                android:padding="7dp"
+                android:padding="9dp"
                 android:src="@drawable/ic_profile"
                 app:tint="@color/vinor_text" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -46,56 +46,37 @@
                     android:maxLines="1"
                     android:text="سلام، همکار عزیز"
                     android:textColor="@color/vinor_text"
-                    android:textSize="15sp"
+                    android:textSize="17sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/dashboardGreetSub"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
+                    android:layout_marginTop="2dp"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="آماده‌ای بفروشی؟"
                     android:textColor="@color/vinor_accent_green"
-                    android:textSize="12sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="end"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="end"
-                    android:text="وینور"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="end"
-                    android:ellipsize="end"
-                    android:gravity="end"
-                    android:maxLines="1"
-                    android:text="فرصت بیشتر، درآمد بالاتر"
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="10sp" />
-            </LinearLayout>
+                android:layout_marginStart="8dp"
+                android:text="وینور"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <ImageButton
                 android:id="@+id/dashboardBell"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="اعلان‌ها"
-                android:padding="8dp"
+                android:padding="12dp"
                 android:src="@drawable/ic_stat_notify"
                 app:tint="@color/vinor_text" />
         </LinearLayout>
@@ -127,7 +108,8 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
 
                 <LinearLayout
                     android:id="@+id/dashboardEmpty"
@@ -150,17 +132,17 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
-                            android:minHeight="48dp"
+                            android:minHeight="64dp"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="4dp">
+                            android:paddingHorizontal="16dp"
+                            android:paddingVertical="10dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="9dp"
                                 android:src="@drawable/ic_wallet"
                                 app:tint="@color/vinor_accent_green" />
 
@@ -178,17 +160,18 @@
                                     android:ellipsize="end"
                                     android:maxLines="1"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="15sp"
+                                    android:textSize="18sp"
                                     android:textStyle="bold" />
 
                                 <TextView
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
                                     android:ellipsize="end"
                                     android:maxLines="1"
                                     android:text="پورسانت‌های قابل دریافت"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="12sp" />
+                                    android:textSize="13sp" />
                             </LinearLayout>
 
                             <TextView
@@ -200,10 +183,10 @@
                                 android:ellipsize="end"
                                 android:gravity="center"
                                 android:maxLines="1"
-                                android:paddingHorizontal="8dp"
-                                android:paddingVertical="4dp"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="6dp"
                                 android:textColor="@color/vinor_accent_green"
-                                android:textSize="11sp"
+                                android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:visibility="gone" />
                         </LinearLayout>
@@ -211,7 +194,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="68dp"
                             android:background="@color/vinor_border" />
                     </LinearLayout>
 
@@ -219,107 +202,108 @@
                         android:id="@+id/dashboardHero"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="4dp"
+                        android:background="@drawable/bg_hub_hero"
                         android:clickable="true"
                         android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:minHeight="48dp"
-                        android:orientation="horizontal"
-                        android:paddingVertical="2dp">
-
-                        <ImageView
-                            android:id="@+id/dashboardHeroIcon"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="12dp"
-                            android:background="@drawable/bg_hub_avatar"
-                            android:contentDescription=""
-                            android:padding="8dp"
-                            android:src="@drawable/ic_handshake" />
+                        android:orientation="vertical"
+                        android:padding="16dp">
 
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                            <TextView
-                                android:id="@+id/dashboardHeroKicker"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:ellipsize="end"
-                                android:maxLines="1"
-                                android:text="فرصت در دستان شماست"
-                                android:textColor="@color/vinor_accent_green"
-                                android:textSize="11sp"
-                                android:visibility="gone" />
+                            <ImageView
+                                android:id="@+id/dashboardHeroIcon"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_hub_avatar"
+                                android:contentDescription=""
+                                android:padding="9dp"
+                                android:src="@drawable/ic_handshake"
+                                app:tint="@color/vinor_accent_green" />
 
                             <LinearLayout
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/dashboardHeroTitle"
-                                    android:layout_width="0dp"
+                                    android:id="@+id/dashboardHeroKicker"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
                                     android:ellipsize="end"
-                                    android:maxLines="2"
-                                    android:text="مشتری دارم"
-                                    android:textColor="@color/vinor_text"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/dashboardHeroCount"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:background="@drawable/bg_count_badge"
-                                    android:minWidth="18dp"
-                                    android:paddingHorizontal="6dp"
-                                    android:paddingVertical="1dp"
+                                    android:maxLines="1"
+                                    android:text="فرصت در دستان شماست"
                                     android:textColor="@color/vinor_on_primary"
                                     android:textSize="12sp"
-                                    android:textStyle="bold"
                                     android:visibility="gone" />
-                            </LinearLayout>
 
-                            <TextView
-                                android:id="@+id/dashboardHeroSub"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:ellipsize="end"
-                                android:maxLines="1"
-                                android:text="برای مشتری فایل مناسب پیدا کن"
-                                android:textColor="@color/vinor_text_muted"
-                                android:textSize="11sp" />
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <TextView
+                                        android:id="@+id/dashboardHeroTitle"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:ellipsize="end"
+                                        android:maxLines="2"
+                                        android:text="مشتری دارم"
+                                        android:textColor="@color/vinor_on_primary"
+                                        android:textSize="18sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/dashboardHeroCount"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="6dp"
+                                        android:background="@drawable/bg_count_badge"
+                                        android:minWidth="18dp"
+                                        android:paddingHorizontal="6dp"
+                                        android:paddingVertical="1dp"
+                                        android:textColor="@color/vinor_on_primary"
+                                        android:textSize="12sp"
+                                        android:textStyle="bold"
+                                        android:visibility="gone" />
+                                </LinearLayout>
+
+                                <TextView
+                                    android:id="@+id/dashboardHeroSub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:ellipsize="end"
+                                    android:maxLines="2"
+                                    android:text="برای مشتری فایل مناسب پیدا کن"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
                         </LinearLayout>
 
                         <TextView
                             android:id="@+id/dashboardHeroStart"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:layout_marginEnd="12dp"
+                            android:layout_marginTop="14dp"
                             android:background="@drawable/bg_hub_start"
                             android:gravity="center"
-                            android:minHeight="30dp"
-                            android:paddingHorizontal="10dp"
+                            android:minHeight="44dp"
                             android:text="شروع کنید"
                             android:textColor="#052E16"
-                            android:textSize="12sp"
+                            android:textSize="15sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="60dp"
-                        android:background="@color/vinor_border" />
 
                     <LinearLayout
                         android:id="@+id/dashboardShortcuts"
@@ -335,16 +319,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="52dp"
+                            android:minHeight="56dp"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="16dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="9dp"
                                 android:src="@drawable/ic_graduation"
                                 app:tint="@color/vinor_text" />
 
@@ -370,7 +354,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="68dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -381,16 +365,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="52dp"
+                            android:minHeight="56dp"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="16dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="9dp"
                                 android:src="@drawable/ic_news"
                                 app:tint="@color/vinor_text" />
 
@@ -416,7 +400,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="68dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -427,16 +411,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="52dp"
+                            android:minHeight="56dp"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="16dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="9dp"
                                 android:src="@drawable/ic_home"
                                 app:tint="@color/vinor_text" />
 
@@ -462,7 +446,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="68dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -473,16 +457,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="52dp"
+                            android:minHeight="56dp"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="16dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="9dp"
                                 android:src="@drawable/ic_clipboard"
                                 app:tint="@color/vinor_text" />
 
@@ -526,30 +510,32 @@
                     <LinearLayout
                         android:id="@+id/dashboardPromoBanner"
                         android:layout_width="match_parent"
-                        android:layout_height="72dp"
-                        android:layout_marginHorizontal="12dp"
-                        android:layout_marginTop="6dp"
-                        android:layout_marginBottom="2dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="8dp"
                         android:background="@drawable/bg_hub_hero"
                         android:gravity="center_vertical"
+                        android:minHeight="84dp"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="12dp">
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:background="@drawable/bg_hub_card"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="2dp"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
                             android:text="تبلیغات"
                             android:textColor="@color/vinor_text"
-                            android:textSize="11sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
+                            android:layout_marginStart="12dp"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
@@ -557,11 +543,10 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
-                                android:includeFontPadding="false"
                                 android:maxLines="1"
                                 android:text="فرصت بیشتر، درآمد بالاتر"
                                 android:textColor="@color/vinor_on_primary"
-                                android:textSize="16sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -569,11 +554,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:ellipsize="end"
-                                android:includeFontPadding="false"
                                 android:maxLines="1"
                                 android:text="وینور"
-                                android:textColor="@color/vinor_on_primary"
-                                android:textSize="12sp" />
+                                android:textColor="@color/vinor_text"
+                                android:textSize="13sp" />
                         </LinearLayout>
                     </LinearLayout>
 
@@ -593,10 +577,11 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:paddingHorizontal="16dp"
-                            android:paddingTop="4dp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="4dp"
                             android:text="عملکرد من"
                             android:textColor="@color/vinor_accent_green"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
@@ -604,7 +589,8 @@
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingVertical="4dp">
+                            android:paddingTop="4dp"
+                            android:paddingBottom="12dp">
 
                             <LinearLayout
                                 android:layout_width="0dp"
@@ -621,7 +607,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="15sp"
+                                    android:textSize="18sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -631,12 +617,12 @@
                                     android:maxLines="2"
                                     android:text="مشتری فعال"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="11sp" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
 
                             <View
                                 android:layout_width="1dp"
-                                android:layout_height="28dp"
+                                android:layout_height="32dp"
                                 android:background="@color/vinor_border" />
 
                             <LinearLayout
@@ -654,7 +640,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="15sp"
+                                    android:textSize="18sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -664,12 +650,12 @@
                                     android:maxLines="2"
                                     android:text="بازدید انجام‌شده"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="11sp" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
 
                             <View
                                 android:layout_width="1dp"
-                                android:layout_height="28dp"
+                                android:layout_height="32dp"
                                 android:background="@color/vinor_border" />
 
                             <LinearLayout
@@ -687,7 +673,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="15sp"
+                                    android:textSize="18sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -697,7 +683,7 @@
                                     android:maxLines="2"
                                     android:text="معامله موفق"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="11sp" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
