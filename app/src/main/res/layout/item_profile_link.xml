@@ -3,48 +3,67 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@android:color/transparent"
+    android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingHorizontal="4dp"
-    android:paddingVertical="14dp">
-
-    <ImageView
-        android:id="@+id/itemProfileLinkIcon"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
-        android:contentDescription=""
-        app:tint="#A1A1AA" />
+    android:orientation="vertical">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp">
 
-        <TextView
-            android:id="@+id/itemProfileLinkTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#ECECEC"
-            android:textSize="15sp" />
+        <ImageView
+            android:id="@+id/itemProfileLinkIcon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_hub_avatar"
+            android:contentDescription=""
+            android:padding="9dp"
+            app:tint="@color/vinor_text" />
 
-        <TextView
-            android:id="@+id/itemProfileLinkSubtitle"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="#8E8E93"
-            android:textSize="12sp" />
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/itemProfileLinkTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/vinor_text"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/itemProfileLinkSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription=""
+            android:src="@drawable/ic_chevron_left"
+            app:tint="@color/vinor_text_muted" />
     </LinearLayout>
 
-    <ImageView
-        android:layout_width="18dp"
-        android:layout_height="18dp"
-        android:contentDescription=""
-        android:src="@drawable/ic_chevron_left"
-        app:tint="#52525B" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="68dp"
+        android:background="@color/vinor_border" />
 </LinearLayout>
