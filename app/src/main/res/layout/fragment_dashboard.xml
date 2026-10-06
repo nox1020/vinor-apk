@@ -17,24 +17,24 @@
             android:background="@color/vinor_bg"
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
-            android:minHeight="44dp"
+            android:minHeight="48dp"
             android:orientation="horizontal"
             android:paddingHorizontal="8dp"
             android:paddingVertical="4dp">
 
             <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/bg_hub_avatar"
                 android:contentDescription=""
-                android:padding="8dp"
+                android:padding="7dp"
                 android:src="@drawable/ic_profile"
                 app:tint="@color/vinor_text" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -64,7 +64,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:gravity="end"
                 android:orientation="vertical">
 
@@ -74,7 +74,7 @@
                     android:layout_gravity="end"
                     android:text="وینور"
                     android:textColor="@color/vinor_text"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -82,18 +82,17 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="end"
                     android:ellipsize="end"
+                    android:gravity="end"
                     android:maxLines="1"
-                    android:maxWidth="132dp"
                     android:text="فرصت بیشتر، درآمد بالاتر"
                     android:textColor="@color/vinor_text_muted"
-                    android:textSize="11sp" />
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <ImageButton
                 android:id="@+id/dashboardBell"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="2dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="اعلان‌ها"
                 android:padding="8dp"
@@ -155,14 +154,14 @@
                             android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp"
-                            android:paddingVertical="6dp">
+                            android:paddingVertical="4dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_wallet"
                                 app:tint="@color/vinor_accent_green" />
 
@@ -180,7 +179,7 @@
                                     android:ellipsize="end"
                                     android:maxLines="1"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="16sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -190,7 +189,7 @@
                                     android:maxLines="1"
                                     android:text="پورسانت‌های قابل دریافت"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="13sp" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
 
                             <TextView
@@ -213,7 +212,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="56dp"
                             android:background="@color/vinor_border" />
                     </LinearLayout>
 
@@ -225,18 +224,18 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
-                        android:minHeight="52dp"
+                        android:minHeight="48dp"
                         android:orientation="horizontal"
-                        android:paddingVertical="4dp">
+                        android:paddingVertical="2dp">
 
                         <ImageView
                             android:id="@+id/dashboardHeroIcon"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
                             android:layout_marginStart="12dp"
                             android:background="@drawable/bg_hub_avatar"
                             android:contentDescription=""
-                            android:padding="8dp"
+                            android:padding="7dp"
                             android:src="@drawable/ic_handshake" />
 
                         <LinearLayout
@@ -254,7 +253,7 @@
                                 android:maxLines="1"
                                 android:text="فرصت در دستان شماست"
                                 android:textColor="@color/vinor_accent_green"
-                                android:textSize="12sp"
+                                android:textSize="11sp"
                                 android:visibility="gone" />
 
                             <LinearLayout
@@ -298,7 +297,7 @@
                                 android:maxLines="1"
                                 android:text="برای مشتری فایل مناسب پیدا کن"
                                 android:textColor="@color/vinor_text_muted"
-                                android:textSize="13sp" />
+                                android:textSize="11sp" />
                         </LinearLayout>
 
                         <TextView
@@ -309,8 +308,8 @@
                             android:layout_marginEnd="12dp"
                             android:background="@drawable/bg_hub_start"
                             android:gravity="center"
-                            android:minHeight="32dp"
-                            android:paddingHorizontal="12dp"
+                            android:minHeight="30dp"
+                            android:paddingHorizontal="10dp"
                             android:text="شروع کنید"
                             android:textColor="#052E16"
                             android:textSize="12sp"
@@ -320,7 +319,7 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:layout_marginStart="60dp"
+                        android:layout_marginStart="56dp"
                         android:background="@color/vinor_border" />
 
                     <LinearLayout
@@ -337,16 +336,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="46dp"
+                            android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_graduation"
                                 app:tint="@color/vinor_text" />
 
@@ -372,7 +371,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="56dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -383,16 +382,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="46dp"
+                            android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_news"
                                 app:tint="@color/vinor_text" />
 
@@ -418,7 +417,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="56dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -429,16 +428,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="46dp"
+                            android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_home"
                                 app:tint="@color/vinor_text" />
 
@@ -464,7 +463,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginStart="60dp"
+                            android:layout_marginStart="56dp"
                             android:background="@color/vinor_border" />
 
                         <LinearLayout
@@ -475,16 +474,16 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
-                            android:minHeight="46dp"
+                            android:minHeight="48dp"
                             android:orientation="horizontal"
                             android:paddingHorizontal="12dp">
 
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_clipboard"
                                 app:tint="@color/vinor_text" />
 
@@ -528,15 +527,14 @@
                     <LinearLayout
                         android:id="@+id/dashboardPromoBanner"
                         android:layout_width="match_parent"
-                        android:layout_height="72dp"
+                        android:layout_height="64dp"
                         android:layout_marginHorizontal="12dp"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginBottom="4dp"
+                        android:layout_marginTop="6dp"
+                        android:layout_marginBottom="2dp"
                         android:background="@drawable/bg_hub_hero"
                         android:gravity="center_vertical"
-                        android:orientation="vertical"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="8dp">
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -549,25 +547,35 @@
                             android:textSize="11sp"
                             android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="match_parent"
+                        <LinearLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:text="فرصت بیشتر، درآمد بالاتر"
-                            android:textColor="@color/vinor_on_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:text="وینور"
-                            android:textColor="@color/vinor_on_primary"
-                            android:textSize="12sp" />
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:includeFontPadding="false"
+                                android:maxLines="1"
+                                android:text="فرصت بیشتر، درآمد بالاتر"
+                                android:textColor="@color/vinor_on_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:includeFontPadding="false"
+                                android:maxLines="1"
+                                android:text="وینور"
+                                android:textColor="@color/vinor_on_primary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
                     </LinearLayout>
 
                     <LinearLayout
@@ -586,11 +594,10 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:paddingHorizontal="16dp"
-                            android:paddingTop="6dp"
-                            android:paddingBottom="2dp"
+                            android:paddingTop="4dp"
                             android:text="عملکرد من"
                             android:textColor="@color/vinor_accent_green"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
@@ -615,7 +622,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="16sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -625,12 +632,12 @@
                                     android:maxLines="2"
                                     android:text="مشتری فعال"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="12sp" />
+                                    android:textSize="11sp" />
                             </LinearLayout>
 
                             <View
                                 android:layout_width="1dp"
-                                android:layout_height="36dp"
+                                android:layout_height="28dp"
                                 android:background="@color/vinor_border" />
 
                             <LinearLayout
@@ -648,7 +655,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="16sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -658,12 +665,12 @@
                                     android:maxLines="2"
                                     android:text="بازدید انجام‌شده"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="12sp" />
+                                    android:textSize="11sp" />
                             </LinearLayout>
 
                             <View
                                 android:layout_width="1dp"
-                                android:layout_height="36dp"
+                                android:layout_height="28dp"
                                 android:background="@color/vinor_border" />
 
                             <LinearLayout
@@ -681,7 +688,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="۰"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="16sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -691,7 +698,7 @@
                                     android:maxLines="2"
                                     android:text="معامله موفق"
                                     android:textColor="@color/vinor_text_muted"
-                                    android:textSize="12sp" />
+                                    android:textSize="11sp" />
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
