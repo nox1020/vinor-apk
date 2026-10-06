@@ -955,7 +955,7 @@ class DashboardFragment : Fragment() {
             pct < 0 -> "−"
             else -> ""
         }
-        return "رشد این ماه\n$sign$body٪"
+        return "رشد این ماه $sign$body٪"
     }
 
     private fun openVinorOrExternal(raw: String) {
