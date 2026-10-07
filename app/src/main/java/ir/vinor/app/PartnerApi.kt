@@ -487,6 +487,7 @@ object PartnerApi {
                 }
                 appCtx?.let { ctx ->
                     VinorApiCacheStore.clearUser(ctx)
+                    VinorAvatarCache.clear(ctx)
                     VinorCacheSession.fingerprint(ctx)
                 }
                 done()

@@ -1,8 +1,6 @@
 package ir.vinor.app
 
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.navigation.fragment.findNavController
@@ -18,11 +16,8 @@ import ir.vinor.app.databinding.ItemProfileLinkBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONObject
 import android.webkit.CookieManager
-import java.util.concurrent.TimeUnit
 
 /**
  * تب من (پروفایل) - کاملاً نیتیو و هماهنگ با وب.
@@ -32,11 +27,6 @@ class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
 
     companion object {
         private const val TAG = "ProfileFragment"
@@ -52,8 +42,8 @@ class ProfileFragment : Fragment() {
     /** اولین onResume بعد از ساخت ویو را رد می‌کند؛ onViewCreated همان بار را زده است. */
     private var resumeLoadArmed = false
     private var renderedMenuKey: String? = null
-    private var shownAvatarUrl: String? = null
-    private var shownAvatar: Bitmap? = null
+    private var wantedAvatarUrl: String? = null
+    private var avatarLoadUrl: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -365,47 +355,53 @@ class ProfileFragment : Fragment() {
 
     private fun showAvatar(avatarUrl: String?) {
         if (avatarUrl.isNullOrEmpty()) {
-            shownAvatarUrl = null
-            shownAvatar = null
+            wantedAvatarUrl = null
             binding.profileAvatar.setImageDrawable(null)
             binding.profileAvatar.visibility = View.GONE
             binding.profileInitials.visibility = View.VISIBLE
             return
         }
-        val fullUrl = "$BASE$avatarUrl"
-        val cached = shownAvatar
-        if (fullUrl == shownAvatarUrl && cached != null) {
-            binding.profileAvatar.setImageBitmap(cached)
+        val fullUrl = VinorAvatarCache.resolve(avatarUrl)
+        wantedAvatarUrl = fullUrl
+        val instant = VinorAvatarCache.peek(fullUrl)
+        if (instant != null) {
+            binding.profileAvatar.setImageBitmap(instant)
             binding.profileAvatar.visibility = View.VISIBLE
             binding.profileInitials.visibility = View.GONE
             return
         }
+        if (avatarLoadUrl == fullUrl) return
+        avatarLoadUrl = fullUrl
         binding.profileInitials.visibility = View.VISIBLE
         binding.profileAvatar.visibility = View.GONE
         loadAvatar(fullUrl)
     }
 
     private fun loadAvatar(fullUrl: String) {
+        val ctx = context ?: run {
+            if (avatarLoadUrl == fullUrl) avatarLoadUrl = null
+            return
+        }
+        val cookie = cookieHeader()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val req = Request.Builder()
-                    .url(fullUrl)
-                    .addHeader("Cookie", cookieHeader())
-                    .build()
-                val bmp = withContext(Dispatchers.IO) {
-                    client.newCall(req).execute().use { resp ->
-                        if (!resp.isSuccessful) return@withContext null
-                        val bytes = resp.body?.bytes() ?: return@withContext null
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    }
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, fullUrl)
+                        ?: VinorAvatarCache.fetch(fullUrl, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, fullUrl, fresh)
+                        }
                 } ?: return@launch
-                shownAvatarUrl = fullUrl
-                shownAvatar = bmp
-                if (_binding == null) return@launch
+                if (wantedAvatarUrl != fullUrl) return@launch
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(fullUrl, bmp)
+                if (_binding == null || wantedAvatarUrl != fullUrl) return@launch
                 binding.profileAvatar.setImageBitmap(bmp)
                 binding.profileAvatar.visibility = View.VISIBLE
                 binding.profileInitials.visibility = View.GONE
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            } finally {
+                if (avatarLoadUrl == fullUrl) avatarLoadUrl = null
+            }
         }
     }
 
