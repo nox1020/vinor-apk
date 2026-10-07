@@ -1,6 +1,7 @@
 package ir.vinor.app
 
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -11,11 +12,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import ir.vinor.app.databinding.FragmentProfileBinding
 import ir.vinor.app.databinding.ItemProfileLinkBinding
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -33,8 +33,6 @@ class ProfileFragment : Fragment() {
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -51,12 +49,19 @@ class ProfileFragment : Fragment() {
     private var latestProfile: JSONObject? = null
     private var loadGen = 0
     private var crmFetchGen = -1
+    /** اولین onResume بعد از ساخت ویو را رد می‌کند؛ onViewCreated همان بار را زده است. */
+    private var resumeLoadArmed = false
+    private var renderedMenuKey: String? = null
+    private var shownAvatarUrl: String? = null
+    private var shownAvatar: Bitmap? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        resumeLoadArmed = false
+        renderedMenuKey = null
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -68,16 +73,20 @@ class ProfileFragment : Fragment() {
                 (activity as? MainActivity)?.openPartnerHome()
             }
         }
-        loadData()
+        latestProfile?.let { bindProfilePayload(it) }
+        loadData(blocking = latestProfile == null)
     }
 
     override fun onResume() {
         super.onResume()
-        loadData()
+        if (!resumeLoadArmed) {
+            resumeLoadArmed = true
+            return
+        }
+        loadData(blocking = false)
     }
 
     override fun onDestroyView() {
-        job.cancel()
         super.onDestroyView()
         _binding = null
     }
@@ -90,31 +99,33 @@ class ProfileFragment : Fragment() {
         ""
     }
 
-    private fun loadData() {
+    private fun loadData(blocking: Boolean) {
         val ctx = context ?: return
         if (_binding == null) return
-        loadGen++
-        binding.profileProgress.visibility = View.VISIBLE
-        binding.profileGuest.visibility = View.GONE
-        binding.profileCard.visibility = View.GONE
-        binding.profileLinks.visibility = View.GONE
+        val gen = ++loadGen
+        if (blocking) {
+            binding.profileProgress.visibility = View.VISIBLE
+            binding.profileGuest.visibility = View.GONE
+            binding.profileCard.visibility = View.GONE
+            binding.profileLinks.visibility = View.GONE
+        }
 
-        scope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val obj = PartnerApi.loadDisplay(PROFILE_DATA, ctx) { data ->
-                    if (_binding == null) return@loadDisplay
+                    if (_binding == null || gen != loadGen) return@loadDisplay
                     bindProfilePayload(data)
                 }
-                if (_binding == null) return@launch
+                if (_binding == null || gen != loadGen) return@launch
                 if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
                     binding.profileProgress.visibility = View.GONE
-                    showGuest()
+                    if (latestProfile == null) showGuest()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadData error", e)
-                if (_binding == null) return@launch
+                if (_binding == null || gen != loadGen) return@launch
                 binding.profileProgress.visibility = View.GONE
-                showGuest()
+                if (latestProfile == null) showGuest()
             }
         }
     }
@@ -174,7 +185,7 @@ class ProfileFragment : Fragment() {
         val gen = loadGen
         if (crmFetchGen == gen) return
         crmFetchGen = gen
-        scope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val home = withContext(Dispatchers.IO) {
                 runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
             } ?: return@launch
@@ -191,6 +202,7 @@ class ProfileFragment : Fragment() {
 
     private fun showGuest(plusOn: Boolean = false, lawyerOn: Boolean = false) {
         if (_binding == null) return
+        renderedMenuKey = null
         binding.profileGuest.visibility = View.VISIBLE
         binding.profileCard.visibility = View.GONE
         binding.profileLinks.visibility = View.VISIBLE
@@ -244,11 +256,23 @@ class ProfileFragment : Fragment() {
             else -> "—"
         }
         binding.profileInitials.text = initials
-        binding.profileInitials.visibility = View.VISIBLE
-        binding.profileAvatar.visibility = View.GONE
-        if (!avatarUrl.isNullOrEmpty()) {
-            loadAvatar("$BASE$avatarUrl")
-        }
+        showAvatar(avatarUrl)
+
+        val menuKey = listOf(
+            mePhone,
+            meName,
+            avatarUrl.orEmpty(),
+            isApproved,
+            isSpecial,
+            hasPendingApp,
+            plusOn,
+            lawyerOn,
+            showAppUpdate,
+            androidApkUrl,
+            androidApkVersion,
+            showCustomers,
+        ).joinToString("\u0001")
+        val keepMenu = menuKey == renderedMenuKey && binding.profileLinks.childCount > 0
 
         binding.profileCard.setOnClickListener {
             try {
@@ -266,6 +290,8 @@ class ProfileFragment : Fragment() {
             }
         }
 
+        if (keepMenu) return
+        renderedMenuKey = menuKey
         binding.profileLinks.removeAllViews()
         addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
         if (isApproved) {
@@ -337,29 +363,54 @@ class ProfileFragment : Fragment() {
         binding.profileLinks.addView(item.root)
     }
 
+    private fun showAvatar(avatarUrl: String?) {
+        if (avatarUrl.isNullOrEmpty()) {
+            shownAvatarUrl = null
+            shownAvatar = null
+            binding.profileAvatar.setImageDrawable(null)
+            binding.profileAvatar.visibility = View.GONE
+            binding.profileInitials.visibility = View.VISIBLE
+            return
+        }
+        val fullUrl = "$BASE$avatarUrl"
+        val cached = shownAvatar
+        if (fullUrl == shownAvatarUrl && cached != null) {
+            binding.profileAvatar.setImageBitmap(cached)
+            binding.profileAvatar.visibility = View.VISIBLE
+            binding.profileInitials.visibility = View.GONE
+            return
+        }
+        binding.profileInitials.visibility = View.VISIBLE
+        binding.profileAvatar.visibility = View.GONE
+        loadAvatar(fullUrl)
+    }
+
     private fun loadAvatar(fullUrl: String) {
-        scope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val req = Request.Builder()
                     .url(fullUrl)
                     .addHeader("Cookie", cookieHeader())
                     .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) return@launch
-                val bytes = resp.body?.bytes() ?: return@launch
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@launch
-                withContext(Dispatchers.Main) {
-                    if (_binding == null) return@withContext
-                    binding.profileAvatar.setImageBitmap(bmp)
-                    binding.profileAvatar.visibility = View.VISIBLE
-                    binding.profileInitials.visibility = View.GONE
-                }
+                val bmp = withContext(Dispatchers.IO) {
+                    client.newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) return@withContext null
+                        val bytes = resp.body?.bytes() ?: return@withContext null
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
+                } ?: return@launch
+                shownAvatarUrl = fullUrl
+                shownAvatar = bmp
+                if (_binding == null) return@launch
+                binding.profileAvatar.setImageBitmap(bmp)
+                binding.profileAvatar.visibility = View.VISIBLE
+                binding.profileInitials.visibility = View.GONE
             } catch (_: Exception) { }
         }
     }
 
     private fun doLogout() {
-        scope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             VinorFcmRegistrar.unregisterCurrentToken(requireContext())
             try {
                 withContext(Dispatchers.IO) {
