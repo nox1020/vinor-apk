@@ -61,15 +61,6 @@
                     android:textSize="13sp" />
             </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="وینور"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
             <ImageButton
                 android:id="@+id/dashboardBell"
                 android:layout_width="48dp"
