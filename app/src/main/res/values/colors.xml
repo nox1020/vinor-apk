@@ -27,5 +27,7 @@
     <color name="vinor_on_primary">#FFFFFF</color>
     <color name="vinor_primary_pressed">#C91F1F</color>
     <color name="vinor_error">#FB7185</color>
+    <!-- برچسب «ویژه» روی عکس کارت پیشنهادی؛ طلایی در پالت قبلی نبود. -->
+    <color name="vinor_badge_gold">#F5B942</color>
     <color name="vinor_border_focus">#29FFFFFF</color>
 </resources>

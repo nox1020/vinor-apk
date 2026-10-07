@@ -38,7 +38,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** خانه نیتیو — میانبرها، ردیف فایل پیشنهادی و کارت مشتری در یک صفحه. چت فقط از تب فوتر. */
+/** خانه نیتیو — میانبرها، کارت مشتری و فایل‌های پیشنهادی در یک صفحه. چت فقط از تب فوتر. */
 class DashboardFragment : Fragment() {
 
     companion object {
@@ -113,6 +113,9 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardShortcutNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
+        }
+        binding.dashboardSuggestSeeAll.setOnClickListener {
+            (activity as? MainActivity)?.openSearch()
         }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
@@ -816,7 +819,7 @@ class DashboardFragment : Fragment() {
     private fun bindSuggest(obj: JSONObject) {
         val files = HomeSuggest.files(obj)
         val show = files.length() > 0
-        binding.dashboardSuggestScroll.isVisible = show
+        binding.dashboardSuggestBlock.isVisible = show
         if (!show) {
             suggestKey = ""
             binding.dashboardSuggest.removeAllViews()
@@ -830,32 +833,41 @@ class DashboardFragment : Fragment() {
         for (i in 0 until limit) {
             val ad = files.optJSONObject(i) ?: continue
             val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
-            card.suggestTitle.text = HomeSuggest.title(ad)
-            val sub = HomeSuggest.subtitle(ad)
-            card.suggestSub.isVisible = sub.isNotBlank()
-            card.suggestSub.text = sub
-            PartnerImages.roundClip(card.suggestImage, 10f)
+            card.suggestTitle.text = HomeSuggest.displayTitle(ad)
+            val spec = HomeSuggest.specLine(ad)
+            card.suggestSpec.isVisible = spec.isNotBlank()
+            card.suggestSpec.text = spec
+            val price = HomeSuggest.priceLine(ad)
+            card.suggestPrice.isVisible = price.isNotBlank()
+            card.suggestPrice.text = price
+            val location = HomeSuggest.locationLine(ad)
+            card.suggestLocBar.isVisible = location.isNotBlank()
+            card.suggestLocation.text = location
+            bindSuggestBadge(card, HomeSuggest.badge(ad))
+            val commission = HomeSuggest.commissionLabel(ad)
+            card.suggestCommissionRow.isVisible = commission.isNotBlank()
+            card.suggestCommission.text = commission
+            PartnerImages.roundClip(card.root, 16f)
             PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
             card.root.setOnClickListener { openSuggest(ad) }
         }
-        if (files.length() > limit) {
-            val more = android.widget.TextView(requireContext()).apply {
-                text = "همه"
-                gravity = Gravity.CENTER
-                setTextColor(ContextCompat.getColor(context, R.color.vinor_accent_green))
-                textSize = 14f
-                setBackgroundResource(R.drawable.bg_flat_outline_card)
-                val pad = (12 * resources.displayMetrics.density).toInt()
-                setPadding(pad, 0, pad, 0)
-                val density = resources.displayMetrics.density
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    (72 * density).toInt(),
-                    (84 * density).toInt(),
-                )
-                setOnClickListener { (activity as? MainActivity)?.openSearch() }
-            }
-            binding.dashboardSuggest.addView(more)
+    }
+
+    private fun bindSuggestBadge(card: ItemHomeSuggestBinding, badge: String) {
+        card.suggestBadge.isVisible = badge.isNotBlank()
+        if (badge.isBlank()) return
+        card.suggestBadge.text = badge
+        val tone = HomeSuggest.badgeTone(badge)
+        val bg = when (tone) {
+            "new" -> R.color.vinor_error
+            "gold" -> R.color.vinor_badge_gold
+            else -> R.color.vinor_accent_green
         }
+        val fg = if (tone == "gold") R.color.vinor_bg else R.color.vinor_on_primary
+        card.suggestBadge.setTextColor(ContextCompat.getColor(requireContext(), fg))
+        card.suggestBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(requireContext(), bg),
+        )
     }
 
     private fun openSuggest(ad: JSONObject) {
