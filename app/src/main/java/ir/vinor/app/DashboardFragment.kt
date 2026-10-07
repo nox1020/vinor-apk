@@ -24,6 +24,7 @@ import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentDashboardBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
+import ir.vinor.app.databinding.ItemHomeSuggestBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +38,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** خانه نیتیو — همان چیدمان وب: آگهی، میانبرها، کارت همکاری. چت فقط از تب فوتر. */
+/** خانه نیتیو — میانبرها، ردیف فایل پیشنهادی و کارت مشتری در یک صفحه. چت فقط از تب فوتر. */
 class DashboardFragment : Fragment() {
 
     companion object {
@@ -60,6 +61,7 @@ class DashboardFragment : Fragment() {
     private var wantChatLayer = false
     private var chatBindGen = 0
     private var boundMessageCount = 0
+    private var suggestKey = ""
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
     }
@@ -807,7 +809,63 @@ class DashboardFragment : Fragment() {
 
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         bindPrompts(obj, adsCount, reqCount)
+        bindSuggest(obj)
         binding.dashboardTiles.isVisible = false
+    }
+
+    private fun bindSuggest(obj: JSONObject) {
+        val files = HomeSuggest.files(obj)
+        val show = files.length() > 0
+        binding.dashboardSuggestScroll.isVisible = show
+        if (!show) {
+            suggestKey = ""
+            binding.dashboardSuggest.removeAllViews()
+            return
+        }
+        val key = files.length().toString() + ":" + files.optJSONObject(0)?.optString("token").orEmpty()
+        if (key == suggestKey && binding.dashboardSuggest.childCount > 0) return
+        suggestKey = key
+        binding.dashboardSuggest.removeAllViews()
+        val limit = minOf(files.length(), HomeSuggest.LIMIT)
+        for (i in 0 until limit) {
+            val ad = files.optJSONObject(i) ?: continue
+            val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
+            card.suggestTitle.text = HomeSuggest.title(ad)
+            val sub = HomeSuggest.subtitle(ad)
+            card.suggestSub.isVisible = sub.isNotBlank()
+            card.suggestSub.text = sub
+            PartnerImages.roundClip(card.suggestImage, 10f)
+            PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
+            card.root.setOnClickListener { openSuggest(ad) }
+        }
+        if (files.length() > limit) {
+            val more = android.widget.TextView(requireContext()).apply {
+                text = "همه"
+                gravity = Gravity.CENTER
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_accent_green))
+                textSize = 14f
+                setBackgroundResource(R.drawable.bg_flat_outline_card)
+                val pad = (12 * resources.displayMetrics.density).toInt()
+                setPadding(pad, 0, pad, 0)
+                val density = resources.displayMetrics.density
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    (72 * density).toInt(),
+                    (84 * density).toInt(),
+                )
+                setOnClickListener { (activity as? MainActivity)?.openSearch() }
+            }
+            binding.dashboardSuggest.addView(more)
+        }
+    }
+
+    private fun openSuggest(ad: JSONObject) {
+        val code = HomeSuggest.landCode(ad)
+        if (code.isNotBlank()) {
+            (activity as? MainActivity)?.openLand(code)
+            return
+        }
+        val url = ad.optString("url").trim()
+        if (url.isNotBlank() && url != "null") openVinorOrExternal(url)
     }
 
     private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {
