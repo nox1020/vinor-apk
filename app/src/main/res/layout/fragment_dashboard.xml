@@ -337,7 +337,7 @@
                                     android:layout_height="22dp"
                                     android:contentDescription=""
                                     android:src="@drawable/ic_graduation"
-                                    app:tint="@color/vinor_bg" />
+                                    app:tint="@color/vinor_accent_green" />
 
                                 <TextView
                                     android:layout_width="match_parent"
@@ -348,7 +348,7 @@
                                     android:gravity="center"
                                     android:maxLines="2"
                                     android:text="آموزش فروش"
-                                    android:textColor="@color/vinor_bg"
+                                    android:textColor="@color/vinor_text"
                                     android:textSize="13sp" />
                             </LinearLayout>
 
@@ -375,7 +375,7 @@
                                     android:layout_height="22dp"
                                     android:contentDescription=""
                                     android:src="@drawable/ic_news"
-                                    app:tint="@color/vinor_bg" />
+                                    app:tint="@color/vinor_accent_green" />
 
                                 <TextView
                                     android:layout_width="match_parent"
@@ -386,7 +386,7 @@
                                     android:gravity="center"
                                     android:maxLines="2"
                                     android:text="خبر وینور"
-                                    android:textColor="@color/vinor_bg"
+                                    android:textColor="@color/vinor_text"
                                     android:textSize="13sp" />
                             </LinearLayout>
 
@@ -413,7 +413,7 @@
                                     android:layout_height="22dp"
                                     android:contentDescription=""
                                     android:src="@drawable/ic_home"
-                                    app:tint="@color/vinor_bg" />
+                                    app:tint="@color/vinor_accent_green" />
 
                                 <TextView
                                     android:layout_width="match_parent"
@@ -424,7 +424,7 @@
                                     android:gravity="center"
                                     android:maxLines="2"
                                     android:text="فایل‌های من"
-                                    android:textColor="@color/vinor_bg"
+                                    android:textColor="@color/vinor_text"
                                     android:textSize="13sp" />
                             </LinearLayout>
                         </LinearLayout>
@@ -459,7 +459,7 @@
                                         android:layout_height="22dp"
                                         android:contentDescription=""
                                         android:src="@drawable/ic_clipboard"
-                                        app:tint="@color/vinor_bg" />
+                                        app:tint="@color/vinor_accent_green" />
 
                                     <TextView
                                         android:id="@+id/dashboardShortcutFollowTitle"
@@ -471,7 +471,7 @@
                                         android:gravity="center"
                                         android:maxLines="2"
                                         android:text="پیگیری مشتری‌ها"
-                                        android:textColor="@color/vinor_bg"
+                                        android:textColor="@color/vinor_text"
                                         android:textSize="13sp" />
                                 </LinearLayout>
 
@@ -481,7 +481,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_gravity="top|start"
                                     android:layout_margin="8dp"
-                                    android:background="@drawable/bg_count_badge"
+                                    android:background="@drawable/bg_vinor_count"
                                     android:gravity="center"
                                     android:minWidth="18dp"
                                     android:paddingHorizontal="5dp"
