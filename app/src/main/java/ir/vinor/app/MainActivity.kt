@@ -378,6 +378,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openCustomers(uri: Uri) {
+        if (!PartnerApi.hasSession()) {
+            DeepLinkPendingStore.save(this, uri.toString())
+            openLogin()
+            return
+        }
+        val url = uri.toString()
+        val current = navController.currentBackStackEntry?.arguments?.getString("url")
+        if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
+        val args = Bundle().apply { putString("url", url) }
+        navController.navigate(R.id.customersFragment, args)
+    }
+
     fun openLand(code: String) {
         val trimmed = code.trim()
         if (trimmed.isBlank()) return
@@ -568,7 +581,7 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.routineFragment)
                 }
             }
-            low.endsWith("/customers") || low.contains("/customers/") -> openInAppPartnerPage(uri)
+            low.endsWith("/customers") || low.contains("/customers/") -> openCustomers(uri)
             else -> openInAppPartnerPage(uri)
         }
     }
@@ -655,6 +668,7 @@ class MainActivity : AppCompatActivity() {
             DeepLinkRouter.DestinationType.PARTNER_COMMISSIONS -> navController.navigate(R.id.commissionsFragment)
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
+            DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.PARTNER_LOGIN -> openLogin()
             DeepLinkRouter.DestinationType.PARTNER_WEB -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.APK_DOWNLOAD -> {

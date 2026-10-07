@@ -202,6 +202,87 @@ object PartnerApi {
         }
     }
 
+    data class PageBody(val code: Int, val url: String, val body: String)
+
+    /** HTML بدون ذخیره. برای صفحه‌هایی که شماره و نام مشتری دارند. */
+    fun getPage(path: String, context: Context? = null): PageBody {
+        val url = if (path.startsWith("http")) path else "$BASE$path"
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return PageBody(0, url, "")
+        }
+        return try {
+            val b = Request.Builder().url(url).addHeader("Accept", "text/html")
+            val cookie = cookieHeader()
+            if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
+            if (context != null) {
+                b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+                VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
+            }
+            client.newCall(b.get().build()).execute().use { resp ->
+                saveCookies(resp)
+                PageBody(resp.code, resp.request.url.toString(), resp.body?.string().orEmpty())
+            }
+        } catch (_: Exception) {
+            PageBody(0, url, "")
+        }
+    }
+
+    /**
+     * POST صفحه‌ای که CSRF و Referer خودش را می‌خواهد. در صف آفلاین نمی‌رود.
+     */
+    fun postPage(
+        path: String,
+        body: JSONObject,
+        csrf: String,
+        refererPath: String,
+        context: Context? = null,
+    ): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executePage(path, body, token, refererPath, context)
+            if (PartnerCustomers.isCsrfExpired(resp)) {
+                val next = resp.optString("csrf_token").trim()
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executePage(path, body, token, refererPath, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executePage(
+        path: String,
+        body: JSONObject,
+        csrf: String,
+        refererPath: String,
+        context: Context?,
+    ): JSONObject {
+        val builder = requestBuilder(path, context)
+            .post(body.toString().toRequestBody(jsonType))
+            .addHeader("Content-Type", "application/json; charset=utf-8")
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", PartnerCustomers.ORIGIN)
+            .addHeader("Referer", PartnerCustomers.ORIGIN + refererPath)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
+    }
+
     fun getHtml(path: String, context: Context? = null): String {
         val url = if (path.startsWith("http")) path else "$BASE$path"
         val b = Request.Builder()

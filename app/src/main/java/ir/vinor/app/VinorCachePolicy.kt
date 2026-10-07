@@ -249,6 +249,7 @@ object VinorCachePolicy {
         "/settlement",
         "/finance",
         "/ai/chat",
+        "/customers",
         "/api/profile/update",
         "/api/profile/avatar",
         "/api/consultant",

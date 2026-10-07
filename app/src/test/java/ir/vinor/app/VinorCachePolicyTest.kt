@@ -47,6 +47,8 @@ class VinorCachePolicyTest {
         assertFalse(VinorCachePolicy.isSensitivePath("/express/partner/profile/data"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/withdrawals/request"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/bank-accounts/data"))
+        assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/customers"))
+        assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/customers"))
         assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/withdrawals/request"))
         assertFalse(VinorCachePolicy.isQueueablePost("https://vinor.ir/express/partner/bank-accounts/add"))
         assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/bank-accounts/data"))

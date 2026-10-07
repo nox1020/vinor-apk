@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EditText xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/customerFieldInput"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/bg_routine_card"
+    android:minHeight="48dp"
+    android:padding="12dp"
+    android:textAlignment="viewStart"
+    android:textColor="@color/vinor_text"
+    android:textColorHint="@color/vinor_text_muted"
+    android:textSize="15sp" />

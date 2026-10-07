@@ -23,6 +23,7 @@ object DeepLinkRouter {
         PARTNER_ROUTINE,
         PARTNER_LANDS,
         PARTNER_NOTIFICATIONS,
+        PARTNER_CUSTOMERS,
         PARTNER_LOGIN,
         PARTNER_WEB,
         PUBLIC_HOME,
@@ -168,7 +169,7 @@ object DeepLinkRouter {
                 )
             path == "/express/partner/customers" || path.startsWith("/express/partner/customers/") ->
                 Route(
-                    type = DestinationType.PARTNER_WEB,
+                    type = DestinationType.PARTNER_CUSTOMERS,
                     targetUrl = "https://$HOST$path${querySuffix(uri)}",
                     requiresAuth = true,
                     originalUri = raw,
