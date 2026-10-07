@@ -2,7 +2,6 @@ package ir.vinor.app
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.net.ConnectivityManager
@@ -15,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var pendingOpenVinorChat = false
+    private var pendingShowHome = false
     private var drawerIsSpecial = false
     private var tabbarForcedHidden = false
     private var tabbarImeHidden = false
@@ -134,17 +135,23 @@ class MainActivity : AppCompatActivity() {
     fun syncDivarTab() {
         if (!::binding.isInitialized) return
         applyTabbarVisibility()
-        val dest = runCatching { navController.currentDestination?.id }.getOrNull()
-        val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
-        val searchOn = dest == R.id.searchFragment
-        val postOn = dest == R.id.myPropertyFormFragment || dest == R.id.myPropertiesFragment
-        val meOn = dest == R.id.profileFragment ||
-            dest == R.id.commissionsFragment ||
-            dest == R.id.routineFragment ||
-            dest == R.id.notesFragment ||
-            dest == R.id.notificationsFragment ||
-            dest == R.id.nativePartnerFragment
-        val adsOn = dest == R.id.dashboardFragment && !chatOn
+        val stack = runCatching { navController.currentBackStack.value.map { it.destination.id } }.getOrDefault(emptyList())
+        val tab = FooterTabs.selected(
+            stack,
+            findDashboard()?.isChatOpen() == true,
+            FooterTabs.Ids(
+                dashboard = R.id.dashboardFragment,
+                search = R.id.searchFragment,
+                profile = R.id.profileFragment,
+                myProperties = R.id.myPropertiesFragment,
+                propertyForm = R.id.myPropertyFormFragment,
+            ),
+        )
+        val adsOn = tab == FooterTabs.Tab.ADS
+        val searchOn = tab == FooterTabs.Tab.SEARCH
+        val postOn = tab == FooterTabs.Tab.POST
+        val chatOn = tab == FooterTabs.Tab.CHAT
+        val meOn = tab == FooterTabs.Tab.ME
         paintTab(
             binding.divarTabbar.tabAdsIcon,
             binding.divarTabbar.tabAdsLabel,
@@ -192,26 +199,49 @@ class MainActivity : AppCompatActivity() {
 
     fun openPartnerHome() {
         pendingOpenVinorChat = false
+        pendingShowHome = true
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
             dash.showHomeEntry()
             dash.scrollHomeToTop()
+            pendingShowHome = false
             syncDivarTab()
             return
         }
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
-            nav.navigate(R.id.dashboardFragment)
+            runCatching { nav.navigate(R.id.dashboardFragment) }
         }
-        findDashboard()?.showHomeEntry()
-        syncDivarTab()
+        revealPendingHome()
+    }
+
+    /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب آگهی‌ها روی چت می‌ماند. */
+    private fun revealPendingHome(left: Int = 12) {
+        if (!pendingShowHome) {
+            syncDivarTab()
+            return
+        }
+        val live = findDashboard()
+        if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+            live.showHomeEntry()
+            live.scrollHomeToTop()
+            pendingShowHome = false
+            syncDivarTab()
+            return
+        }
+        if (left > 0) binding.root.post { revealPendingHome(left - 1) }
+        else {
+            pendingShowHome = false
+            syncDivarTab()
+        }
     }
 
     fun openVinorChat() {
+        pendingShowHome = false
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
-            dash.openVinorChat()
+            if (!dash.isChatOpen()) dash.openVinorChat()
             syncDivarTab()
             return
         }
@@ -252,6 +282,10 @@ class MainActivity : AppCompatActivity() {
 
     fun openProfile() {
         if (navController.currentDestination?.id == R.id.profileFragment) return
+        if (popToInStack(R.id.profileFragment)) {
+            syncDivarTab()
+            return
+        }
         navigateTab(R.id.profileFragment)
     }
 
@@ -278,7 +312,17 @@ class MainActivity : AppCompatActivity() {
 
     fun openSearch() {
         if (navController.currentDestination?.id == R.id.searchFragment) return
+        if (popToInStack(R.id.searchFragment)) {
+            syncDivarTab()
+            return
+        }
         navigateTab(R.id.searchFragment)
+    }
+
+    /** اگر ریشهٔ همین تب زیر صفحهٔ فعلی است، همان را نشان بده و فرگمنت را از نو نساز. */
+    private fun popToInStack(destId: Int): Boolean {
+        if (runCatching { navController.getBackStackEntry(destId) }.isFailure) return false
+        return navController.popBackStack(destId, false)
     }
 
     private fun openNativePage(page: String, asTab: Boolean) {
@@ -381,7 +425,10 @@ class MainActivity : AppCompatActivity() {
         fill: Int,
     ) {
         icon.setImageResource(if (on) fill else outline)
-        val c = Color.parseColor(if (on) "#4ADE80" else "#A3A3A3")
+        val c = ContextCompat.getColor(
+            this,
+            if (on) R.color.vinor_accent_green else R.color.vinor_text_muted,
+        )
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
         label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
