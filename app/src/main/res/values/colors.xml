@@ -2,6 +2,8 @@
 <resources>
     <color name="ic_launcher_background">#000000</color>
     <color name="vinor_bg">#000000</color>
+    <!-- هدر و فوتر تب‌ها؛ چند درجه روشن‌تر از زمینه تا نوارها از صفحه جدا شوند. -->
+    <color name="vinor_chrome">#141416</color>
     <color name="vinor_bg_light">#000000</color>
     <color name="vinor_bg_dark">#000000</color>
     <color name="vinor_pwa_bg">#000000</color>

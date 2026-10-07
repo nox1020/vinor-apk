@@ -10,6 +10,7 @@
         android:id="@+id/searchHeader"
         android:layout_width="match_parent"
         android:layout_height="56dp"
+        android:background="@color/vinor_chrome"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp">
 
