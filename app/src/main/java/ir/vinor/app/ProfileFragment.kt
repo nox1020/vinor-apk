@@ -420,9 +420,10 @@ class ProfileFragment : Fragment() {
                 Log.e(TAG, "logout error", e)
             }
             PartnerApi.clearCookies {
+                val host = activity as? MainActivity
+                host?.dropChatForSignedOutAccount()
                 if (_binding == null) return@clearCookies
                 context?.let { Toast.makeText(it, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show() }
-                val host = activity as? MainActivity
                 if (host != null) {
                     host.openPartnerHome()
                 } else {

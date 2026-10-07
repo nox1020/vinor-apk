@@ -55,6 +55,7 @@ class DashboardFragment : Fragment() {
     private var attachUploading = false
     private var cameraOutput: Uri? = null
     private var cachedHistory: JSONObject? = null
+    private var chatAccount: String? = null
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
@@ -178,6 +179,12 @@ class DashboardFragment : Fragment() {
 
     fun isChatOpen(): Boolean = chatLayerOpen && wantChatLayer
 
+    /** چتِ باز فقط وقتی مال همین نشست است که دوباره از شبکه پر نشود. */
+    fun isCurrentAccountChatOpen(): Boolean {
+        val account = currentAccountKey()
+        return isChatOpen() && account != null && chatAccount == account
+    }
+
     /** تب آگهی‌ها: لایهٔ چت را ببند، آگهی‌ها را نشان بده. */
     fun showHomeEntry() {
         wantChatLayer = false
@@ -228,9 +235,17 @@ class DashboardFragment : Fragment() {
         b.dashboardScroll.post { b.dashboardScroll.scrollTo(0, 0) }
     }
 
-    /** کلیک تب چت / «وینور»: اول پیام‌ها، فایل‌ها بعداً. */
+    /** کلیک تب چت / «وینور»: فقط نشست همین حساب. */
     fun openVinorChat() {
         if (_binding == null) return
+        val account = currentAccountKey()
+        if (account == null) {
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
         wantChatLayer = true
         chatLayerOpen = true
         hideHomeDashboardWidgets()
@@ -306,9 +321,10 @@ class DashboardFragment : Fragment() {
 
     private fun onAttachKind(kind: String) {
         closeAttach()
-        if (!PartnerApi.hasSession()) {
+        if (currentAccountKey() == null) {
             Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
             return
         }
         when (kind) {
@@ -338,9 +354,10 @@ class DashboardFragment : Fragment() {
 
     private fun startUpload(uri: Uri, kind: String) {
         if (_binding == null) return
-        if (!PartnerApi.hasSession()) {
+        if (currentAccountKey() == null) {
             Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
             return
         }
         val ctx = requireContext()
@@ -369,7 +386,8 @@ class DashboardFragment : Fragment() {
                 if (http == 401 || http == 403 || resp.optBoolean("need_login")) {
                     clearPendingAttachment()
                     Toast.makeText(ctx, resp.optString("error").ifBlank { "برای ارسال فایل وارد شوید." }, Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openDrawer()
+                    releaseChatAccount()
+                    (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
                 if (resp.optBoolean("ok") && resp.optString("url").isNotBlank()) {
@@ -536,12 +554,10 @@ class DashboardFragment : Fragment() {
 
     private fun loadAll(fromPull: Boolean = false) {
         val ctx = context ?: return
-        if (PartnerApi.hasSession()) {
+        if (currentAccountKey() != null) {
             fetchHistory(bindIfWanted = wantChatLayer)
         } else {
-            cachedHistory = null
-            threadId = null
-            if (wantChatLayer) bindChat(JSONObject())
+            releaseChatAccount()
         }
         scope.launch {
             var shownCache = binding.dashboardEmpty.isVisible
@@ -637,31 +653,37 @@ class DashboardFragment : Fragment() {
 
     private fun fetchHistory(bindIfWanted: Boolean) {
         val ctx = context ?: return
+        val account = currentAccountKey()
+        if (account == null) {
+            releaseChatAccount()
+            if (bindIfWanted) (activity as? MainActivity)?.requireChatLogin()
+            finishRefreshUi()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
+        val gen = chatBindGen
         scope.launch {
             try {
                 val peeked = withContext(Dispatchers.IO) {
                     PartnerApi.peekJson("/express/partner/ai/history", ctx)
                 }
-                if (_binding == null) return@launch
-                if (peeked != null) {
-                    rememberHistory(peeked)
-                    if (bindIfWanted && wantChatLayer) bindChatIfNeeded(peeked)
-                }
+                if (!chatStill(account, gen)) return@launch
+                if (peeked != null && bindIfWanted && wantChatLayer) bindChatIfNeeded(peeked)
                 val hist = withContext(Dispatchers.IO) {
                     PartnerApi.get("/express/partner/ai/history", ctx)
                 }
-                if (_binding == null) return@launch
+                if (!chatStill(account, gen)) return@launch
                 val status = hist.optInt("http_status")
                 if (status == 401 || status == 403) {
-                    cachedHistory = null
-                    threadId = null
-                    if (bindIfWanted && wantChatLayer) bindChat(JSONObject())
+                    releaseChatAccount()
+                    if (bindIfWanted) (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
                 rememberHistory(hist)
                 if (bindIfWanted && wantChatLayer) bindChatIfNeeded(hist)
             } catch (_: Exception) {
-                if (_binding != null && bindIfWanted && wantChatLayer &&
+                if (chatStill(account, gen) && bindIfWanted && wantChatLayer &&
                     binding.dashboardChatList.childCount == 0
                 ) {
                     bindChat(JSONObject())
@@ -672,6 +694,44 @@ class DashboardFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun currentAccountKey(): String? {
+        if (!PartnerApi.hasSession()) return null
+        val ctx = context ?: return ChatSessionGate.accountKey(true, VinorCacheSession.ANON)
+        val fp = runCatching { VinorCacheSession.fingerprint(ctx) }.getOrDefault(VinorCacheSession.ANON)
+        return ChatSessionGate.accountKey(true, fp)
+    }
+
+    private fun chatStill(account: String, gen: Int): Boolean {
+        if (_binding == null || gen != chatBindGen) return false
+        return currentAccountKey() == account
+    }
+
+    /** خروج یا عوض شدن حساب: ترد، حباب‌ها و پیوست همین صفحه پاک می‌شوند. */
+    fun releaseChatAccount() {
+        val wasOpen = chatLayerOpen || wantChatLayer
+        discardAccountChat()
+        wantChatLayer = false
+        if (wasOpen && _binding != null) showHomeEntry() else chatLayerOpen = false
+    }
+
+    private fun discardAccountChat() {
+        chatBindGen += 1
+        threadId = null
+        cachedHistory = null
+        boundMessageCount = 0
+        chatAccount = null
+        landsByCode.clear()
+        pendingAttachment = null
+        attachUploading = false
+        val b = _binding ?: return
+        b.dashboardChatList.removeAllViews()
+        b.dashboardChatInput.setText("")
+        b.dashboardAttachPreview.isVisible = false
+        b.dashboardAttachPreview.alpha = 1f
+        if (b.dashboardAttachSheet.isVisible || b.dashboardAttachScrim.isVisible) closeAttach()
+        syncSendEnabled()
     }
 
     private fun bindChatIfNeeded(obj: JSONObject) {
@@ -978,8 +1038,9 @@ class DashboardFragment : Fragment() {
     }
 
     private fun bindChat(obj: JSONObject) {
-        if (!wantChatLayer) return
-        threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
+        val account = currentAccountKey() ?: return
+        if (!wantChatLayer || chatAccount != account) return
+        rememberHistory(obj)
         val messages = obj.optJSONArray("messages") ?: JSONArray()
         boundMessageCount = messages.length()
         val gen = chatBindGen
@@ -1146,6 +1207,13 @@ class DashboardFragment : Fragment() {
     }
 
     private fun sendChat(prefill: String? = null, chipIntent: String = "") {
+        val account = currentAccountKey()
+        if (account == null) {
+            (activity as? MainActivity)?.requireChatLogin()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
         val text = prefill?.trim().orEmpty().ifBlank {
             binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
         }
@@ -1178,19 +1246,11 @@ class DashboardFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
                 if (_binding == null) return@launch
-                if (!wantChatLayer || !chatLayerOpen) return@launch
+                if (!wantChatLayer || !chatLayerOpen || currentAccountKey() != account) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
-                    if (toSend != null) {
-                        pendingAttachment = toSend
-                        showAttachPreview(
-                            toSend.optString("kind"),
-                            toSend.optString("name"),
-                            toSend.optLong("size"),
-                            uploading = false,
-                        )
-                    }
-                    (activity as? MainActivity)?.openDrawer()
+                    releaseChatAccount()
+                    (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {
@@ -1204,7 +1264,8 @@ class DashboardFragment : Fragment() {
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }
                     if (err.contains("ورود") || err.contains("لاگین")) {
-                        (activity as? MainActivity)?.openDrawer()
+                        releaseChatAccount()
+                        (activity as? MainActivity)?.requireChatLogin()
                     } else {
                         Toast.makeText(requireContext(), err, Toast.LENGTH_SHORT).show()
                     }

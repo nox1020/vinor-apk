@@ -192,6 +192,8 @@ object PartnerApi {
             if (code in 200..299) {
                 remember(path, obj, context)
                 obj
+            } else if (!ChatSessionGate.cacheMayHideAuthFailure(path, code)) {
+                obj
             } else {
                 peekJson(path, context) ?: obj
             }
@@ -357,6 +359,10 @@ object PartnerApi {
                 mgr.flush()
                 synchronized(cookieLock) {
                     cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
+                }
+                appCtx?.let { ctx ->
+                    VinorApiCacheStore.clearUser(ctx)
+                    VinorCacheSession.fingerprint(ctx)
                 }
                 done()
             }

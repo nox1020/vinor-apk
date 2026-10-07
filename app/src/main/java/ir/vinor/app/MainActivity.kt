@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var pendingOpenVinorChat = false
+    private var resumeChatAfterAuth = false
     private var pendingShowHome = false
     private var drawerIsSpecial = false
     private var tabbarForcedHidden = false
@@ -237,11 +238,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openVinorChat() {
+        if (!PartnerApi.hasSession()) {
+            requireChatLogin()
+            return
+        }
         pendingShowHome = false
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
-            if (!dash.isChatOpen()) dash.openVinorChat()
+            if (!dash.isCurrentAccountChatOpen()) dash.openVinorChat()
             syncDivarTab()
             return
         }
@@ -254,6 +259,10 @@ class MainActivity : AppCompatActivity() {
         fun tryOpen(left: Int) {
             if (!pendingOpenVinorChat) {
                 syncDivarTab()
+                return
+            }
+            if (!PartnerApi.hasSession()) {
+                requireChatLogin()
                 return
             }
             val live = findDashboard()
@@ -272,6 +281,30 @@ class MainActivity : AppCompatActivity() {
         val pending = pendingOpenVinorChat
         pendingOpenVinorChat = false
         return pending
+    }
+
+    /** مهمان تب چت را زده؛ بعد از OTP همان چتِ حساب جدید باز می‌شود. */
+    fun requireChatLogin() {
+        resumeChatAfterAuth = true
+        pendingOpenVinorChat = false
+        openLogin()
+    }
+
+    fun clearChatResume() {
+        resumeChatAfterAuth = false
+    }
+
+    fun openChatIfResumed() {
+        if (!resumeChatAfterAuth || !PartnerApi.hasSession()) return
+        resumeChatAfterAuth = false
+        openVinorChat()
+    }
+
+    fun dropChatForSignedOutAccount() {
+        resumeChatAfterAuth = false
+        pendingOpenVinorChat = false
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        host?.childFragmentManager?.fragments?.forEach { (it as? DashboardFragment)?.releaseChatAccount() }
     }
 
     fun openLogin() {
@@ -372,7 +405,11 @@ class MainActivity : AppCompatActivity() {
         binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
         binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
         binding.root.post {
-            navController.addOnDestinationChangedListener { _, _, _ ->
+            navController.addOnDestinationChangedListener { _, destination, _ ->
+                val onLogin = destination.id == R.id.loginStep1Fragment ||
+                    destination.id == R.id.loginStep2Fragment ||
+                    destination.id == R.id.loginWebFragment
+                if (!onLogin && !PartnerApi.hasSession()) resumeChatAfterAuth = false
                 binding.root.post { syncDivarTab() }
             }
             syncDivarTab()
@@ -557,6 +594,7 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {
             }
             PartnerApi.clearCookies {
+                dropChatForSignedOutAccount()
                 Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
                 refreshPartnerFlags()
                 openPartnerHome()
