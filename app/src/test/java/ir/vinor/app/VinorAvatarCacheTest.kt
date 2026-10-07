@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -35,6 +36,21 @@ class VinorAvatarCacheTest {
                 "https://vinor.ir/a.jpg",
                 "https://vinor.ir/a.jpg",
             ),
+        )
+    }
+
+    @Test
+    fun urlFrom_prefersFirstRealAvatar() {
+        val home = JSONObject()
+        val profile = JSONObject().put("avatar_url", "/express/partner/api/profile/avatar?v=3")
+        assertEquals("", VinorAvatarCache.urlFrom(home, JSONObject()))
+        assertEquals(
+            "/express/partner/api/profile/avatar?v=3",
+            VinorAvatarCache.urlFrom(home, profile),
+        )
+        assertEquals(
+            "https://vinor.ir/a.jpg?v=1",
+            VinorAvatarCache.urlFrom(JSONObject().put("avatar_url", "https://vinor.ir/a.jpg?v=1"), profile),
         )
     }
 

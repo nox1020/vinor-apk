@@ -23,11 +23,15 @@
             android:paddingVertical="8dp">
 
             <ImageView
+                android:id="@+id/dashboardHomeAvatar"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_hub_avatar"
-                android:contentDescription=""
+                android:clickable="true"
+                android:contentDescription="پروفایل"
+                android:focusable="true"
                 android:padding="9dp"
+                android:scaleType="centerCrop"
                 android:src="@drawable/ic_profile"
                 app:tint="@color/vinor_text" />
 

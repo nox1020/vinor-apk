@@ -62,6 +62,22 @@ object VinorAvatarCache {
         if (samePhoto(memUrl, url) && bmp != null && !bmp.isRecycled) bmp else null
     }
 
+    fun currentUrl(): String = synchronized(lock) { memUrl }
+
+    fun currentBitmap(): Bitmap? = synchronized(lock) {
+        val bmp = memBitmap
+        if (bmp != null && !bmp.isRecycled) bmp else null
+    }
+
+    fun urlFrom(vararg objects: JSONObject?): String {
+        for (obj in objects) {
+            if (obj == null) continue
+            val value = obj.optString("avatar_url").trim()
+            if (value.isNotEmpty() && value != "null") return value
+        }
+        return ""
+    }
+
     fun rememberBitmap(url: String, bitmap: Bitmap) = synchronized(lock) {
         memUrl = resolve(url)
         memBitmap = bitmap

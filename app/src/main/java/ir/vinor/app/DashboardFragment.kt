@@ -3,6 +3,8 @@ package ir.vinor.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -62,6 +64,9 @@ class DashboardFragment : Fragment() {
     private var chatBindGen = 0
     private var boundMessageCount = 0
     private var suggestKey = ""
+    private var homeAvatarWanted: String? = null
+    private var homeAvatarLoading: String? = null
+    private var homeAvatarLookup = false
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
     }
@@ -105,6 +110,8 @@ class DashboardFragment : Fragment() {
         binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
         binding.dashboardBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+        binding.dashboardHomeAvatar.setOnClickListener { (activity as? MainActivity)?.openProfile() }
+        PartnerImages.roundClip(binding.dashboardHomeAvatar, 20f)
         binding.dashboardWallet.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/commissions")
         }
@@ -143,6 +150,11 @@ class DashboardFragment : Fragment() {
         syncComposerVisible()
         paintRememberedHome()
         loadAll()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        rememberedHome?.let { bindHomeAvatar(it) }
         if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
             openVinorChat()
         }
@@ -764,6 +776,106 @@ class DashboardFragment : Fragment() {
         if (!tid.isNullOrBlank()) threadId = tid
     }
 
+    private fun bindHomeAvatar(home: JSONObject) {
+        if (_binding == null) return
+        val loggedIn = home.optBoolean("is_logged_in") || home.optString("me_name").isNotBlank()
+        if (!loggedIn) {
+            homeAvatarLookup = false
+            showHomeAvatarFallback()
+            return
+        }
+        val ctx = context
+        val profile = if (ctx != null) PartnerApi.peekJson("/express/partner/profile/data", ctx) else null
+        val url = VinorAvatarCache.urlFrom(home, profile)
+        val memUrl = VinorAvatarCache.currentUrl()
+        val memNewer = memUrl.isNotEmpty() &&
+            (url.isEmpty() || VinorAvatarCache.version(memUrl) > VinorAvatarCache.version(url) ||
+                (VinorAvatarCache.version(memUrl) == VinorAvatarCache.version(url) &&
+                    VinorAvatarCache.base(memUrl) == VinorAvatarCache.base(url)))
+        if (memNewer) {
+            VinorAvatarCache.currentBitmap()?.let {
+                applyHomePhoto(it)
+                if (url.isEmpty() || VinorAvatarCache.samePhoto(memUrl, url)) return
+            }
+        }
+        if (url.isNotEmpty()) {
+            showHomeAvatar(url)
+            return
+        }
+        if (profile != null || homeAvatarLookup || ctx == null) {
+            if (profile != null) showHomeAvatarFallback()
+            return
+        }
+        homeAvatarLookup = true
+        scope.launch {
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }.getOrNull()
+            }
+            if (_binding == null) return@launch
+            val found = VinorAvatarCache.urlFrom(fresh)
+            if (found.isEmpty()) showHomeAvatarFallback() else showHomeAvatar(found)
+        }
+    }
+
+    private fun showHomeAvatar(url: String) {
+        val resolved = VinorAvatarCache.resolve(url)
+        if (resolved.isEmpty()) {
+            showHomeAvatarFallback()
+            return
+        }
+        homeAvatarWanted = resolved
+        VinorAvatarCache.peek(resolved)?.let {
+            applyHomePhoto(it)
+            return
+        }
+        if (homeAvatarLoading == resolved) return
+        homeAvatarLoading = resolved
+        val ctx = context ?: return
+        val cookie = android.webkit.CookieManager.getInstance().getCookie(PartnerApi.BASE).orEmpty()
+        scope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, resolved)
+                        ?: VinorAvatarCache.fetch(resolved, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, resolved, fresh)
+                        }
+                }
+                if (_binding == null || homeAvatarWanted != resolved) return@launch
+                if (bytes == null) {
+                    showHomeAvatarFallback()
+                    return@launch
+                }
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(resolved, bmp)
+                if (_binding == null || homeAvatarWanted != resolved) return@launch
+                applyHomePhoto(bmp)
+            } finally {
+                if (homeAvatarLoading == resolved) homeAvatarLoading = null
+            }
+        }
+    }
+
+    private fun applyHomePhoto(bmp: Bitmap) {
+        val view = binding.dashboardHomeAvatar
+        view.setPadding(0, 0, 0, 0)
+        ImageViewCompat.setImageTintList(view, null)
+        view.scaleType = ImageView.ScaleType.CENTER_CROP
+        view.setImageBitmap(bmp)
+    }
+
+    private fun showHomeAvatarFallback() {
+        homeAvatarWanted = null
+        val view = binding.dashboardHomeAvatar
+        val pad = (9 * resources.displayMetrics.density).toInt()
+        view.setPadding(pad, pad, pad, pad)
+        view.scaleType = ImageView.ScaleType.CENTER_CROP
+        ImageViewCompat.setImageTintList(
+            view,
+            ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_text)),
+        )
+        view.setImageResource(R.drawable.ic_profile)
+    }
+
     private fun bindHome(obj: JSONObject) {
         isApproved = obj.optBoolean("is_approved")
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
@@ -780,6 +892,7 @@ class DashboardFragment : Fragment() {
 
         val name = obj.optString("me_name")
         binding.dashboardGreetName.text = if (name.isBlank()) "سلام، همکار عزیز" else "سلام، $name"
+        bindHomeAvatar(obj)
         binding.dashboardGreetSub.text = when {
             isApproved -> "آماده‌ای بفروشی؟"
             obj.optBoolean("has_pending_app") -> "درخواستت در حال بررسی است"
