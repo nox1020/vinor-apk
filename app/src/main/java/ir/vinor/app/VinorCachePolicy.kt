@@ -244,6 +244,8 @@ object VinorCachePolicy {
         "/login",
         "/logout",
         "/wallet",
+        "/withdrawals",
+        "/bank-accounts",
         "/settlement",
         "/finance",
         "/ai/chat",

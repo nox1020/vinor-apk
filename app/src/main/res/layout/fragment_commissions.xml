@@ -1,244 +1,615 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/vinor_bg"
-    android:layoutDirection="rtl"
-    android:orientation="vertical">
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:minHeight="56dp"
-        android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="8dp">
-
-        <ImageButton
-            android:id="@+id/commissionsBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="بازگشت"
-            android:padding="12dp"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="@color/vinor_text" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:text="کیف پول"
-            android:textColor="@color/vinor_text"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/vinor_border" />
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true"
-        android:overScrollMode="never"
-        android:scrollbars="none">
+        android:layout_height="match_parent"
+        android:background="@color/vinor_bg"
+        android:layoutDirection="rtl"
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="16dp">
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp">
 
-            <ProgressBar
-                android:id="@+id/commissionsProgress"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="16dp"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_hub_hero"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="کل درآمد"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/commissionsTotal"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:maxLines="2"
-                    android:text="۰"
-                    android:textColor="@color/vinor_on_primary"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="16dp"
-                android:paddingBottom="8dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="8dp">
-
-                    <TextView
-                        android:id="@+id/commissionsPending"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="۰"
-                        android:textColor="@color/vinor_text"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:gravity="center"
-                        android:maxLines="2"
-                        android:text="در انتظار"
-                        android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="32dp"
-                    android:background="@color/vinor_border" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="8dp">
-
-                    <TextView
-                        android:id="@+id/commissionsPaid"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="۰"
-                        android:textColor="@color/vinor_text"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:gravity="center"
-                        android:maxLines="2"
-                        android:text="پرداخت‌شده"
-                        android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="32dp"
-                    android:background="@color/vinor_border" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="6dp">
-
-                    <TextView
-                        android:id="@+id/commissionsSoldCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="۰"
-                        android:textColor="@color/vinor_text"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:gravity="center"
-                        android:maxLines="2"
-                        android:text="فروش‌های تایید شده"
-                        android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/vinor_border" />
+            <ImageButton
+                android:id="@+id/commissionsBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="بازگشت"
+                android:padding="12dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/vinor_text" />
 
             <TextView
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="4dp"
-                android:text="پورسانت‌ها"
-                android:textColor="@color/vinor_accent_green"
-                android:textSize="14sp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:text="کیف پول"
+                android:textColor="@color/vinor_text"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/vinor_border" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/commissionsList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
-
-            <LinearLayout
-                android:id="@+id/commissionsEmpty"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
                 android:orientation="vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingVertical="28dp"
-                android:visibility="gone">
+                android:paddingBottom="16dp">
 
-                <TextView
-                    android:id="@+id/commissionsEmptyText"
+                <ProgressBar
+                    android:id="@+id/commissionsProgress"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_hub_hero"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="کل درآمد"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/commissionsTotal"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:maxLines="2"
+                        android:text="۰"
+                        android:textColor="@color/vinor_on_primary"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="8dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="8dp">
+
+                        <TextView
+                            android:id="@+id/commissionsPending"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="۰"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:maxLines="2"
+                            android:text="در انتظار"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="32dp"
+                        android:background="@color/vinor_border" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="8dp">
+
+                        <TextView
+                            android:id="@+id/commissionsPaid"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="۰"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:maxLines="2"
+                            android:text="پرداخت‌شده"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="32dp"
+                        android:background="@color/vinor_border" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="6dp">
+
+                        <TextView
+                            android:id="@+id/commissionsSoldCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="۰"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:maxLines="2"
+                            android:text="فروش‌های تایید شده"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/commissionsWithdrawCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_flat_outline_card"
+                    android:clickable="false"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="قابل برداشت"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/commissionsWithdrawable"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="۰ تومان"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/commissionsWithdrawStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/commissionsWithdrawBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_hub_start"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:text="درخواست برداشت"
+                        android:textColor="#052E16"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@color/vinor_border" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="4dp"
+                    android:text="پورسانت‌ها"
+                    android:textColor="@color/vinor_accent_green"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/commissionsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/commissionsEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:text="هنوز پورسانتی ثبت نشده است."
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="15sp" />
+                    android:orientation="vertical"
+                    android:paddingHorizontal="24dp"
+                    android:paddingVertical="28dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/commissionsEmptyText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="هنوز پورسانتی ثبت نشده است."
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="15sp" />
+                </LinearLayout>
             </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/withdrawSheet"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/vinor_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:layoutDirection="rtl"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp">
+
+            <ImageButton
+                android:id="@+id/withdrawSheetBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="بازگشت"
+                android:padding="12dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/vinor_text" />
+
+            <TextView
+                android:id="@+id/withdrawSheetTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:text="درخواست برداشت"
+                android:textColor="@color/vinor_text"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/withdrawSheetProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="12dp"
+                android:visibility="gone" />
         </LinearLayout>
-    </ScrollView>
-</LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/vinor_border" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:id="@+id/withdrawStepRequest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="قابل برداشت"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/withdrawAvailable"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="مبلغ (تومان)"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/withdrawAmount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_routine_card"
+                        android:hint="مثلاً ۵۰۰۰۰"
+                        android:inputType="number"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="ltr"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="حساب مقصد"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <LinearLayout
+                        android:id="@+id/withdrawAccountRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_flat_outline_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="56dp"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp">
+
+                        <TextView
+                            android:id="@+id/withdrawAccountTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="انتخاب حساب"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/withdrawAccountSub"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="برای واریز، شبا را انتخاب کنید"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textDirection="ltr"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/withdrawRequestError"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="@color/vinor_error"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/withdrawStepPick"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/withdrawBankList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/withdrawBankEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:padding="24dp"
+                        android:text="هنوز حسابی ثبت نشده."
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="15sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/withdrawAddOpen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_flat_outline_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:text="افزودن حساب"
+                        android:textColor="@color/vinor_accent_green"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/withdrawStepAdd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="16dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="نام بانک"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/withdrawBankName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_routine_card"
+                        android:hint="مثلاً ملت"
+                        android:inputType="text"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="نام صاحب حساب"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/withdrawOwnerName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_routine_card"
+                        android:inputType="textPersonName"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="شماره شبا"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/withdrawSheba"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_routine_card"
+                        android:hint="IR"
+                        android:inputType="text"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="ltr"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/withdrawAddError"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="@color/vinor_error"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <TextView
+            android:id="@+id/withdrawSheetSubmit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_hub_start"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:text="ثبت درخواست"
+            android:textColor="#052E16"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</FrameLayout>

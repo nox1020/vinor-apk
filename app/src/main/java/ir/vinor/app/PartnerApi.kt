@@ -276,6 +276,50 @@ object PartnerApi {
         }
     }
 
+    /**
+     * POST مالی کیف پول. در صف آفلاین نمی‌رود و موفقیت جعلی نمی‌سازد.
+     * سرور این مسیرها را فقط با X-CSRFToken به‌اضافه Referer صفحهٔ کمیسیون می‌پذیرد.
+     */
+    fun postFinance(path: String, body: JSONObject, csrf: String, context: Context? = null): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executeFinance(path, body, token, context)
+            if (WalletWithdraw.isCsrfExpired(resp)) {
+                val next = WalletWithdraw.csrfOf(resp)
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executeFinance(path, body, token, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executeFinance(path: String, body: JSONObject, csrf: String, context: Context?): JSONObject {
+        val builder = requestBuilder(path, context)
+            .post(body.toString().toRequestBody(jsonType))
+            .addHeader("Content-Type", "application/json; charset=utf-8")
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", WalletWithdraw.ORIGIN)
+            .addHeader("Referer", WalletWithdraw.ORIGIN + WalletWithdraw.REFERER_PATH)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
+    }
+
     private fun enqueueOrOffline(ctx: Context, url: String, body: JSONObject): JSONObject {
         if (VinorCachePolicy.isQueueablePost(url)) {
             return VinorOfflineQueue.enqueue(ctx, "post", url, "POST", body.toString())
