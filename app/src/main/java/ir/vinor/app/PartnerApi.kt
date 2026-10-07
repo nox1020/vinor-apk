@@ -477,6 +477,7 @@ object PartnerApi {
 
     fun clearCookies(done: () -> Unit) {
         setLoggedIn(false)
+        ProfileFragment.clearRemembered()
         synchronized(cookieLock) { cookieSnapshot = "" }
         val apply = {
             val mgr = CookieManager.getInstance()

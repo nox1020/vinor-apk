@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -32,8 +33,42 @@ class ProfileFragment : Fragment() {
         private const val TAG = "ProfileFragment"
         private const val BASE = "https://vinor.ir"
         private const val PROFILE_DATA = "/express/partner/profile/data"
+        private const val PROFILE_EDIT_DATA = "/express/partner/profile/edit/data"
         private const val HOME_DATA = "/express/partner/home/data"
         private const val API_LOGOUT = "/express/partner/api/logout"
+
+        /** آخرین پروفایل همین فرآیند تا باز شدن دوبارهٔ تب صفحه خالی نماند. */
+        private var rememberedProfile: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            rememberedProfile = null
+            sessionStamp++
+        }
+
+        /** نام یا عکس تازه را روی کش پروفایل می‌نویسد تا برگشت به این صفحه نسخهٔ قدیمی را نشان ندهد. */
+        fun noteLocalEdit(context: Context, name: String? = null, avatarUrl: String? = null) {
+            if (name == null && avatarUrl.isNullOrEmpty()) return
+            patchCached(context, PROFILE_DATA, name, avatarUrl, keep = true)
+            patchCached(context, PROFILE_EDIT_DATA, name, avatarUrl, keep = false)
+        }
+
+        private fun patchCached(
+            context: Context,
+            path: String,
+            name: String?,
+            avatarUrl: String?,
+            keep: Boolean,
+        ) {
+            val current = PartnerApi.peekJson(path, context)
+            val source = current ?: (if (keep) rememberedProfile else null) ?: return
+            val obj = JSONObject(source.toString())
+            obj.remove("from_cache")
+            if (name != null) obj.put("me_name", name)
+            if (!avatarUrl.isNullOrEmpty()) obj.put("avatar_url", avatarUrl)
+            if (keep) rememberedProfile = JSONObject(obj.toString())
+            PartnerApi.remember(path, obj, context)
+        }
     }
 
     private var latestProfile: JSONObject? = null
@@ -63,8 +98,15 @@ class ProfileFragment : Fragment() {
                 (activity as? MainActivity)?.openPartnerHome()
             }
         }
-        latestProfile?.let { bindProfilePayload(it) }
+        paintCachedProfile()
         loadData(blocking = latestProfile == null)
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        if (savedInstanceState == null || _binding == null) return
+        paintCachedProfile()
+        if (latestProfile != null) binding.profileProgress.visibility = View.GONE
     }
 
     override fun onResume() {
@@ -89,40 +131,54 @@ class ProfileFragment : Fragment() {
         ""
     }
 
+    private fun paintCachedProfile() {
+        val snap = rememberedProfile ?: context?.let { ctx ->
+            runCatching { PartnerApi.peekJson(PROFILE_DATA, ctx) }.getOrNull()
+        } ?: return
+        bindProfilePayload(snap)
+    }
+
     private fun loadData(blocking: Boolean) {
         val ctx = context ?: return
         if (_binding == null) return
         val gen = ++loadGen
-        if (blocking) {
+        val stamp = sessionStamp
+        val empty = binding.profileCard.visibility != View.VISIBLE &&
+            binding.profileGuest.visibility != View.VISIBLE
+        if (blocking && empty) {
             binding.profileProgress.visibility = View.VISIBLE
-            binding.profileGuest.visibility = View.GONE
-            binding.profileCard.visibility = View.GONE
-            binding.profileLinks.visibility = View.GONE
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val obj = PartnerApi.loadDisplay(PROFILE_DATA, ctx) { data ->
-                    if (_binding == null || gen != loadGen) return@loadDisplay
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
                     bindProfilePayload(data)
                 }
-                if (_binding == null || gen != loadGen) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                binding.profileProgress.visibility = View.GONE
                 if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
-                    binding.profileProgress.visibility = View.GONE
                     if (latestProfile == null) showGuest()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadData error", e)
-                if (_binding == null || gen != loadGen) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 binding.profileProgress.visibility = View.GONE
                 if (latestProfile == null) showGuest()
             }
         }
     }
 
+    private fun rememberProfile(obj: JSONObject) {
+        val copy = JSONObject(obj.toString())
+        copy.remove("from_cache")
+        rememberedProfile = copy
+        latestProfile = copy
+    }
+
     private fun bindProfilePayload(obj: JSONObject) {
         if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) return
-        latestProfile = obj
+        rememberProfile(obj)
         binding.profileProgress.visibility = View.GONE
         val plusOn = obj.optBoolean("plus_system_enabled", false)
         val lawyerOn = obj.optBoolean("lawyer_feature_on", false)
@@ -192,11 +248,13 @@ class ProfileFragment : Fragment() {
 
     private fun showGuest(plusOn: Boolean = false, lawyerOn: Boolean = false) {
         if (_binding == null) return
-        renderedMenuKey = null
+        rememberedProfile = null
         binding.profileGuest.visibility = View.VISIBLE
         binding.profileCard.visibility = View.GONE
         binding.profileLinks.visibility = View.VISIBLE
-        binding.profileNotifications.visibility = View.GONE
+        binding.profileNotifications.visibility = View.INVISIBLE
+        binding.profileNotifications.isEnabled = false
+        syncCardDivider()
         binding.profileGuestLogin.setOnClickListener {
             try {
                 findNavController().navigate(R.id.action_profile_to_login)
@@ -205,12 +263,16 @@ class ProfileFragment : Fragment() {
             }
         }
         binding.profileGuestApply.setOnClickListener { openUrl("$BASE/express/partner/apply/step1") }
-        binding.profileLinks.removeAllViews()
-        addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
-        addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
-        addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
-        if (plusOn) addMenuRow("وینور پلاس", "دریافت اشتراک", R.drawable.ic_sparkle, "login")
-        if (lawyerOn) addMenuRow("وکیل ملکی", "برای استفاده وارد شوید", R.drawable.ic_scale, "login")
+        val guestKey = ProfileMenu.guestKey(plusOn, lawyerOn)
+        if (guestKey == renderedMenuKey && binding.profileLinks.childCount > 0) return
+        renderedMenuKey = guestKey
+        replaceMenu {
+            addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
+            addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
+            addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+            if (plusOn) addMenuRow("وینور پلاس", "دریافت اشتراک", R.drawable.ic_sparkle, "login")
+            if (lawyerOn) addMenuRow("وکیل ملکی", "برای استفاده وارد شوید", R.drawable.ic_scale, "login")
+        }
     }
 
     private fun bindProfile(
@@ -232,6 +294,8 @@ class ProfileFragment : Fragment() {
         binding.profileCard.visibility = View.VISIBLE
         binding.profileLinks.visibility = View.VISIBLE
         binding.profileNotifications.visibility = View.VISIBLE
+        binding.profileNotifications.isEnabled = true
+        syncCardDivider()
 
         binding.profileName.text = meName
         binding.profilePhone.text = mePhone
@@ -248,20 +312,17 @@ class ProfileFragment : Fragment() {
         binding.profileInitials.text = initials
         showAvatar(avatarUrl)
 
-        val menuKey = listOf(
-            mePhone,
-            meName,
-            avatarUrl.orEmpty(),
-            isApproved,
-            isSpecial,
-            hasPendingApp,
-            plusOn,
-            lawyerOn,
-            showAppUpdate,
-            androidApkUrl,
-            androidApkVersion,
-            showCustomers,
-        ).joinToString("\u0001")
+        val menuKey = ProfileMenu.rowsKey(
+            isApproved = isApproved,
+            isSpecial = isSpecial,
+            hasPendingApp = hasPendingApp,
+            plusOn = plusOn,
+            lawyerOn = lawyerOn,
+            showAppUpdate = showAppUpdate,
+            apkUrl = androidApkUrl,
+            apkVersion = androidApkVersion,
+            showCustomers = showCustomers,
+        )
         val keepMenu = menuKey == renderedMenuKey && binding.profileLinks.childCount > 0
 
         binding.profileCard.setOnClickListener {
@@ -282,51 +343,67 @@ class ProfileFragment : Fragment() {
 
         if (keepMenu) return
         renderedMenuKey = menuKey
+        replaceMenu {
+            addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
+            if (isApproved) {
+                addMenuRow("پیگیری", "درخواست، بازدید و معامله", R.drawable.ic_routine, "$BASE/express/partner/requests")
+                if (showCustomers) {
+                    addMenuRow("مشتریان", "", R.drawable.ic_users_stroke, "$BASE${PartnerCrm.PATH}")
+                }
+                addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
+                addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")
+                addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
+                addMenuRow("دعوت همکار", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
+            } else {
+                if (hasPendingApp) {
+                    addMenuRow("وضعیت بازاریاب وینور", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
+                } else {
+                    addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
+                }
+                addMenuRow("دعوت دوستان", "", R.drawable.ic_share_nodes, "$BASE/express/partner/invite")
+                addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
+            }
+            if (plusOn) {
+                addMenuRow(
+                    if (isSpecial) "وینور پلاس" else "دریافت وینور پلاس",
+                    "",
+                    R.drawable.ic_sparkle,
+                    "$BASE/express/partner/plus",
+                )
+            }
+            if (lawyerOn) {
+                addMenuRow("وکیل ملکی", "مشاوره حقوقی املاک ایران", R.drawable.ic_scale, "lawyer")
+            }
+            if (showAppUpdate && androidApkUrl.isNotEmpty()) {
+                val appUpdateSub = if (androidApkVersion.isNotEmpty()) {
+                    "نسخه جدید برای دانلود آماده است (نسخه $androidApkVersion)"
+                } else {
+                    "نسخه جدید برای دانلود آماده است"
+                }
+                addMenuRow(
+                    "بروزرسانی اپلیکیشن",
+                    appUpdateSub,
+                    R.drawable.ic_help,
+                    "apk_update:$androidApkUrl|$androidApkVersion",
+                )
+            }
+            addMenuRow("تنظیمات", "", R.drawable.ic_settings, "$BASE/express/partner/settings")
+        }
+    }
+
+    private fun syncCardDivider() {
+        val show = binding.profileCard.visibility == View.VISIBLE ||
+            binding.profileGuest.visibility == View.VISIBLE
+        binding.profileCardDivider.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    /** حذف و ساخت ردیف‌ها جای اسکرول را برنمی‌گرداند. */
+    private fun replaceMenu(fill: () -> Unit) {
+        val scroll = binding.profileScroll
+        val y = scroll.scrollY
         binding.profileLinks.removeAllViews()
-        addMenuRow("ملک من", "ثبت ملک و انتشار آگهی", R.drawable.ic_home, "$BASE/express/partner/my-property")
-        if (isApproved) {
-            addMenuRow("پیگیری", "درخواست، بازدید و معامله", R.drawable.ic_routine, "$BASE/express/partner/requests")
-            if (showCustomers) {
-                addMenuRow("مشتریان", "", R.drawable.ic_users_stroke, "$BASE${PartnerCrm.PATH}")
-            }
-            addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
-            addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")
-            addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
-            addMenuRow("دعوت همکار", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
-        } else {
-            if (hasPendingApp) {
-                addMenuRow("وضعیت بازاریاب وینور", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
-            } else {
-                addMenuRow("بازاریاب وینور", "", R.drawable.ic_person_add, "$BASE/express/partner/apply/step1")
-            }
-            addMenuRow("دعوت دوستان", "", R.drawable.ic_share_nodes, "$BASE/express/partner/invite")
-            addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
-        }
-        if (plusOn) {
-            addMenuRow(
-                if (isSpecial) "وینور پلاس" else "دریافت وینور پلاس",
-                "",
-                R.drawable.ic_sparkle,
-                "$BASE/express/partner/plus",
-            )
-        }
-        if (lawyerOn) {
-            addMenuRow("وکیل ملکی", "مشاوره حقوقی املاک ایران", R.drawable.ic_scale, "lawyer")
-        }
-        if (showAppUpdate && androidApkUrl.isNotEmpty()) {
-            val appUpdateSub = if (androidApkVersion.isNotEmpty()) {
-                "نسخه جدید برای دانلود آماده است (نسخه $androidApkVersion)"
-            } else {
-                "نسخه جدید برای دانلود آماده است"
-            }
-            addMenuRow(
-                "بروزرسانی اپلیکیشن",
-                appUpdateSub,
-                R.drawable.ic_help,
-                "apk_update:$androidApkUrl|$androidApkVersion",
-            )
-        }
-        addMenuRow("تنظیمات", "", R.drawable.ic_settings, "$BASE/express/partner/settings")
+        fill()
+        if (y > 0) scroll.post { scroll.scrollTo(0, y) }
     }
 
     private fun addMenuRow(title: String, subtitle: String, icon: Int, url: String) {
@@ -362,6 +439,9 @@ class ProfileFragment : Fragment() {
             return
         }
         val fullUrl = VinorAvatarCache.resolve(avatarUrl)
+        val already = wantedAvatarUrl == fullUrl &&
+            binding.profileAvatar.visibility == View.VISIBLE &&
+            binding.profileAvatar.drawable != null
         wantedAvatarUrl = fullUrl
         val instant = VinorAvatarCache.peek(fullUrl)
         if (instant != null) {
@@ -370,10 +450,12 @@ class ProfileFragment : Fragment() {
             binding.profileInitials.visibility = View.GONE
             return
         }
-        if (avatarLoadUrl == fullUrl) return
+        if (already || avatarLoadUrl == fullUrl) return
         avatarLoadUrl = fullUrl
-        binding.profileInitials.visibility = View.VISIBLE
-        binding.profileAvatar.visibility = View.GONE
+        if (binding.profileAvatar.drawable == null) {
+            binding.profileInitials.visibility = View.VISIBLE
+            binding.profileAvatar.visibility = View.GONE
+        }
         loadAvatar(fullUrl)
     }
 
@@ -467,4 +549,33 @@ class ProfileFragment : Fragment() {
             context?.let { Toast.makeText(it, "خطا در باز کردن لینک", Toast.LENGTH_SHORT).show() }
         }
     }
+}
+
+/** ردیف‌های منو به نام، شماره و عکس وابسته نیستند تا عوض شدنشان کل لیست را از نو نسازد. */
+internal object ProfileMenu {
+    fun rowsKey(
+        isApproved: Boolean,
+        isSpecial: Boolean,
+        hasPendingApp: Boolean,
+        plusOn: Boolean,
+        lawyerOn: Boolean,
+        showAppUpdate: Boolean,
+        apkUrl: String,
+        apkVersion: String,
+        showCustomers: Boolean,
+    ): String = listOf(
+        "user",
+        isApproved,
+        isSpecial,
+        hasPendingApp,
+        plusOn,
+        lawyerOn,
+        showAppUpdate,
+        apkUrl,
+        apkVersion,
+        showCustomers,
+    ).joinToString("\u0001")
+
+    fun guestKey(plusOn: Boolean, lawyerOn: Boolean): String =
+        listOf("guest", plusOn, lawyerOn).joinToString("\u0001")
 }

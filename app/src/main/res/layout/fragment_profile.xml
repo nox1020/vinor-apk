@@ -1,19 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/vinor_bg"
-    android:fillViewport="true"
-    android:overScrollMode="never"
-    android:scrollbars="none">
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layoutDirection="rtl"
-        android:orientation="vertical"
-        android:paddingBottom="16dp">
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -56,7 +53,7 @@
                 android:contentDescription="اعلان‌ها"
                 android:padding="12dp"
                 android:src="@drawable/ic_messages"
-                android:visibility="gone"
+                android:visibility="invisible"
                 app:tint="@color/vinor_text" />
         </LinearLayout>
 
@@ -65,185 +62,204 @@
             android:layout_height="1dp"
             android:background="@color/vinor_border" />
 
-        <ProgressBar
-            android:id="@+id/profileProgress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:visibility="gone" />
-
-        <LinearLayout
-            android:id="@+id/profileGuest"
+        <ScrollView
+            android:id="@+id/profileScroll"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/bg_routine_card"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:padding="20dp"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:background="@drawable/bg_hub_avatar"
-                android:contentDescription=""
-                android:padding="14dp"
-                android:src="@drawable/ic_profile"
-                app:tint="@color/vinor_text" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="کاربر وارد نشده است"
-                android:textColor="@color/vinor_text"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:gravity="center"
-                android:text="برای مشاهده و مدیریت پروفایل وارد شوید"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/profileGuestLogin"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_hub_start"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:minHeight="44dp"
-                android:text="ورود"
-                android:textColor="#052E16"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/profileGuestApply"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:minHeight="44dp"
-                android:text="بازاریاب وینور"
-                android:textColor="@color/vinor_accent_green"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/profileCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="88dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="16dp"
-            android:visibility="gone">
-
-            <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:background="@drawable/bg_hub_avatar"
-                android:clipToOutline="true">
-
-                <ImageView
-                    android:id="@+id/profileAvatar"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription=""
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/profileInitials"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:layoutDirection="rtl"
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
 
-                <TextView
-                    android:id="@+id/profileName"
+                <LinearLayout
+                    android:id="@+id/profileGuest"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="همکار وینور"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_routine_card"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/profilePhone"
+                    <ImageView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_hub_avatar"
+                        android:contentDescription=""
+                        android:padding="14dp"
+                        android:src="@drawable/ic_profile"
+                        app:tint="@color/vinor_text" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="کاربر وارد نشده است"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="برای مشاهده و مدیریت پروفایل وارد شوید"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/profileGuestLogin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_hub_start"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:text="ورود"
+                        android:textColor="#052E16"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/profileGuestApply"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:text="بازاریاب وینور"
+                        android:textColor="@color/vinor_accent_green"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/profileCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="13sp" />
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="88dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="16dp"
+                    android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/profileStatus"
-                    android:layout_width="wrap_content"
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_hub_avatar"
+                        android:clipToOutline="true">
+
+                        <ImageView
+                            android:id="@+id/profileAvatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription=""
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/profileInitials"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/profileName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="همکار وینور"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/profilePhone"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/profileStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="همکار تایید شده"
+                            android:textColor="@color/vinor_accent_green"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/profileLogout"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="40dp"
+                        android:paddingHorizontal="12dp"
+                        android:text="خروج"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/profileCardDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/vinor_border"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/profileLinks"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="همکار تایید شده"
-                    android:textColor="@color/vinor_accent_green"
-                    android:textSize="13sp" />
+                    android:orientation="vertical"
+                    android:visibility="gone" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/profileLogout"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:minHeight="40dp"
-                android:paddingHorizontal="12dp"
-                android:text="خروج"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="14sp" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/vinor_border" />
-
-        <LinearLayout
-            android:id="@+id/profileLinks"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" />
+        </ScrollView>
     </LinearLayout>
-</ScrollView>
+
+    <ProgressBar
+        android:id="@+id/profileProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+</FrameLayout>

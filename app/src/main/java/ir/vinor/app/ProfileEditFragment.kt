@@ -327,6 +327,7 @@ class ProfileEditFragment : Fragment() {
                         val resolved = VinorAvatarCache.resolve(newUrl)
                         VinorAvatarCache.store(requireContext(), resolved, bytes)
                         if (bmp != null) VinorAvatarCache.rememberBitmap(resolved, bmp)
+                        context?.let { ProfileFragment.noteLocalEdit(it, avatarUrl = newUrl) }
                     }
                     if (bmp != null) {
                         binding.profileEditAvatar.setImageBitmap(bmp)
@@ -375,7 +376,10 @@ class ProfileEditFragment : Fragment() {
                             JSONObject(resp.body?.string() ?: "{}").optBoolean("success", false)
                         }.getOrElse { false }
                         if (ok) {
-                            context?.let { Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show() }
+                            context?.let {
+                                ProfileFragment.noteLocalEdit(it, name = name)
+                                Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show()
+                            }
                             findNavController().navigateUp()
                         } else {
                             context?.let { Toast.makeText(it, "خطا در ذخیره", Toast.LENGTH_SHORT).show() }
