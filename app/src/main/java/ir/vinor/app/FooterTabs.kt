@@ -17,11 +17,13 @@ object FooterTabs {
     )
 
     fun selected(stack: List<Int>, chatOpen: Boolean, ids: Ids): Tab {
-        if (stack.isEmpty() || stack.last() == ids.dashboard) {
+        // بک‌استک با خودِ گراف ناوبری شروع می‌شود؛ ریشهٔ تب اولین صفحه بعد از خانه است.
+        val homeAt = stack.indexOf(ids.dashboard)
+        val pages = if (homeAt >= 0) stack.subList(homeAt, stack.size) else stack
+        if (pages.isEmpty() || pages.last() == ids.dashboard) {
             return if (chatOpen) Tab.CHAT else Tab.ADS
         }
-        val root = if (stack.first() == ids.dashboard) stack.getOrNull(1) else stack.first()
-        return when (root) {
+        return when (pages.getOrNull(1)) {
             ids.search -> Tab.SEARCH
             ids.profile -> Tab.ME
             ids.myProperties, ids.propertyForm -> Tab.POST

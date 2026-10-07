@@ -3,7 +3,6 @@ package ir.vinor.app
 import android.content.Context
 import android.content.Intent
 import android.graphics.PorterDuff
-import android.graphics.Typeface
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -15,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -257,7 +257,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             val live = findDashboard()
-            if (live != null) {
+            if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
                 live.openVinorChat()
                 pendingOpenVinorChat = false
                 syncDivarTab()
@@ -431,7 +431,10 @@ class MainActivity : AppCompatActivity() {
         )
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
-        label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
+        label.typeface = ResourcesCompat.getFont(
+            this,
+            if (on) R.font.vazirmatn_bold else R.font.vazirmatn_regular,
+        )
     }
 
     private fun findWebPage(): BaseWebViewFragment? {
