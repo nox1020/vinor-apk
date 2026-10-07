@@ -112,9 +112,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
         }
-        binding.dashboardShortcutFiles.setOnClickListener {
-            (activity as? MainActivity)?.openPath("/express/partner/my-property")
-        }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
