@@ -20,12 +20,15 @@ object PartnerCustomers {
         val required: Boolean,
     )
 
+    data class Fact(val label: String, val value: String, val phone: Boolean = false)
+
     data class Row(
         val id: String,
         val title: String,
         val phone: String,
         val notes: String,
         val status: String,
+        val facts: List<Fact> = emptyList(),
     )
 
     data class Tab(val label: String, val href: String, val selected: Boolean)
@@ -148,6 +151,26 @@ object PartnerCustomers {
         return fallback
     }
 
+    fun addActionLabel(raw: String): String {
+        val text = raw.trim()
+        if (text.isEmpty() || text == "ذخیره مشتری" || text == "ثبت مشتری" || text == "ذخیره") {
+            return "افزودن مشتری"
+        }
+        return text
+    }
+
+    fun detailFacts(row: Row): List<Fact> {
+        val out = ArrayList<Fact>()
+        if (row.phone.isNotBlank()) out.add(Fact("موبایل", row.phone, phone = true))
+        if (row.status.isNotBlank()) out.add(Fact("وضعیت", row.status))
+        for (fact in row.facts) {
+            if (out.any { it.label == fact.label && it.value == fact.value }) continue
+            out.add(fact)
+        }
+        if (row.notes.isNotBlank()) out.add(Fact("یادداشت", row.notes))
+        return out
+    }
+
     fun normalizePhone(raw: String): String {
         var digits = PartnerApi.asciiDigits(raw)
         if (digits.startsWith("0098")) digits = digits.drop(4)
@@ -259,12 +282,16 @@ object PartnerCustomers {
         }
         if (title.isBlank() && phone.isBlank()) return null
         if (title == "مشتریان" && phone.isBlank()) return null
+        val shownTitle = title.ifBlank { phone }
+        val notes = classText(inner, "note").ifBlank { classText(inner, "desc") }
+        val status = classText(inner, "status").ifBlank { classText(inner, "badge") }
         return Row(
             id = id,
-            title = title.ifBlank { phone },
+            title = shownTitle,
             phone = phone,
-            notes = classText(inner, "note").ifBlank { classText(inner, "desc") },
-            status = classText(inner, "status").ifBlank { classText(inner, "badge") },
+            notes = notes,
+            status = status,
+            facts = extraFacts(inner, shownTitle, phone, notes, status),
         )
     }
 
@@ -287,13 +314,17 @@ object PartnerCustomers {
                 val combined = listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
                 val title = firstString(obj, "name", "full_name", "title", "customer_name").ifBlank { combined }
                 if (title.isBlank() && phone.isBlank()) continue
+                val shownTitle = title.ifBlank { phone }
+                val notes = firstString(obj, "notes", "note", "description")
+                val status = firstString(obj, "status", "state", "status_label")
                 out.add(
                     Row(
                         id = firstString(obj, "id", "customer_id"),
-                        title = title.ifBlank { phone },
+                        title = shownTitle,
                         phone = phone,
-                        notes = firstString(obj, "notes", "note", "description"),
-                        status = firstString(obj, "status", "state", "status_label"),
+                        notes = notes,
+                        status = status,
+                        facts = jsonFacts(obj, shownTitle, phone, notes, status),
                     ),
                 )
             }
@@ -389,6 +420,38 @@ object PartnerCustomers {
         return LABELS[name] ?: name
     }
 
+    private fun extraFacts(inner: String, title: String, phone: String, notes: String, status: String): List<Fact> {
+        val out = ArrayList<Fact>()
+        fun add(label: String, value: String) {
+            val text = value.trim()
+            if (text.isBlank() || text == title || text == phone || text == notes || text == status) return
+            if (out.any { it.label == label || it.value == text }) return
+            out.add(Fact(label, text))
+        }
+        val pairs = Regex(
+            """<dt\b[^>]*>(.*?)</dt>\s*<dd\b[^>]*>(.*?)</dd>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        for (pair in pairs.findAll(inner)) {
+            val label = plainLines(pair.groupValues[1]).firstOrNull().orEmpty()
+            val value = plainLines(pair.groupValues[2]).joinToString(" ")
+            if (label.isNotBlank()) add(label, value)
+        }
+        for ((token, label) in EXTRA) add(label, classText(inner, token))
+        return out
+    }
+
+    private fun jsonFacts(obj: JSONObject, title: String, phone: String, notes: String, status: String): List<Fact> {
+        val out = ArrayList<Fact>()
+        for ((keys, label) in JSON_FACTS) {
+            val value = firstString(obj, *keys)
+            if (value.isBlank() || value == title || value == phone || value == notes || value == status) continue
+            if (out.any { it.label == label || it.value == value }) continue
+            out.add(Fact(label, value))
+        }
+        return out
+    }
+
     private fun classText(inner: String, token: String): String {
         val match = Regex(
             """<(?:p|span|div|h[1-6]|a|td|strong)\b[^>]*class\s*=\s*["'][^"']*$token[^"']*["'][^>]*>(.*?)</""",
@@ -472,6 +535,29 @@ object PartnerCustomers {
         }
         return ""
     }
+
+    private val EXTRA = listOf(
+        "city" to "شهر",
+        "area" to "منطقه",
+        "region" to "منطقه",
+        "district" to "منطقه",
+        "neighborhood" to "محله",
+        "budget" to "بودجه",
+        "request" to "درخواست",
+        "source" to "منبع",
+        "email" to "ایمیل",
+        "date" to "تاریخ",
+    )
+
+    private val JSON_FACTS = listOf(
+        arrayOf("city", "customer_city") to "شهر",
+        arrayOf("area", "district", "neighborhood", "region", "location") to "منطقه",
+        arrayOf("budget", "budget_text") to "بودجه",
+        arrayOf("request", "request_type", "need", "intent") to "درخواست",
+        arrayOf("source") to "منبع",
+        arrayOf("email") to "ایمیل",
+        arrayOf("created_at", "created", "date") to "تاریخ",
+    )
 
     private val LABELS = mapOf(
         "customer_first_name" to "نام",

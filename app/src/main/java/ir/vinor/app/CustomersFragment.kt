@@ -17,6 +17,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentCustomersBinding
+import ir.vinor.app.databinding.ItemCustomerDetailBinding
+import ir.vinor.app.databinding.ItemCustomerFactBinding
 import ir.vinor.app.databinding.ItemCustomerFieldBinding
 import ir.vinor.app.databinding.ItemCustomerRowBinding
 import kotlinx.coroutines.Dispatchers
@@ -160,7 +162,7 @@ class CustomersFragment : Fragment() {
     private fun bindPage() {
         bindTabs()
         bindSearch()
-        binding.customersAdd.text = page.submitLabel
+        binding.customersAddLabel.text = PartnerCustomers.addActionLabel(page.submitLabel)
         binding.customersAdd.isVisible = page.fields.isNotEmpty()
         binding.customersList.removeAllViews()
         binding.customersEmpty.isVisible = page.rows.isEmpty()
@@ -170,10 +172,12 @@ class CustomersFragment : Fragment() {
             val item = ItemCustomerRowBinding.inflate(inflater, binding.customersList, true)
             item.customerRowAvatar.text = row.title.trim().firstOrNull()?.toString().orEmpty()
             item.customerRowTitle.text = row.title
-            val sub = listOf(row.phone, row.status, row.notes).filter { it.isNotBlank() }.joinToString(" · ")
-            item.customerRowSub.text = sub
-            item.customerRowSub.isVisible = sub.isNotBlank()
-            if (row.phone.isNotBlank()) item.customerRowSub.textDirection = View.TEXT_DIRECTION_LTR
+            item.customerRowStatus.isVisible = row.status.isNotBlank()
+            item.customerRowStatus.text = row.status
+            item.customerRowPhone.isVisible = row.phone.isNotBlank()
+            item.customerRowPhone.text = row.phone
+            item.customerRowNotes.isVisible = row.notes.isNotBlank()
+            item.customerRowNotes.text = row.notes
             item.root.setOnClickListener { openDetail(row) }
         }
     }
@@ -181,19 +185,24 @@ class CustomersFragment : Fragment() {
     private fun bindTabs() {
         binding.customersTabs.removeAllViews()
         binding.customersTabsScroll.isVisible = page.tabs.isNotEmpty()
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
         for (tab in page.tabs) {
             val chip = TextView(requireContext())
             chip.text = tab.label
             chip.textSize = 14f
-            chip.minHeight = (36 * resources.displayMetrics.density).toInt()
+            chip.minHeight = dp(36)
             chip.gravity = android.view.Gravity.CENTER
             chip.setTextColor(
                 ContextCompat.getColor(
                     requireContext(),
-                    if (tab.selected) R.color.vinor_accent_green else R.color.vinor_text_muted,
+                    if (tab.selected) R.color.vinor_on_primary else R.color.vinor_text_muted,
                 ),
             )
-            chip.setPadding(28, 12, 28, 12)
+            chip.setBackgroundResource(
+                if (tab.selected) R.drawable.bg_follow_tab_on else R.drawable.bg_follow_tab,
+            )
+            chip.setPadding(dp(14), dp(8), dp(14), dp(8))
             chip.setOnClickListener {
                 val next = absolute(tab.href)
                 if (next != pageUrl) {
@@ -201,7 +210,12 @@ class CustomersFragment : Fragment() {
                     load()
                 }
             }
-            binding.customersTabs.addView(chip)
+            val lp = android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.marginEnd = dp(8)
+            binding.customersTabs.addView(chip, lp)
         }
     }
 
@@ -230,15 +244,18 @@ class CustomersFragment : Fragment() {
         pendingDelete = false
         inputs.clear()
         binding.customersSheetBody.removeAllViews()
-        binding.customersSheetTitle.text = page.submitLabel
+        val addLabel = PartnerCustomers.addActionLabel(page.submitLabel)
+        binding.customersSheetTitle.text = addLabel
         binding.customersSheetError.isVisible = false
         binding.customersSheetDelete.isVisible = false
         binding.customersSheetSubmit.isVisible = true
-        binding.customersSheetSubmit.text = page.submitLabel
+        binding.customersSheetSubmitLabel.text = addLabel
+        binding.customersSheetSubmitIcon.setImageResource(R.drawable.ic_customer_plus)
         val inflater = LayoutInflater.from(requireContext())
         for (field in page.fields) {
             val item = ItemCustomerFieldBinding.inflate(inflater, binding.customersSheetBody, true)
-            item.customerFieldInput.hint = field.label
+            item.customerFieldLabel.text = field.label
+            item.customerFieldInput.hint = if (field.phone) "0912…" else ""
             item.customerFieldInput.inputType = when {
                 field.phone -> android.text.InputType.TYPE_CLASS_PHONE
                 field.multiline -> android.text.InputType.TYPE_CLASS_TEXT or
@@ -262,21 +279,21 @@ class CustomersFragment : Fragment() {
         binding.customersSheetError.isVisible = false
         binding.customersSheetDelete.isVisible = page.canDelete && row.id.isNotBlank()
         binding.customersSheetDelete.text = "حذف"
-        fun line(text: String, ltr: Boolean) {
-            if (text.isBlank()) return
-            val view = TextView(requireContext())
-            view.text = text
-            view.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
-            view.textSize = 16f
-            view.setPadding(0, 18, 0, 0)
-            if (ltr) view.textDirection = View.TEXT_DIRECTION_LTR
-            binding.customersSheetBody.addView(view)
+        val inflater = LayoutInflater.from(requireContext())
+        val head = ItemCustomerDetailBinding.inflate(inflater, binding.customersSheetBody, true)
+        head.customerDetailAvatar.text = row.title.trim().firstOrNull()?.toString().orEmpty()
+        head.customerDetailName.text = row.title
+        val facts = PartnerCustomers.detailFacts(row)
+        head.customerDetailFacts.isVisible = facts.isNotEmpty()
+        for (fact in facts) {
+            val line = ItemCustomerFactBinding.inflate(inflater, head.customerDetailFacts, true)
+            line.customerFactLabel.text = fact.label
+            line.customerFactValue.text = fact.value
+            if (fact.phone) line.customerFactValue.textDirection = View.TEXT_DIRECTION_LTR
         }
-        line(row.phone, true)
-        line(row.status, false)
-        line(row.notes, false)
         binding.customersSheetSubmit.isVisible = row.phone.isNotBlank()
-        binding.customersSheetSubmit.text = "تماس"
+        binding.customersSheetSubmitLabel.text = "تماس"
+        binding.customersSheetSubmitIcon.setImageResource(R.drawable.ic_customer_call)
         binding.customersSheet.isVisible = true
     }
 
@@ -308,7 +325,7 @@ class CustomersFragment : Fragment() {
         }
         binding.customersSheetError.isVisible = false
         val body = PartnerCustomers.createBody(values, page.fields)
-        post(page.actionPath, body, page.submitLabel.ifBlank { "مشتری ثبت شد." }) {
+        post(page.actionPath, body, "مشتری اضافه شد.") {
             closeSheet()
             load()
         }

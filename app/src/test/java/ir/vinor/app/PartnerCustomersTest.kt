@@ -72,6 +72,9 @@ class PartnerCustomersTest {
         assertTrue(page.fields[0].required)
         assertTrue(page.fields[2].phone)
         assertEquals("ذخیره مشتری", page.submitLabel)
+        assertEquals("افزودن مشتری", PartnerCustomers.addActionLabel(page.submitLabel))
+        assertEquals("افزودن مشتری", PartnerCustomers.addActionLabel("ثبت مشتری"))
+        assertEquals("افزودن مشتری", PartnerCustomers.addActionLabel(""))
         assertEquals(PartnerCrm.PATH, page.actionPath)
         assertTrue(page.canDelete)
         assertEquals("id", page.deleteIdKey)
@@ -112,9 +115,38 @@ class PartnerCustomersTest {
         assertEquals("09120000000", page.rows[0].phone)
         assertEquals("شمال", page.rows[0].notes)
         assertEquals("3", page.rows[0].id)
+        assertEquals(
+            listOf("موبایل", "وضعیت", "یادداشت"),
+            PartnerCustomers.detailFacts(page.rows[0]).map { it.label },
+        )
         assertTrue(page.fields.any { it.name == "customer_phone" && it.phone })
         assertTrue(page.fields.any { it.name == "notes" && !it.required })
         assertEquals("مشتری‌ای ثبت نشده.", PartnerCustomers.parse("<div></div>").emptyText)
+    }
+
+    @Test
+    fun extraFacts_stayWithTheCustomer() {
+        val html = """
+            <article class="vn-customer-card" data-customer-id="8">
+              <p class="vn-customer-name">رضا</p>
+              <a href="tel:09120001111">09120001111</a>
+              <span class="vn-customer-city">تهران</span>
+              <span class="vn-customer-budget">تا ۵ میلیارد</span>
+              <dl><dt>محله</dt><dd>جردن</dd></dl>
+            </article>
+        """.trimIndent()
+        val card = PartnerCustomers.parse(html).rows.single()
+        assertEquals(listOf("محله", "شهر", "بودجه"), card.facts.map { it.label })
+        assertEquals("جردن", card.facts.first { it.label == "محله" }.value)
+        val json = """
+            <script type="application/json">
+              {"customers":[{"id":9,"name":"نرگس","customer_phone":"09123334444","city":"رشت","location":"گلسار","notes":"ویلا"}]}
+            </script>
+        """.trimIndent()
+        val row = PartnerCustomers.parse(json).rows.single()
+        assertEquals(listOf("شهر", "منطقه"), row.facts.map { it.label })
+        assertEquals("گلسار", row.facts.first { it.label == "منطقه" }.value)
+        assertTrue(PartnerCustomers.detailFacts(row).any { it.label == "یادداشت" && it.value == "ویلا" })
     }
 
     @Test
