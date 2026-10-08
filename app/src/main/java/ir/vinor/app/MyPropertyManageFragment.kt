@@ -100,10 +100,10 @@ class MyPropertyManageFragment : Fragment() {
         val published = snapshot.optBoolean("published_for_sale")
         MyPropertyManage.actions().forEach { action ->
             val row = ItemProfileLinkBinding.inflate(layoutInflater, host, false)
-            row.itemProfileLinkTitle.text = MyPropertyManage.label(action)
+            val label = MyPropertyManage.label(action, published && action == MyPropertyManage.Action.PUBLISH)
+            row.itemProfileLinkTitle.text = label
             val subtitle = when (action) {
                 MyPropertyManage.Action.PRICE -> if (price > 0L) PartnerFormat.toman(price) + " تومان" else ""
-                MyPropertyManage.Action.PUBLISH -> if (published) "منتشر شده" else ""
                 else -> ""
             }
             row.itemProfileLinkSubtitle.isVisible = subtitle.isNotBlank()
@@ -123,7 +123,7 @@ class MyPropertyManageFragment : Fragment() {
                 row.itemProfileLinkIcon.imageTintList = android.content.res.ColorStateList.valueOf(error)
             }
             row.root.setOnClickListener { onAction(action) }
-            row.root.contentDescription = MyPropertyManage.label(action)
+            row.root.contentDescription = label
             host.addView(row.root)
         }
     }
@@ -137,11 +137,7 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.Action.DELETE -> showDeleteSheet()
             MyPropertyManage.Action.SHARE -> share()
             MyPropertyManage.Action.PUBLISH -> {
-                if (snapshot.optBoolean("published_for_sale")) {
-                    toast("این ملک برای فروش منتشر شده است.")
-                } else {
-                    showPublishSheet()
-                }
+                if (snapshot.optBoolean("published_for_sale")) showStopSheet() else showPublishSheet()
             }
         }
     }
@@ -242,6 +238,20 @@ class MyPropertyManageFragment : Fragment() {
         )
     }
 
+    private fun showStopSheet() {
+        val sheet = SheetPropertyDeleteBinding.inflate(layoutInflater)
+        val dialog = openSheet(sheet.root)
+        sheet.deleteSheetTitle.text = "توقف انتشار فروش"
+        sheet.deleteSheetMessage.text = "این ملک از آگهی‌های فروش برداشته می‌شود و دیگر برای بقیه دیده نمی‌شود."
+        sheet.deleteSheetConfirm.text = "توقف انتشار فروش"
+        sheet.deleteSheetConfirm.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
+        sheet.deleteSheetCancel.setOnClickListener { dialog.dismiss() }
+        sheet.deleteSheetConfirm.setOnClickListener {
+            dialog.dismiss()
+            postUnpublish()
+        }
+    }
+
     private fun showDeleteSheet() {
         val sheet = SheetPropertyDeleteBinding.inflate(layoutInflater)
         val dialog = openSheet(sheet.root)
@@ -292,6 +302,20 @@ class MyPropertyManageFragment : Fragment() {
             bindPreview()
             bindRows()
             toast(fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." })
+        }
+    }
+
+    private fun postUnpublish() {
+        val code = MyPropertyManage.codeOf(snapshot)
+        if (code.isBlank()) {
+            toast("کد ملک نامعتبر است.")
+            return
+        }
+        post(MyPropertyManage.UNPUBLISH_PATH, MyPropertyManage.unpublishBody(code), "توقف انتشار ناموفق بود.") {
+            snapshot.put("published_for_sale", false)
+            bindPreview()
+            bindRows()
+            toast("انتشار فروش متوقف شد.")
         }
     }
 

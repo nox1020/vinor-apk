@@ -18,6 +18,13 @@ class MyPropertyManageTest {
     }
 
     @Test
+    fun publishLabel_becomesStopWhenAlreadyPublished() {
+        assertEquals("انتشار برای فروش", MyPropertyManage.label(MyPropertyManage.Action.PUBLISH, published = false))
+        assertEquals("توقف انتشار فروش", MyPropertyManage.label(MyPropertyManage.Action.PUBLISH, published = true))
+        assertEquals("4", MyPropertyManage.unpublishBody("4").getString("code"))
+    }
+
+    @Test
     fun shareUrl_usesLandPath() {
         assertEquals(
             "https://vinor.ir/express/partner/lands/12",

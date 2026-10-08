@@ -10,6 +10,7 @@ object MyPropertyManage {
     const val DELETE_PATH = "/express/partner/api/my-property/delete"
     const val SUBMIT_PATH = "/express/partner/api/my-property/submit"
     const val PUBLISH_PATH = "/express/partner/api/my-property/publish"
+    const val UNPUBLISH_PATH = "/express/partner/api/my-property/unpublish"
 
     enum class Action {
         VIEW,
@@ -29,13 +30,13 @@ object MyPropertyManage {
         Action.PUBLISH,
     )
 
-    fun label(action: Action): String = when (action) {
+    fun label(action: Action, published: Boolean = false): String = when (action) {
         Action.VIEW -> "نمایش ملک"
         Action.EDIT -> "ویرایش"
         Action.PRICE -> "تعیین قیمت"
         Action.DELETE -> "حذف آگهی"
         Action.SHARE -> "اشتراک‌گذاری"
-        Action.PUBLISH -> "انتشار برای فروش"
+        Action.PUBLISH -> if (published) "توقف انتشار فروش" else "انتشار برای فروش"
     }
 
     fun codeOf(snapshot: JSONObject): String = text(snapshot, "code")
@@ -86,6 +87,8 @@ object MyPropertyManage {
     }
 
     fun deleteBody(code: String): JSONObject = JSONObject().put("code", code.trim())
+
+    fun unpublishBody(code: String): JSONObject = JSONObject().put("code", code.trim())
 
     fun publishBody(code: String, payment: String, commission: String, sendAll: Boolean): JSONObject {
         return JSONObject()

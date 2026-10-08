@@ -282,10 +282,19 @@ class LandDetailFragment : Fragment() {
         binding.landDetailPayRow.isVisible = canPublish
         binding.landDetailCommissionRow.isVisible = canPublish
         binding.landDetailSendAll.isVisible = canPublish
+        if (published) {
+            binding.landDetailPayRow.isVisible = false
+            binding.landDetailCommissionRow.isVisible = false
+            binding.landDetailSendAll.isVisible = false
+            binding.landDetailPublishTitle.text = "توقف انتشار فروش"
+            binding.landDetailPublishHint.text = "با توقف، این ملک از آگهی‌های فروش برداشته می‌شود."
+            binding.landDetailPublishCta.isVisible = true
+            binding.landDetailPublishCta.text = "توقف انتشار فروش"
+            binding.landDetailPublishCta.setOnClickListener { stopPublish(code) }
+            return
+        }
         if (!canPublish) {
-            binding.landDetailPublishTitle.text = "برای فروش منتشر شده"
-            binding.landDetailPublishHint.text = "این ملک در آگهی‌های وینور نمایش داده می‌شود."
-            binding.landDetailPublishCta.isVisible = false
+            binding.landDetailPublish.isVisible = false
             return
         }
         binding.landDetailPublishTitle.text = "انتشار برای فروش"
@@ -296,6 +305,40 @@ class LandDetailFragment : Fragment() {
         binding.landDetailPayDeal.setOnClickListener { selectedPayment = "توافقی"; paintPayChips() }
         binding.landDetailPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paintPayChips() }
         binding.landDetailPublishCta.setOnClickListener { publish(code) }
+    }
+
+    private fun stopPublish(code: String) {
+        val ctx = context ?: return
+        if (publishing) return
+        publishing = true
+        binding.landDetailPublishCta.alpha = 0.6f
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(
+                        MyPropertyManage.UNPUBLISH_PATH,
+                        MyPropertyManage.unpublishBody(code),
+                        ctx,
+                    )
+                }
+                if (_binding == null) return@launch
+                if (fresh.optBoolean("ok", false)) {
+                    Toast.makeText(ctx, fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." }, Toast.LENGTH_SHORT).show()
+                    load(code)
+                } else {
+                    Toast.makeText(
+                        ctx,
+                        MyPropertyManage.failureMessage(fresh, "توقف انتشار ناموفق بود."),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } finally {
+                publishing = false
+                _binding?.landDetailPublishCta?.alpha = 1f
+            }
+        }
     }
 
     private fun paintPayChips() {
