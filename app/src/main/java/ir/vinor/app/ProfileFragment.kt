@@ -252,8 +252,6 @@ class ProfileFragment : Fragment() {
         binding.profileGuest.visibility = View.VISIBLE
         binding.profileCard.visibility = View.GONE
         binding.profileLinks.visibility = View.VISIBLE
-        binding.profileNotifications.visibility = View.INVISIBLE
-        binding.profileNotifications.isEnabled = false
         syncCardDivider()
         binding.profileGuestLogin.setOnClickListener {
             try {
@@ -293,8 +291,6 @@ class ProfileFragment : Fragment() {
         binding.profileGuest.visibility = View.GONE
         binding.profileCard.visibility = View.VISIBLE
         binding.profileLinks.visibility = View.VISIBLE
-        binding.profileNotifications.visibility = View.VISIBLE
-        binding.profileNotifications.isEnabled = true
         syncCardDivider()
 
         binding.profileName.text = meName
@@ -333,13 +329,6 @@ class ProfileFragment : Fragment() {
             }
         }
         binding.profileLogout.setOnClickListener { doLogout() }
-        binding.profileNotifications.setOnClickListener {
-            try {
-                findNavController().navigate(R.id.notificationsFragment)
-            } catch (_: Exception) {
-                openUrl("$BASE/express/partner/notifications")
-            }
-        }
 
         if (keepMenu) return
         renderedMenuKey = menuKey
