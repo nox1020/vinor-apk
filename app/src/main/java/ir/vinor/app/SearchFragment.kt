@@ -653,11 +653,12 @@ class SearchFragment : Fragment() {
     }
 
     private fun openAd(ad: SearchAd) {
-        when {
-            ad.source == "vinor" && ad.token.isNotBlank() -> (activity as? MainActivity)?.openLand(ad.token)
-            ad.source == "divar" && ad.token.isNotBlank() -> (activity as? MainActivity)?.openLand("divar:${ad.token}")
-            ad.url.isNotBlank() -> openVinorOrExternal(ad.url)
+        val code = SearchAds.openCode(ad)
+        if (code.isNotBlank()) {
+            (activity as? MainActivity)?.openLand(code)
+            return
         }
+        if (ad.url.isNotBlank()) openVinorOrExternal(ad.url)
     }
 
     private fun openVinorOrExternal(raw: String) {

@@ -567,7 +567,15 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/invite") -> openNativePage(NativePartnerFragment.PAGE_INVITE)
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
-            low.endsWith("/search") -> openSearch()
+            low.endsWith("/search") -> {
+                val land = uri.getQueryParameter("land")
+                val divar = uri.getQueryParameter("divar")
+                when {
+                    !land.isNullOrBlank() -> openLand(land)
+                    !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    else -> openSearch()
+                }
+            }
             low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()

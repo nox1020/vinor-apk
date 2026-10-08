@@ -263,6 +263,37 @@ class SearchQueryTest {
     }
 
     @Test
+    fun partnerCard_opensFromCodeWhenTokenIsMissing() {
+        val partner = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "250متر زمین ویلایی دماوند")
+                    .put("code", "2")
+                    .put("source", "vinor")
+                    .put("published_for_sale", true),
+            ),
+        )
+        assertEquals(1, partner.size)
+        assertEquals("2", partner[0].token)
+        assertEquals("vinor", partner[0].source)
+        assertEquals("/express/partner/lands/2", partner[0].url)
+        assertEquals("2", SearchAds.openCode(partner[0]))
+        val onlyUrl = SearchAd(url = "/express/partner/lands/9")
+        assertEquals("9", SearchAds.openCode(onlyUrl))
+        val query = SearchAd(url = "/express/partner/home?land=4")
+        assertEquals("4", SearchAds.openCode(query))
+        val divar = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "دیوار")
+                    .put("divar_token", "tok")
+                    .put("source", "divar"),
+            ),
+        )
+        assertEquals("divar:tok", SearchAds.openCode(divar[0]))
+    }
+
+    @Test
     fun publicSitemap_listsPublishedLandsNewestFirst() {
         val xml = """
             <urlset>

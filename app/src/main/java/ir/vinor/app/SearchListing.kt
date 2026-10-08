@@ -103,6 +103,24 @@ object SearchAds {
         return dedupe(picked)
     }
 
+    /**
+     * کد باز شدن جزئیات. آگهی همکار اغلب `code` دارد نه `token`،
+     * و گاهی فقط نشانی `/lands/` یا `?land=` است.
+     */
+    fun openCode(ad: SearchAd): String {
+        val token = ad.token.trim()
+        val url = ad.url.trim()
+        val divarUrl = pathToken(url, "/divar/")
+        val divarQuery = queryValue(url, "divar")
+        if (ad.source == "divar" || divarUrl.isNotBlank() || divarQuery.isNotBlank()) {
+            val tok = token.ifBlank { divarUrl }.ifBlank { divarQuery }
+            if (tok.isNotBlank()) return "divar:$tok"
+        }
+        if (token.isNotBlank()) return token
+        val land = pathToken(url, "/lands/").ifBlank { queryValue(url, "land") }
+        return land
+    }
+
     /** آگهی‌های JSON خانه. بدون پرچم انتشار می‌مانند؛ `published_for_sale=false` حذف می‌شود. */
     fun fromObjects(array: JSONArray): List<SearchAd> {
         val out = ArrayList<SearchAd>(array.length())
@@ -210,6 +228,7 @@ object SearchAds {
         val created = listOf("created_at", "published_at", "created", "date", "listed_at")
             .firstNotNullOfOrNull { key -> text(ad, key).takeIf { it.isNotEmpty() } }
             .orEmpty()
+        val identity = identityOf(ad)
         return SearchAd(
             title = text(ad, "title"),
             priceRaw = price,
@@ -217,15 +236,69 @@ object SearchAds {
             city = text(ad, "city"),
             district = district.ifBlank { districtFromLocation(location) },
             areaRaw = area.ifBlank { areaFromFacts(ad) },
-            token = text(ad, "token"),
-            source = text(ad, "source"),
-            url = text(ad, "url"),
+            token = identity.token,
+            source = identity.source,
+            url = identity.url,
             imageUrl = text(ad, "image_url"),
             imageCount = ad.optInt("image_count"),
             commissionAmount = ad.optInt("commission_amount"),
             createdAt = parseTime(created),
             index = index,
         )
+    }
+
+    private data class Identity(val token: String, val source: String, val url: String)
+
+    /** `token` اگر باشد همان می‌ماند؛ وگرنه `code` / `land_code` / نشانی. */
+    private fun identityOf(ad: JSONObject): Identity {
+        val explicit = text(ad, "token")
+        val code = text(ad, "code").ifBlank { text(ad, "land_code") }
+        val divarToken = text(ad, "divar_token")
+        val rawUrl = text(ad, "url").ifBlank { text(ad, "href") }.ifBlank { text(ad, "link") }
+        val sourceHint = text(ad, "source")
+        val divar = sourceHint == "divar" || rawUrl.contains("/divar/") || divarToken.isNotBlank() && code.isBlank() && explicit.isBlank()
+        val token = when {
+            divar -> explicit.ifBlank { divarToken }.ifBlank { pathToken(rawUrl, "/divar/") }
+            explicit.isNotBlank() -> explicit
+            code.isNotBlank() -> code
+            else -> pathToken(rawUrl, "/lands/").ifBlank { queryValue(rawUrl, "land") }
+        }
+        val source = when {
+            sourceHint == "divar" || sourceHint == "vinor" -> sourceHint
+            divar -> "divar"
+            token.isNotBlank() -> "vinor"
+            else -> ""
+        }
+        val url = rawUrl.ifBlank {
+            when {
+                source == "divar" && token.isNotBlank() -> "/express/partner/divar/$token"
+                source == "vinor" && token.isNotBlank() -> "/express/partner/lands/$token"
+                else -> ""
+            }
+        }
+        return Identity(token, source, url)
+    }
+
+    private fun pathToken(url: String, marker: String): String {
+        val at = url.indexOf(marker)
+        if (at < 0) return ""
+        return url.substring(at + marker.length)
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+            .trim()
+    }
+
+    private fun queryValue(url: String, key: String): String {
+        val query = url.substringAfter('?', "").substringBefore('#')
+        if (query.isBlank() || query == url) return ""
+        for (part in query.split('&')) {
+            val bits = part.split('=', limit = 2)
+            if (bits.size == 2 && bits[0] == key) {
+                return runCatching { java.net.URLDecoder.decode(bits[1], "UTF-8") }.getOrDefault(bits[1]).trim()
+            }
+        }
+        return ""
     }
 
     private fun areaFromFacts(ad: JSONObject): String {
