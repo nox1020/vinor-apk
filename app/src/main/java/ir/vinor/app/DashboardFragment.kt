@@ -1194,7 +1194,8 @@ class DashboardFragment : Fragment() {
         binding.dashboardHeroSub.isVisible = !customer && sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = false
-        binding.dashboardHeroStart.text = if (customer) "شروع کنید" else "ادامه"
+        binding.dashboardHeroStart.isVisible = !customer
+        if (!customer) binding.dashboardHeroStart.text = "ادامه"
         binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
         if (customer) {
             binding.dashboardHeroTitle.maxLines = 1

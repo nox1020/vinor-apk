@@ -637,9 +637,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="6dp"
                                 android:fontFamily="@font/vazirmatn_bold"
-                                android:text="شروع کنید"
+                                android:text="ادامه"
                                 android:textColor="@color/vinor_customer_bg"
-                                android:textSize="15sp" />
+                                android:textSize="15sp"
+                                android:visibility="gone" />
                         </LinearLayout>
 
                         <LinearLayout
