@@ -5,6 +5,8 @@ import org.json.JSONObject
 
 /** تب‌ها، کارت و نتیجهٔ ثبت صفحهٔ پیگیری. فیلدها همان پاسخ درخواست‌ها هستند. */
 object FollowRequests {
+    const val DATA_PATH = "/express/partner/api/requests/data"
+    const val PAGE_PATH = "/express/partner/requests"
     const val EMPTY = "موردی در این تب نیست."
     const val FAIL = "ثبت ناموفق بود."
 
@@ -51,12 +53,23 @@ object FollowRequests {
     }
 
     fun items(payload: JSONObject, tab: String): List<JSONObject> {
-        val array = payload.optJSONArray("items") ?: payload.optJSONArray("inbox_items") ?: JSONArray()
+        val grouped = payload.optJSONObject("items_by_tab")
+            ?: payload.optJSONObject("pipeline")
+            ?: payload.optJSONObject("tabs_items")
+        val scoped = grouped?.optJSONArray(tab)
+            ?: payload.optJSONArray(tab)
+        val array = scoped
+            ?: payload.optJSONArray("items")
+            ?: payload.optJSONArray("inbox_items")
+            ?: JSONArray()
         val out = ArrayList<JSONObject>()
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            val itemTab = text(item, "pipeline_tab").ifBlank { "requests" }
-            if (tab.isNotBlank() && itemTab != tab) continue
+            val itemTab = text(item, "pipeline_tab")
+            if (scoped == null && tab.isNotBlank()) {
+                val effectiveTab = itemTab.ifBlank { "requests" }
+                if (effectiveTab != tab) continue
+            }
             out.add(item)
         }
         return out
@@ -99,8 +112,20 @@ object FollowRequests {
             Tone.PRIMARY,
             body = JSONObject().put("outcome", "interested"),
         )
-        add("can_confirm_deal", "تأیید معامله", "/deal-confirm", Tone.PRIMARY)
-        add("can_close_deal", "بستن", "/deal-close", Tone.SECONDARY)
+        add(
+            "can_confirm_deal",
+            "تأیید معامله",
+            "/deal-confirm",
+            Tone.PRIMARY,
+            "انجام معامله تأیید شود؟",
+        )
+        add(
+            "can_close_deal",
+            "بستن معامله",
+            "/deal-close",
+            Tone.SECONDARY,
+            "این معامله بسته شود؟",
+        )
         add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
         add(
             "can_register_result",
@@ -109,7 +134,7 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "follow_up"),
         )
-        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY)
+        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
         add(
             "can_register_result",
             "بی‌علاقه",
@@ -144,6 +169,12 @@ object FollowRequests {
         if (payload.has("ok") && !payload.optBoolean("ok")) return false
         if (payload.optString("error").isNotBlank()) return false
         return true
+    }
+
+    fun isUnauthorized(payload: JSONObject): Boolean {
+        val error = payload.optString("error").trim().lowercase()
+        return payload.optInt("http_status") == 401 ||
+            error in setOf("unauthorized", "login_required", "session_expired")
     }
 
     fun userMessage(payload: JSONObject, fallback: String = FAIL): String {

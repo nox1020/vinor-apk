@@ -80,6 +80,38 @@ class FollowRequestsTest {
     }
 
     @Test
+    fun acceptsServerGroupedPipelineItems() {
+        val payload = JSONObject().put(
+            "items_by_tab",
+            JSONObject()
+                .put(
+                    "visits",
+                    JSONArray().put(JSONObject().put("id", 4).put("title", "بازدید دماوند")),
+                )
+                .put(
+                    "deals",
+                    JSONArray().put(JSONObject().put("id", 5).put("title", "معامله دماوند")),
+                ),
+        )
+        assertEquals("بازدید دماوند", FollowRequests.items(payload, "visits").single().optString("title"))
+        assertEquals("معامله دماوند", FollowRequests.items(payload, "deals").single().optString("title"))
+    }
+
+    @Test
+    fun irreversibleVisitAndDealActionsAskForConfirmation() {
+        val actions = FollowRequests.actions(
+            JSONObject()
+                .put("can_confirm_deal", true)
+                .put("can_close_deal", true)
+                .put("can_no_show", true),
+            "8",
+        )
+        assertEquals("انجام معامله تأیید شود؟", actions.first { it.label == "تأیید معامله" }.confirm)
+        assertEquals("این معامله بسته شود؟", actions.first { it.label == "بستن معامله" }.confirm)
+        assertEquals("عدم حضور مشتری ثبت شود؟", actions.first { it.label == "عدم حضور" }.confirm)
+    }
+
+    @Test
     fun acceptsSuccessWithoutOkAndKeepsFailureText() {
         assertTrue(FollowRequests.isOk(JSONObject().put("success", true).put("http_status", 200)))
         assertTrue(FollowRequests.isOk(JSONObject().put("ok", true).put("http_status", 200)))
@@ -98,5 +130,8 @@ class FollowRequestsTest {
             "انجام شد",
             FollowRequests.userMessage(JSONObject().put("message", "انجام شد").put("http_status", 200)),
         )
+        assertTrue(FollowRequests.isUnauthorized(JSONObject().put("http_status", 401)))
+        assertTrue(FollowRequests.isUnauthorized(JSONObject().put("error", "session_expired")))
+        assertFalse(FollowRequests.isUnauthorized(JSONObject().put("http_status", 403).put("error", "forbidden")))
     }
 }

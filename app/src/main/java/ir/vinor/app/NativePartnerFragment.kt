@@ -46,6 +46,7 @@ class NativePartnerFragment : Fragment() {
     private var lastPayload = JSONObject()
     private var searchQuery = ""
     private var followBusy = false
+    private var followCsrf = ""
     private var followSheet: BottomSheetDialog? = null
 
     val page: String
@@ -206,6 +207,10 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindPayload(obj: JSONObject) {
         lastPayload = obj
+        if (page == PAGE_REQUESTS) {
+            val freshCsrf = obj.optString("csrf_token").trim()
+            if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+        }
         hideSpecials()
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
@@ -611,15 +616,31 @@ class NativePartnerFragment : Fragment() {
     private fun postRequest(path: String, body: JSONObject) {
         val ctx = context ?: return
         if (followBusy) return
-        followBusy = true
+        setFollowBusy(true)
         scope.launch {
             try {
-                val resp = withContext(Dispatchers.IO) { PartnerApi.postJson(path, body, ctx) }
+                val token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx) }
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postPage(path, body, token, FollowRequests.PAGE_PATH, ctx)
+                }
                 if (_binding == null) return@launch
+                val freshCsrf = resp.optString("csrf_token").trim()
+                if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+                if (FollowRequests.isUnauthorized(resp)) {
+                    followCsrf = ""
+                    Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
                 if (FollowRequests.isOk(resp)) {
                     val note = resp.optString("message").trim()
                     val toast = if (note.isBlank() || note.equals("null", true)) "ثبت شد." else note
                     Toast.makeText(ctx, toast, Toast.LENGTH_SHORT).show()
+                    // نتیجهٔ بازدید یا معامله ممکن است کارت را به تب بعدی منتقل کند.
+                    // انتخاب پیشنهادی سرور را در بارگذاری بعدی بپذیر.
+                    activeTab = ""
+                    binding.nativeList.removeAllViews()
+                    binding.nativeRefresh.isRefreshing = true
                     load(forceNet = true)
                 } else {
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
@@ -627,8 +648,40 @@ class NativePartnerFragment : Fragment() {
             } catch (e: Exception) {
                 if (_binding != null) Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
             } finally {
-                followBusy = false
+                if (_binding != null) setFollowBusy(false) else followBusy = false
             }
+        }
+    }
+
+    private fun ensureFollowCsrf(ctx: Context): String {
+        if (followCsrf.isNotBlank()) return followCsrf
+        val profile = try {
+            PartnerApi.get("/express/partner/profile/data", ctx)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        var token = profile.optString("csrf_token").trim()
+        if (token.isBlank()) {
+            val page = PartnerApi.getPage(FollowRequests.PAGE_PATH, ctx)
+            token = PartnerCustomers.csrfFromHtml(page.body)
+        }
+        followCsrf = token
+        return token
+    }
+
+    private fun setFollowBusy(busy: Boolean) {
+        followBusy = busy
+        val b = _binding ?: return
+        b.nativeProgress.isVisible = busy
+        setEnabledRecursively(b.nativeList, !busy)
+        setEnabledRecursively(b.nativeTabs, !busy)
+        b.nativeRefresh.isEnabled = !busy
+    }
+
+    private fun setEnabledRecursively(view: View, enabled: Boolean) {
+        view.isEnabled = enabled
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) setEnabledRecursively(view.getChildAt(i), enabled)
         }
     }
 
@@ -753,7 +806,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_LEVELS -> "/express/partner/api/levels/data"
             PAGE_INVITE -> "/express/partner/api/invite/data"
             PAGE_APPLY -> "/express/partner/api/apply/data"
-            PAGE_REQUESTS -> "/express/partner/api/requests/data"
+            PAGE_REQUESTS -> FollowRequests.DATA_PATH
             PAGE_LISTINGS -> "/express/partner/api/listings/data"
             PAGE_TERMS -> "/express/partner/api/legal/data?doc=terms"
             PAGE_PRIVACY -> "/express/partner/api/legal/data?doc=privacy"

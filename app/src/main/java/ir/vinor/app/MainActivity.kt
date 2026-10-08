@@ -576,7 +576,8 @@ class MainActivity : AppCompatActivity() {
                     else -> openSearch()
                 }
             }
-            low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low == "/express/partner/requests" || low.startsWith("/express/partner/requests/") ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
@@ -692,6 +693,8 @@ class MainActivity : AppCompatActivity() {
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
             DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS -> openPath(route.targetUrl)
+            DeepLinkRouter.DestinationType.PARTNER_REQUESTS ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             DeepLinkRouter.DestinationType.PARTNER_LOGIN -> openLogin()
             DeepLinkRouter.DestinationType.PARTNER_WEB -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.APK_DOWNLOAD -> {
