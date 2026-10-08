@@ -123,6 +123,13 @@ object WalletWithdraw {
         }
     }
 
+    fun money(obj: JSONObject, vararg keys: String): Long {
+        for (key in keys) {
+            readLong(obj, key)?.let { return it.coerceAtLeast(0L) }
+        }
+        return 0L
+    }
+
     fun readBalance(root: JSONObject?): Long? {
         if (root == null) return null
         val direct = readBalanceKeys(root)

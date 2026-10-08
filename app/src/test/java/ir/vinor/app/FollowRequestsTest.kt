@@ -106,9 +106,60 @@ class FollowRequestsTest {
                 .put("can_no_show", true),
             "8",
         )
-        assertEquals("انجام معامله تأیید شود؟", actions.first { it.label == "تأیید معامله" }.confirm)
-        assertEquals("این معامله بسته شود؟", actions.first { it.label == "بستن معامله" }.confirm)
+        val confirm = actions.first { it.path.endsWith("/deal-confirm") }
+        val close = actions.first { it.path.endsWith("/deal-close") }
+        assertEquals("تأیید نهایی", confirm.label)
+        assertEquals(FollowRequests.Tone.PRIMARY, confirm.tone)
+        assertEquals("تأیید نهایی این پرونده ثبت شود؟", confirm.confirm)
+        assertEquals("انجام معامله", close.label)
+        assertEquals(FollowRequests.Tone.SECONDARY, close.tone)
+        assertEquals("انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.", close.confirm)
         assertEquals("عدم حضور مشتری ثبت شود؟", actions.first { it.label == "عدم حضور" }.confirm)
+        assertTrue(actions.none { it.opensWallet })
+    }
+
+    @Test
+    fun closedDealShowsCreditedCommissionAndWallet() {
+        val item = JSONObject()
+            .put("id", 8)
+            .put("pipeline_tab", "deals")
+            .put("commission_amount", 3_000_000_000L)
+            .put("commission_status", "paid")
+        val card = FollowRequests.card(item, "deals")
+        assertEquals(
+            "پورسانت ${PartnerFormat.toman(3_000_000_000L)} تومان · واریز شده",
+            card.commission,
+        )
+        val deposit = card.actions.single()
+        assertEquals("واریز پورسانت", deposit.label)
+        assertTrue(deposit.opensWallet)
+        assertEquals("/express/partner/commissions", deposit.path)
+        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+    }
+
+    @Test
+    fun openDealKeepsCommissionVisibleWithoutDepositAction() {
+        val item = JSONObject()
+            .put("id", 8)
+            .put("can_close_deal", true)
+            .put("commission_amount", 1_500_000)
+            .put("commission_status", "pending")
+        val card = FollowRequests.card(item, "deals")
+        assertEquals("پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز", card.commission)
+        assertTrue(card.actions.none { it.opensWallet })
+        assertEquals("انجام معامله", card.actions.first { it.path.endsWith("/deal-close") }.label)
+    }
+
+    @Test
+    fun silentDealResponsesUseStageCopy() {
+        val confirm = "/express/partner/requests/8/deal-confirm"
+        val close = "/express/partner/requests/8/deal-close"
+        assertEquals("تأیید نهایی ثبت شد.", FollowRequests.doneMessage(confirm, JSONObject()))
+        assertEquals(
+            "معامله انجام شد. پورسانت به کیف پول واریز می‌شود.",
+            FollowRequests.doneMessage(close, JSONObject()),
+        )
+        assertEquals("ثبت شد", FollowRequests.doneMessage(close, JSONObject().put("message", "ثبت شد")))
     }
 
     @Test

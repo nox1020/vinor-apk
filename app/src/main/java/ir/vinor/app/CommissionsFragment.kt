@@ -92,11 +92,7 @@ class CommissionsFragment : Fragment() {
         _binding = null
     }
 
-    private fun formatToman(value: Int): String {
-        if (value == 0) return "۰"
-        val s = value.toString().reversed().chunked(3).joinToString("،").reversed()
-        return toPersianDigits(s)
-    }
+    private fun formatToman(value: Long): String = PartnerFormat.toman(value)
 
     private fun toPersianDigits(s: String): String {
         val persian = "۰۱۲۳۴۵۶۷۸۹"
@@ -170,9 +166,9 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun bindCommissionPayload(obj: JSONObject) {
-        val total = obj.optInt("total_commission", 0)
-        val pending = obj.optInt("pending_commission", 0)
-        val paid = obj.optInt("paid_commission", 0)
+        val total = WalletWithdraw.money(obj, "total_commission")
+        val pending = WalletWithdraw.money(obj, "pending_commission")
+        val paid = WalletWithdraw.money(obj, "paid_commission")
         val soldCount = obj.optInt("sold_count", 0)
         val itemsArr = obj.optJSONArray("items") ?: org.json.JSONArray()
         val items = mutableListOf<JSONObject>()
@@ -212,9 +208,9 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun bind(
-        total: Int,
-        pending: Int,
-        paid: Int,
+        total: Long,
+        pending: Long,
+        paid: Long,
         soldCount: Int,
         items: List<JSONObject>
     ) {
@@ -247,9 +243,9 @@ class CommissionsFragment : Fragment() {
             itemBinding.itemCommissionStatus.setTextColor(statusColor(status))
             val pct = c.optDouble("commission_pct", 0.0)
             itemBinding.itemCommissionPct.text = if (pct == pct.toLong().toDouble()) "${pct.toLong()}%" else "$pct%"
-            val amount = (c.optInt("commission_amount", 0)).coerceAtLeast(0)
+            val amount = WalletWithdraw.money(c, "commission_amount")
             itemBinding.itemCommissionAmount.text = formatToman(amount) + " تومان"
-            val saleAmount = (c.optInt("sale_amount", 0)).coerceAtLeast(0)
+            val saleAmount = WalletWithdraw.money(c, "sale_amount")
             if (saleAmount > 0) {
                 itemBinding.itemCommissionSaleRow.visibility = View.VISIBLE
                 itemBinding.itemCommissionSaleAmount.text = formatToman(saleAmount) + " تومان"

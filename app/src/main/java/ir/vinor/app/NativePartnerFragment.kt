@@ -454,7 +454,7 @@ class NativePartnerFragment : Fragment() {
             )
             return
         }
-        for (row in rows) addRequestCard(FollowRequests.card(row))
+        for (row in rows) addRequestCard(FollowRequests.card(row, tab))
     }
 
     private fun bindLegal(obj: JSONObject) {
@@ -537,6 +537,8 @@ class NativePartnerFragment : Fragment() {
         card.requestCardCustomer.text = item.customer
         card.requestCardWhen.isVisible = item.whenText.isNotBlank()
         card.requestCardWhen.text = item.whenText
+        card.requestCardCommission.isVisible = item.commission.isNotBlank()
+        card.requestCardCommission.text = item.commission
         card.requestCardPersonBody.updateLayoutParams<LinearLayout.LayoutParams> {
             marginStart = if (item.customer.isNotBlank()) dp(12) else 0
         }
@@ -560,7 +562,11 @@ class NativePartnerFragment : Fragment() {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (action.confirm != null) confirmFollow(action) else postRequest(action.path, action.body)
+                    when {
+                        action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
+                        action.confirm != null -> confirmFollow(action)
+                        else -> postRequest(action.path, action.body)
+                    }
                 }
             }
             val lp = LinearLayout.LayoutParams(
@@ -592,6 +598,10 @@ class NativePartnerFragment : Fragment() {
         sheet.followConfirmTitle.text = action.label
         sheet.followConfirmMessage.text = action.confirm
         sheet.followConfirmYes.text = action.label
+        if (action.tone != FollowRequests.Tone.DANGER) {
+            sheet.followConfirmYes.setBackgroundResource(R.drawable.bg_hub_start)
+            sheet.followConfirmYes.setTextColor(Color.parseColor("#052E16"))
+        }
         val dialog = openFollowSheet(sheet.root)
         sheet.followConfirmNo.setOnClickListener { dialog.dismiss() }
         sheet.followConfirmYes.setOnClickListener {
@@ -638,9 +648,7 @@ class NativePartnerFragment : Fragment() {
                     return@launch
                 }
                 if (FollowRequests.isOk(resp)) {
-                    val note = resp.optString("message").trim()
-                    val toast = if (note.isBlank() || note.equals("null", true)) "ثبت شد." else note
-                    Toast.makeText(ctx, toast, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, FollowRequests.doneMessage(path, resp), Toast.LENGTH_SHORT).show()
                     // نتیجهٔ بازدید یا معامله ممکن است کارت را به تب بعدی منتقل کند.
                     // انتخاب پیشنهادی سرور را در بارگذاری بعدی بپذیر.
                     activeTab = ""

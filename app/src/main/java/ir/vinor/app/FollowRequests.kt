@@ -20,6 +20,7 @@ object FollowRequests {
         val body: JSONObject,
         val tone: Tone,
         val confirm: String? = null,
+        val opensWallet: Boolean = false,
     )
 
     data class Card(
@@ -29,6 +30,7 @@ object FollowRequests {
         val customer: String,
         val whenText: String,
         val landCode: String,
+        val commission: String,
         val actions: List<Action>,
     )
 
@@ -75,7 +77,7 @@ object FollowRequests {
         return out
     }
 
-    fun card(item: JSONObject): Card {
+    fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)
         val title = text(item, "title").ifBlank { text(item, "land_title") }.ifBlank { "پیگیری" }
         return Card(
@@ -85,11 +87,22 @@ object FollowRequests {
             customer = text(item, "customer_name"),
             whenText = text(item, "visit_when"),
             landCode = text(item, "land_code"),
-            actions = actions(item, id),
+            commission = commissionLine(item),
+            actions = actions(item, id, tab),
         )
     }
 
-    fun actions(item: JSONObject, id: String): List<Action> {
+    fun doneMessage(path: String, payload: JSONObject): String {
+        val note = payload.optString("message").trim()
+        if (note.isNotEmpty() && !note.equals("null", true)) return note
+        return when {
+            path.endsWith("/deal-confirm") -> "تأیید نهایی ثبت شد."
+            path.endsWith("/deal-close") -> "معامله انجام شد. پورسانت به کیف پول واریز می‌شود."
+            else -> "ثبت شد."
+        }
+    }
+
+    fun actions(item: JSONObject, id: String, tab: String = ""): List<Action> {
         if (id.isBlank()) return emptyList()
         val base = "/express/partner/requests/$id"
         val all = ArrayList<Action>()
@@ -114,17 +127,17 @@ object FollowRequests {
         )
         add(
             "can_confirm_deal",
-            "تأیید معامله",
+            "تأیید نهایی",
             "/deal-confirm",
             Tone.PRIMARY,
-            "انجام معامله تأیید شود؟",
+            "تأیید نهایی این پرونده ثبت شود؟",
         )
         add(
             "can_close_deal",
-            "بستن معامله",
+            "انجام معامله",
             "/deal-close",
             Tone.SECONDARY,
-            "این معامله بسته شود؟",
+            "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
         )
         add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
         add(
@@ -144,6 +157,17 @@ object FollowRequests {
         )
         add("can_reject_deal", "رد معامله", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
         add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
+        if (depositReady(item, tab)) {
+            all.add(
+                Action(
+                    label = "واریز پورسانت",
+                    path = "/express/partner/commissions",
+                    body = JSONObject(),
+                    tone = Tone.SECONDARY,
+                    opensWallet = true,
+                ),
+            )
+        }
         if (all.none { it.tone == Tone.PRIMARY }) {
             val index = all.indexOfFirst { it.tone == Tone.SECONDARY }
             if (index >= 0) all[index] = all[index].copy(tone = Tone.PRIMARY)
@@ -197,6 +221,39 @@ object FollowRequests {
         if (error.any { it.code > 127 }) return error
         if (payload.optInt("http_status") == 401 || error == "unauthorized") return "برای ادامه وارد شوید."
         return fallback
+    }
+
+    private fun commissionLine(item: JSONObject): String {
+        val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
+        val status = commissionStatus(item)
+        return when {
+            amount > 0L && status.isNotBlank() -> "پورسانت ${PartnerFormat.toman(amount)} تومان · $status"
+            amount > 0L -> "پورسانت ${PartnerFormat.toman(amount)} تومان"
+            status.isNotBlank() -> "پورسانت · $status"
+            else -> ""
+        }
+    }
+
+    private fun commissionStatus(item: JSONObject): String {
+        val raw = text(item, "commission_status").ifBlank { text(item, "payout_status") }
+        return when (raw.lowercase()) {
+            "paid", "deposited", "credited", "settled" -> "واریز شده"
+            "approved" -> "تأیید شده"
+            "pending", "waiting", "processing" -> "در انتظار واریز"
+            "rejected" -> "رد شده"
+            else -> raw
+        }
+    }
+
+    private fun depositReady(item: JSONObject, tab: String): Boolean {
+        val key = text(item, "commission_status").ifBlank { text(item, "payout_status") }.lowercase()
+        if (key in setOf("paid", "deposited", "credited", "settled")) return true
+        if (flag(item, "can_open_commission") || flag(item, "commission_credited")) return true
+        if (flag(item, "can_confirm_deal") || flag(item, "can_close_deal")) return false
+        val stage = text(item, "pipeline_tab").ifBlank { tab }
+        if (stage != "deals" && stage != "deal") return false
+        val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
+        return amount > 0L || key in setOf("pending", "approved", "waiting", "processing")
     }
 
     private fun flag(obj: JSONObject, key: String): Boolean {

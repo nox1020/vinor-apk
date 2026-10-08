@@ -105,6 +105,8 @@ class WalletWithdrawTest {
         assertEquals(4500L, WalletWithdraw.readBalance(commissions))
         assertEquals(1200L, WalletWithdraw.readBalance(JSONObject().put("withdrawable_balance", 1200)))
         assertNull(WalletWithdraw.readBalance(JSONObject().put("total_commission", 9000)))
+        assertEquals(3_000_000_000L, WalletWithdraw.money(JSONObject().put("commission_amount", 3_000_000_000L), "commission_amount"))
+        assertEquals(0L, WalletWithdraw.money(JSONObject().put("commission_amount", -5), "commission_amount"))
     }
 
     @Test
