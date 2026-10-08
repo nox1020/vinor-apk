@@ -322,140 +322,186 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:baselineAligned="false"
                             android:orientation="horizontal">
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutTrain"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_flat_outline_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="آموزش فروش"
                                 android:focusable="true"
                                 android:gravity="center_horizontal"
-                                android:minHeight="104dp"
                                 android:orientation="vertical"
                                 android:paddingHorizontal="8dp"
-                                android:paddingVertical="14dp">
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <ImageView
-                                    android:layout_width="22dp"
-                                    android:layout_height="22dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_graduation"
-                                    app:tint="@color/vinor_accent_green" />
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
+
+                                    <ImageView
+                                        android:layout_width="36dp"
+                                        android:layout_height="36dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription=""
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_cap" />
+                                </FrameLayout>
 
                                 <TextView
                                     android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="8dp"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
+                                    android:layout_weight="1"
                                     android:ellipsize="end"
-                                    android:fontFamily="@font/vazirmatn"
+                                    android:fontFamily="@font/vazirmatn_bold"
                                     android:gravity="center"
-                                    android:maxLines="2"
+                                    android:maxLines="1"
                                     android:text="آموزش فروش"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="13sp" />
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="11sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
 
                             <View
-                                android:layout_width="8dp"
+                                android:layout_width="12dp"
                                 android:layout_height="1dp" />
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutNews"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_flat_outline_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="خبر وینور"
                                 android:focusable="true"
                                 android:gravity="center_horizontal"
-                                android:minHeight="104dp"
                                 android:orientation="vertical"
                                 android:paddingHorizontal="8dp"
-                                android:paddingVertical="14dp">
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <ImageView
-                                    android:layout_width="22dp"
-                                    android:layout_height="22dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_news"
-                                    app:tint="@color/vinor_accent_green" />
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
+
+                                    <ImageView
+                                        android:layout_width="34dp"
+                                        android:layout_height="34dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription=""
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_news" />
+                                </FrameLayout>
 
                                 <TextView
                                     android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="8dp"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
+                                    android:layout_weight="1"
                                     android:ellipsize="end"
-                                    android:fontFamily="@font/vazirmatn"
+                                    android:fontFamily="@font/vazirmatn_bold"
                                     android:gravity="center"
-                                    android:maxLines="2"
+                                    android:maxLines="1"
                                     android:text="خبر وینور"
                                     android:textColor="@color/vinor_text"
-                                    android:textSize="13sp" />
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="11sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
 
                             <View
-                                android:layout_width="8dp"
+                                android:layout_width="12dp"
                                 android:layout_height="1dp" />
 
-                            <FrameLayout
+                            <LinearLayout
                                 android:id="@+id/dashboardShortcutFollow"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_flat_outline_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="پیگیری مشتری‌ها"
                                 android:focusable="true"
-                                android:minHeight="104dp">
+                                android:gravity="center_horizontal"
+                                android:orientation="vertical"
+                                android:paddingHorizontal="6dp"
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:gravity="center_horizontal"
-                                    android:minHeight="104dp"
-                                    android:orientation="vertical"
-                                    android:paddingHorizontal="8dp"
-                                    android:paddingVertical="14dp">
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp"
+                                    android:layoutDirection="ltr">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
 
                                     <ImageView
-                                        android:layout_width="22dp"
-                                        android:layout_height="22dp"
+                                        android:layout_width="30dp"
+                                        android:layout_height="30dp"
+                                        android:layout_gravity="center"
                                         android:contentDescription=""
-                                        android:src="@drawable/ic_clipboard"
-                                        app:tint="@color/vinor_accent_green" />
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_phone" />
 
                                     <TextView
-                                        android:id="@+id/dashboardShortcutFollowTitle"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="8dp"
-                                        android:ellipsize="end"
-                                        android:fontFamily="@font/vazirmatn"
+                                        android:id="@+id/dashboardFollowBadge"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="22dp"
+                                        android:layout_gravity="top|end"
+                                        android:background="@drawable/bg_tile_badge"
+                                        android:fontFamily="@font/vazirmatn_bold"
                                         android:gravity="center"
-                                        android:maxLines="2"
-                                        android:text="پیگیری مشتری‌ها"
-                                        android:textColor="@color/vinor_text"
-                                        android:textSize="13sp" />
-                                </LinearLayout>
+                                        android:includeFontPadding="false"
+                                        android:minWidth="22dp"
+                                        android:paddingHorizontal="4dp"
+                                        android:textColor="@color/vinor_on_primary"
+                                        android:textSize="12sp"
+                                        android:visibility="gone" />
+                                </FrameLayout>
 
                                 <TextView
-                                    android:id="@+id/dashboardFollowBadge"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_gravity="top|start"
-                                    android:layout_margin="8dp"
-                                    android:background="@drawable/bg_vinor_count"
+                                    android:id="@+id/dashboardShortcutFollowTitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
+                                    android:layout_weight="1"
+                                    android:ellipsize="end"
+                                    android:fontFamily="@font/vazirmatn_bold"
                                     android:gravity="center"
-                                    android:minWidth="18dp"
-                                    android:paddingHorizontal="5dp"
-                                    android:paddingVertical="1dp"
-                                    android:textColor="@color/vinor_on_primary"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold"
-                                    android:visibility="gone" />
-                            </FrameLayout>
+                                    android:maxLines="1"
+                                    android:text="پیگیری مشتری‌ها"
+                                    android:textColor="@color/vinor_text"
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="10sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
+                            </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
 

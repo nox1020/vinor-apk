@@ -910,6 +910,7 @@ class DashboardFragment : Fragment() {
             binding.dashboardPerfVisits.text = PartnerFormat.toman(obj.optInt("home_visits_done"))
             binding.dashboardPerfCustomers.text = PartnerFormat.toman(obj.optInt("home_active_customers"))
             binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
+            binding.dashboardShortcutFollow.contentDescription = "پیگیری مشتری‌ها"
             binding.dashboardFollowBadge.isVisible = reqCount > 0
             if (reqCount > 0) binding.dashboardFollowBadge.text = PartnerFormat.toman(reqCount)
             binding.dashboardShortcutFollow.setOnClickListener {
@@ -917,6 +918,7 @@ class DashboardFragment : Fragment() {
             }
         } else {
             binding.dashboardShortcutFollowTitle.text = "سطوح همکاری"
+            binding.dashboardShortcutFollow.contentDescription = "سطوح همکاری"
             binding.dashboardFollowBadge.isVisible = false
             binding.dashboardShortcutFollow.setOnClickListener {
                 (activity as? MainActivity)?.openPath("/express/partner/levels")
