@@ -176,6 +176,48 @@ object SearchAds {
         return number.toLongOrNull()?.takeIf { it in 1..1_000_000 }
     }
 
+    /** قیمت کارت. عدد خام تومان می‌شود؛ «توافقی» و متن آماده دست نمی‌خورند. */
+    fun cardPrice(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return "توافقی"
+        if ("توافقی" in trimmed || "تومان" in trimmed) return trimmed
+        val amount = parseToman(trimmed) ?: return trimmed
+        return PartnerFormat.toman(amount) + " تومان"
+    }
+
+    /** متراژ کارت. واحد اگر در متن نباشد اضافه می‌شود. */
+    fun cardArea(raw: String): String {
+        val trimmed = raw.trim().replace(Regex("\\s+"), " ")
+        if (trimmed.isEmpty()) return ""
+        if ("متر" in trimmed) return trimmed
+        val meters = parseArea(trimmed) ?: return ""
+        return PartnerFormat.toman(meters) + " متر"
+    }
+
+    /** محلهٔ کارت: شهر و منطقه، بدون تکرار. عبارت زمانی سرور همان‌طور می‌ماند. */
+    fun cardPlace(ad: SearchAd): String {
+        val loc = ad.location.trim()
+        if (loc.isNotEmpty() && (loc.contains("پیش") || loc.contains("ساعت") || loc.contains("هفته"))) {
+            return loc
+        }
+        val town = ad.city.trim()
+        val hood = ad.district.trim().ifBlank { districtFromLocation(loc) }.ifBlank {
+            loc.removePrefix("در ").trim()
+        }.removePrefix("در ").trim()
+        val listed = town.isNotEmpty() && (
+            hood == town ||
+                hood.startsWith("$town،") ||
+                hood.startsWith("$town,") ||
+                hood.startsWith("$town ·")
+            )
+        return when {
+            town.isNotEmpty() && hood.isNotEmpty() && !listed -> "در $town، $hood"
+            hood.isNotEmpty() -> "در $hood"
+            town.isNotEmpty() -> "در $town"
+            else -> ""
+        }
+    }
+
     fun districtFromLocation(location: String): String {
         val loc = location.trim()
         if (loc.isEmpty()) return ""

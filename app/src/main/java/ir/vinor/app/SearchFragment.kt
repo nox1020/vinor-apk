@@ -310,9 +310,12 @@ class SearchFragment : Fragment() {
         items.forEachIndexed { index, ad ->
             val row = ItemAdsAllRowBinding.inflate(layoutInflater, b.searchList, false)
             row.adsAllTitle.text = ad.title
-            val price = ad.priceRaw.ifBlank { "توافقی" }
+            val price = SearchAds.cardPrice(ad.priceRaw)
             row.adsAllPrice.text = price
-            val loc = locationLine(ad)
+            val area = SearchAds.cardArea(ad.areaRaw)
+            row.adsAllArea.isVisible = area.isNotBlank()
+            row.adsAllArea.text = area
+            val loc = SearchAds.cardPlace(ad)
             row.adsAllLoc.text = loc
             row.adsAllLoc.isVisible = loc.isNotBlank()
             if (approved && ad.commissionAmount > 0) {
@@ -324,13 +327,14 @@ class SearchFragment : Fragment() {
             row.adsAllShots.isVisible = ad.imageCount > 1
             if (ad.imageCount > 1) {
                 row.adsAllShots.text = PartnerFormat.digits(ad.imageCount)
-                val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)
+                val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)?.mutate()
+                camera?.setTint(ContextCompat.getColor(requireContext(), R.color.vinor_text))
                 row.adsAllShots.setCompoundDrawablesRelativeWithIntrinsicBounds(camera, null, null, null)
             }
             row.adsAllDivider.isVisible = index != items.lastIndex
             PartnerImages.roundClip(row.adsAllThumbWrap, 12f)
             row.adsAllThumb.tag = ad.imageUrl
-            row.root.contentDescription = listOf(ad.title, price, loc).filter { it.isNotBlank() }.joinToString("، ")
+            row.root.contentDescription = listOf(ad.title, price, area, loc).filter { it.isNotBlank() }.joinToString("، ")
             row.root.setOnClickListener { openAd(ad) }
             b.searchList.addView(row.root)
         }
@@ -644,12 +648,6 @@ class SearchFragment : Fragment() {
         rawAds.forEach { if (it.city.isNotBlank()) set.add(it.city.trim()) }
         if ("تهران" !in set) return listOf("تهران") + set
         return set.toList()
-    }
-
-    private fun locationLine(ad: SearchAd): String {
-        val loc = ad.location
-        if (loc.isBlank()) return ""
-        return if (loc.contains("در ") || loc.startsWith("در")) loc else "در $loc"
     }
 
     private fun openAd(ad: SearchAd) {

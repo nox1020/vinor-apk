@@ -294,6 +294,36 @@ class SearchQueryTest {
     }
 
     @Test
+    fun cardText_formatsPriceAreaAndPlace() {
+        val partner = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "250متر زمین ویلایی دماوند")
+                    .put("code", "2")
+                    .put("city", "تهران")
+                    .put("location", "تهرانپارس")
+                    .put("size", 250)
+                    .put("price_toman", 1_000_000_000L)
+                    .put("published_for_sale", true),
+            ),
+        )[0]
+        assertEquals("۱،۰۰۰،۰۰۰،۰۰۰ تومان", SearchAds.cardPrice(partner.priceRaw))
+        assertEquals("۲۵۰ متر", SearchAds.cardArea(partner.areaRaw))
+        assertEquals("در تهران، تهرانپارس", SearchAds.cardPlace(partner))
+        assertEquals("توافقی", SearchAds.cardPrice(""))
+        assertEquals("توافقی", SearchAds.cardPrice("توافقی"))
+        assertEquals("۱،۰۰۰،۰۰۰،۰۰۰ تومان", SearchAds.cardPrice("۱،۰۰۰،۰۰۰،۰۰۰ تومان"))
+        assertEquals("۲۵۰ متر مربع", SearchAds.cardArea("۲۵۰ متر مربع"))
+        assertEquals("", SearchAds.cardArea(""))
+        val timed = SearchAd(location = "۲ ساعت پیش", city = "تهران")
+        assertEquals("۲ ساعت پیش", SearchAds.cardPlace(timed))
+        val hood = SearchAd(location = "در نقش‌جهان", city = "اصفهان")
+        assertEquals("در اصفهان، نقش‌جهان", SearchAds.cardPlace(hood))
+        val already = SearchAd(location = "تهران، تهرانپارس", city = "تهران")
+        assertEquals("در تهران، تهرانپارس", SearchAds.cardPlace(already))
+    }
+
+    @Test
     fun publicSitemap_listsPublishedLandsNewestFirst() {
         val xml = """
             <urlset>
