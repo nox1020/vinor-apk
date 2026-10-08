@@ -8,8 +8,6 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -18,6 +16,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import ir.vinor.app.databinding.FragmentLandDetailBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +39,11 @@ class LandDetailFragment : Fragment() {
     private var listing = JSONObject()
     private var bodyExpanded = false
     private var galleryCount = 0
-    private val galleryScrollListener = ViewTreeObserver.OnScrollChangedListener { updateGalleryCounter() }
+    private val pageCallback = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            paintCounter(position)
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -57,7 +61,8 @@ class LandDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.landDetailBack.setOnClickListener { findNavController().navigateUp() }
-        binding.landDetailGallery.viewTreeObserver.addOnScrollChangedListener(galleryScrollListener)
+        binding.landDetailShare.setOnClickListener { shareListing() }
+        binding.landDetailGallery.registerOnPageChangeCallback(pageCallback)
         val code = arguments?.getString("code").orEmpty().trim()
         listingCode = code
         if (code.isBlank()) {
@@ -89,7 +94,7 @@ class LandDetailFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        _binding?.landDetailGallery?.viewTreeObserver?.removeOnScrollChangedListener(galleryScrollListener)
+        _binding?.landDetailGallery?.unregisterOnPageChangeCallback(pageCallback)
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -136,13 +141,19 @@ class LandDetailFragment : Fragment() {
         binding.landDetailError.isVisible = false
         val source = obj.optString("source")
         val isDivar = source == "divar" || code.startsWith("divar:", ignoreCase = true)
-        val badge = obj.optString("owner_badge")
-        binding.landDetailBadge.isVisible = isDivar || badge.isNotBlank()
-        binding.landDetailBadge.text = when {
-            isDivar -> "دیوار"
-            badge.isNotBlank() -> badge
-            else -> "دیوار"
-        }
+        val hasSession = PartnerApi.hasSession()
+        val isMine = obj.optBoolean("is_mine")
+        val published = obj.optBoolean("published_for_sale")
+        val audience = LandDetailRole.audience(hasSession, isMine)
+        val badge = LandDetailRole.badge(
+            hasSession,
+            isMine,
+            isDivar,
+            obj.optString("owner_badge"),
+            published,
+        )
+        binding.landDetailBadge.isVisible = badge.isNotBlank()
+        binding.landDetailBadge.text = badge
         binding.landDetailTitle.text = obj.optString("title").ifBlank { "آگهی" }
         val priceText = obj.optString("price").trim()
         val priceToman = obj.optLong("price_toman")
@@ -153,10 +164,13 @@ class LandDetailFragment : Fragment() {
         }
         binding.landDetailPrice.isVisible = binding.landDetailPrice.text.isNotBlank()
         val comm = obj.optInt("commission_amount")
-        binding.landDetailCommission.isVisible = comm > 0
+        binding.landDetailCommission.isVisible = LandDetailRole.showCommission(hasSession, comm)
         if (comm > 0) {
             binding.landDetailCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
+        val place = LandDetailRole.place(obj.optString("city"), obj.optString("location"))
+        binding.landDetailPlace.text = place
+        binding.landDetailPlace.isVisible = place.isNotBlank()
         val meta = obj.optString("meta").ifBlank {
             listOf(
                 obj.optString("city"),
@@ -167,23 +181,82 @@ class LandDetailFragment : Fragment() {
             ).filter { it.isNotBlank() }.joinToString(" · ")
         }
         binding.landDetailMeta.text = meta
-        binding.landDetailMeta.isVisible = meta.isNotBlank()
+        binding.landDetailMeta.isVisible = LandDetailRole.showMeta(hasSession, place, meta)
+        val rows = obj.optJSONArray("rows") ?: JSONArray()
         bindGallery(obj)
+        bindFacts(rows)
         bindBody(obj.optString("description").ifBlank { obj.optString("body") })
-        bindRows(obj.optJSONArray("rows") ?: JSONArray())
-        val divarUrl = obj.optString("divar_url")
-        val showDivar = obj.optBoolean("show_divar") || (isDivar && divarUrl.isNotBlank())
-        binding.landDetailSticky.isVisible = showDivar
-        binding.landDetailDivar.isVisible = showDivar
-        if (showDivar) {
-            binding.landDetailDivar.setOnClickListener {
-                val url = divarUrl.ifBlank {
-                    "https://divar.ir/v/${code.substringAfter(':')}"
-                }
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        bindRows(rows)
+        bindSticky(code, obj, audience, isDivar, published)
+        bindPublish(code, obj, hasSession, isMine, published)
+    }
+
+    private fun bindSticky(
+        code: String,
+        obj: JSONObject,
+        audience: LandDetailRole.Audience,
+        isDivar: Boolean,
+        published: Boolean,
+    ) {
+        val divarUrl = obj.optString("divar_url").trim()
+        val action = LandDetailRole.sticky(
+            audience,
+            isDivar,
+            obj.optBoolean("show_divar"),
+            divarUrl.isNotBlank(),
+        )
+        binding.landDetailSticky.isVisible = true
+        binding.landDetailStickyPrice.text = binding.landDetailPrice.text
+        binding.landDetailStickyPrice.isVisible = binding.landDetailPrice.text.isNotBlank()
+        val hint = LandDetailRole.stickyHint(audience, published)
+        binding.landDetailStickyHint.isVisible = hint.isNotBlank()
+        binding.landDetailStickyHint.text = hint
+        if (hint.isNotBlank()) {
+            binding.landDetailStickyHint.setTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (published) R.color.vinor_accent_green else R.color.vinor_text_muted,
+                ),
+            )
+        }
+        binding.landDetailDivar.text = action.label
+        binding.landDetailDivar.setOnClickListener {
+            when (action.kind) {
+                LandDetailRole.StickyKind.LOGIN -> (activity as? MainActivity)?.requireChatLogin()
+                LandDetailRole.StickyKind.CHAT -> (activity as? MainActivity)?.openVinorChat()
+                LandDetailRole.StickyKind.DIVAR -> openDivar(code, divarUrl)
+                LandDetailRole.StickyKind.MANAGE -> (activity as? MainActivity)?.openMyPropertyManage(obj)
             }
         }
-        bindPublish(code, obj)
+    }
+
+    private fun openDivar(code: String, divarUrl: String) {
+        val url = divarUrl.ifBlank { "https://divar.ir/v/${code.substringAfter(':')}" }
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    private fun shareListing() {
+        val title = listing.optString("title").trim()
+        val price = _binding?.landDetailPrice?.text?.toString().orEmpty().trim()
+        val link = publicLink()
+        val text = listOf(title, price, link).filter { it.isNotBlank() }.joinToString("\n")
+        if (text.isBlank()) return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(send, "اشتراک‌گذاری"))
+    }
+
+    private fun publicLink(): String {
+        val code = listingCode.trim()
+        if (code.startsWith("divar:", ignoreCase = true)) {
+            val given = listing.optString("divar_url").trim()
+            if (given.isNotBlank()) return given
+            return "https://divar.ir/v/${code.substringAfter(':')}"
+        }
+        if (code.isBlank()) return ""
+        return "https://vinor.ir/express/partner/lands/$code"
     }
 
     private fun bindGallery(obj: JSONObject) {
@@ -200,48 +273,57 @@ class LandDetailFragment : Fragment() {
             if (cover.isNotBlank()) urls.add(cover)
         }
         galleryCount = urls.size
-        binding.landDetailGalleryInner.removeAllViews()
         if (urls.isEmpty()) {
             binding.landDetailGallery.isVisible = false
+            binding.landDetailGallery.adapter = null
             binding.landDetailImage.isVisible = true
-            binding.landDetailImage.setImageDrawable(null)
-            binding.landDetailImage.setBackgroundColor(
-                ContextCompat.getColor(requireContext(), R.color.vinor_raised_2),
-            )
             binding.landDetailCounter.isVisible = false
             return
         }
         binding.landDetailImage.isVisible = false
         binding.landDetailGallery.isVisible = true
-        val width = resources.displayMetrics.widthPixels
-        val height = binding.landDetailGallery.layoutParams.height
-        urls.forEach { url ->
-            val img = ImageView(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams(width, height)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised_2))
-            }
-            binding.landDetailGalleryInner.addView(img)
-            PartnerImages.bind(scope, img, url)
-        }
-        binding.landDetailCounter.isVisible = urls.size > 1
-        binding.landDetailGallery.post {
-            binding.landDetailGallery.scrollTo(0, 0)
-            updateGalleryCounter()
-        }
+        binding.landDetailGallery.adapter = GalleryAdapter(urls)
+        binding.landDetailGallery.setCurrentItem(0, false)
+        paintCounter(0)
     }
 
-    private fun updateGalleryCounter() {
+    private fun paintCounter(position: Int) {
         val b = _binding ?: return
         if (galleryCount <= 1) {
             b.landDetailCounter.isVisible = false
             return
         }
-        val hsv: HorizontalScrollView = b.landDetailGallery
-        val page = hsv.width.coerceAtLeast(1)
-        val idx = ((hsv.scrollX + page / 2) / page).coerceIn(0, galleryCount - 1) + 1
+        val idx = position.coerceIn(0, galleryCount - 1) + 1
         b.landDetailCounter.isVisible = true
         b.landDetailCounter.text = "${PartnerFormat.digits(idx)} از ${PartnerFormat.digits(galleryCount)}"
+    }
+
+    private fun bindFacts(rows: JSONArray) {
+        val host = binding.landDetailFacts
+        host.removeAllViews()
+        val items = LandDetailRole.highlights(rows)
+        binding.landDetailFactsScroll.isVisible = items.isNotEmpty()
+        val gap = dp(8)
+        items.forEachIndexed { index, text ->
+            val chip = TextView(requireContext()).apply {
+                this.text = text
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_text))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.vazirmatn)
+                background = ContextCompat.getDrawable(context, R.drawable.bg_ld_fact)
+                gravity = android.view.Gravity.CENTER
+                minHeight = dp(32)
+                val pad = dp(12)
+                setPadding(pad, 0, pad, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(32),
+                ).apply {
+                    if (index != items.lastIndex) marginEnd = gap
+                }
+            }
+            host.addView(chip)
+        }
     }
 
     private fun bindBody(raw: String) {
@@ -277,10 +359,16 @@ class LandDetailFragment : Fragment() {
         }
     }
 
-    private fun bindPublish(code: String, obj: JSONObject) {
+    private fun bindPublish(
+        code: String,
+        obj: JSONObject,
+        hasSession: Boolean,
+        isMine: Boolean,
+        publishedFlag: Boolean,
+    ) {
         val canPublish = obj.optBoolean("can_publish")
-        val published = obj.optBoolean("published_for_sale") && obj.optBoolean("is_mine")
-        binding.landDetailPublish.isVisible = canPublish || published
+        val published = publishedFlag && isMine
+        binding.landDetailPublish.isVisible = LandDetailRole.showPublish(hasSession, canPublish, isMine, publishedFlag)
         binding.landDetailPayRow.isVisible = canPublish
         binding.landDetailCommissionRow.isVisible = canPublish
         binding.landDetailSendAll.isVisible = canPublish
@@ -292,6 +380,7 @@ class LandDetailFragment : Fragment() {
             binding.landDetailPublishHint.text = "با توقف، این ملک از آگهی‌های فروش برداشته می‌شود."
             binding.landDetailPublishCta.isVisible = true
             binding.landDetailPublishCta.text = "توقف انتشار فروش"
+            paintPublishCta(stop = true)
             binding.landDetailPublishCta.setOnClickListener { stopPublish(code) }
             return
         }
@@ -302,6 +391,7 @@ class LandDetailFragment : Fragment() {
         binding.landDetailPublishTitle.text = "انتشار برای فروش"
         binding.landDetailPublishHint.text = "بعد از انتشار، این ملک در آگهی‌های وینور دیده می‌شود."
         binding.landDetailPublishCta.isVisible = true
+        paintPublishCta(stop = false)
         paintPayChips()
         binding.landDetailPayCash.setOnClickListener { selectedPayment = "نقدی"; paintPayChips() }
         binding.landDetailPayDeal.setOnClickListener { selectedPayment = "توافقی"; paintPayChips() }
@@ -399,9 +489,11 @@ class LandDetailFragment : Fragment() {
         binding.landDetailRows.removeAllViews()
         if (rows.length() <= 0) {
             binding.landDetailRows.isVisible = false
+            binding.landDetailSpecs.isVisible = false
             return
         }
         binding.landDetailRows.isVisible = true
+        binding.landDetailSpecs.isVisible = true
         val pad = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             10f,
@@ -434,5 +526,45 @@ class LandDetailFragment : Fragment() {
             line.addView(valView)
             binding.landDetailRows.addView(line)
         }
+        val any = binding.landDetailRows.childCount > 0
+        binding.landDetailRows.isVisible = any
+        binding.landDetailSpecs.isVisible = any
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun paintPublishCta(stop: Boolean) {
+        val cta = binding.landDetailPublishCta
+        if (stop) {
+            cta.setBackgroundResource(R.drawable.bg_ld_surface)
+            cta.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
+        } else {
+            cta.setBackgroundResource(R.drawable.bg_hub_start)
+            cta.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg))
+        }
+    }
+
+    private inner class GalleryAdapter(
+        private val urls: List<String>,
+    ) : RecyclerView.Adapter<GalleryAdapter.Holder>() {
+        inner class Holder(val image: ImageView) : RecyclerView.ViewHolder(image)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val image = ImageView(parent.context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(ContextCompat.getColor(context, R.color.vinor_raised_2))
+            }
+            return Holder(image)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            PartnerImages.bind(scope, holder.image, urls[position])
+        }
+
+        override fun getItemCount(): Int = urls.size
     }
 }
