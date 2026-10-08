@@ -57,10 +57,7 @@ class SearchFragment : Fragment() {
     private var sheetDialog: BottomSheetDialog? = null
 
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener {
-        val b = _binding ?: return@OnScrollChangedListener
-        if (!isAdded) return@OnScrollChangedListener
-        val threshold = 8 * resources.displayMetrics.density
-        b.searchHeaderBorder.isVisible = b.searchScroll.scrollY > threshold
+        if (_binding == null || !isAdded) return@OnScrollChangedListener
         bindVisibleImages()
     }
 
@@ -75,7 +72,7 @@ class SearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_primary_red))
+        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
         binding.searchRefresh.setProgressBackgroundColorSchemeColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
         binding.searchClear.setOnClickListener {
@@ -576,7 +573,7 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         val bar = Snackbar.make(b.root, "اتصال برقرار نشد", Snackbar.LENGTH_LONG)
         bar.setAction("تلاش دوباره") { load() }
-        bar.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+        bar.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
         bar.view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
         bar.view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
             text.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))

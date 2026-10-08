@@ -80,6 +80,7 @@
         android:id="@+id/searchChipScroll"
         android:layout_width="match_parent"
         android:layout_height="48dp"
+        android:background="@color/vinor_chrome"
         android:overScrollMode="never"
         android:scrollbars="none">
 
@@ -172,8 +173,7 @@
         android:id="@+id/searchHeaderBorder"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/vinor_border"
-        android:visibility="gone" />
+        android:background="@color/vinor_border" />
 
     <TextView
         android:id="@+id/searchCount"
@@ -271,13 +271,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_marginTop="16dp"
-                        android:background="@drawable/bg_search_apply"
+                        android:background="@drawable/bg_hub_start"
                         android:clickable="true"
                         android:focusable="true"
                         android:fontFamily="@font/vazirmatn_bold"
                         android:gravity="center"
                         android:text="حذف فیلترها"
-                        android:textColor="@color/vinor_on_primary"
+                        android:textColor="#052E16"
                         android:textSize="15sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -307,13 +307,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_marginTop="16dp"
-                        android:background="@drawable/bg_search_apply"
+                        android:background="@drawable/bg_hub_start"
                         android:clickable="true"
                         android:focusable="true"
                         android:fontFamily="@font/vazirmatn_bold"
                         android:gravity="center"
                         android:text="تلاش دوباره"
-                        android:textColor="@color/vinor_on_primary"
+                        android:textColor="#052E16"
                         android:textSize="15sp" />
                 </LinearLayout>
 
