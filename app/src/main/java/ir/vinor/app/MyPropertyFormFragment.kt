@@ -93,7 +93,7 @@ class MyPropertyFormFragment : Fragment() {
         editSnapshot = arguments?.getString(ARG_SNAPSHOT).orEmpty()
         editCode = arguments?.getString(ARG_CODE).orEmpty().trim()
         if (editCode.isBlank() && editSnapshot.isNotBlank()) {
-            editCode = runCatching { JSONObject(editSnapshot).optString("code") }.getOrDefault("").trim()
+            editCode = runCatching { MyPropertyManage.codeOf(JSONObject(editSnapshot)) }.getOrDefault("").trim()
         }
         if (publicListing) {
             binding.mpFormHeader.pageTitle.text = "ثبت آگهی"
@@ -283,6 +283,12 @@ class MyPropertyFormFragment : Fragment() {
         fill(b.mpFormSize.text, size) { b.mpFormSize.setText(it) }
         val price = digitsOf(textOf(obj, "price_total")).ifBlank { digitsOf(textOf(obj, "price_toman")) }
         fill(b.mpFormPrice.text, price) { b.mpFormPrice.setText(it) }
+        val pay = MyPropertyManage.paymentOf(obj)
+        if (pay.isNotBlank()) selectNamed(b.mpFormPayment, paymentMethods, pay)
+        val commission = MyPropertyManage.commissionOf(obj)
+        if (commission.isNotBlank() && b.mpFormCommission.text.isNullOrBlank()) {
+            b.mpFormCommission.setText(commission)
+        }
     }
 
     private fun selectNamed(spinner: Spinner, items: MutableList<String>, value: String) {
@@ -610,6 +616,14 @@ class MyPropertyFormFragment : Fragment() {
         val location = binding.mpFormLocation.text?.toString()?.trim().orEmpty()
         val size = longDigits(binding.mpFormSize.text?.toString().orEmpty())
         val price = longDigits(binding.mpFormPrice.text?.toString().orEmpty())
+        val snap = runCatching { JSONObject(editSnapshot) }.getOrNull()
+        val payment = MyPropertyManage.editPayment(
+            snap,
+            if (publicListing) selectedPayment() else "",
+            publicListing,
+        )
+        val typedCommission = if (publicListing) commissionPct()?.toString().orEmpty() else ""
+        val commission = MyPropertyManage.editCommission(snap, typedCommission, publicListing)
         when {
             title.isBlank() || city.isBlank() || location.isBlank() || size <= 0L || price <= 0L -> {
                 showError("لطفاً فیلدهای اجباری را پر کنید.")
@@ -619,22 +633,20 @@ class MyPropertyFormFragment : Fragment() {
                 showError("عنوان باید حداقل ۱۰ کاراکتر باشد.")
                 return
             }
-            publicListing && selectedPayment().isBlank() -> {
+            publicListing && payment.isBlank() -> {
                 showError("نحوه پرداخت را انتخاب کنید.")
                 return
             }
-            publicListing && selectedPayment() == "اقساطی" && collectInstallments() == null -> {
+            publicListing && payment == "اقساطی" && collectInstallments() == null -> {
                 showError("برای پرداخت اقساطی حداقل یک قسط معتبر وارد کنید.")
                 return
             }
-            publicListing && commissionPct() == null -> {
+            publicListing && commission.isBlank() -> {
                 showError("درصد پورسانت الزامی است.")
                 return
             }
         }
         val ppm = if (size > 0L) price / size else 0L
-        val payment = if (publicListing) selectedPayment() else "توافقی"
-        val commission = if (publicListing) commissionPct()?.toString() ?: "0" else "0"
         val body = JSONObject()
             .put("title", title)
             .put("city", city)
@@ -688,7 +700,8 @@ class MyPropertyFormFragment : Fragment() {
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {
-                    toast(obj.optString("message").ifBlank { "ملک شما ثبت شد." })
+                    val saved = if (editCode.isNotBlank()) "تغییرات ذخیره شد." else "ملک شما ثبت شد."
+                    toast(obj.optString("message").ifBlank { saved })
                     (activity as? MainActivity)?.openMyProperty()
                 } else {
                     showError(obj.optString("error").ifBlank {

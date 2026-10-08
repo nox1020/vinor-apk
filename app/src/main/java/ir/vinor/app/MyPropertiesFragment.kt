@@ -183,7 +183,7 @@ class MyPropertiesFragment : Fragment() {
             card.landCardCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
         PartnerImages.bind(scope, card.landCardImage, land.optString("image_url"), card.landCardImagePlaceholder)
-        val code = land.optString("code")
+        val code = MyPropertyManage.codeOf(land)
         card.root.setOnClickListener {
             if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }

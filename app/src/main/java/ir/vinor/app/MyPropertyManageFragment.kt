@@ -77,7 +77,7 @@ class MyPropertyManageFragment : Fragment() {
         val price = MyPropertyManage.priceOf(snapshot)
         b.mpManagePrice.isVisible = price > 0L
         if (price > 0L) b.mpManagePrice.text = PartnerFormat.toman(price) + " تومان"
-        val published = snapshot.optBoolean("published_for_sale")
+        val published = MyPropertyManage.isPublished(snapshot)
         b.mpManageStatus.text = MyPropertyManage.statusOf(snapshot)
         b.mpManageStatus.setTextColor(
             ContextCompat.getColor(
@@ -88,7 +88,7 @@ class MyPropertyManageFragment : Fragment() {
         PartnerImages.bind(
             scope,
             b.mpManageImage,
-            snapshot.optString("image_url"),
+            MyPropertyManage.imageOf(snapshot),
             b.mpManageImagePlaceholder,
         )
     }
@@ -97,7 +97,7 @@ class MyPropertyManageFragment : Fragment() {
         val host = _binding?.mpManageActions ?: return
         host.removeAllViews()
         val price = MyPropertyManage.priceOf(snapshot)
-        val published = snapshot.optBoolean("published_for_sale")
+        val published = MyPropertyManage.isPublished(snapshot)
         MyPropertyManage.actions().forEach { action ->
             val row = ItemProfileLinkBinding.inflate(layoutInflater, host, false)
             val label = MyPropertyManage.label(action, published && action == MyPropertyManage.Action.PUBLISH)
@@ -137,7 +137,7 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.Action.DELETE -> showDeleteSheet()
             MyPropertyManage.Action.SHARE -> share()
             MyPropertyManage.Action.PUBLISH -> {
-                if (snapshot.optBoolean("published_for_sale")) showStopSheet() else showPublishSheet()
+                if (MyPropertyManage.isPublished(snapshot)) showStopSheet() else showPublishSheet()
             }
         }
     }
@@ -210,6 +210,10 @@ class MyPropertyManageFragment : Fragment() {
 
     private fun showPublishSheet() {
         val sheet = SheetPropertyPublishBinding.inflate(layoutInflater)
+        val knownPay = MyPropertyManage.paymentOf(snapshot)
+        if (knownPay == "نقدی" || knownPay == "توافقی" || knownPay == "معاوضه") selectedPayment = knownPay
+        val knownCommission = MyPropertyManage.commissionOf(snapshot)
+        if (knownCommission.isNotBlank()) sheet.publishCommission.setText(knownCommission)
         val dialog = openSheet(sheet.root)
         fun paint() {
             paintChip(sheet.publishPayCash, selectedPayment == "نقدی")
@@ -282,7 +286,7 @@ class MyPropertyManageFragment : Fragment() {
 
     private fun postPrice(price: Long) {
         val body = MyPropertyManage.priceBody(snapshot, price)
-        post(MyPropertyManage.SUBMIT_PATH, body, "قیمت ثبت شد.") { fresh ->
+        post(MyPropertyManage.SUBMIT_PATH, body, "ثبت قیمت ناموفق بود.") { fresh ->
             snapshot.put("price_total", price)
             bindPreview()
             bindRows()
@@ -297,11 +301,39 @@ class MyPropertyManageFragment : Fragment() {
             return
         }
         val body = MyPropertyManage.publishBody(code, payment, commission, sendAll)
-        post(MyPropertyManage.PUBLISH_PATH, body, "انتشار ناموفق بود.") { fresh ->
-            snapshot.put("published_for_sale", true)
-            bindPreview()
-            bindRows()
-            toast(fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." })
+        val ctx = context ?: return
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(MyPropertyManage.PUBLISH_PATH, body, ctx)
+                }
+                val land = if (fresh.optBoolean("ok")) {
+                    withContext(Dispatchers.IO) { PartnerApi.get(MyPropertyManage.landDataPath(code), ctx) }
+                } else {
+                    null
+                }
+                if (_binding == null) return@launch
+                if (fresh.optInt("http_status") == 401) {
+                    toast("برای این کار وارد شوید.")
+                    (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                if (MyPropertyManage.publishAccepted(fresh, land)) {
+                    if (land != null) snapshot = MyPropertyManage.mergeDetail(snapshot, land)
+                    MyPropertyManage.markPublished(snapshot, true)
+                    bindPreview()
+                    bindRows()
+                    toast(fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." })
+                } else {
+                    toast(MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."))
+                }
+            } catch (e: Exception) {
+                toast(e.message ?: "انتشار ناموفق بود.")
+            } finally {
+                busy = false
+            }
         }
     }
 
@@ -336,7 +368,7 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (MyPropertyManage.unpublishStopped(fresh, land)) {
                     snapshot = if (land != null) MyPropertyManage.mergeDetail(snapshot, land) else snapshot
-                    snapshot.put("published_for_sale", false)
+                    MyPropertyManage.markPublished(snapshot, false)
                     bindPreview()
                     bindRows()
                     toast(fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." })

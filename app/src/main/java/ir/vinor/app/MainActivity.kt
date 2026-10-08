@@ -506,7 +506,7 @@ class MainActivity : AppCompatActivity() {
     fun openPropertyEdit(snapshot: org.json.JSONObject) {
         val args = Bundle().apply {
             putBoolean(MyPropertyFormFragment.ARG_PUBLIC, false)
-            putString(MyPropertyFormFragment.ARG_CODE, snapshot.optString("code"))
+            putString(MyPropertyFormFragment.ARG_CODE, MyPropertyManage.codeOf(snapshot))
             putString(MyPropertyFormFragment.ARG_SNAPSHOT, snapshot.toString())
         }
         navController.navigate(R.id.myPropertyFormFragment, args)

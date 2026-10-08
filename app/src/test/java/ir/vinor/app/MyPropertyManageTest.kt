@@ -98,6 +98,63 @@ class MyPropertyManageTest {
         assertEquals("15000000000", body.getString("price_total"))
         assertEquals("15000000", body.getString("price_per_meter"))
         assertEquals("تهران", body.getString("city"))
+        assertEquals("توافقی", body.getString("payment_method"))
+        assertEquals("0", body.getString("express_commission_pct"))
+    }
+
+    @Test
+    fun priceBody_keepsExistingPaymentAndCommission() {
+        val card = JSONObject()
+            .put("code", "4")
+            .put("payment_method", "نقدی")
+            .put("commission_pct", 2)
+            .put("size", "500")
+        val body = MyPropertyManage.priceBody(card, 1_000_000L)
+        assertEquals("نقدی", body.getString("payment_method"))
+        assertEquals("2", body.getString("express_commission_pct"))
+        assertEquals("2000", body.getString("price_per_meter"))
+    }
+
+    @Test
+    fun status_followsPublishFlagNotStaleBadge() {
+        val live = JSONObject().put("published_for_sale", true).put("badge_label", "خصوصی")
+        assertTrue(MyPropertyManage.isPublished(live))
+        assertEquals("منتشرشده", MyPropertyManage.statusOf(live))
+        val fromBadge = JSONObject().put("badge_label", "منتشرشده")
+        assertTrue(MyPropertyManage.isPublished(fromBadge))
+        assertEquals("4", MyPropertyManage.codeOf(JSONObject().put("id", 4)))
+    }
+
+    @Test
+    fun edit_keepsKnownTerms() {
+        val snap = JSONObject().put("payment_method", "نقدی").put("commission_pct", "2")
+        assertEquals("نقدی", MyPropertyManage.editPayment(snap, "", publicListing = false))
+        assertEquals("معاوضه", MyPropertyManage.editPayment(snap, "معاوضه", publicListing = true))
+        assertEquals("", MyPropertyManage.editPayment(null, "", publicListing = true))
+        assertEquals("2", MyPropertyManage.editCommission(snap, "", publicListing = false))
+        assertEquals("0", MyPropertyManage.editCommission(null, "", publicListing = false))
+    }
+
+    @Test
+    fun publishAccepted_rejectsWhenListingStaysPrivate() {
+        val ok = JSONObject().put("ok", true).put("http_status", 200)
+        val stillPrivate = JSONObject().put("ok", true).put("published_for_sale", false)
+        val live = JSONObject().put("ok", true).put("published_for_sale", true)
+        assertFalse(MyPropertyManage.publishAccepted(ok, stillPrivate))
+        assertTrue(MyPropertyManage.publishAccepted(ok, live))
+        assertTrue(MyPropertyManage.publishAccepted(ok, null))
+    }
+
+    @Test
+    fun mergeDetail_copiesImageAndSizeFromRows() {
+        val card = JSONObject().put("code", "1").put("title", "ملک من")
+        val detail = JSONObject()
+            .put("ok", true)
+            .put("images", JSONArray().put("/uploads/a.jpg"))
+            .put("rows", JSONArray().put(JSONObject().put("label", "متراژ").put("value", "1000 متر")))
+        val merged = MyPropertyManage.mergeDetail(card, detail)
+        assertEquals("/uploads/a.jpg", merged.getString("image_url"))
+        assertEquals("1000", merged.getString("size"))
     }
 
     @Test

@@ -40,20 +40,42 @@ object MyPropertyManage {
         Action.PUBLISH -> if (published) "توقف انتشار فروش" else "انتشار برای فروش"
     }
 
-    fun codeOf(snapshot: JSONObject): String = text(snapshot, "code")
+    fun codeOf(snapshot: JSONObject): String {
+        val code = text(snapshot, "code")
+        if (code.isNotBlank()) return code
+        return text(snapshot, "id")
+    }
 
     fun titleOf(snapshot: JSONObject): String = text(snapshot, "title").ifBlank { "ملک شما" }
 
     fun priceOf(snapshot: JSONObject): Long {
         val total = longOf(snapshot, "price_total")
         if (total > 0L) return total
-        return longOf(snapshot, "price_toman")
+        val toman = longOf(snapshot, "price_toman")
+        if (toman > 0L) return toman
+        return longOf(snapshot, "price")
+    }
+
+    fun isPublished(snapshot: JSONObject): Boolean {
+        if (snapshot.has("published_for_sale")) return snapshot.optBoolean("published_for_sale")
+        return text(snapshot, "badge_label") == "منتشرشده"
     }
 
     fun statusOf(snapshot: JSONObject): String {
+        if (snapshot.has("published_for_sale")) {
+            return if (snapshot.optBoolean("published_for_sale")) "منتشرشده" else "خصوصی"
+        }
         val badge = text(snapshot, "badge_label")
         if (badge.isNotBlank()) return badge
-        return if (snapshot.optBoolean("published_for_sale")) "منتشرشده" else "خصوصی"
+        return "خصوصی"
+    }
+
+    fun markPublished(snapshot: JSONObject, published: Boolean) {
+        snapshot.put("published_for_sale", published)
+        val badge = text(snapshot, "badge_label")
+        if (badge.isBlank() || badge == "منتشرشده" || badge == "خصوصی") {
+            snapshot.put("badge_label", if (published) "منتشرشده" else "خصوصی")
+        }
     }
 
     fun shareUrl(code: String): String {
@@ -68,14 +90,17 @@ object MyPropertyManage {
 
     fun priceAmount(raw: String): Long = digits(raw).toLongOrNull() ?: 0L
 
-    /** همان قرارداد ثبت ملک، با کد تا سرور همین آگهی را به‌روز کند. */
+    /**
+     * همان قرارداد ثبت ملک، با کد تا سرور همین آگهی را به‌روز کند.
+     * روش پرداخت و پورسانت فعلی حفظ می‌شود تا تعیین قیمت شرایط فروش را عوض نکند.
+     */
     fun priceBody(snapshot: JSONObject, price: Long): JSONObject {
         val body = JSONObject()
             .put("code", codeOf(snapshot))
             .put("price_total", price.toString())
-            .put("payment_method", "توافقی")
-            .put("express_commission_pct", "0")
-        val size = longOf(snapshot, "size")
+            .put("payment_method", paymentOf(snapshot).ifBlank { "توافقی" })
+            .put("express_commission_pct", commissionOf(snapshot).ifBlank { "0" })
+        val size = sizeOf(snapshot)
         if (size > 0L) {
             body.put("size", size.toString())
             body.put("price_per_meter", (price / size).toString())
@@ -118,6 +143,44 @@ object MyPropertyManage {
         return text(snapshot, "express_commission_pct")
     }
 
+    /** ویرایش ملک منتشرشده نباید روش پرداخت را به توافقی برگرداند. */
+    fun editPayment(snapshot: JSONObject?, selected: String, publicListing: Boolean): String {
+        val chosen = selected.trim()
+        if (isChosenPayment(chosen)) return chosen
+        val known = paymentOf(snapshot)
+        if (known.isNotBlank()) return known
+        return if (publicListing) "" else "توافقی"
+    }
+
+    /** ویرایش نباید پورسانت ثبت‌شده را صفر کند. */
+    fun editCommission(snapshot: JSONObject?, typed: String, publicListing: Boolean): String {
+        val entered = typed.trim()
+        if (publicListing && entered.isNotBlank()) return entered
+        val known = commissionOf(snapshot)
+        if (known.isNotBlank()) return known
+        return if (publicListing) "" else "0"
+    }
+
+    fun sizeOf(snapshot: JSONObject): Long {
+        val direct = longOf(snapshot, "size")
+        if (direct > 0L) return direct
+        return digits(rowValue(snapshot, "متراژ")).toLongOrNull() ?: 0L
+    }
+
+    fun imageOf(snapshot: JSONObject): String {
+        listOf("image_url", "image_full", "image_thumb", "image_raw", "cover_image").forEach { key ->
+            val value = text(snapshot, key)
+            if (value.isNotBlank() && value != "null") return value
+        }
+        val images = snapshot.optJSONArray("images") ?: return ""
+        val first = images.opt(0) ?: return ""
+        return when (first) {
+            is String -> first.trim()
+            is JSONObject -> text(first, "url").ifBlank { text(first, "src") }
+            else -> ""
+        }
+    }
+
     fun landDataPath(code: String): String {
         val encoded = URLEncoder.encode(code.trim(), Charsets.UTF_8.name()).replace("+", "%20")
         return "/express/partner/api/lands/$encoded/data"
@@ -134,7 +197,21 @@ object MyPropertyManage {
         return !land.optBoolean("published_for_sale")
     }
 
-    /** اگر پاسخ انتشار موفق باشد ولی ملک هنوز منتشر است، پیام موفقیت سرور نشان داده نمی‌شود. */
+    /**
+     * پاسخ موفق کافی نیست اگر جزئیات ملک هنوز منتشر نشده باشد.
+     * اگر جزئیات در دسترس نباشد، همان پاسخ سرور ملاک است.
+     */
+    fun publishAccepted(post: JSONObject, land: JSONObject?): Boolean {
+        val status = post.optInt("http_status", 200)
+        if (status !in 200..299) return false
+        if (!post.optBoolean("ok")) return false
+        if (land == null || !land.has("published_for_sale")) return true
+        val landStatus = land.optInt("http_status", 200)
+        if (landStatus != 0 && landStatus !in 200..299) return true
+        return land.optBoolean("published_for_sale")
+    }
+
+    /** اگر پاسخ سرور موفق باشد ولی وضعیت ملک عوض نشده، پیام موفقیت نشان داده نمی‌شود. */
     fun unpublishFailure(post: JSONObject, fallback: String): String {
         if (post.optBoolean("ok")) return fallback
         return failureMessage(post, fallback)
@@ -174,6 +251,14 @@ object MyPropertyManage {
         if (commissionOf(out).isBlank()) {
             val commission = commissionOf(detail)
             if (commission.isNotBlank()) out.put("commission_pct", commission)
+        }
+        if (text(out, "size").isBlank()) {
+            val size = sizeOf(detail)
+            if (size > 0L) out.put("size", size.toString())
+        }
+        if (imageOf(out).isBlank()) {
+            val image = imageOf(detail)
+            if (image.isNotBlank()) out.put("image_url", image)
         }
         return out
     }
