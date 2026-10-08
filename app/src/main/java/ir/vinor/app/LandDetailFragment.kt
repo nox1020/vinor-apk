@@ -36,6 +36,7 @@ class LandDetailFragment : Fragment() {
     private var publishing = false
     private var selectedPayment = "نقدی"
     private var listingCode = ""
+    private var listing = JSONObject()
     private var bodyExpanded = false
     private var galleryCount = 0
     private val galleryScrollListener = ViewTreeObserver.OnScrollChangedListener { updateGalleryCounter() }
@@ -131,6 +132,7 @@ class LandDetailFragment : Fragment() {
 
     private fun bindLand(code: String, obj: JSONObject) {
         if (!obj.optBoolean("ok") && obj.optString("title").isBlank()) return
+        listing = obj
         binding.landDetailError.isVisible = false
         val source = obj.optString("source")
         val isDivar = source == "divar" || code.startsWith("divar:", ignoreCase = true)
@@ -317,7 +319,7 @@ class LandDetailFragment : Fragment() {
                 val fresh = withContext(Dispatchers.IO) {
                     PartnerApi.postJson(
                         MyPropertyManage.UNPUBLISH_PATH,
-                        MyPropertyManage.unpublishBody(code),
+                        MyPropertyManage.unpublishBody(code, listing),
                         ctx,
                     )
                 }
@@ -333,7 +335,7 @@ class LandDetailFragment : Fragment() {
                 } else {
                     Toast.makeText(
                         ctx,
-                        MyPropertyManage.failureMessage(fresh, "توقف انتشار ناموفق بود."),
+                        MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."),
                         Toast.LENGTH_SHORT,
                     ).show()
                 }

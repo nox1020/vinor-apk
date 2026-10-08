@@ -89,11 +89,33 @@ object MyPropertyManage {
 
     fun deleteBody(code: String): JSONObject = JSONObject().put("code", code.trim())
 
-    fun unpublishBody(code: String): JSONObject {
+    /**
+     * توقف همان مسیر انتشار است. سرور قبل از خواندن پرچم توقف، نحوهٔ پرداخت را اجباری می‌کند؛
+     * بدون آن پاسخ «نحوه پرداخت را انتخاب کنید» می‌دهد و آگهی روشن می‌ماند.
+     * روش و پورسانت فعلی ملک حفظ می‌شود تا شرایط فروش عوض نشود.
+     */
+    fun unpublishBody(code: String, snapshot: JSONObject? = null): JSONObject {
         return JSONObject()
             .put("code", code.trim())
+            .put("payment_method", paymentOf(snapshot).ifBlank { "نقدی" })
+            .put("commission_pct", commissionOf(snapshot).ifBlank { "2" })
+            .put("auto_send_all_partners", false)
             .put("published_for_sale", false)
             .put("unpublish", true)
+    }
+
+    fun paymentOf(snapshot: JSONObject?): String {
+        if (snapshot == null) return ""
+        val direct = text(snapshot, "payment_method")
+        if (isChosenPayment(direct)) return direct
+        return rowValue(snapshot, "نحوه پرداخت").takeIf { isChosenPayment(it) }.orEmpty()
+    }
+
+    fun commissionOf(snapshot: JSONObject?): String {
+        if (snapshot == null) return ""
+        val direct = text(snapshot, "commission_pct")
+        if (direct.isNotBlank()) return direct
+        return text(snapshot, "express_commission_pct")
     }
 
     fun landDataPath(code: String): String {
@@ -110,6 +132,12 @@ object MyPropertyManage {
         val landStatus = land.optInt("http_status", 200)
         if (landStatus != 0 && landStatus !in 200..299) return false
         return !land.optBoolean("published_for_sale")
+    }
+
+    /** اگر پاسخ انتشار موفق باشد ولی ملک هنوز منتشر است، پیام موفقیت سرور نشان داده نمی‌شود. */
+    fun unpublishFailure(post: JSONObject, fallback: String): String {
+        if (post.optBoolean("ok")) return fallback
+        return failureMessage(post, fallback)
     }
 
     fun publishBody(code: String, payment: String, commission: String, sendAll: Boolean): JSONObject {
@@ -139,6 +167,14 @@ object MyPropertyManage {
         }
         if (detail.has("published_for_sale")) out.put("published_for_sale", detail.optBoolean("published_for_sale"))
         if (detail.has("can_publish")) out.put("can_publish", detail.optBoolean("can_publish"))
+        if (paymentOf(out).isBlank()) {
+            val pay = paymentOf(detail)
+            if (pay.isNotBlank()) out.put("payment_method", pay)
+        }
+        if (commissionOf(out).isBlank()) {
+            val commission = commissionOf(detail)
+            if (commission.isNotBlank()) out.put("commission_pct", commission)
+        }
         return out
     }
 
@@ -147,6 +183,20 @@ object MyPropertyManage {
         val err = obj.optString("error").trim().ifBlank { obj.optString("message").trim() }
         if (err.isBlank() || err.equals("Not Found", ignoreCase = true)) return fallback
         return err
+    }
+
+    private fun isChosenPayment(value: String): Boolean {
+        val trimmed = value.trim()
+        return trimmed.isNotBlank() && trimmed != "انتخاب کنید"
+    }
+
+    private fun rowValue(obj: JSONObject, label: String): String {
+        val rows = obj.optJSONArray("rows") ?: return ""
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            if (text(row, "label") == label) return text(row, "value")
+        }
+        return ""
     }
 
     private fun text(obj: JSONObject, key: String): String {

@@ -317,7 +317,11 @@ class MyPropertyManageFragment : Fragment() {
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson(MyPropertyManage.UNPUBLISH_PATH, MyPropertyManage.unpublishBody(code), ctx)
+                    PartnerApi.postJson(
+                        MyPropertyManage.UNPUBLISH_PATH,
+                        MyPropertyManage.unpublishBody(code, snapshot),
+                        ctx,
+                    )
                 }
                 val land = if (fresh.optBoolean("ok")) {
                     withContext(Dispatchers.IO) { PartnerApi.get(MyPropertyManage.landDataPath(code), ctx) }
@@ -337,7 +341,7 @@ class MyPropertyManageFragment : Fragment() {
                     bindRows()
                     toast(fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." })
                 } else {
-                    toast(MyPropertyManage.failureMessage(fresh, "توقف انتشار ناموفق بود."))
+                    toast(MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."))
                 }
             } catch (e: Exception) {
                 toast(e.message ?: "توقف انتشار ناموفق بود.")

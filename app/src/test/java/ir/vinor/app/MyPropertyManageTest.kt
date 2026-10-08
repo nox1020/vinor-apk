@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,10 +25,43 @@ class MyPropertyManageTest {
         val body = MyPropertyManage.unpublishBody("4")
         assertEquals("4", body.getString("code"))
         assertFalse(body.getBoolean("published_for_sale"))
+        assertTrue(body.getBoolean("unpublish"))
+        assertEquals("نقدی", body.getString("payment_method"))
+        assertEquals("2", body.getString("commission_pct"))
+        assertFalse(body.getBoolean("auto_send_all_partners"))
         assertEquals(
             "/express/partner/api/my-property/publish?published_for_sale=0",
             MyPropertyManage.UNPUBLISH_PATH,
         )
+    }
+
+    @Test
+    fun unpublishBody_keepsListingPaymentSoServerValidationPasses() {
+        val rows = JSONArray().put(JSONObject().put("label", "نحوه پرداخت").put("value", "توافقی"))
+        val card = JSONObject().put("code", "1").put("title", "ملک من")
+        val detail = JSONObject()
+            .put("ok", true)
+            .put("title", "عنوان سرور")
+            .put("commission_pct", 0)
+            .put("payment_method", JSONObject.NULL)
+            .put("rows", rows)
+        val merged = MyPropertyManage.mergeDetail(card, detail)
+        assertEquals("توافقی", merged.getString("payment_method"))
+        assertEquals("0", merged.getString("commission_pct"))
+        val body = MyPropertyManage.unpublishBody("1", merged)
+        assertEquals("توافقی", body.getString("payment_method"))
+        assertEquals("0", body.getString("commission_pct"))
+        assertFalse(body.getBoolean("published_for_sale"))
+        val placeholder = JSONObject().put("payment_method", "انتخاب کنید")
+        assertEquals("نقدی", MyPropertyManage.unpublishBody("1", placeholder).getString("payment_method"))
+    }
+
+    @Test
+    fun unpublishFailure_hidesSuccessTextWhenListingStaysLive() {
+        val republished = JSONObject().put("ok", true).put("message", "ملک برای فروش منتشر شد.")
+        assertEquals("توقف انتشار ناموفق بود.", MyPropertyManage.unpublishFailure(republished, "توقف انتشار ناموفق بود."))
+        val rejected = JSONObject().put("ok", false).put("http_status", 400).put("error", "نحوه پرداخت را انتخاب کنید")
+        assertEquals("نحوه پرداخت را انتخاب کنید", MyPropertyManage.unpublishFailure(rejected, "توقف انتشار ناموفق بود."))
     }
 
     @Test
