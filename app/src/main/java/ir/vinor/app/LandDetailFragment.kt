@@ -321,8 +321,13 @@ class LandDetailFragment : Fragment() {
                         ctx,
                     )
                 }
+                val land = if (fresh.optBoolean("ok")) {
+                    withContext(Dispatchers.IO) { PartnerApi.get(apiPath(code), ctx) }
+                } else {
+                    null
+                }
                 if (_binding == null) return@launch
-                if (fresh.optBoolean("ok", false)) {
+                if (MyPropertyManage.unpublishStopped(fresh, land)) {
                     Toast.makeText(ctx, fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." }, Toast.LENGTH_SHORT).show()
                     load(code)
                 } else {

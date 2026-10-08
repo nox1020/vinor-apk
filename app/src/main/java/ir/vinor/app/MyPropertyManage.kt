@@ -10,7 +10,8 @@ object MyPropertyManage {
     const val DELETE_PATH = "/express/partner/api/my-property/delete"
     const val SUBMIT_PATH = "/express/partner/api/my-property/submit"
     const val PUBLISH_PATH = "/express/partner/api/my-property/publish"
-    const val UNPUBLISH_PATH = "/express/partner/api/my-property/unpublish"
+    /** همان مسیر انتشار؛ توقف با published_for_sale=false. مسیر جداگانه روی سرور نیست. */
+    const val UNPUBLISH_PATH = "$PUBLISH_PATH?published_for_sale=0"
 
     enum class Action {
         VIEW,
@@ -88,7 +89,28 @@ object MyPropertyManage {
 
     fun deleteBody(code: String): JSONObject = JSONObject().put("code", code.trim())
 
-    fun unpublishBody(code: String): JSONObject = JSONObject().put("code", code.trim())
+    fun unpublishBody(code: String): JSONObject {
+        return JSONObject()
+            .put("code", code.trim())
+            .put("published_for_sale", false)
+            .put("unpublish", true)
+    }
+
+    fun landDataPath(code: String): String {
+        val encoded = URLEncoder.encode(code.trim(), Charsets.UTF_8.name()).replace("+", "%20")
+        return "/express/partner/api/lands/$encoded/data"
+    }
+
+    /** موفقیت فقط وقتی پاسخ انتشار قبول شود و جزئیات ملک دیگر منتشرشده نباشد. */
+    fun unpublishStopped(post: JSONObject, land: JSONObject?): Boolean {
+        val status = post.optInt("http_status", 200)
+        if (status !in 200..299) return false
+        if (!post.optBoolean("ok")) return false
+        if (land == null || !land.has("published_for_sale")) return false
+        val landStatus = land.optInt("http_status", 200)
+        if (landStatus != 0 && landStatus !in 200..299) return false
+        return !land.optBoolean("published_for_sale")
+    }
 
     fun publishBody(code: String, payment: String, commission: String, sendAll: Boolean): JSONObject {
         return JSONObject()

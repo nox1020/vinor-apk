@@ -307,15 +307,43 @@ class MyPropertyManageFragment : Fragment() {
 
     private fun postUnpublish() {
         val code = MyPropertyManage.codeOf(snapshot)
+        val ctx = context ?: return
         if (code.isBlank()) {
             toast("کد ملک نامعتبر است.")
             return
         }
-        post(MyPropertyManage.UNPUBLISH_PATH, MyPropertyManage.unpublishBody(code), "توقف انتشار ناموفق بود.") {
-            snapshot.put("published_for_sale", false)
-            bindPreview()
-            bindRows()
-            toast("انتشار فروش متوقف شد.")
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(MyPropertyManage.UNPUBLISH_PATH, MyPropertyManage.unpublishBody(code), ctx)
+                }
+                val land = if (fresh.optBoolean("ok")) {
+                    withContext(Dispatchers.IO) { PartnerApi.get(MyPropertyManage.landDataPath(code), ctx) }
+                } else {
+                    null
+                }
+                if (_binding == null) return@launch
+                if (fresh.optInt("http_status") == 401) {
+                    toast("برای این کار وارد شوید.")
+                    (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                if (MyPropertyManage.unpublishStopped(fresh, land)) {
+                    snapshot = if (land != null) MyPropertyManage.mergeDetail(snapshot, land) else snapshot
+                    snapshot.put("published_for_sale", false)
+                    bindPreview()
+                    bindRows()
+                    toast(fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." })
+                } else {
+                    toast(MyPropertyManage.failureMessage(fresh, "توقف انتشار ناموفق بود."))
+                }
+            } catch (e: Exception) {
+                toast(e.message ?: "توقف انتشار ناموفق بود.")
+            } finally {
+                busy = false
+            }
         }
     }
 

@@ -21,7 +21,25 @@ class MyPropertyManageTest {
     fun publishLabel_becomesStopWhenAlreadyPublished() {
         assertEquals("انتشار برای فروش", MyPropertyManage.label(MyPropertyManage.Action.PUBLISH, published = false))
         assertEquals("توقف انتشار فروش", MyPropertyManage.label(MyPropertyManage.Action.PUBLISH, published = true))
-        assertEquals("4", MyPropertyManage.unpublishBody("4").getString("code"))
+        val body = MyPropertyManage.unpublishBody("4")
+        assertEquals("4", body.getString("code"))
+        assertFalse(body.getBoolean("published_for_sale"))
+        assertEquals(
+            "/express/partner/api/my-property/publish?published_for_sale=0",
+            MyPropertyManage.UNPUBLISH_PATH,
+        )
+    }
+
+    @Test
+    fun unpublishStopped_requiresServerToClearTheFlag() {
+        val ok = JSONObject().put("ok", true).put("http_status", 200)
+        val missingRoute = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
+        val stillLive = JSONObject().put("ok", true).put("published_for_sale", true)
+        val stopped = JSONObject().put("ok", true).put("published_for_sale", false)
+        assertFalse(MyPropertyManage.unpublishStopped(missingRoute, stopped))
+        assertFalse(MyPropertyManage.unpublishStopped(ok, stillLive))
+        assertFalse(MyPropertyManage.unpublishStopped(ok, null))
+        assertTrue(MyPropertyManage.unpublishStopped(ok, stopped))
     }
 
     @Test
