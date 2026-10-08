@@ -116,6 +116,25 @@
             android:name="publicListing"
             app:argType="boolean"
             android:defaultValue="false" />
+        <argument
+            android:name="editCode"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/myPropertyManageFragment"
+        android:name="ir.vinor.app.MyPropertyManageFragment"
+        android:label="مدیریت ملک"
+        tools:layout="@layout/fragment_my_property_manage">
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
     </fragment>
 
     <fragment

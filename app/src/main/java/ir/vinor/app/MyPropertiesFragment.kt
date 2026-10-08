@@ -185,7 +185,7 @@ class MyPropertiesFragment : Fragment() {
         PartnerImages.bind(scope, card.landCardImage, land.optString("image_url"), card.landCardImagePlaceholder)
         val code = land.optString("code")
         card.root.setOnClickListener {
-            if (code.isNotBlank()) (activity as? MainActivity)?.openLand(code)
+            if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
         binding.mpList.addView(card.root)
     }

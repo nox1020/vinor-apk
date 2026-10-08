@@ -446,6 +446,7 @@ class MainActivity : AppCompatActivity() {
             dest == R.id.profileEditFragment ||
             dest == R.id.landDetailFragment ||
             dest == R.id.myPropertyFormFragment ||
+            dest == R.id.myPropertyManageFragment ||
             dest == R.id.partnerPageFragment
         val chatOpen = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         if (!chatOpen) tabbarImeHidden = false
@@ -495,6 +496,20 @@ class MainActivity : AppCompatActivity() {
     fun openMyProperty() {
         if (navController.currentDestination?.id == R.id.myPropertiesFragment) return
         navigateTab(R.id.myPropertiesFragment)
+    }
+
+    fun openMyPropertyManage(snapshot: org.json.JSONObject) {
+        val args = Bundle().apply { putString(MyPropertyManageFragment.ARG_SNAPSHOT, snapshot.toString()) }
+        navController.navigate(R.id.myPropertyManageFragment, args)
+    }
+
+    fun openPropertyEdit(snapshot: org.json.JSONObject) {
+        val args = Bundle().apply {
+            putBoolean(MyPropertyFormFragment.ARG_PUBLIC, false)
+            putString(MyPropertyFormFragment.ARG_CODE, snapshot.optString("code"))
+            putString(MyPropertyFormFragment.ARG_SNAPSHOT, snapshot.toString())
+        }
+        navController.navigate(R.id.myPropertyFormFragment, args)
     }
 
     fun openOwnerHomeForm() {
