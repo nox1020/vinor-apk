@@ -2,31 +2,103 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginTop="12dp"
     android:background="@drawable/bg_routine_card"
     android:orientation="vertical"
     android:padding="16dp">
 
     <TextView
+        android:id="@+id/requestCardStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_follow_status"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="4dp"
+        android:textColor="@color/vinor_accent_green"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/requestCardTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:maxLines="2"
         android:textColor="@color/vinor_text"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:textSize="16sp" />
 
-    <TextView
-        android:id="@+id/requestCardMeta"
+    <LinearLayout
+        android:id="@+id/requestCardPerson"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textColor="@color/vinor_text_muted"
-        android:textSize="13sp" />
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/requestCardAvatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_hub_avatar"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:gravity="center"
+            android:textColor="@color/vinor_text"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:id="@+id/requestCardPersonBody"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/requestCardCustomer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:textColor="@color/vinor_text"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/requestCardWhen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="2"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/requestCardActions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal" />
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/requestCardOpen"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_flat_outline_card"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:minHeight="44dp"
+        android:text="نمایش ملک"
+        android:textColor="@color/vinor_text"
+        android:textSize="15sp"
+        android:visibility="gone" />
 </LinearLayout>

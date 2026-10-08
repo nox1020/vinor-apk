@@ -14,14 +14,19 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import ir.vinor.app.databinding.FragmentNativePartnerBinding
 import ir.vinor.app.databinding.ItemHelpStepBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
 import ir.vinor.app.databinding.ItemNativeCardBinding
 import ir.vinor.app.databinding.ItemNativeRequestBinding
+import ir.vinor.app.databinding.SheetFollowConfirmBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +45,8 @@ class NativePartnerFragment : Fragment() {
     private var activeTab = ""
     private var lastPayload = JSONObject()
     private var searchQuery = ""
+    private var followBusy = false
+    private var followSheet: BottomSheetDialog? = null
 
     val page: String
         get() = arguments?.getString(ARG_PAGE).orEmpty().ifBlank { PAGE_TRAINING }
@@ -87,6 +94,8 @@ class NativePartnerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        followSheet?.dismiss()
+        followSheet = null
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -374,28 +383,68 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
-        val tabs = obj.optJSONArray("tabs") ?: JSONArray()
-        if (activeTab.isBlank()) activeTab = obj.optString("active_tab").ifBlank { "requests" }
-        bindTabs(tabs, "id", "title") { tab ->
-            activeTab = tab
-            renderRequestItems(obj, tab)
-        }
+        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"))
+        activeTab = FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
+        bindRequestTabs(tabs)
         renderRequestItems(obj, activeTab)
+    }
+
+    private fun bindRequestTabs(tabs: List<FollowRequests.Tab>) {
+        binding.nativeTabsScroll.isVisible = tabs.isNotEmpty()
+        binding.nativeTabs.removeAllViews()
+        for (tab in tabs) {
+            val on = tab.id == activeTab
+            val chip = TextView(requireContext()).apply {
+                text = tab.title
+                textSize = 14f
+                gravity = android.view.Gravity.CENTER
+                minHeight = dp(36)
+                setTextColor(
+                    ContextCompat.getColor(
+                        context,
+                        if (on) R.color.vinor_on_primary else R.color.vinor_text_muted,
+                    ),
+                )
+                setBackgroundResource(if (on) R.drawable.bg_follow_tab_on else R.drawable.bg_follow_tab)
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                setOnClickListener {
+                    if (activeTab == tab.id) return@setOnClickListener
+                    activeTab = tab.id
+                    bindRequestTabs(tabs)
+                    renderRequestItems(lastPayload, activeTab)
+                }
+            }
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.marginEnd = dp(8)
+            binding.nativeTabs.addView(chip, lp)
+        }
     }
 
     private fun renderRequestItems(obj: JSONObject, tab: String) {
         binding.nativeList.removeAllViews()
-        val items = obj.optJSONArray("items") ?: obj.optJSONArray("inbox_items") ?: JSONArray()
-        var shown = 0
-        for (i in 0 until items.length()) {
-            val it = items.optJSONObject(i) ?: continue
-            val itemTab = it.optString("pipeline_tab").ifBlank { "requests" }
-            if (tab.isNotBlank() && itemTab != tab) continue
-            addRequestCard(it)
-            shown++
+        binding.nativeEmpty.isVisible = false
+        val rows = FollowRequests.items(obj, tab)
+        if (rows.isEmpty()) {
+            val empty = TextView(requireContext()).apply {
+                text = FollowRequests.EMPTY
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+                textSize = 15f
+                gravity = android.view.Gravity.CENTER
+                setPadding(dp(24), dp(32), dp(24), dp(32))
+            }
+            binding.nativeList.addView(
+                empty,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            return
         }
-        binding.nativeEmpty.isVisible = shown == 0
-        if (shown == 0) binding.nativeEmpty.text = "موردی در این تب نیست."
+        for (row in rows) addRequestCard(FollowRequests.card(row))
     }
 
     private fun bindLegal(obj: JSONObject) {
@@ -433,30 +482,6 @@ class NativePartnerFragment : Fragment() {
         }
     }
 
-    private fun bindTabs(tabs: JSONArray, idKey: String, titleKey: String, onPick: (String) -> Unit) {
-        binding.nativeTabsScroll.isVisible = tabs.length() > 0
-        binding.nativeTabs.removeAllViews()
-        for (i in 0 until tabs.length()) {
-            val tab = tabs.optJSONObject(i) ?: continue
-            val id = tab.optString(idKey)
-            val chip = TextView(requireContext()).apply {
-                text = tab.optString(titleKey)
-                setTextColor(Color.parseColor(if (id == activeTab || (activeTab.isBlank() && i == 0)) "#FFFFFF" else "#A1A1AA"))
-                textSize = 13f
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-                setBackgroundResource(if (id == activeTab || (activeTab.isBlank() && i == 0)) R.drawable.bg_button_primary else R.drawable.bg_routine_card)
-                setOnClickListener {
-                    activeTab = id
-                    bindTabs(tabs, idKey, titleKey, onPick)
-                    onPick(id)
-                }
-            }
-            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lp.marginEnd = dp(8)
-            binding.nativeTabs.addView(chip, lp)
-        }
-    }
-
     private fun addCard(title: String, body: String, kicker: String = "", expanded: Boolean = true) {
         val card = ItemNativeCardBinding.inflate(layoutInflater, binding.nativeList, false)
         card.nativeCardTitle.text = title
@@ -486,59 +511,123 @@ class NativePartnerFragment : Fragment() {
         binding.nativeList.addView(row, lp)
     }
 
-    private fun addRequestCard(item: JSONObject) {
+    private fun addRequestCard(item: FollowRequests.Card) {
         val card = ItemNativeRequestBinding.inflate(layoutInflater, binding.nativeList, false)
-        card.requestCardTitle.text = item.optString("title").ifBlank { item.optString("land_title") }
-        val meta = listOf(
-            item.optString("status_label"),
-            item.optString("customer_name"),
-            item.optString("visit_when"),
-        ).filter { it.isNotBlank() }.joinToString(" · ")
-        card.requestCardMeta.text = meta
-        val id = item.optString("id")
-        fun action(label: String, path: String, body: JSONObject = JSONObject()) {
+        card.requestCardStatus.isVisible = item.status.isNotBlank()
+        card.requestCardStatus.text = item.status
+        card.requestCardTitle.text = item.title
+        val titleLp = card.requestCardTitle.layoutParams as ViewGroup.MarginLayoutParams
+        titleLp.topMargin = if (item.status.isNotBlank()) dp(8) else 0
+        card.requestCardTitle.layoutParams = titleLp
+        val showPerson = item.customer.isNotBlank() || item.whenText.isNotBlank()
+        card.requestCardPerson.isVisible = showPerson
+        card.requestCardAvatar.isVisible = item.customer.isNotBlank()
+        card.requestCardAvatar.text = item.customer.trim().firstOrNull()?.toString().orEmpty()
+        card.requestCardCustomer.isVisible = item.customer.isNotBlank()
+        card.requestCardCustomer.text = item.customer
+        card.requestCardWhen.isVisible = item.whenText.isNotBlank()
+        card.requestCardWhen.text = item.whenText
+        card.requestCardPersonBody.updateLayoutParams<LinearLayout.LayoutParams> {
+            marginStart = if (item.customer.isNotBlank()) dp(12) else 0
+        }
+        item.actions.forEachIndexed { index, action ->
+            val primary = action.tone == FollowRequests.Tone.PRIMARY
+            val danger = action.tone == FollowRequests.Tone.DANGER
             val btn = TextView(requireContext()).apply {
-                text = label
-                setTextColor(Color.parseColor("#86EFAC"))
-                textSize = 12f
-                setPadding(dp(10), dp(8), dp(10), dp(8))
-                setOnClickListener { postRequest(path, body) }
+                text = action.label
+                textSize = 15f
+                gravity = android.view.Gravity.CENTER
+                minHeight = dp(44)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setBackgroundResource(if (primary) R.drawable.bg_hub_start else R.drawable.bg_flat_outline_card)
+                setTextColor(
+                    when {
+                        primary -> Color.parseColor("#052E16")
+                        danger -> ContextCompat.getColor(context, R.color.vinor_error)
+                        else -> ContextCompat.getColor(context, R.color.vinor_text)
+                    },
+                )
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    if (action.confirm != null) confirmFollow(action) else postRequest(action.path, action.body)
+                }
             }
-            card.requestCardActions.addView(btn)
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(if (index == 0) 12 else 8)
+            card.requestCardActions.addView(btn, lp)
         }
-        if (item.optBoolean("can_remove")) action("حذف", "/express/partner/requests/$id/remove")
-        if (item.optBoolean("can_revisit")) action("بازدید مجدد", "/express/partner/requests/$id/revisit")
-        if (item.optBoolean("can_complete")) action("انجام شد", "/express/partner/requests/$id/complete")
-        if (item.optBoolean("can_no_show")) action("عدم حضور", "/express/partner/requests/$id/no-show")
-        if (item.optBoolean("can_register_result")) {
-            action("علاقه‌مند", "/express/partner/requests/$id/visit-result", JSONObject().put("outcome", "interested"))
-            action("پیگیری", "/express/partner/requests/$id/visit-result", JSONObject().put("outcome", "follow_up"))
-            action("بی‌علاقه", "/express/partner/requests/$id/visit-result", JSONObject().put("outcome", "not_interested"))
-        }
-        if (item.optBoolean("can_confirm_deal")) action("تأیید معامله", "/express/partner/requests/$id/deal-confirm")
-        if (item.optBoolean("can_reject_deal")) action("رد معامله", "/express/partner/requests/$id/deal-reject")
-        if (item.optBoolean("can_close_deal")) action("بستن", "/express/partner/requests/$id/deal-close")
-        val code = item.optString("land_code")
-        if (code.isNotBlank()) {
-            card.root.setOnClickListener { (activity as? MainActivity)?.openLand(code) }
+        val openPrimary = item.actions.isEmpty()
+        card.requestCardOpen.isVisible = item.landCode.isNotBlank()
+        if (item.landCode.isNotBlank()) {
+            card.requestCardOpen.setBackgroundResource(
+                if (openPrimary) R.drawable.bg_hub_start else R.drawable.bg_flat_outline_card,
+            )
+            card.requestCardOpen.setTextColor(
+                if (openPrimary) Color.parseColor("#052E16")
+                else ContextCompat.getColor(requireContext(), R.color.vinor_text),
+            )
+            card.requestCardOpen.setOnClickListener {
+                (activity as? MainActivity)?.openLand(item.landCode)
+            }
         }
         binding.nativeList.addView(card.root)
     }
 
+    private fun confirmFollow(action: FollowRequests.Action) {
+        val sheet = SheetFollowConfirmBinding.inflate(layoutInflater)
+        sheet.followConfirmTitle.text = action.label
+        sheet.followConfirmMessage.text = action.confirm
+        sheet.followConfirmYes.text = action.label
+        val dialog = openFollowSheet(sheet.root)
+        sheet.followConfirmNo.setOnClickListener { dialog.dismiss() }
+        sheet.followConfirmYes.setOnClickListener {
+            dialog.dismiss()
+            postRequest(action.path, action.body)
+        }
+    }
+
+    private fun openFollowSheet(content: View): BottomSheetDialog {
+        followSheet?.dismiss()
+        val dialog = BottomSheetDialog(requireContext())
+        dialog.setContentView(content)
+        dialog.setOnShowListener {
+            val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                ?: return@setOnShowListener
+            panel.setBackgroundColor(Color.TRANSPARENT)
+            BottomSheetBehavior.from(panel).apply {
+                skipCollapsed = true
+                state = BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+        followSheet = dialog
+        dialog.show()
+        return dialog
+    }
+
     private fun postRequest(path: String, body: JSONObject) {
         val ctx = context ?: return
+        if (followBusy) return
+        followBusy = true
         scope.launch {
             try {
                 val resp = withContext(Dispatchers.IO) { PartnerApi.postJson(path, body, ctx) }
                 if (_binding == null) return@launch
-                if (resp.optBoolean("ok")) {
-                    Toast.makeText(ctx, resp.optString("message").ifBlank { "ثبت شد." }, Toast.LENGTH_SHORT).show()
+                if (FollowRequests.isOk(resp)) {
+                    val note = resp.optString("message").trim()
+                    val toast = if (note.isBlank() || note.equals("null", true)) "ثبت شد." else note
+                    Toast.makeText(ctx, toast, Toast.LENGTH_SHORT).show()
                     load(forceNet = true)
                 } else {
-                    Toast.makeText(ctx, resp.optString("error").ifBlank { "ناموفق بود." }, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null) Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } finally {
+                followBusy = false
             }
         }
     }
