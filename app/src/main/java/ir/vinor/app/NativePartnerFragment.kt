@@ -143,13 +143,18 @@ class NativePartnerFragment : Fragment() {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null) return@launch
                 val code = fresh.optInt("http_status")
-                if (code == 401 || fresh.optString("error") == "unauthorized") {
+                val followUnauthorized = page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh)
+                if (code == 401 || fresh.optString("error") == "unauthorized" || followUnauthorized) {
                     bindEmpty("برای ادامه وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
+                    (activity as? MainActivity)?.openLogin()
                     return@launch
                 }
                 if (code == 403) {
                     bindEmpty(fresh.optString("error").ifBlank { "دسترسی ندارید." })
+                    return@launch
+                }
+                if (page == PAGE_REQUESTS && !FollowRequests.isOk(fresh)) {
+                    bindEmpty(FollowRequests.userMessage(fresh, "بارگذاری پیگیری ناموفق بود."))
                     return@launch
                 }
                 bindPayload(fresh)
