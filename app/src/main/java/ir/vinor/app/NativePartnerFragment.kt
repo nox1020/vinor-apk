@@ -144,10 +144,12 @@ class NativePartnerFragment : Fragment() {
                 }
                 bindPayload(fresh)
             } catch (e: Exception) {
-                if (_binding != null && binding.nativeList.childCount == 0) {
-                    bindEmpty(e.message ?: "خطای شبکه")
-                } else {
+                if (_binding == null) return@launch
+                val showing = binding.nativeList.childCount > 0 || binding.nativeInviteBox.isVisible
+                if (showing) {
                     Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                } else {
+                    bindEmpty(e.message ?: "خطای شبکه")
                 }
             } finally {
                 if (_binding != null) {
@@ -325,20 +327,20 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindInvite(obj: JSONObject) {
         binding.nativeInviteBox.isVisible = true
-        binding.nativeLeadBox.isVisible = true
+        setTitle(InvitePage.TITLE)
         val approved = obj.optBoolean("is_approved")
-        val bonus = obj.optInt("bonus_per_invite")
-        setTitle(if (approved) "دعوت از همکاران" else "دعوت از دوستان")
-        binding.nativeLead.text = if (approved) {
-            "هر همکار تأییدشده، ${PartnerFormat.toman(bonus)} تومان به موجودی شما اضافه می‌شود."
-        } else {
-            "لینک زیر را بفرست تا دوستانت راحت‌تر به وینور بپیوندند."
-        }
-        binding.nativeInviteUrl.text = obj.optString("invite_url")
-        val stats = obj.optJSONObject("ref_stats")
-        if (approved && stats != null) {
-            addCard("دریافت‌شده", PartnerFormat.toman(stats.optInt("total_earned")) + " تومان")
-        }
+        binding.nativeInviteIcon.setImageResource(
+            if (approved) R.drawable.ic_person_add else R.drawable.ic_share_nodes,
+        )
+        binding.nativeInviteLead.text = InvitePage.lead(approved, obj.optInt("bonus_per_invite"))
+        val url = InvitePage.linkOf(obj.optString("invite_url"), "")
+        binding.nativeInviteUrl.text = if (url.isBlank()) InvitePage.EMPTY_LINK else url
+        binding.nativeInviteUrl.setTextColor(
+            requireContext().getColor(if (url.isBlank()) R.color.vinor_text_muted else R.color.vinor_text),
+        )
+        val earned = InvitePage.earnedText(approved, obj.optJSONObject("ref_stats"))
+        binding.nativeInviteStat.isVisible = earned != null
+        if (earned != null) binding.nativeInviteEarned.text = earned
     }
 
     private fun bindApply(obj: JSONObject) {
@@ -574,21 +576,31 @@ class NativePartnerFragment : Fragment() {
         }
     }
 
+    private fun inviteLink(): String = InvitePage.linkOf(
+        lastPayload.optString("invite_url"),
+        binding.nativeInviteUrl.text?.toString().orEmpty(),
+    )
+
     private fun copyInvite() {
-        val url = lastPayload.optString("invite_url").ifBlank { binding.nativeInviteUrl.text?.toString().orEmpty() }
-        if (url.isBlank()) return
+        val url = inviteLink()
+        if (url.isBlank()) {
+            Toast.makeText(requireContext(), InvitePage.MISSING, Toast.LENGTH_SHORT).show()
+            return
+        }
         val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("invite", url))
         Toast.makeText(requireContext(), "لینک کپی شد.", Toast.LENGTH_SHORT).show()
     }
 
     private fun shareInvite() {
-        val url = lastPayload.optString("invite_url")
-        val text = lastPayload.optString("share_text")
-        if (url.isBlank()) return
+        val message = InvitePage.shareMessage(lastPayload.optString("share_text"), inviteLink())
+        if (message.isNullOrBlank()) {
+            Toast.makeText(requireContext(), InvitePage.MISSING, Toast.LENGTH_SHORT).show()
+            return
+        }
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "$text\n$url")
+            putExtra(Intent.EXTRA_TEXT, message)
         }, "اشتراک‌گذاری"))
     }
 

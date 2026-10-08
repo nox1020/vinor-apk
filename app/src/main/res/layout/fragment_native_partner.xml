@@ -293,40 +293,139 @@
                         android:id="@+id/nativeInviteBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:orientation="vertical"
                         android:visibility="gone">
 
-                        <TextView
-                            android:id="@+id/nativeInviteUrl"
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_auth_input"
-                            android:padding="14dp"
-                            android:textColor="#E4E4E7"
-                            android:textDirection="ltr"
-                            android:textSize="13sp" />
+                            android:background="@drawable/bg_routine_card"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="16dp">
 
-                        <TextView
-                            android:id="@+id/nativeInviteCopy"
+                            <ImageView
+                                android:id="@+id/nativeInviteIcon"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_hub_avatar"
+                                android:contentDescription="دعوت"
+                                android:padding="9dp"
+                                android:src="@drawable/ic_person_add"
+                                app:tint="@color/vinor_accent_green" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/nativeInviteHeadline"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:text="دعوت"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="16sp" />
+
+                                <TextView
+                                    android:id="@+id/nativeInviteLead"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:lineSpacingMultiplier="1.35"
+                                    android:textColor="@color/vinor_text_muted"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/nativeInviteStat"
                             android:layout_width="match_parent"
-                            android:layout_height="44dp"
-                            android:layout_marginTop="10dp"
-                            android:background="@drawable/bg_button_primary"
-                            android:gravity="center"
-                            android:text="کپی لینک"
-                            android:textColor="#FFFFFF"
-                            android:textStyle="bold" />
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_routine_card"
+                            android:orientation="vertical"
+                            android:padding="16dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="دریافت‌شده"
+                                android:textColor="@color/vinor_text_muted"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/nativeInviteEarned"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:fontFamily="@font/vazirmatn_bold"
+                                android:textColor="@color/vinor_accent_green"
+                                android:textSize="22sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_routine_card"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="لینک دعوت"
+                                android:textColor="@color/vinor_text_muted"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/nativeInviteUrl"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:background="@drawable/bg_invite_link"
+                                android:padding="12dp"
+                                android:textColor="@color/vinor_text"
+                                android:textDirection="ltr"
+                                android:textIsSelectable="true"
+                                android:textSize="14sp" />
+                        </LinearLayout>
 
                         <TextView
                             android:id="@+id/nativeInviteShare"
                             android:layout_width="match_parent"
-                            android:layout_height="44dp"
-                            android:layout_marginTop="8dp"
-                            android:background="@drawable/bg_routine_card"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:background="@drawable/bg_hub_start"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:fontFamily="@font/vazirmatn_bold"
                             android:gravity="center"
+                            android:minHeight="48dp"
                             android:text="اشتراک‌گذاری"
-                            android:textColor="#FFFFFF"
-                            android:textStyle="bold" />
+                            android:textColor="#052E16"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/nativeInviteCopy"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_flat_outline_card"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:fontFamily="@font/vazirmatn_bold"
+                            android:gravity="center"
+                            android:minHeight="48dp"
+                            android:text="کپی لینک"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="16sp" />
                     </LinearLayout>
 
                     <LinearLayout

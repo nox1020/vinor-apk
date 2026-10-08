@@ -362,7 +362,7 @@ class ProfileFragment : Fragment() {
                 addMenuRow("کیف پول", "", R.drawable.ic_wallet, "$BASE/express/partner/commissions")
                 addMenuRow("نشان‌ها", "", R.drawable.ic_bookmark, "$BASE/express/partner/favorites")
                 addMenuRow("آموزش", "", R.drawable.ic_graduation, "$BASE/express/partner/training")
-                addMenuRow("دعوت همکار", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
+                addMenuRow("دعوت", "", R.drawable.ic_person_add, "$BASE/express/partner/invite")
             } else {
                 if (hasPendingApp) {
                     addMenuRow("وضعیت بازاریاب وینور", "", R.drawable.ic_clock, "$BASE/express/partner/thanks")
