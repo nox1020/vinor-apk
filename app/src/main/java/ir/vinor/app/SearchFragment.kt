@@ -177,9 +177,26 @@ class SearchFragment : Fragment() {
         } else {
             emptyList()
         }
-        val ads = SearchAds.catalog(searchRows, homeAds, homeHtmlAds)
+        val primary = SearchAds.catalog(searchRows, homeAds, homeHtmlAds)
+        val ads = if (primary.isNotEmpty()) primary else publicPublished(ctx)
         val failed = ads.isEmpty() && (home == null || isFailedHome(home))
         return SearchLoad(ads, home?.optBoolean("is_approved") == true, failed)
+    }
+
+    /** مهمان ردیف SSR ندارد؛ sitemap نشانی ملک‌های منتشرشدهٔ عمومی است. */
+    private fun publicPublished(ctx: Context): List<SearchAd> {
+        val xml = runCatching { PartnerApi.getHtml(PublicSearchCatalog.SITEMAP_PATH, ctx) }.getOrDefault("")
+        val refs = PublicSearchCatalog.landRefs(xml).take(PublicSearchCatalog.MAX)
+        val out = ArrayList<SearchAd>(refs.size)
+        for (ref in refs) {
+            val obj = runCatching {
+                PartnerApi.get("/express/partner/api/lands/${Uri.encode(ref.code)}/data", ctx)
+            }.getOrNull() ?: continue
+            if (obj.has("http_status") && obj.optInt("http_status") !in 200..299) continue
+            val ad = PublicSearchCatalog.fromDetail(obj, ref.lastmod, out.size) ?: continue
+            out += ad
+        }
+        return SearchAds.dedupe(out)
     }
 
     private fun publish() {

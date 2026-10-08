@@ -261,4 +261,52 @@ class SearchQueryTest {
         val again = SearchAds.dedupe(ads + ads.first())
         assertEquals(2, again.size)
     }
+
+    @Test
+    fun publicSitemap_listsPublishedLandsNewestFirst() {
+        val xml = """
+            <urlset>
+              <url><loc>https://vinor.ir/express/partner/home</loc></url>
+              <url><loc>https://vinor.ir/express/partner/lands/1</loc><lastmod>2026-09-19</lastmod></url>
+              <url><loc>https://vinor.ir/express/partner/lands/2</loc><lastmod>2026-10-08</lastmod></url>
+              <url><loc>https://vinor.ir/partners</loc></url>
+            </urlset>
+        """.trimIndent()
+        val refs = PublicSearchCatalog.landRefs(xml)
+        assertEquals(listOf("2", "1"), refs.map { it.code })
+        val fresh = PublicSearchCatalog.fromDetail(
+            JSONObject()
+                .put("published_for_sale", true)
+                .put("code", "2")
+                .put("title", "250متر زمین ویلایی دماوند")
+                .put("city", "تهران")
+                .put("location", "تهرانپارس")
+                .put("size", 250)
+                .put("price_toman", 1_000_000_000L)
+                .put("image_url", "/uploads/a.jpg")
+                .put("images", org.json.JSONArray().put("/uploads/a.jpg"))
+                .put("source", "vinor"),
+            refs[0].lastmod,
+            0,
+        )
+        assertEquals("2", fresh?.token)
+        assertEquals("vinor", fresh?.source)
+        assertEquals("/express/partner/lands/2", fresh?.url)
+        assertEquals("250", fresh?.areaRaw)
+        assertEquals("تهران", fresh?.city)
+        assertTrue((fresh?.createdAt ?: 0L) > 0L)
+        assertTrue(fresh?.priceRaw?.contains("تومان") == true)
+        val hidden = PublicSearchCatalog.fromDetail(
+            JSONObject().put("published_for_sale", false).put("code", "9").put("title", "خصوصی"),
+            "",
+            1,
+        )
+        assertNull(hidden)
+        val unmarked = PublicSearchCatalog.fromDetail(
+            JSONObject().put("code", "8").put("title", "بدون پرچم"),
+            "",
+            2,
+        )
+        assertNull(unmarked)
+    }
 }
