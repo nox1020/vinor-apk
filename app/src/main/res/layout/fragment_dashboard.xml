@@ -648,7 +648,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="12dp"
                             android:layout_weight="1"
-                            android:gravity="center_vertical|start"
+                            android:gravity="center"
                             android:orientation="vertical">
 
                             <TextView
@@ -668,7 +668,7 @@
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
                                 android:fontFamily="@font/vazirmatn_bold"
-                                android:gravity="start"
+                                android:gravity="center"
                                 android:maxLines="1"
                                 android:text="مشتری دارم"
                                 android:textColor="@color/vinor_on_primary"

@@ -1197,6 +1197,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardHeroStart.isVisible = !customer
         if (!customer) binding.dashboardHeroStart.text = "ادامه"
         binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
+        binding.dashboardHeroTitle.gravity = if (customer) Gravity.CENTER else Gravity.START
         if (customer) {
             binding.dashboardHeroTitle.maxLines = 1
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
