@@ -10,7 +10,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.Editable
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -23,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
+import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import ir.vinor.app.databinding.FragmentDashboardBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
@@ -1112,12 +1117,40 @@ class DashboardFragment : Fragment() {
         } else {
             prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
         }
-        binding.dashboardHeroKicker.isVisible = action == "open_customer_modal"
-        binding.dashboardHeroStart.text = if (action == "open_customer_modal") "شروع کنید" else "ادامه"
-        binding.dashboardHeroTitle.text = label
+        val customer = action == "open_customer_modal"
+        binding.dashboardHeroKicker.isVisible = false
+        binding.dashboardHeroSub.isVisible = !customer && sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = false
-        binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
+        binding.dashboardHeroStart.text = if (customer) "شروع کنید" else "ادامه"
+        binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
+        if (customer) {
+            binding.dashboardHeroTitle.maxLines = 1
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                binding.dashboardHeroTitle,
+                18,
+                26,
+                1,
+                TypedValue.COMPLEX_UNIT_SP,
+            )
+            binding.dashboardHeroTitle.text = customerTitle()
+            binding.dashboardHeroIcon.setImageResource(R.drawable.ic_customer_plus)
+            ImageViewCompat.setImageTintList(binding.dashboardHeroIcon, null)
+        } else {
+            TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                binding.dashboardHeroTitle,
+                TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE,
+            )
+            binding.dashboardHeroTitle.text = label
+            binding.dashboardHeroTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+            binding.dashboardHeroTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            binding.dashboardHeroTitle.maxLines = 2
+            binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
+            ImageViewCompat.setImageTintList(
+                binding.dashboardHeroIcon,
+                ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg)),
+            )
+        }
         val href = prompt?.optString("href").orEmpty()
         binding.dashboardHero.setOnClickListener {
             when {
@@ -1172,6 +1205,17 @@ class DashboardFragment : Fragment() {
                 else -> runPromptOr(prompt, fallbackAction)
             }
         }
+    }
+
+    /** «مشتری» سفید و «دارم» سبز؛ ترتیب منطقی در متن راست‌به‌چپ همان طرح است. */
+    private fun customerTitle(): SpannableString {
+        val text = SpannableString("مشتری دارم")
+        val split = text.indexOf(' ')
+        val white = ContextCompat.getColor(requireContext(), R.color.vinor_on_primary)
+        val green = ContextCompat.getColor(requireContext(), R.color.vinor_customer_word)
+        text.setSpan(ForegroundColorSpan(white), 0, split, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(ForegroundColorSpan(green), split + 1, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return text
     }
 
     private fun heroIcon(name: String?): Int = when (name) {
