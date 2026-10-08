@@ -1,5 +1,7 @@
 package ir.vinor.app
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -165,5 +167,98 @@ class SearchQueryTest {
         )
         val byArea = SearchAds.apply(areas, SearchQuery(areaMin = 75, areaMax = 120))
         assertEquals(listOf("مناسب"), byArea.map { it.title })
+    }
+
+    @Test
+    fun defaultCity_isAllProvincesAndNewestKeepsServerOrder() {
+        assertEquals("همه استان‌ها", SearchQuery.ALL_PROVINCES)
+        assertEquals("", SearchQuery().city)
+        assertEquals(SearchSort.NEWEST, SearchQuery().sort)
+        val plain = listOf(
+            SearchAd(title = "دوم", index = 1),
+            SearchAd(title = "اول", index = 0),
+        )
+        assertEquals(listOf("اول", "دوم"), SearchAds.newest(plain).map { it.title })
+        assertEquals(listOf("اول", "دوم"), SearchAds.apply(plain, SearchQuery()).map { it.title })
+    }
+
+    @Test
+    fun newest_sortsCreatedAtDescending() {
+        val ads = listOf(
+            SearchAd(title = "قدیم", createdAt = 1_000, index = 0),
+            SearchAd(title = "بدون", index = 1),
+            SearchAd(title = "جدید", createdAt = 5_000, index = 2),
+        )
+        assertEquals(listOf("جدید", "قدیم", "بدون"), SearchAds.newest(ads).map { it.title })
+        assertEquals(1_710_000_000_000L, SearchAds.parseTime("1710000000"))
+        assertEquals(1_710_000_000_000L, SearchAds.parseTime("1710000000000"))
+        assertTrue(SearchAds.parseTime("2026-03-01T10:00:00") > 0L)
+        assertTrue(SearchAds.parseTime("2026-03-01") > 0L)
+        assertEquals(0L, SearchAds.parseTime(""))
+        assertEquals(0L, SearchAds.parseTime("null"))
+    }
+
+    @Test
+    fun catalog_prefersPublishedSearchRowsNewestFirst() {
+        val html = """
+            <a class="vn-search-row" href="/express/partner/lands/20" data-land-code="20" data-city="اصفهان" data-created="2026-04-02T08:00:00">
+              <img src="/a.jpg">
+              <p class="vn-search-name">جدید اصفهان</p>
+              <p class="vn-search-price">۴٬۰۰۰٬۰۰۰٬۰۰۰</p>
+              <p class="vn-search-loc">در نقش‌جهان</p>
+              <p class="vn-search-comm">پورسانت ۱۲۰۰۰۰۰</p>
+              <span class="vn-search-shots">۲</span>
+            </a>
+            <a class="vn-search-row" href="/express/partner/divar/tok" data-divar-token="tok" data-city="تهران" data-created="2026-01-01">
+              <p class="vn-search-name">قدیم تهران</p>
+              <p class="vn-search-price">توافقی</p>
+            </a>
+            <a class="vn-search-row" href="/express/partner/lands/9" data-land-code="9" data-published-for-sale="false">
+              <p class="vn-search-name">خصوصی</p>
+            </a>
+        """.trimIndent()
+        val rows = SearchPageHtml.parse(html)
+        assertEquals(listOf("جدید اصفهان", "قدیم تهران"), rows.map { it.title })
+        assertEquals("vinor", rows[0].source)
+        assertEquals("20", rows[0].token)
+        assertEquals("اصفهان", rows[0].city)
+        assertEquals("نقش‌جهان", rows[0].district)
+        assertEquals(1_200_000, rows[0].commissionAmount)
+        assertEquals(2, rows[0].imageCount)
+        assertEquals("divar", rows[1].source)
+        assertTrue(rows[0].createdAt > rows[1].createdAt)
+        val home = listOf(SearchAd(title = "فقط خانه", index = 0))
+        val chosen = SearchAds.catalog(rows, home, emptyList())
+        assertEquals(listOf("جدید اصفهان", "قدیم تهران"), SearchAds.apply(chosen, SearchQuery()).map { it.title })
+    }
+
+    @Test
+    fun homeJson_dropsUnpublishedAndSortsByCreatedAt() {
+        val array = JSONArray()
+            .put(
+                JSONObject()
+                    .put("title", "خصوصی")
+                    .put("published_for_sale", false)
+                    .put("token", "1"),
+            )
+            .put(
+                JSONObject()
+                    .put("title", "قدیمی")
+                    .put("published_for_sale", true)
+                    .put("created_at", "2026-01-01T00:00:00")
+                    .put("token", "2")
+                    .put("price_toman", 3_000_000_000L),
+            )
+            .put(
+                JSONObject()
+                    .put("title", "تازه")
+                    .put("created_at", "2026-06-01T00:00:00")
+                    .put("token", "3"),
+            )
+        val ads = SearchAds.fromObjects(array)
+        assertEquals(listOf("قدیمی", "تازه"), ads.map { it.title })
+        assertEquals(listOf("تازه", "قدیمی"), SearchAds.apply(ads, SearchQuery()).map { it.title })
+        val again = SearchAds.dedupe(ads + ads.first())
+        assertEquals(2, again.size)
     }
 }

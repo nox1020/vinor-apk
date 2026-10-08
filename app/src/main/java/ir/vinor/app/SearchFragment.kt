@@ -1,6 +1,7 @@
 package ir.vinor.app
 
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
 import android.net.Uri
@@ -39,7 +40,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** تب جستجو — خرید ملک، فیلتر محلی روی دادهٔ فعلی خانه. */
+/** تب جستجو — پیش‌فرض همه استان‌ها، آگهی‌های منتشرشده از جدید به قدیم. */
 class SearchFragment : Fragment() {
 
     private var _binding: FragmentSearchBinding? = null
@@ -130,8 +131,8 @@ class SearchFragment : Fragment() {
         }
         val ctx = context ?: return
         scope.launch {
-            val obj = try {
-                withContext(Dispatchers.IO) { PartnerApi.get("/express/partner/home/data", ctx) }
+            val loaded = try {
+                withContext(Dispatchers.IO) { fetchAds(ctx) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -139,7 +140,7 @@ class SearchFragment : Fragment() {
             }
             if (_binding == null) return@launch
             binding.searchRefresh.isRefreshing = false
-            if (obj == null || isFailedHome(obj)) {
+            if (loaded == null || loaded.failed) {
                 val previous = if (kept.isNotEmpty()) {
                     SearchUiState(SearchPhase.CONTENT, kept, query.hasClearableFilters())
                 } else {
@@ -150,12 +151,35 @@ class SearchFragment : Fragment() {
                 if (ui.items.isNotEmpty()) showOfflineBar()
                 return@launch
             }
-            approved = obj.optBoolean("is_approved")
-            rawAds = readAds(obj.optJSONArray("divar_pro_ads") ?: JSONArray())
+            approved = loaded.approved
+            rawAds = loaded.ads
             hasSnapshot = true
             ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
             render()
         }
+    }
+
+    private fun fetchAds(ctx: Context): SearchLoad {
+        val searchHtml = runCatching {
+            PartnerApi.getHtml("/express/partner/search?sort=newest", ctx)
+        }.getOrDefault("")
+        val searchRows = SearchPageHtml.parse(searchHtml)
+        val home = runCatching { PartnerApi.get("/express/partner/home/data", ctx) }.getOrNull()
+        val homeAds = if (home == null) {
+            emptyList()
+        } else {
+            SearchAds.fromObjects(home.optJSONArray("divar_pro_ads") ?: JSONArray()) +
+                SearchAds.fromObjects(home.optJSONArray("suggested_files") ?: JSONArray())
+        }
+        val homeHtmlAds = if (searchRows.isEmpty() && homeAds.isEmpty()) {
+            val html = runCatching { PartnerApi.getHtml("/express/partner/home", ctx) }.getOrDefault("")
+            SearchAds.fromObjects(HomeAdsHtml.parse(html))
+        } else {
+            emptyList()
+        }
+        val ads = SearchAds.catalog(searchRows, homeAds, homeHtmlAds)
+        val failed = ads.isEmpty() && (home == null || isFailedHome(home))
+        return SearchLoad(ads, home?.optBoolean("is_approved") == true, failed)
     }
 
     private fun publish() {
@@ -254,9 +278,13 @@ class SearchFragment : Fragment() {
             "فیلتر متراژ، انتخاب‌شده: ${area.replace("\u2013", " تا ")}"
         }
         val city = query.city.trim()
-        b.searchCity.text = if (city.isEmpty()) "شهر ▾" else "$city ▾"
+        b.searchCity.text = if (city.isEmpty()) "${SearchQuery.ALL_PROVINCES} ▾" else "$city ▾"
         b.searchCity.isSelected = city.isNotEmpty()
-        b.searchCity.contentDescription = if (city.isEmpty()) "انتخاب شهر" else "شهر، انتخاب‌شده: $city"
+        b.searchCity.contentDescription = if (city.isEmpty()) {
+            SearchQuery.ALL_PROVINCES
+        } else {
+            "شهر، انتخاب‌شده: $city"
+        }
     }
 
     private fun bindRows(items: List<SearchAd>) {
@@ -475,15 +503,16 @@ class SearchFragment : Fragment() {
     private fun showCitySheet() {
         val session = openSheet("شهر") ?: return
         var selected = query.city.trim()
-        val rows = knownCities().map { city ->
-            city to optionRow(city, city == selected) {}
+        val choices = listOf("" to SearchQuery.ALL_PROVINCES) + knownCities().map { it to it }
+        val rows = choices.map { (value, label) ->
+            Triple(value, label, optionRow(label, value == selected) {})
         }
         fun paint() {
-            rows.forEach { (city, view) -> styleOption(view, city == selected) }
+            rows.forEach { (value, _, view) -> styleOption(view, value == selected) }
         }
-        rows.forEach { (city, view) ->
+        rows.forEach { (value, _, view) ->
             view.setOnClickListener {
-                selected = if (selected == city) "" else city
+                selected = if (value.isEmpty()) "" else if (selected == value) "" else value
                 paint()
             }
             session.sheet.sheetBody.addView(view)
@@ -598,58 +627,6 @@ class SearchFragment : Fragment() {
         rawAds.forEach { if (it.city.isNotBlank()) set.add(it.city.trim()) }
         if ("تهران" !in set) return listOf("تهران") + set
         return set.toList()
-    }
-
-    private fun readAds(array: JSONArray): List<SearchAd> {
-        val out = ArrayList<SearchAd>(array.length())
-        for (i in 0 until array.length()) {
-            val ad = array.optJSONObject(i) ?: continue
-            out += jsonAd(ad, out.size)
-        }
-        return out
-    }
-
-    private fun jsonAd(ad: JSONObject, index: Int): SearchAd {
-        val area = jsonText(ad, "area").ifBlank { jsonText(ad, "size") }.ifBlank { jsonText(ad, "area_m2") }
-        val areaText = area.ifBlank { areaFromFacts(ad) }
-        val price = jsonText(ad, "price").ifBlank {
-            val toman = ad.optLong("price_toman")
-            if (toman > 0) toman.toString() else {
-                val total = ad.optLong("price_total")
-                if (total > 0) total.toString() else ""
-            }
-        }
-        val district = jsonText(ad, "district").ifBlank { jsonText(ad, "neighborhood") }
-        val location = jsonText(ad, "location")
-        return SearchAd(
-            title = jsonText(ad, "title"),
-            priceRaw = price,
-            location = location,
-            city = jsonText(ad, "city"),
-            district = district.ifBlank { SearchAds.districtFromLocation(location) },
-            areaRaw = areaText,
-            token = jsonText(ad, "token"),
-            source = jsonText(ad, "source"),
-            url = jsonText(ad, "url"),
-            imageUrl = jsonText(ad, "image_url"),
-            imageCount = ad.optInt("image_count"),
-            commissionAmount = ad.optInt("commission_amount"),
-            index = index,
-        )
-    }
-
-    private fun areaFromFacts(ad: JSONObject): String {
-        val facts = ad.optJSONArray("facts") ?: return ""
-        for (i in 0 until facts.length()) {
-            val bit = facts.optString(i)
-            if ("متر" in bit) return bit
-        }
-        return ""
-    }
-
-    private fun jsonText(ad: JSONObject, key: String): String {
-        val value = ad.optString(key).trim()
-        return if (value.isEmpty() || value == "null") "" else value
     }
 
     private fun locationLine(ad: SearchAd): String {
@@ -771,6 +748,8 @@ class SearchFragment : Fragment() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private data class RangePreset(val label: String, val min: Long?, val max: Long?)
+
+    private data class SearchLoad(val ads: List<SearchAd>, val approved: Boolean, val failed: Boolean)
 
     private data class SheetSession(val dialog: BottomSheetDialog, val sheet: SheetSearchFilterBinding)
 

@@ -65,12 +65,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_search_chip_state"
-                android:contentDescription="انتخاب شهر"
+                android:contentDescription="همه استان‌ها"
                 android:fontFamily="@font/vazirmatn_medium"
                 android:gravity="center"
                 android:minWidth="48dp"
                 android:paddingHorizontal="10dp"
-                android:text="شهر ▾"
+                android:text="همه استان‌ها ▾"
                 android:textColor="@color/search_chip_text"
                 android:textSize="13sp" />
         </LinearLayout>

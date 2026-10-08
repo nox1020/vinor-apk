@@ -1,5 +1,8 @@
 package ir.vinor.app
 
+import org.json.JSONArray
+import org.json.JSONObject
+
 /** آگهیٔ نرمال‌شده برای فیلتر محلی. قیمت دیوار رشته است. */
 data class SearchAd(
     val title: String = "",
@@ -15,6 +18,7 @@ data class SearchAd(
     val imageCount: Int = 0,
     val commissionAmount: Int = 0,
     val rooms: Int? = null,
+    val createdAt: Long = 0L,
     val index: Int = 0,
 ) {
     val priceToman: Long? get() = SearchAds.parseToman(priceRaw)
@@ -61,7 +65,7 @@ object SearchAds {
         val n = query.normalized()
         val filtered = ads.filter { matches(it, n) }
         return when (n.sort) {
-            SearchSort.NEWEST -> filtered.sortedBy { it.index }
+            SearchSort.NEWEST -> newest(filtered)
             SearchSort.PRICE_ASC -> filtered.sortedWith(priceOrder(ascending = true))
             SearchSort.PRICE_DESC -> filtered.sortedWith(priceOrder(ascending = false))
             SearchSort.AREA_ASC -> filtered.sortedWith(areaOrder(ascending = true))
@@ -74,6 +78,75 @@ object SearchAds {
         val trimmed = raw.trim()
         if (trimmed.isEmpty() || "توافقی" in trimmed) return null
         return SearchQuery.parseAmount(trimmed)
+    }
+
+    /** جدیدترین اول. اگر تاریخ باشد همان ملاک است، وگرنه ترتیب سرور حفظ می‌شود. */
+    fun newest(ads: List<SearchAd>): List<SearchAd> {
+        if (ads.none { it.createdAt > 0L }) return ads.sortedBy { it.index }
+        return ads.sortedWith(compareByDescending<SearchAd> { it.createdAt }.thenBy { it.index })
+    }
+
+    /**
+     * صفحهٔ جستجو اگر ردیف داشته باشد همان فهرست منتشرشده است.
+     * وگرنه آگهی‌های خانه، و در نهایت کارت‌های HTML خانه.
+     */
+    fun catalog(
+        searchRows: List<SearchAd>,
+        homeAds: List<SearchAd>,
+        homeHtmlAds: List<SearchAd>,
+    ): List<SearchAd> {
+        val picked = when {
+            searchRows.isNotEmpty() -> searchRows
+            homeAds.isNotEmpty() -> homeAds
+            else -> homeHtmlAds
+        }
+        return dedupe(picked)
+    }
+
+    /** آگهی‌های JSON خانه. بدون پرچم انتشار می‌مانند؛ `published_for_sale=false` حذف می‌شود. */
+    fun fromObjects(array: JSONArray): List<SearchAd> {
+        val out = ArrayList<SearchAd>(array.length())
+        for (i in 0 until array.length()) {
+            val ad = array.optJSONObject(i) ?: continue
+            if (unpublished(ad)) continue
+            out += fromObject(ad, out.size)
+        }
+        return out
+    }
+
+    fun dedupe(ads: List<SearchAd>): List<SearchAd> {
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<SearchAd>(ads.size)
+        for (ad in ads) {
+            val key = when {
+                ad.token.isNotBlank() -> "${ad.source}:${ad.token}"
+                ad.url.isNotBlank() -> "u:${ad.url}"
+                else -> "t:${ad.title}:${ad.location}:${ad.priceRaw}"
+            }
+            if (!seen.add(key)) continue
+            out += ad.copy(index = out.size)
+        }
+        return out
+    }
+
+    fun parseTime(raw: String?): Long {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty() || text == "null") return 0L
+        text.toLongOrNull()?.let { n ->
+            if (n > 1_000_000_000_000L) return n
+            if (n > 1_000_000_000L) return n * 1000
+        }
+        val normalized = text.replace('T', ' ').substringBefore('.').substringBefore('+').substringBefore('Z').trim()
+        return try {
+            java.time.LocalDateTime.parse(normalized.replace(' ', 'T'))
+                .toEpochSecond(java.time.ZoneOffset.UTC) * 1000
+        } catch (_: Exception) {
+            try {
+                java.time.LocalDate.parse(normalized.take(10)).toEpochDay() * 86_400_000L
+            } catch (_: Exception) {
+                0L
+            }
+        }
     }
 
     fun parseArea(raw: String): Long? {
@@ -109,6 +182,64 @@ object SearchAds {
             }
         }
         return mapped.lowercase()
+    }
+
+    private fun unpublished(ad: JSONObject): Boolean {
+        if (!ad.has("published_for_sale")) return false
+        return when (val value = ad.opt("published_for_sale")) {
+            is Boolean -> !value
+            is Number -> value.toInt() == 0
+            is String -> value.trim().lowercase() in setOf("false", "0", "no")
+            else -> false
+        }
+    }
+
+    private fun fromObject(ad: JSONObject, index: Int): SearchAd {
+        val area = text(ad, "area").ifBlank { text(ad, "size") }.ifBlank { text(ad, "area_m2") }
+        val price = text(ad, "price").ifBlank {
+            val toman = ad.optLong("price_toman")
+            if (toman > 0) {
+                toman.toString()
+            } else {
+                val total = ad.optLong("price_total")
+                if (total > 0) total.toString() else ""
+            }
+        }
+        val location = text(ad, "location")
+        val district = text(ad, "district").ifBlank { text(ad, "neighborhood") }
+        val created = listOf("created_at", "published_at", "created", "date", "listed_at")
+            .firstNotNullOfOrNull { key -> text(ad, key).takeIf { it.isNotEmpty() } }
+            .orEmpty()
+        return SearchAd(
+            title = text(ad, "title"),
+            priceRaw = price,
+            location = location,
+            city = text(ad, "city"),
+            district = district.ifBlank { districtFromLocation(location) },
+            areaRaw = area.ifBlank { areaFromFacts(ad) },
+            token = text(ad, "token"),
+            source = text(ad, "source"),
+            url = text(ad, "url"),
+            imageUrl = text(ad, "image_url"),
+            imageCount = ad.optInt("image_count"),
+            commissionAmount = ad.optInt("commission_amount"),
+            createdAt = parseTime(created),
+            index = index,
+        )
+    }
+
+    private fun areaFromFacts(ad: JSONObject): String {
+        val facts = ad.optJSONArray("facts") ?: return ""
+        for (i in 0 until facts.length()) {
+            val bit = facts.optString(i)
+            if ("متر" in bit) return bit
+        }
+        return ""
+    }
+
+    private fun text(ad: JSONObject, key: String): String {
+        val value = ad.optString(key).trim()
+        return if (value.isEmpty() || value == "null") "" else value
     }
 
     private fun matches(ad: SearchAd, query: SearchQuery): Boolean {
