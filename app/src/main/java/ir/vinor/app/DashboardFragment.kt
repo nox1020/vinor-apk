@@ -67,6 +67,8 @@ class DashboardFragment : Fragment() {
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
+    private var customerCsrf: String = ""
+    private var customerBusy = false
     private var boundMessageCount = 0
     private var suggestKey = ""
     private var homeAvatarWanted: String? = null
@@ -133,8 +135,26 @@ class DashboardFragment : Fragment() {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
         binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
+        binding.dashboardCustomerSheetHost.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
+        binding.dashboardCustomerNotes.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submitCustomer()
+                true
+            } else {
+                false
+            }
+        }
+        val clearCustomerError = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { showCustomerError(null) }
+        }
+        binding.dashboardCustomerFirst.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerLast.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerPhone.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerNotes.addTextChangedListener(clearCustomerError)
         val headerPad = (56 * resources.displayMetrics.density).toInt()
         binding.dashboardRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
@@ -307,7 +327,13 @@ class DashboardFragment : Fragment() {
     private fun closeCustomer(): Boolean {
         val b = _binding ?: return false
         if (!b.dashboardCustomer.isVisible) return false
+        b.dashboardCustomerFirst.clearFocus()
+        b.dashboardCustomerLast.clearFocus()
+        b.dashboardCustomerPhone.clearFocus()
+        b.dashboardCustomerNotes.clearFocus()
+        hideKeyboard()
         b.dashboardCustomer.isVisible = false
+        showCustomerError(null)
         return true
     }
 
@@ -498,64 +524,110 @@ class DashboardFragment : Fragment() {
 
     private fun openCustomer() {
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
         closeAttach()
+        showCustomerError(null)
         binding.dashboardCustomer.isVisible = true
+        binding.dashboardCustomerFirst.requestFocus()
     }
 
     private fun submitCustomer() {
+        if (customerBusy) return
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
-        val body = JSONObject()
-            .put("customer_first_name", binding.dashboardCustomerFirst.text?.toString()?.trim().orEmpty())
-            .put("customer_last_name", binding.dashboardCustomerLast.text?.toString()?.trim().orEmpty())
-            .put("customer_phone", binding.dashboardCustomerPhone.text?.toString()?.trim().orEmpty())
-            .put("notes", binding.dashboardCustomerNotes.text?.toString()?.trim().orEmpty())
-        binding.dashboardCustomerSubmit.isEnabled = false
+        val first = binding.dashboardCustomerFirst.text?.toString().orEmpty()
+        val last = binding.dashboardCustomerLast.text?.toString().orEmpty()
+        val phone = binding.dashboardCustomerPhone.text?.toString().orEmpty()
+        val notes = binding.dashboardCustomerNotes.text?.toString().orEmpty()
+        val problem = CustomerRegister.error(first, last, phone, notes)
+        if (problem != null) {
+            showCustomerError(problem)
+            return
+        }
+        showCustomerError(null)
+        val body = CustomerRegister.body(first, last, phone, notes)
+        setCustomerBusy(true)
+        val ctx = requireContext()
         scope.launch {
             try {
+                val token = withContext(Dispatchers.IO) { ensureCustomerCsrf(ctx) }
                 val resp = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/home/register-customer", body, requireContext())
+                    PartnerApi.postPage(CustomerRegister.PATH, body, token, CustomerRegister.REFERER, ctx)
                 }
                 if (_binding == null) return@launch
-                val http = resp.optInt("http_status")
-                if (http == 401 || http == 403) {
-                    Toast.makeText(
-                        requireContext(),
-                        resp.optString("error").ifBlank { "برای ثبت درخواست وارد شوید." },
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    if (http == 401) (activity as? MainActivity)?.openDrawer()
+                val fresh = resp.optString("csrf_token").trim()
+                if (fresh.isNotBlank()) customerCsrf = fresh
+                if (PartnerCustomers.isUnauthorized(resp)) {
+                    customerCsrf = ""
+                    Toast.makeText(ctx, "برای ثبت مشتری وارد شوید.", Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
                     return@launch
                 }
-                if (resp.optBoolean("ok")) {
+                if (PartnerCustomers.isOk(resp)) {
+                    clearCustomerForm()
                     closeCustomer()
-                    binding.dashboardCustomerFirst.setText("")
-                    binding.dashboardCustomerLast.setText("")
-                    binding.dashboardCustomerPhone.setText("")
-                    binding.dashboardCustomerNotes.setText("")
                     Toast.makeText(
-                        requireContext(),
-                        resp.optString("message").ifBlank { "درخواست بازدید ثبت شد." },
+                        ctx,
+                        PartnerCustomers.userMessage(resp, "مشتری ثبت شد."),
                         Toast.LENGTH_SHORT,
                     ).show()
                 } else {
-                    Toast.makeText(
-                        requireContext(),
-                        resp.optString("error").ifBlank { "ثبت ناموفق بود." },
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    showCustomerError(PartnerCustomers.userMessage(resp, "ثبت ناموفق بود."))
                 }
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null) showCustomerError(e.message ?: "خطای شبکه")
             } finally {
-                if (_binding != null) binding.dashboardCustomerSubmit.isEnabled = true
+                if (_binding != null) setCustomerBusy(false)
             }
         }
+    }
+
+    private fun ensureCustomerCsrf(ctx: android.content.Context): String {
+        if (customerCsrf.isNotBlank()) return customerCsrf
+        val profile = try {
+            PartnerApi.get("/express/partner/profile/data", ctx)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        var token = profile.optString("csrf_token").trim()
+        if (token.isBlank()) {
+            val html = try {
+                PartnerApi.getHtml("/express/partner/home", ctx)
+            } catch (_: Exception) {
+                ""
+            }
+            token = PartnerCustomers.csrfFromHtml(html)
+        }
+        customerCsrf = token
+        return token
+    }
+
+    private fun showCustomerError(text: String?) {
+        val b = _binding ?: return
+        val message = text?.trim().orEmpty()
+        b.dashboardCustomerError.text = message
+        b.dashboardCustomerError.isVisible = message.isNotEmpty()
+    }
+
+    private fun setCustomerBusy(busy: Boolean) {
+        customerBusy = busy
+        val b = _binding ?: return
+        b.dashboardCustomerProgress.isVisible = busy
+        b.dashboardCustomerSubmit.isEnabled = !busy
+        b.dashboardCustomerSubmit.alpha = if (busy) 0.55f else 1f
+    }
+
+    private fun clearCustomerForm() {
+        val b = _binding ?: return
+        b.dashboardCustomerFirst.setText("")
+        b.dashboardCustomerLast.setText("")
+        b.dashboardCustomerPhone.setText("")
+        b.dashboardCustomerNotes.setText("")
+        showCustomerError(null)
     }
 
     private fun syncSendEnabled() {
