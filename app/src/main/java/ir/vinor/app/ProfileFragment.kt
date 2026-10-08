@@ -39,10 +39,13 @@ class ProfileFragment : Fragment() {
 
         /** آخرین پروفایل همین فرآیند تا باز شدن دوبارهٔ تب صفحه خالی نماند. */
         private var rememberedProfile: JSONObject? = null
+        /** آخرین فلگ قطعی CRM تا ردیف مشتریان در باز شدن بعدی همان اول باشد. */
+        private var rememberedCrm: Boolean? = null
         private var sessionStamp = 0
 
         fun clearRemembered() {
             rememberedProfile = null
+            rememberedCrm = null
             sessionStamp++
         }
 
@@ -73,7 +76,7 @@ class ProfileFragment : Fragment() {
 
     private var latestProfile: JSONObject? = null
     private var loadGen = 0
-    private var crmFetchGen = -1
+    private var crmInFlight = false
     /** اولین onResume بعد از ساخت ویو را رد می‌کند؛ onViewCreated همان بار را زده است. */
     private var resumeLoadArmed = false
     private var renderedMenuKey: String? = null
@@ -215,34 +218,51 @@ class ProfileFragment : Fragment() {
     }
 
     private fun customersMenuVisible(profile: JSONObject): Boolean {
-        if (!profile.optBoolean("is_approved", false)) return false
-        val profileFlag = flagOrNull(profile, PartnerCrm.FLAG)
-        if (profileFlag != null) return profileFlag
         val ctx = context
         val home = if (ctx != null) PartnerApi.peekJson(HOME_DATA, ctx) else null
         val homeFlag = flagOrNull(home, PartnerCrm.FLAG)
-        val fresh = ctx != null && homeFlag != null && PartnerApi.isFresh(HOME_DATA, ctx)
-        if (!fresh) refreshCrmFromHome(profile, PartnerCrm.showMenu(true, null, homeFlag))
-        return PartnerCrm.showMenu(true, null, homeFlag)
+        val fresh = homeFlag != null && ctx != null && PartnerApi.isFresh(HOME_DATA, ctx)
+        val profileFlag = flagOrNull(profile, PartnerCrm.FLAG)
+        val decision = PartnerCrm.decide(
+            isApproved = profile.optBoolean("is_approved", false),
+            profileFlag = profileFlag,
+            homeFlag = homeFlag,
+            homeFresh = fresh,
+            remembered = rememberedCrm,
+        )
+        if (!decision.refresh) {
+            if (profile.optBoolean("is_approved", false)) {
+                (profileFlag ?: homeFlag)?.let { rememberedCrm = it }
+            }
+        } else {
+            refreshCrmFromHome(profile, decision.visible)
+        }
+        return decision.visible
     }
 
     private fun refreshCrmFromHome(profile: JSONObject, shown: Boolean) {
         val ctx = context ?: return
-        val gen = loadGen
-        if (crmFetchGen == gen) return
-        crmFetchGen = gen
+        if (crmInFlight) return
+        crmInFlight = true
+        val stamp = sessionStamp
         viewLifecycleOwner.lifecycleScope.launch {
-            val home = withContext(Dispatchers.IO) {
-                runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
-            } ?: return@launch
-            if (gen != loadGen || _binding == null) return@launch
-            val visible = PartnerCrm.showMenu(
-                profile.optBoolean("is_approved", false),
-                null,
-                flagOrNull(home, PartnerCrm.FLAG),
-            )
-            if (visible == shown) return@launch
-            bindProfilePayload(latestProfile ?: profile)
+            try {
+                val home = withContext(Dispatchers.IO) {
+                    runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
+                } ?: return@launch
+                if (_binding == null || stamp != sessionStamp) return@launch
+                val homeFlag = flagOrNull(home, PartnerCrm.FLAG)
+                val visible = PartnerCrm.showMenu(
+                    profile.optBoolean("is_approved", false),
+                    null,
+                    homeFlag,
+                )
+                if (homeFlag != null) rememberedCrm = homeFlag
+                if (visible == shown) return@launch
+                bindProfilePayload(latestProfile ?: profile)
+            } finally {
+                crmInFlight = false
+            }
         }
     }
 
