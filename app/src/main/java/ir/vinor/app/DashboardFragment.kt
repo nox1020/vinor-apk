@@ -76,6 +76,7 @@ class DashboardFragment : Fragment() {
     private var lastSyncAt = ""
     private var chatPollJob: Job? = null
     private var historyInFlight = false
+    private var historyQueued = false
     private var syncInFlight = false
     private var chatSending = false
     private var chatWriteGen = 0
@@ -803,7 +804,10 @@ class DashboardFragment : Fragment() {
         }
         if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
         chatAccount = account
-        if (historyInFlight) return
+        if (historyInFlight) {
+            if (force) historyQueued = true
+            return
+        }
         val gen = chatBindGen
         val write = chatWriteGen
         historyInFlight = true
@@ -813,7 +817,11 @@ class DashboardFragment : Fragment() {
                     PartnerApi.peekJson(ChatLive.HISTORY, ctx)
                 }
                 if (!chatStill(account, gen)) return@launch
-                if (peeked != null && wantChatLayer) bindChatIfNeeded(peeked)
+                if (peeked != null && wantChatLayer &&
+                    (_binding?.dashboardChatList?.childCount ?: 0) == 0
+                ) {
+                    bindChatIfNeeded(peeked)
+                }
                 val urgent = force || wantChatLayer
                 if (!urgent && peeked != null && withContext(Dispatchers.IO) {
                         PartnerApi.isFresh(ChatLive.HISTORY, ctx)
@@ -840,11 +848,16 @@ class DashboardFragment : Fragment() {
                     if (wantChatLayer) (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
-                if (path != ChatLive.HISTORY && chatCacheable(hist)) {
+                if (path != ChatLive.HISTORY && chatCacheable(hist) &&
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
                     PartnerApi.remember(ChatLive.HISTORY, hist, ctx)
                 }
-                rememberHistory(hist)
-                if (wantChatLayer) bindChatIfNeeded(hist)
+                if (wantChatLayer) bindChatIfNeeded(hist) else if (
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
+                    rememberHistory(hist)
+                }
             } catch (_: Exception) {
                 if (chatStill(account, gen) && wantChatLayer &&
                     binding.dashboardChatList.childCount == 0
@@ -853,7 +866,12 @@ class DashboardFragment : Fragment() {
                 }
             } finally {
                 historyInFlight = false
+                val again = historyQueued
+                historyQueued = false
                 if (wantChatLayer) finishRefreshUi()
+                if (again && _binding != null && currentAccountKey() == account) {
+                    fetchHistory(bindIfWanted = true, force = true)
+                }
             }
         }
     }
@@ -876,7 +894,7 @@ class DashboardFragment : Fragment() {
         val messages = ChatLive.messagesOf(cachedHistory)
         val path = ChatLive.syncPath(
             tid,
-            messages.length(),
+            ChatLive.syncCount(messages),
             lastSyncAt,
             ChatLive.escalationIds(messages),
         )
@@ -921,6 +939,7 @@ class DashboardFragment : Fragment() {
         boundFingerprint = ChatLive.fingerprint(next)
         lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(next))
         context?.let { PartnerApi.remember(ChatLive.HISTORY, base, it) }
+        if (ChatLive.sameVisible(existing, next)) return
         if (next.length() > existing.length() && !transcriptEdited(existing, next)) {
             for (i in existing.length() until next.length()) {
                 val msg = next.optJSONObject(i) ?: continue
@@ -988,6 +1007,7 @@ class DashboardFragment : Fragment() {
         lastSyncAt = ""
         emptyPollStreak = 0
         chatSending = false
+        historyQueued = false
         chatAccount = null
         landsByCode.clear()
         pendingAttachment = null
@@ -1003,16 +1023,29 @@ class DashboardFragment : Fragment() {
 
     private fun bindChatIfNeeded(obj: JSONObject) {
         val messages = ChatLive.messagesOf(obj)
-        val fp = ChatLive.fingerprint(messages)
+        val current = ChatLive.messagesOf(cachedHistory)
+        threadFrom(obj)?.let { tid ->
+            if (threadId.isNullOrBlank() || ChatLive.shouldReplaceTranscript(current, messages)) threadId = tid
+        }
+        if (!ChatLive.shouldReplaceTranscript(current, messages)) return
         rememberHistory(obj)
         lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(messages))
-        if (fp == boundFingerprint && (_binding?.dashboardChatList?.childCount ?: 0) > 0) return
+        if (ChatLive.fingerprint(messages) == boundFingerprint &&
+            (_binding?.dashboardChatList?.childCount ?: 0) > 0
+        ) {
+            return
+        }
         bindChat(obj)
     }
 
     private fun rememberHistory(obj: JSONObject) {
         cachedHistory = obj
+        threadFrom(obj)?.let { threadId = it }
+    }
+
+    private fun threadFrom(obj: JSONObject): String? {
         var tid = obj.optString("thread_id").takeIf { it.isNotBlank() }
+            ?: obj.optJSONObject("data")?.optString("thread_id")?.takeIf { it.isNotBlank() }
         if (tid.isNullOrBlank()) {
             val threads = obj.optJSONArray("threads") ?: JSONArray()
             for (i in 0 until threads.length()) {
@@ -1024,7 +1057,7 @@ class DashboardFragment : Fragment() {
                 if (th.optBoolean("is_active")) break
             }
         }
-        if (!tid.isNullOrBlank()) threadId = tid
+        return tid
     }
 
     private fun bindHomeAvatar(home: JSONObject) {
@@ -1750,6 +1783,7 @@ class DashboardFragment : Fragment() {
         startChatPoll()
         context?.let { PartnerApi.forget(ChatLive.HISTORY, it) }
         val pending = addBubble("user", text, null, toSend)
+        val thinking = addBubble("assistant", "…", null, null)
         scope.launch {
             var delivered = false
             try {
@@ -1760,8 +1794,7 @@ class DashboardFragment : Fragment() {
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
-                if (_binding == null) return@launch
-                if (!wantChatLayer || !chatLayerOpen || currentAccountKey() != account) return@launch
+                if (_binding == null || currentAccountKey() != account) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
                     releaseChatAccount()
@@ -1777,17 +1810,14 @@ class DashboardFragment : Fragment() {
                     boundFingerprint = ChatLive.fingerprint(transcript)
                     lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(transcript))
                     context?.let { PartnerApi.remember(ChatLive.HISTORY, stored, it) }
-                    val codes = resp.optJSONArray("land_codes")
-                    val reply = resp.optString("reply")
-                    if (reply.isNotBlank() || (codes != null && codes.length() > 0)) {
-                        if (codes != null) {
-                            for (i in 0 until codes.length()) prefetchLand(codes.optString(i))
-                        }
-                        addBubble("assistant", reply, codes)
+                    if (wantChatLayer && chatLayerOpen) {
+                        thinking?.let { _binding?.dashboardChatList?.removeView(it) }
+                        renderMessages(transcript, stick = true)
+                        paintMissingLands(transcript)
                     } else {
-                        showServerAssistant(resp)
+                        _binding?.dashboardChatList?.removeAllViews()
+                        boundFingerprint = ""
                     }
-                    binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
                     delivered = true
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }
@@ -1795,38 +1825,41 @@ class DashboardFragment : Fragment() {
                         releaseChatAccount()
                         (activity as? MainActivity)?.requireChatLogin()
                     } else {
-                        restoreFailedSend(pending, text, toSend)
+                        restoreFailedSend(pending, thinking, text, toSend)
                         Toast.makeText(requireContext(), err, Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
                 if (_binding != null && wantChatLayer) {
-                    restoreFailedSend(pending, text, toSend)
+                    restoreFailedSend(pending, thinking, text, toSend)
                     Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
                 }
             } finally {
                 chatSending = false
+                if (!delivered) {
+                    _binding?.dashboardChatList?.let { list -> thinking?.let { list.removeView(it) } }
+                }
                 if (_binding != null) syncSendEnabled()
-                if (delivered) pollSync()
+                if (delivered && wantChatLayer && chatLayerOpen) pollSync()
             }
         }
     }
 
-    private fun showServerAssistant(resp: JSONObject) {
-        val server = ChatLive.messagesOf(resp)
-        var last: JSONObject? = null
-        for (i in 0 until server.length()) {
-            val msg = server.optJSONObject(i) ?: continue
-            if (msg.optString("role") == "assistant" && !ChatLive.isHidden(msg)) last = msg
+    private fun paintMissingLands(messages: JSONArray) {
+        val missing = landCodesIn(messages).filter { !landsByCode.containsKey(it) }
+        if (missing.isEmpty()) return
+        val gen = chatBindGen
+        val fp = boundFingerprint
+        scope.launch {
+            coroutineScope { missing.map { code -> async { prefetchLand(code) } }.awaitAll() }
+            if (_binding == null || gen != chatBindGen || !wantChatLayer) return@launch
+            if (fp == boundFingerprint) renderMessages(messages, stick = followingLatest())
         }
-        val msg = last ?: return
-        val att = msg.optJSONObject("attachment")
-            ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
-        addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
     }
 
-    private fun restoreFailedSend(pending: View?, text: String, attachment: JSONObject?) {
+    private fun restoreFailedSend(pending: View?, thinking: View?, text: String, attachment: JSONObject?) {
         val b = _binding ?: return
+        thinking?.let { b.dashboardChatList.removeView(it) }
         pending?.let { b.dashboardChatList.removeView(it) }
         if (text.isNotBlank() && b.dashboardChatInput.text.isNullOrBlank()) {
             b.dashboardChatInput.setText(text)

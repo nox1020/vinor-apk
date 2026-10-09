@@ -58,18 +58,19 @@ class ChatLiveTest {
     }
 
     @Test
-    fun unseenSkipsKnownIdsPendingUserAndHiddenRows() {
+    fun unseenSkipsKnownIdsAndHiddenRows() {
         val have = JSONArray()
             .put(JSONObject().put("id", "1").put("role", "user").put("content", "سلام"))
-            .put(JSONObject().put("role", "user").put("content", "پیش‌نویس"))
+            .put(JSONObject().put("id", "2").put("role", "user").put("content", "پیش‌نویس"))
         val incoming = JSONArray()
             .put(JSONObject().put("id", "1").put("role", "user").put("content", "سلام"))
             .put(JSONObject().put("id", "9").put("role", "user").put("content", "پیش‌نویس").put("created_at", "t"))
             .put(JSONObject().put("id", "3").put("role", "assistant").put("content", "جدید"))
             .put(JSONObject().put("role", "user").put("content", "مخفی").put("hide_ui", true))
         val fresh = ChatLive.unseen(have, incoming)
-        assertEquals(1, fresh.length())
-        assertEquals("3", fresh.getJSONObject(0).getString("id"))
+        assertEquals(2, fresh.length())
+        assertEquals("9", fresh.getJSONObject(0).getString("id"))
+        assertEquals("3", fresh.getJSONObject(1).getString("id"))
     }
 
     @Test
@@ -92,10 +93,10 @@ class ChatLiveTest {
     }
 
     @Test
-    fun exchangeKeepsReplyAndDropsThePendingDuplicate() {
+    fun exchangeKeepsReplyWithoutErasingThePreviousTurn() {
         val history = JSONObject().put(
             "messages",
-            JSONArray().put(JSONObject().put("role", "user").put("content", "قیمت؟")),
+            JSONArray().put(JSONObject().put("id", "old").put("role", "user").put("content", "قیمت؟")),
         )
         val response = JSONObject()
             .put("ok", true)
@@ -105,16 +106,19 @@ class ChatLiveTest {
         val next = ChatLive.applyExchange(history, "قیمت؟", null, response, null)
         val messages = next.getJSONArray("messages")
         assertEquals("thr", next.getString("thread_id"))
-        assertEquals(2, messages.length())
-        assertEquals("assistant", messages.getJSONObject(1).getString("role"))
-        assertEquals("L1", messages.getJSONObject(1).getJSONArray("land_codes").getString(0))
+        assertEquals(3, messages.length())
+        assertEquals("old", messages.getJSONObject(0).getString("id"))
+        assertEquals("assistant", messages.getJSONObject(2).getString("role"))
+        assertEquals("L1", messages.getJSONObject(2).getJSONArray("land_codes").getString(0))
     }
 
     @Test
     fun exchangePrefersServerMessagesOverTheLocalReply() {
         val history = JSONObject().put(
             "messages",
-            JSONArray().put(JSONObject().put("role", "user").put("content", "سلام")),
+            JSONArray()
+                .put(JSONObject().put("role", "user").put("content", "سلام").put("pending", true))
+                .put(JSONObject().put("role", "assistant").put("content", "علیک").put("pending", true)),
         )
         val server = JSONArray()
             .put(JSONObject().put("id", "u").put("role", "user").put("content", "سلام").put("created_at", "a"))
@@ -126,6 +130,22 @@ class ChatLiveTest {
         assertEquals("u", messages.getJSONObject(0).getString("id"))
         assertEquals("a", messages.getJSONObject(1).getString("id"))
         assertEquals("b", ChatLive.lastSyncAt(messages))
+        assertTrue(ChatLive.sameVisible(history.getJSONArray("messages"), messages))
+        assertEquals(0, ChatLive.syncCount(history.getJSONArray("messages")))
+        assertEquals(2, ChatLive.syncCount(messages))
+    }
+
+    @Test
+    fun emptyHistoryDoesNotWipeAnOpenTranscript() {
+        val have = JSONArray().put(JSONObject().put("id", "1").put("role", "user").put("content", "سلام"))
+        assertFalse(ChatLive.shouldReplaceTranscript(have, JSONArray()))
+        assertFalse(ChatLive.shouldReplaceTranscript(have, JSONArray(have.toString())))
+        assertTrue(
+            ChatLive.shouldReplaceTranscript(
+                JSONArray(),
+                JSONArray().put(JSONObject().put("id", "1").put("role", "assistant").put("content", "درود")),
+            ),
+        )
     }
 
     @Test

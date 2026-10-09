@@ -99,8 +99,69 @@ object ChatLive {
         return ids
     }
 
+    fun visibleCount(messages: JSONArray?): Int {
+        if (messages == null) return 0
+        var n = 0
+        for (i in 0 until messages.length()) {
+            val msg = messages.optJSONObject(i) ?: continue
+            if (!isHidden(msg)) n += 1
+        }
+        return n
+    }
+
+    /** تعدادی که سرور از قبل دیده؛ حباب محلیِ در انتظار را حساب نکن. */
+    fun syncCount(messages: JSONArray?): Int {
+        if (messages == null) return 0
+        var n = 0
+        for (i in 0 until messages.length()) {
+            val msg = messages.optJSONObject(i) ?: continue
+            if (isHidden(msg) || msg.optBoolean("pending")) continue
+            if (msg.optString("id").isBlank() && msg.optString("created_at").isBlank()) continue
+            n += 1
+        }
+        return n
+    }
+
+    /**
+     * تاریخچهٔ خالی نباید رونوشتِ موجود را پاک کند.
+     * اثر انگشت یکسان هم نیاز به کشیدن دوباره ندارد.
+     */
+    fun shouldReplaceTranscript(current: JSONArray?, incoming: JSONArray?): Boolean {
+        val next = incoming ?: JSONArray()
+        val have = current ?: JSONArray()
+        if (fingerprint(have) == fingerprint(next)) return false
+        if (visibleCount(next) == 0 && visibleCount(have) > 0) return false
+        return true
+    }
+
+    /** متن و پیوست یکی است؛ id و زمان برای پرش لیست کافی نیستند. */
+    fun sameVisible(current: JSONArray?, incoming: JSONArray?): Boolean {
+        val a = current ?: JSONArray()
+        val b = incoming ?: JSONArray()
+        if (visibleCount(a) != visibleCount(b)) return false
+        var ia = 0
+        var ib = 0
+        while (ia < a.length() && ib < b.length()) {
+            val left = a.optJSONObject(ia)
+            val right = b.optJSONObject(ib)
+            if (left == null || isHidden(left)) {
+                ia += 1
+                continue
+            }
+            if (right == null || isHidden(right)) {
+                ib += 1
+                continue
+            }
+            if (visibleKey(left) != visibleKey(right)) return false
+            ia += 1
+            ib += 1
+        }
+        return true
+    }
+
     /**
      * پیام تازه را اضافه می‌کند و اگر همان id با متن تازه آمده باشد جایگزین می‌کند.
+     * حباب pending با همان نقش و متن، نسخهٔ سروری همان پیام است نه پیام دوم.
      * null یعنی چیزی برای کشیدن دوباره نیست.
      */
     fun reconcile(existing: JSONArray?, incoming: JSONArray?): JSONArray? {
@@ -124,6 +185,12 @@ object ChatLive {
                     break
                 }
                 if (found) continue
+            }
+            val pendingAt = pendingIndex(next, msg)
+            if (pendingAt >= 0) {
+                next.put(pendingAt, msg)
+                changed = true
+                continue
             }
             if (!seen(next, msg)) {
                 next.put(msg)
@@ -176,31 +243,53 @@ object ChatLive {
         if (tid.isNotBlank()) base.put("thread_id", tid)
         val messages = messagesOf(base)
         val server = messagesOf(response)
-        if (server.length() > 0 && server !== messages) {
-            dropPendingUser(messages, userText)
-            for (i in 0 until server.length()) {
-                val msg = server.optJSONObject(i) ?: continue
-                if (isHidden(msg)) continue
-                if (!seen(messages, msg)) messages.put(msg)
-            }
-        } else if (response.optBoolean("ok") || response.optString("reply").isNotBlank()) {
+        val merged = if (server.length() > 0 && server !== messages) {
+            reconcile(messages, server) ?: messages
+        } else {
+            messages
+        }
+        if (server.length() == 0 && (response.optBoolean("ok") || response.optString("reply").isNotBlank())) {
             if (userText.isNotBlank() || attachment != null) {
-                val user = JSONObject().put("role", "user").put("content", userText)
+                val user = JSONObject().put("role", "user").put("content", userText).put("pending", true)
                 if (attachment != null) user.put("attachment", attachment)
-                if (!seen(messages, user)) messages.put(user)
-            }
-            val reply = response.optString("reply")
-            val codes = response.optJSONArray("land_codes")
-            if (reply.isNotBlank() || (codes != null && codes.length() > 0)) {
-                val asst = JSONObject().put("role", "assistant").put("content", reply)
-                if (codes != null) asst.put("land_codes", codes)
-                val created = response.optString("created_at")
-                if (created.isNotBlank()) asst.put("created_at", created)
-                if (!seen(messages, asst)) messages.put(asst)
+                if (!seen(merged, user)) merged.put(user)
             }
         }
-        base.put("messages", messages)
+        val reply = response.optString("reply")
+        val codes = response.optJSONArray("land_codes")
+        if (!serverHasAssistant(server) &&
+            (reply.isNotBlank() || (codes != null && codes.length() > 0)) &&
+            !assistantHas(merged, reply, codes)
+        ) {
+            val asst = JSONObject().put("role", "assistant").put("content", reply).put("pending", true)
+            if (codes != null) asst.put("land_codes", codes)
+            val created = response.optString("created_at")
+            if (created.isNotBlank()) asst.put("created_at", created)
+            if (!seen(merged, asst)) merged.put(asst)
+        }
+        base.put("messages", merged)
         return base
+    }
+
+    private fun serverHasAssistant(server: JSONArray): Boolean {
+        for (i in 0 until server.length()) {
+            val msg = server.optJSONObject(i) ?: continue
+            if (msg.optString("role") == "assistant" && !isHidden(msg)) return true
+        }
+        return false
+    }
+
+    private fun assistantHas(messages: JSONArray, reply: String, codes: JSONArray?): Boolean {
+        if (reply.isBlank() && (codes == null || codes.length() == 0)) return true
+        for (i in 0 until messages.length()) {
+            val msg = messages.optJSONObject(i) ?: continue
+            if (msg.optString("role") != "assistant" || isHidden(msg)) continue
+            if (reply.isNotBlank() && msg.optString("content") == reply) return true
+            if (reply.isBlank() && codes != null && msg.optJSONArray("land_codes")?.toString() == codes.toString()) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun identity(msg: JSONObject): String {
@@ -220,34 +309,39 @@ object ChatLive {
         val esc = msg.optString("escalation_id")
         val role = msg.optString("role")
         val ts = msg.optString("created_at")
-        val content = msg.optString("content").take(96)
         for (i in 0 until existing.length()) {
             val have = existing.optJSONObject(i) ?: continue
             if (id.isNotBlank() && have.optString("id") == id) return true
-            if (esc.isNotBlank() && have.optString("escalation_id") == esc) return true
-            if (ts.isNotBlank() && have.optString("created_at") == ts && have.optString("role") == role) return true
-            if (have.optString("id").isBlank() &&
-                have.optString("created_at").isBlank() &&
-                role == "user" &&
-                have.optString("role") == "user" &&
-                content.isNotBlank() &&
-                have.optString("content").take(96) == content
-            ) {
+            if (esc.isNotBlank() && have.optString("escalation_id") == esc && have.optString("role") == role) {
                 return true
             }
+            if (ts.isNotBlank() && have.optString("created_at") == ts && have.optString("role") == role) return true
         }
         return false
     }
 
-    private fun dropPendingUser(messages: JSONArray, userText: String) {
-        for (i in messages.length() - 1 downTo 0) {
-            val msg = messages.optJSONObject(i) ?: continue
-            if (msg.optString("role") != "user") continue
-            if (msg.optString("id").isNotBlank() || msg.optString("created_at").isNotBlank()) continue
-            if (msg.optString("content") != userText) continue
-            messages.remove(i)
-            return
+    /** آخرین حباب محلیِ در انتظار با همان نقش و متن. */
+    private fun pendingIndex(existing: JSONArray, msg: JSONObject): Int {
+        val role = msg.optString("role")
+        val content = msg.optString("content").take(96)
+        if (role.isBlank()) return -1
+        for (i in existing.length() - 1 downTo 0) {
+            val have = existing.optJSONObject(i) ?: continue
+            if (!have.optBoolean("pending")) continue
+            if (have.optString("role") != role) continue
+            if (have.optString("content").take(96) != content) continue
+            return i
         }
+        return -1
+    }
+
+    private fun visibleKey(msg: JSONObject): String {
+        val role = msg.optString("role")
+        val content = msg.optString("content").take(96)
+        val att = msg.optJSONObject("attachment")?.optString("url")
+            ?: msg.optJSONObject("meta")?.optJSONObject("attachment")?.optString("url").orEmpty()
+        val codes = msg.optJSONArray("land_codes")?.toString().orEmpty()
+        return "$role|$att|$content|$codes"
     }
 
     private fun enc(raw: String): String =
