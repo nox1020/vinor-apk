@@ -12,7 +12,9 @@ object FollowRequests {
 
     enum class Tone { PRIMARY, SECONDARY, DANGER }
 
-    data class Tab(val id: String, val title: String)
+    data class Tab(val id: String, val title: String, val count: Int = 0)
+
+    enum class Mark { NEUTRAL, GOOD, BAD }
 
     data class Action(
         val label: String,
@@ -30,19 +32,32 @@ object FollowRequests {
         val customer: String,
         val whenText: String,
         val landCode: String,
+        val phone: String = "",
         val commission: String,
         val actions: List<Action>,
     )
 
-    fun tabs(array: JSONArray?): List<Tab> {
-        if (array == null) return emptyList()
-        val out = ArrayList<Tab>()
-        for (i in 0 until array.length()) {
-            val tab = array.optJSONObject(i) ?: continue
-            val id = text(tab, "id")
-            if (id.isBlank()) continue
-            out.add(Tab(id, text(tab, "title").ifBlank { id }))
+    fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
+
+    fun tabs(array: JSONArray?, payload: JSONObject?): List<Tab> {
+        val parsed = readTabs(array)
+        val grouped = payload?.let { groupedOf(it) }
+        if (parsed.isNotEmpty()) {
+            if (grouped == null) return parsed
+            return parsed.map { tab ->
+                if (tab.count > 0) tab
+                else tab.copy(count = grouped.optJSONArray(tab.id)?.length() ?: 0)
+            }
         }
+        if (grouped == null) return emptyList()
+        val out = ArrayList<Tab>()
+        val keys = grouped.keys()
+        while (keys.hasNext()) {
+            val id = keys.next().trim()
+            if (id.isBlank()) continue
+            out.add(Tab(id, stageTitle(id), grouped.optJSONArray(id)?.length() ?: 0))
+        }
+        out.sortBy { stageOrder(it.id) }
         return out
     }
 
@@ -110,10 +125,17 @@ object FollowRequests {
             groupedOf(payload)?.keys()?.forEach { names.add(it) }
             names.addAll(listOf("requests", "visits", "deals", "deal"))
         }
+        var best = ""
+        var bestRank = -1
         for (tab in names) {
-            if (items(payload, tab).any { idOf(it) == id }) return tab
+            if (items(payload, tab).none { idOf(it) == id }) continue
+            val rank = stageRank(tab)
+            if (rank >= bestRank) {
+                best = tab
+                bestRank = rank
+            }
         }
-        return ""
+        return best
     }
 
     fun refreshesWallet(path: String): Boolean = path.substringBefore('?').endsWith("/deal-close")
@@ -134,10 +156,9 @@ object FollowRequests {
         val out = ArrayList<JSONObject>()
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            val itemTab = text(item, "pipeline_tab")
             if (scoped == null && tab.isNotBlank()) {
-                val effectiveTab = itemTab.ifBlank { "requests" }
-                if (effectiveTab != tab) continue
+                val effectiveTab = normalizeStage(stageOf(item).ifBlank { "requests" })
+                if (effectiveTab != normalizeStage(tab)) continue
             }
             out.add(item)
         }
@@ -146,27 +167,54 @@ object FollowRequests {
 
     fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)
-        val title = text(item, "title").ifBlank { text(item, "land_title") }.ifBlank { "پیگیری" }
+        val title = firstText(item, "title", "land_title", "property_title").ifBlank { "پیگیری" }
         return Card(
             id = id,
             title = title,
             status = displayStatus(item, tab),
-            customer = text(item, "customer_name"),
-            whenText = text(item, "visit_when"),
-            landCode = text(item, "land_code"),
+            customer = firstText(item, "customer_name", "customer", "client_name", "buyer_name"),
+            whenText = firstText(item, "visit_when", "when_label", "visit_label", "scheduled_label"),
+            landCode = firstText(item, "land_code", "property_code", "file_code"),
+            phone = firstText(item, "customer_phone", "phone", "mobile", "tel"),
             commission = commissionLine(item),
             actions = actions(item, id, tab),
         )
     }
 
-    fun doneMessage(path: String, payload: JSONObject): String {
+    fun doneMessage(path: String, payload: JSONObject, body: JSONObject = JSONObject()): String {
         val note = payload.optString("message").trim()
         if (note.isNotEmpty() && !note.equals("null", true)) return note
+        val bare = path.substringBefore('?')
+        val outcome = body.optString("outcome").trim()
         return when {
-            path.endsWith("/deal-confirm") -> "تأیید نهایی ثبت شد."
-            path.endsWith("/deal-close") -> "معامله انجام شد. پورسانت به کیف پول واریز می‌شود."
+            bare.endsWith("/deal-close") -> "معامله انجام شد. پورسانت به کیف پول واریز می‌شود."
+            bare.endsWith("/deal-confirm") -> "تأیید نهایی ثبت شد."
+            bare.endsWith("/deal-reject") -> "معامله رد شد."
+            bare.endsWith("/remove") -> "از پیگیری حذف شد."
+            bare.endsWith("/no-show") -> "عدم حضور ثبت شد."
+            bare.endsWith("/revisit") -> "بازدید مجدد ثبت شد."
+            bare.endsWith("/complete") -> "بازدید انجام شد."
+            bare.endsWith("/visit-result") && outcome == "interested" -> "علاقه‌مندی ثبت شد."
+            bare.endsWith("/visit-result") && outcome == "follow_up" -> "پیگیری ثبت شد."
+            bare.endsWith("/visit-result") && outcome == "not_interested" -> "بی‌علاقگی ثبت شد."
             else -> "ثبت شد."
         }
+    }
+
+    fun statusMark(status: String): Mark {
+        val kind = WalletWithdraw.commissionKind(status)
+        if (kind == "rejected") return Mark.BAD
+        if (kind == "paid" || kind == "success") return Mark.GOOD
+        if (
+            status.contains("رد") ||
+            status.contains("بی‌علاق") ||
+            status.contains("عدم حضور") ||
+            status.contains("ناموفق")
+        ) {
+            return Mark.BAD
+        }
+        if (status.contains("موفق") || status.contains("واریز") || status.contains("علاقه")) return Mark.GOOD
+        return Mark.NEUTRAL
     }
 
     fun actions(item: JSONObject, id: String, tab: String = ""): List<Action> {
@@ -320,8 +368,8 @@ object FollowRequests {
         val kind = WalletWithdraw.commissionKind(commissionKey(item))
         if (kind == "paid" || kind == "success") return true
         if (!depositReady(item, tab)) return false
-        val stage = text(item, "pipeline_tab").ifBlank { tab }
-        return stage in DEAL_STAGES
+        return normalizeStage(stageOf(item).ifBlank { tab }) == "done" ||
+            normalizeStage(stageOf(item).ifBlank { tab }) == "deals"
     }
 
     private fun depositReady(item: JSONObject, tab: String): Boolean {
@@ -330,15 +378,67 @@ object FollowRequests {
         if (kind == "paid" || kind == "success") return true
         if (flag(item, "can_open_commission") || flag(item, "commission_credited")) return true
         if (flag(item, "can_confirm_deal") || flag(item, "can_close_deal")) return false
-        val stage = text(item, "pipeline_tab").ifBlank { tab }
-        if (stage !in DEAL_STAGES) return false
+        val stage = normalizeStage(stageOf(item).ifBlank { tab })
+        if (stage != "deals" && stage != "done") return false
         val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
         val awaiting = amount > 0L || kind == "pending" || kind == "approved"
         if (flag(item, "can_register_result") || flag(item, "can_reject_deal")) return awaiting
         return true
     }
 
-    private val DEAL_STAGES = setOf("deals", "deal", "done", "success", "closed", "sold", "completed")
+    private fun readTabs(array: JSONArray?): List<Tab> {
+        if (array == null) return emptyList()
+        val out = ArrayList<Tab>()
+        for (i in 0 until array.length()) {
+            when (val raw = array.opt(i)) {
+                is String -> {
+                    val id = raw.trim()
+                    if (id.isNotBlank() && !id.equals("null", true)) out.add(Tab(id, stageTitle(id)))
+                }
+                is JSONObject -> {
+                    val id = firstText(raw, "id", "key", "slug", "code")
+                    if (id.isBlank()) continue
+                    val title = firstText(raw, "title", "label", "name").ifBlank { stageTitle(id) }
+                    out.add(Tab(id, title, countOf(raw)))
+                }
+            }
+        }
+        return out
+    }
+
+    private fun stageOf(item: JSONObject): String =
+        firstText(item, "pipeline_tab", "stage", "bucket")
+
+    private fun normalizeStage(raw: String): String = when (raw.trim()) {
+        "request", "requests", "inbox", "درخواست", "درخواست‌ها" -> "requests"
+        "visit", "visits", "بازدید", "بازدیدها" -> "visits"
+        "deal", "deals", "معامله", "معاملات" -> "deals"
+        "done", "success", "closed", "sold", "completed", "موفق", "موفق‌ها" -> "done"
+        else -> raw.trim()
+    }
+
+    private fun stageRank(tab: String): Int = when (normalizeStage(tab)) {
+        "requests" -> 1
+        "visits" -> 2
+        "deals" -> 3
+        "done" -> 4
+        else -> 0
+    }
+
+    private fun stageOrder(tab: String): Int = stageRank(tab).let { if (it == 0) 50 else it }
+
+    private fun stageTitle(id: String): String = when (normalizeStage(id)) {
+        "requests" -> "درخواست"
+        "visits" -> "بازدید"
+        "deals" -> "معامله"
+        "done" -> "موفق"
+        else -> id
+    }
+
+    private fun countOf(obj: JSONObject): Int =
+        WalletWithdraw.money(obj, "count", "total", "badge", "items_count")
+            .coerceIn(0L, Int.MAX_VALUE.toLong())
+            .toInt()
 
     private fun groupedOf(payload: JSONObject): JSONObject? =
         payload.optJSONObject("items_by_tab")
@@ -362,8 +462,16 @@ object FollowRequests {
     }
 
     private fun idOf(obj: JSONObject): String {
-        if (!obj.has("id") || obj.isNull("id")) return ""
-        val raw = obj.opt("id") ?: return ""
+        for (key in listOf("id", "request_id", "follow_id")) {
+            val id = rawId(obj, key)
+            if (id.isNotBlank()) return id
+        }
+        return ""
+    }
+
+    private fun rawId(obj: JSONObject, key: String): String {
+        if (!obj.has(key) || obj.isNull(key)) return ""
+        val raw = obj.opt(key) ?: return ""
         val text = when (raw) {
             is Number -> {
                 val whole = raw.toLong()
@@ -372,6 +480,14 @@ object FollowRequests {
             else -> raw.toString()
         }.trim()
         return if (text.isBlank() || text.equals("null", true)) "" else text
+    }
+
+    private fun firstText(obj: JSONObject, vararg keys: String): String {
+        for (key in keys) {
+            val value = text(obj, key)
+            if (value.isNotBlank()) return value
+        }
+        return ""
     }
 
     private fun text(obj: JSONObject, key: String): String {

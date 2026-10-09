@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -46,6 +47,8 @@ class NativePartnerFragment : Fragment() {
     private var pendingFollowId = ""
     private var pendingFollowPath = ""
     private var pendingFollowBody = JSONObject()
+    private var followEpoch = 0
+    private var followReload = false
     private var lastPayload = JSONObject()
     private var searchQuery = ""
     private var followBusy = false
@@ -78,7 +81,10 @@ class NativePartnerFragment : Fragment() {
         }
         binding.nativeRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.nativeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
-        binding.nativeRefresh.setOnRefreshListener { load(forceNet = true) }
+        binding.nativeRefresh.setOnRefreshListener {
+            if (page == PAGE_REQUESTS) followEpoch++
+            load(forceNet = true)
+        }
         binding.nativeApplySubmit.setOnClickListener { submitApply() }
         binding.nativeInviteCopy.setOnClickListener { copyInvite() }
         binding.nativeInviteShare.setOnClickListener { shareInvite() }
@@ -127,15 +133,20 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun loadJson(forceNet: Boolean) {
-        val ctx = context ?: return
+        val epoch = followEpoch
+        val ctx = context ?: run {
+            finishFollowReload(epoch)
+            return
+        }
         val path = dataPath(page) ?: return bindEmpty("صفحه پیدا نشد.")
         scope.launch {
             if (!forceNet) {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
+                if (!followCurrent(epoch)) return@launch
                 if (_binding != null && cached != null) bindPayload(cached)
                 else if (_binding != null) binding.nativeProgress.isVisible = true
                 if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) {
-                    if (_binding != null) {
+                    if (_binding != null && followCurrent(epoch)) {
                         binding.nativeProgress.isVisible = false
                         binding.nativeRefresh.isRefreshing = false
                     }
@@ -144,7 +155,7 @@ class NativePartnerFragment : Fragment() {
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
-                if (_binding == null) return@launch
+                if (_binding == null || !followCurrent(epoch)) return@launch
                 val code = fresh.optInt("http_status")
                 val followUnauthorized = page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh)
                 if (code == 401 || fresh.optString("error") == "unauthorized" || followUnauthorized) {
@@ -162,7 +173,7 @@ class NativePartnerFragment : Fragment() {
                 }
                 bindPayload(fresh)
             } catch (e: Exception) {
-                if (_binding == null) return@launch
+                if (_binding == null || !followCurrent(epoch)) return@launch
                 val showing = binding.nativeList.childCount > 0 || binding.nativeInviteBox.isVisible
                 if (showing) {
                     Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
@@ -170,12 +181,21 @@ class NativePartnerFragment : Fragment() {
                     bindEmpty(e.message ?: "خطای شبکه")
                 }
             } finally {
-                if (_binding != null) {
+                if (_binding != null && followCurrent(epoch)) {
                     binding.nativeProgress.isVisible = false
                     binding.nativeRefresh.isRefreshing = false
                 }
+                finishFollowReload(epoch)
             }
         }
+    }
+
+    private fun followCurrent(epoch: Int): Boolean = page != PAGE_REQUESTS || epoch == followEpoch
+
+    private fun finishFollowReload(epoch: Int) {
+        if (page != PAGE_REQUESTS || epoch != followEpoch || !followReload) return
+        followReload = false
+        if (_binding != null) setFollowBusy(false) else followBusy = false
     }
 
     private fun loadFavorites() {
@@ -396,7 +416,7 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
-        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"))
+        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"), obj)
         activeTab = if (pendingFollowId.isNotBlank()) {
             val located = FollowRequests.locateTab(obj, pendingFollowId, tabs)
             val hint = FollowRequests.stageHint(pendingFollowPath, pendingFollowBody, tabs)
@@ -417,7 +437,11 @@ class NativePartnerFragment : Fragment() {
         for (tab in tabs) {
             val on = tab.id == activeTab
             val chip = TextView(requireContext()).apply {
-                text = tab.title
+                text = if (tab.count > 0) {
+                    "${tab.title} ${PartnerFormat.toman(tab.count.toLong())}"
+                } else {
+                    tab.title
+                }
                 textSize = 14f
                 gravity = android.view.Gravity.CENTER
                 minHeight = dp(36)
@@ -434,6 +458,13 @@ class NativePartnerFragment : Fragment() {
                     activeTab = tab.id
                     bindRequestTabs(tabs)
                     renderRequestItems(lastPayload, activeTab)
+                }
+                if (on) {
+                    post {
+                        val scroller = binding.nativeTabsScroll
+                        val target = (left + width / 2 - scroller.width / 2).coerceAtLeast(0)
+                        scroller.smoothScrollTo(target, 0)
+                    }
                 }
             }
             val lp = LinearLayout.LayoutParams(
@@ -537,18 +568,39 @@ class NativePartnerFragment : Fragment() {
         val card = ItemNativeRequestBinding.inflate(layoutInflater, binding.nativeList, false)
         card.requestCardStatus.isVisible = item.status.isNotBlank()
         card.requestCardStatus.text = item.status
+        card.requestCardStatus.setTextColor(
+            ContextCompat.getColor(
+                requireContext(),
+                when (FollowRequests.statusMark(item.status)) {
+                    FollowRequests.Mark.GOOD -> R.color.vinor_accent_green
+                    FollowRequests.Mark.BAD -> R.color.vinor_error
+                    FollowRequests.Mark.NEUTRAL -> R.color.vinor_text_muted
+                },
+            ),
+        )
         card.requestCardTitle.text = item.title
         val titleLp = card.requestCardTitle.layoutParams as ViewGroup.MarginLayoutParams
         titleLp.topMargin = if (item.status.isNotBlank()) dp(8) else 0
         card.requestCardTitle.layoutParams = titleLp
-        val showPerson = item.customer.isNotBlank() || item.whenText.isNotBlank()
+        val meta = listOf(item.whenText, item.phone).filter { it.isNotBlank() }.joinToString(" · ")
+        val showPerson = item.customer.isNotBlank() || meta.isNotBlank()
         card.requestCardPerson.isVisible = showPerson
         card.requestCardAvatar.isVisible = item.customer.isNotBlank()
         card.requestCardAvatar.text = item.customer.trim().firstOrNull()?.toString().orEmpty()
         card.requestCardCustomer.isVisible = item.customer.isNotBlank()
         card.requestCardCustomer.text = item.customer
-        card.requestCardWhen.isVisible = item.whenText.isNotBlank()
-        card.requestCardWhen.text = item.whenText
+        card.requestCardWhen.isVisible = meta.isNotBlank()
+        card.requestCardWhen.text = meta
+        val dial = PartnerApi.asciiDigits(item.phone)
+        if (dial.length >= 8) {
+            card.requestCardPerson.isClickable = true
+            card.requestCardPerson.isFocusable = true
+            card.requestCardPerson.setOnClickListener {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dial")))
+                }
+            }
+        }
         card.requestCardCommission.isVisible = item.commission.isNotBlank()
         card.requestCardCommission.text = item.commission
         card.requestCardPersonBody.updateLayoutParams<LinearLayout.LayoutParams> {
@@ -660,7 +712,7 @@ class NativePartnerFragment : Fragment() {
                     return@launch
                 }
                 if (FollowRequests.isOk(resp)) {
-                    Toast.makeText(ctx, FollowRequests.doneMessage(path, resp), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, FollowRequests.doneMessage(path, resp, body), Toast.LENGTH_SHORT).show()
                     PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
                     if (FollowRequests.refreshesWallet(path)) {
                         FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
@@ -673,6 +725,8 @@ class NativePartnerFragment : Fragment() {
                     }
                     binding.nativeList.removeAllViews()
                     binding.nativeRefresh.isRefreshing = true
+                    followReload = true
+                    followEpoch++
                     load(forceNet = true)
                 } else {
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
@@ -680,7 +734,9 @@ class NativePartnerFragment : Fragment() {
             } catch (e: Exception) {
                 if (_binding != null) Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
             } finally {
-                if (_binding != null) setFollowBusy(false) else followBusy = false
+                if (!followReload) {
+                    if (_binding != null) setFollowBusy(false) else followBusy = false
+                }
             }
         }
     }

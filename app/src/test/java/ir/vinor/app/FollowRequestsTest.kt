@@ -214,6 +214,72 @@ class FollowRequestsTest {
     }
 
     @Test
+    fun everyStageStaysReachableWhenTheServerOmitsTabTitles() {
+        val payload = JSONObject().put(
+            "items_by_tab",
+            JSONObject()
+                .put("requests", JSONArray().put(JSONObject().put("id", 1)))
+                .put("visits", JSONArray().put(JSONObject().put("id", 2)).put(JSONObject().put("id", 3))),
+        )
+        val derived = FollowRequests.tabs(null, payload)
+        assertEquals(listOf("requests", "visits"), derived.map { it.id })
+        assertEquals("درخواست", derived[0].title)
+        assertEquals("بازدید", derived[1].title)
+        assertEquals(2, derived[1].count)
+        val named = FollowRequests.tabs(
+            JSONArray().put(JSONObject().put("key", "deals").put("label", "معامله").put("count", 4)),
+        )
+        assertEquals("deals", named.single().id)
+        assertEquals("معامله", named.single().title)
+        assertEquals(4, named.single().count)
+        val inbox = JSONObject().put(
+            "inbox_items",
+            JSONArray().put(
+                JSONObject()
+                    .put("request_id", 9)
+                    .put("stage", "بازدید")
+                    .put("customer", "سارا")
+                    .put("customer_phone", "۰۹۱۲۱۲۳۴۵۶۷")
+                    .put("property_code", "B2")
+                    .put("visit_when", "پنجشنبه"),
+            ),
+        )
+        val card = FollowRequests.card(FollowRequests.items(inbox, "visit").single())
+        assertEquals("9", card.id)
+        assertEquals("سارا", card.customer)
+        assertEquals("پنجشنبه", card.whenText)
+        assertEquals("۰۹۱۲۱۲۳۴۵۶۷", card.phone)
+        assertEquals("B2", card.landCode)
+        val both = JSONObject().put(
+            "items_by_tab",
+            JSONObject()
+                .put("requests", JSONArray().put(JSONObject().put("id", 4)))
+                .put("deals", JSONArray().put(JSONObject().put("id", 4))),
+        )
+        val tabs = FollowRequests.tabs(
+            JSONArray()
+                .put(JSONObject().put("id", "requests").put("title", "درخواست"))
+                .put(JSONObject().put("id", "deals").put("title", "معامله")),
+        )
+        assertEquals("deals", FollowRequests.locateTab(both, "4", tabs))
+        assertEquals(FollowRequests.Mark.NEUTRAL, FollowRequests.statusMark("بازدید"))
+        assertEquals(FollowRequests.Mark.GOOD, FollowRequests.statusMark("معامله موفق"))
+        assertEquals(FollowRequests.Mark.BAD, FollowRequests.statusMark("بی‌علاقه"))
+        val visit = "/express/partner/requests/9/visit-result"
+        assertEquals(
+            "علاقه‌مندی ثبت شد.",
+            FollowRequests.doneMessage(visit, JSONObject(), JSONObject().put("outcome", "interested")),
+        )
+        assertEquals(
+            "پیگیری ثبت شد.",
+            FollowRequests.doneMessage(visit, JSONObject(), JSONObject().put("outcome", "follow_up")),
+        )
+        assertEquals("بازدید انجام شد.", FollowRequests.doneMessage("/express/partner/requests/9/complete", JSONObject()))
+        assertEquals("عدم حضور ثبت شد.", FollowRequests.doneMessage("/express/partner/requests/9/no-show", JSONObject()))
+        assertEquals("معامله رد شد.", FollowRequests.doneMessage("/express/partner/requests/9/deal-reject", JSONObject()))
+    }
+
+    @Test
     fun silentDealResponsesUseStageCopy() {
         val confirm = "/express/partner/requests/8/deal-confirm"
         val close = "/express/partner/requests/8/deal-close"
