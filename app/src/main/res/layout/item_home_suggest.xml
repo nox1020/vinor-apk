@@ -7,6 +7,7 @@
     android:background="@drawable/bg_flat_outline_card"
     android:clickable="true"
     android:focusable="true"
+    android:baselineAligned="false"
     android:layoutDirection="rtl"
     android:minHeight="112dp"
     android:orientation="horizontal">
@@ -126,8 +127,9 @@
 
     <FrameLayout
         android:layout_width="104dp"
-        android:layout_height="112dp"
-        android:layout_gravity="center_vertical">
+        android:layout_height="match_parent"
+        android:layout_gravity="fill_vertical"
+        android:minHeight="112dp">
 
         <ImageView
             android:id="@+id/suggestImage"

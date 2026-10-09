@@ -1026,7 +1026,7 @@ class DashboardFragment : Fragment() {
             val ad = files.optJSONObject(i) ?: continue
             val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
             card.suggestTitle.text = HomeSuggest.displayTitle(ad)
-            val spec = HomeSuggest.specLine(ad)
+            val spec = HomeSuggest.cardSpec(ad)
             card.suggestSpec.isVisible = spec.isNotBlank()
             card.suggestSpec.text = spec
             val price = HomeSuggest.priceLine(ad)
@@ -1047,7 +1047,15 @@ class DashboardFragment : Fragment() {
             card.root.setOnClickListener { openSuggest(ad) }
         }
         binding.dashboardSuggestScroll.post {
-            if (_binding != null) binding.dashboardSuggestScroll.scrollTo(0, 0)
+            val scroll = _binding?.dashboardSuggestScroll ?: return@post
+            val child = scroll.getChildAt(0) ?: return@post
+            val viewport = scroll.width - scroll.paddingLeft - scroll.paddingRight
+            val x = HomeSuggest.startScrollX(
+                child.width,
+                viewport,
+                scroll.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
+            )
+            scroll.scrollTo(x, 0)
         }
     }
 

@@ -106,17 +106,32 @@ object HomeSuggest {
     }
 
     /**
-     * برچسب روی عکس. فیلد واقعی یا «جدید» برای آگهی چندساعت اخیر؛
-     * وگرنه «پیشنهادی» چون کارت داخل همین ردیف است، نه ویژگی ساختگی ملک.
+     * برچسب روی عکس کوچک. فیلد واقعی یا «جدید» برای آگهی چندساعت اخیر.
+     * «پیشنهادی» تکرار عنوان ردیف است و روی بندانگشتی جا نمی‌شود.
      */
     fun badge(ad: JSONObject): String {
-        listOf("badge", "tag", "ribbon", "label", "listed_label").forEach { key ->
+        listOf("badge", "tag", "ribbon", "listed_label").forEach { key ->
             val value = ad.optString(key).trim()
-            if (value.isNotEmpty() && value != "null") return value
+            if (value.isNotEmpty() && value != "null" && value != "پیشنهادی") return value
         }
         val location = ad.optString("location")
         if (recentRe.containsMatchIn(location)) return "جدید"
-        return "پیشنهادی"
+        return ""
+    }
+
+    /** ویژگی کارت، بدون تکرار متراژی که عنوان از قبل می‌گوید. */
+    fun cardSpec(ad: JSONObject): String {
+        val spec = specLine(ad)
+        if (meters(ad) <= 0L) return spec
+        val feature = spec.substringBefore(" | ").trim()
+        if (feature.contains("م²") || feature.contains("متر")) return ""
+        return feature
+    }
+
+    /** در RTL نقطهٔ صفر، ته ردیف است. شروع یعنی اولین کارت سمت راست. */
+    fun startScrollX(contentWidth: Int, viewportWidth: Int, rtl: Boolean): Int {
+        val range = (contentWidth - viewportWidth).coerceAtLeast(0)
+        return if (rtl) range else 0
     }
 
     /** new = مرجانی، gold = ویژه، green = بقیه. */

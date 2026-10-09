@@ -54,8 +54,9 @@ class HomeSuggestTest {
         assertEquals("زمین ۲۰۰ متری به بالا", HomeSuggest.displayTitle(titled))
         assertEquals("آب و برق | ۲۰۰ م²", HomeSuggest.specLine(titled))
         assertEquals("دماوند - گرمابسرد", HomeSuggest.locationLine(titled))
-        assertEquals("پیشنهادی", HomeSuggest.badge(titled))
-        assertEquals("green", HomeSuggest.badgeTone(HomeSuggest.badge(titled)))
+        assertEquals("", HomeSuggest.badge(titled))
+        assertEquals("آب و برق", HomeSuggest.cardSpec(titled))
+        assertEquals("green", HomeSuggest.badgeTone("پیشنهادی"))
 
         val facts = JSONObject()
             .put("title", "فایل")
@@ -64,6 +65,8 @@ class HomeSuggestTest {
             .put("listed_label", "ویژه")
         assertEquals("زمین ۵۰۰ متری", HomeSuggest.displayTitle(facts))
         assertEquals("کاربری مسکونی | ۵۰۰ م²", HomeSuggest.specLine(facts))
+        assertEquals("کاربری مسکونی", HomeSuggest.cardSpec(facts))
+        assertEquals("", HomeSuggest.cardSpec(JSONObject().put("title", "زمین ۵۰۰ متری")))
         assertEquals("ویژه", HomeSuggest.badge(facts))
         assertEquals("gold", HomeSuggest.badgeTone("ویژه"))
         assertEquals(0, HomeSuggest.commissionPercent(JSONObject().put("price_toman", 100)))
@@ -137,6 +140,13 @@ class HomeSuggestTest {
             "خانه ۱۲۰ متری",
             HomeSuggest.displayTitle(JSONObject().put("title", "خانه ۱۲۰ متری دماوند")),
         )
+    }
+
+    @Test
+    fun startScroll_keepsFirstCardAtTheRtlEdge() {
+        assertEquals(400, HomeSuggest.startScrollX(700, 300, rtl = true))
+        assertEquals(0, HomeSuggest.startScrollX(700, 300, rtl = false))
+        assertEquals(0, HomeSuggest.startScrollX(200, 300, rtl = true))
     }
 
     @Test
