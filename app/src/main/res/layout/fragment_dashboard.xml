@@ -582,6 +582,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:clipToPadding="false"
+                            android:layoutDirection="rtl"
                             android:overScrollMode="never"
                             android:paddingHorizontal="16dp"
                             android:paddingBottom="4dp"
@@ -591,6 +592,7 @@
                                 android:id="@+id/dashboardSuggest"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layoutDirection="rtl"
                                 android:orientation="horizontal" />
                         </HorizontalScrollView>
                     </LinearLayout>

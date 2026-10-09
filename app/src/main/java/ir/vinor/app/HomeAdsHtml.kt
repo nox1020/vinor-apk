@@ -52,7 +52,7 @@ object HomeAdsHtml {
                     .put("token", land.ifBlank { divar })
                     .put("source", source)
                     .put("url", href)
-                    .put("commission_amount", commission(block)),
+                    .also { putCommission(it, inner(block, "vn-home-divar__comm")) },
             )
         }
         return out
@@ -75,9 +75,12 @@ object HomeAdsHtml {
         return re.find(block)?.groupValues?.get(1).orEmpty()
     }
 
-    private fun commission(block: String): Int {
-        val raw = inner(block, "vn-home-divar__comm")
-        return if (raw.isBlank()) 0 else digits(raw)
+    private fun putCommission(obj: JSONObject, raw: String) {
+        if (raw.isBlank()) return
+        val amount = digitsLong(raw)
+        if (amount <= 0L) return
+        if (raw.contains('٪') || raw.contains('%')) obj.put("commission_pct", amount)
+        else obj.put("commission_amount", amount)
     }
 
     private fun shots(block: String): Int {
@@ -88,7 +91,9 @@ object HomeAdsHtml {
         return digits(span)
     }
 
-    private fun digits(raw: String): Int {
+    private fun digits(raw: String): Int = digitsLong(raw).toInt()
+
+    private fun digitsLong(raw: String): Long {
         val mapped = buildString {
             raw.forEach { c ->
                 when (c) {
@@ -97,7 +102,7 @@ object HomeAdsHtml {
                 }
             }
         }
-        return mapped.toIntOrNull() ?: 0
+        return mapped.toLongOrNull() ?: 0L
     }
 
     private fun unescape(value: String): String =

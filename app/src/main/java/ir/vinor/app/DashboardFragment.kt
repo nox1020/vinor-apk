@@ -1017,7 +1017,7 @@ class DashboardFragment : Fragment() {
             binding.dashboardSuggest.removeAllViews()
             return
         }
-        val key = files.length().toString() + ":" + files.optJSONObject(0)?.optString("token").orEmpty()
+        val key = HomeSuggest.fingerprint(files)
         if (key == suggestKey && binding.dashboardSuggest.childCount > 0) return
         suggestKey = key
         binding.dashboardSuggest.removeAllViews()
@@ -1041,7 +1041,13 @@ class DashboardFragment : Fragment() {
             card.suggestCommission.text = commission
             PartnerImages.roundClip(card.root, 16f)
             PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
+            card.root.contentDescription = HomeSuggest.displayTitle(ad)
+            val url = ad.optString("url").trim().let { if (it.isBlank() || it == "null") "" else it }
+            card.root.isClickable = HomeSuggest.landCode(ad).isNotBlank() || url.isNotBlank()
             card.root.setOnClickListener { openSuggest(ad) }
+        }
+        binding.dashboardSuggestScroll.post {
+            if (_binding != null) binding.dashboardSuggestScroll.scrollTo(0, 0)
         }
     }
 

@@ -8,9 +8,26 @@ object HomeSuggest {
     const val LIMIT = 12
 
     fun files(home: JSONObject): JSONArray {
-        val suggested = home.optJSONArray("suggested_files")
-        if (suggested != null && suggested.length() > 0) return suggested
-        return home.optJSONArray("divar_pro_ads") ?: JSONArray()
+        val suggested = usable(home.optJSONArray("suggested_files"))
+        if (suggested.length() > 0) return suggested
+        return usable(home.optJSONArray("divar_pro_ads"))
+    }
+
+    fun fingerprint(files: JSONArray): String {
+        val parts = ArrayList<String>(files.length())
+        for (i in 0 until files.length()) {
+            val ad = files.optJSONObject(i) ?: continue
+            parts += listOf(
+                landCode(ad),
+                displayTitle(ad),
+                priceLine(ad),
+                specLine(ad),
+                commissionLabel(ad),
+                imageUrl(ad),
+                badge(ad),
+            ).joinToString("|")
+        }
+        return parts.joinToString("\n")
     }
 
     fun title(ad: JSONObject): String {
@@ -36,8 +53,13 @@ object HomeSuggest {
 
     fun priceLine(ad: JSONObject): String {
         val price = ad.optString("price").trim()
-        if (price.isNotEmpty() && price != "null") return price
-        val toman = longField(ad, "price_toman")
+        if (price.isNotEmpty() && price != "null") {
+            if ("تومان" in price || "توافقی" in price) return price
+            val parsed = SearchAds.parseToman(price)
+            if (parsed != null && parsed > 0L) return PartnerFormat.toman(parsed) + " تومان"
+            return price
+        }
+        val toman = priceToman(ad)
         if (toman > 0L) return PartnerFormat.toman(toman) + " تومان"
         return ""
     }
@@ -68,7 +90,9 @@ object HomeSuggest {
 
     /** درصد پورسانت از `commission_amount / price_toman`، نه عدد ثابت. */
     fun commissionPercent(ad: JSONObject): Int {
-        val price = longField(ad, "price_toman")
+        val explicit = percentField(ad, "commission_pct", "express_commission_pct")
+        if (explicit in 1..100) return explicit
+        val price = priceToman(ad)
         val commission = longField(ad, "commission_amount")
         if (price <= 0L || commission <= 0L) return 0
         val pct = (commission * 100 + price / 2) / price
@@ -105,11 +129,9 @@ object HomeSuggest {
     fun imageUrl(ad: JSONObject): String = PartnerImages.coverUrl(ad)
 
     fun landCode(ad: JSONObject): String {
-        val token = ad.optString("token").trim()
-        if (token.isEmpty() || token == "null") return ""
-        val source = ad.optString("source").trim()
-        val url = ad.optString("url")
-        return if (source == "divar" || url.contains("/divar/")) "divar:$token" else token
+        val parsed = SearchAds.fromObjects(JSONArray().put(ad))
+        if (parsed.isEmpty()) return ""
+        return SearchAds.openCode(parsed[0])
     }
 
     private fun meters(ad: JSONObject): Long {
@@ -130,8 +152,11 @@ object HomeSuggest {
     private fun kindOf(title: String): String {
         val text = title.replace("\u200c", "")
         val land = text.contains("زمین")
-        if (Regex("""باغ(?!چه)""").containsMatchIn(text) && !land) return "باغ"
-        if (text.contains("ویلا") && !land) return "ویلا"
+        if (land) return "زمین"
+        if (Regex("""باغ(?!چه)""").containsMatchIn(text)) return "باغ"
+        if (text.contains("ویلا")) return "ویلا"
+        if (text.contains("آپارتمان")) return "آپارتمان"
+        if (text.contains("خانه")) return "خانه"
         return "زمین"
     }
 
@@ -209,6 +234,51 @@ object HomeSuggest {
         if (letters in placeSkip || token in placeSkip) return false
         if (token.contains("متر")) return false
         return true
+    }
+
+    private fun usable(source: JSONArray?): JSONArray {
+        val out = JSONArray()
+        if (source == null) return out
+        val seen = LinkedHashSet<String>()
+        for (i in 0 until source.length()) {
+            if (out.length() >= LIMIT) break
+            val ad = source.optJSONObject(i) ?: continue
+            if (SearchAds.fromObjects(JSONArray().put(ad)).isEmpty()) continue
+            val key = dedupeKey(ad)
+            if (!seen.add(key)) continue
+            out.put(ad)
+        }
+        return out
+    }
+
+    private fun dedupeKey(ad: JSONObject): String {
+        val code = landCode(ad)
+        if (code.isNotBlank()) return code
+        return listOf(title(ad), priceLine(ad), locationLine(ad), imageUrl(ad)).joinToString("|")
+    }
+
+    private fun priceToman(ad: JSONObject): Long {
+        val direct = longField(ad, "price_toman")
+        if (direct > 0L) return direct
+        val total = longField(ad, "price_total")
+        if (total > 0L) return total
+        return SearchAds.parseToman(ad.optString("price")) ?: 0L
+    }
+
+    private fun percentField(ad: JSONObject, vararg keys: String): Int {
+        for (key in keys) {
+            if (!ad.has(key) || ad.isNull(key)) continue
+            val value = when (val raw = ad.opt(key)) {
+                is Number -> raw.toDouble()
+                is String -> {
+                    val latin = SearchQuery.normalizeDigits(raw).replace('٫', '.').replace(',', '.')
+                    Regex("""\d+(?:\.\d+)?""").find(latin)?.value?.toDoubleOrNull()
+                }
+                else -> null
+            } ?: continue
+            if (value in 1.0..100.0) return (value + 0.5).toInt().coerceIn(1, 100)
+        }
+        return 0
     }
 
     private fun longField(ad: JSONObject, key: String): Long {

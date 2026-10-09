@@ -8,7 +8,8 @@
     android:clickable="true"
     android:focusable="true"
     android:layoutDirection="rtl"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:paddingBottom="10dp">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -116,7 +117,6 @@
         android:orientation="horizontal"
         android:paddingHorizontal="10dp"
         android:paddingTop="6dp"
-        android:paddingBottom="10dp"
         android:visibility="gone">
 
         <TextView
