@@ -101,6 +101,19 @@ object VinorApiCacheStore {
         return runCatching { JSONObject(String(hit.first, Charsets.UTF_8)) }.getOrNull()
     }
 
+    /** آخرین پاسخ نمایشی را دور می‌ریزد تا موجودی و پورسانت بعد از معامله کهنه نماند. */
+    fun forget(context: Context, url: String) {
+        val raw = url.trim()
+        if (raw.isEmpty() || !VinorCachePolicy.isSafeGetApi(raw)) return
+        val normalized = VinorCachePolicy.normalizeUrl(raw)
+        val session = VinorCacheSession.scopeForRead(context)
+        synchronized(memLock) { mem.remove(sessionMemoryKey(session, normalized)) }
+        val dir = directory(context, session)
+        val id = key(raw)
+        VinorCacheIo.deleteQuiet(File(dir, "$id.bin"))
+        VinorCacheIo.deleteQuiet(File(dir, "$id.json"))
+    }
+
     fun isFresh(context: Context, url: String?): Boolean {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return false

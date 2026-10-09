@@ -43,6 +43,9 @@ class NativePartnerFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var activeTab = ""
+    private var pendingFollowId = ""
+    private var pendingFollowPath = ""
+    private var pendingFollowBody = JSONObject()
     private var lastPayload = JSONObject()
     private var searchQuery = ""
     private var followBusy = false
@@ -394,7 +397,16 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindRequests(obj: JSONObject) {
         val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"))
-        activeTab = FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
+        activeTab = if (pendingFollowId.isNotBlank()) {
+            val located = FollowRequests.locateTab(obj, pendingFollowId, tabs)
+            val hint = FollowRequests.stageHint(pendingFollowPath, pendingFollowBody, tabs)
+            pendingFollowId = ""
+            pendingFollowPath = ""
+            pendingFollowBody = JSONObject()
+            FollowRequests.focusAfterAction(obj.optString("active_tab"), located, hint, tabs)
+        } else {
+            FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
+        }
         bindRequestTabs(tabs)
         renderRequestItems(obj, activeTab)
     }
@@ -649,9 +661,16 @@ class NativePartnerFragment : Fragment() {
                 }
                 if (FollowRequests.isOk(resp)) {
                     Toast.makeText(ctx, FollowRequests.doneMessage(path, resp), Toast.LENGTH_SHORT).show()
-                    // نتیجهٔ بازدید یا معامله ممکن است کارت را به تب بعدی منتقل کند.
-                    // انتخاب پیشنهادی سرور را در بارگذاری بعدی بپذیر.
-                    activeTab = ""
+                    PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
+                    if (FollowRequests.refreshesWallet(path)) {
+                        FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
+                    }
+                    if (FollowRequests.movesCard(path, body)) {
+                        pendingFollowId = FollowRequests.requestIdFromPath(path)
+                        pendingFollowPath = path
+                        pendingFollowBody = JSONObject(body.toString())
+                        activeTab = ""
+                    }
                     binding.nativeList.removeAllViews()
                     binding.nativeRefresh.isRefreshing = true
                     load(forceNet = true)

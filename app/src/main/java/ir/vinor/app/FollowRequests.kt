@@ -48,16 +48,81 @@ object FollowRequests {
 
     fun activeId(current: String, suggested: String, tabs: List<Tab>): String {
         val known = tabs.map { it.id }.toSet()
-        fun keep(id: String): Boolean = id.isNotBlank() && (known.isEmpty() || id in known)
-        if (keep(current)) return current
-        if (keep(suggested)) return suggested
+        if (keepTab(current, known)) return current
+        if (keepTab(suggested, known)) return suggested
         return tabs.firstOrNull()?.id ?: "requests"
     }
 
+    /** بعد از ثبت مرحله: تبِ خود کارت، بعد تب سرور، بعد حدس مرحله. */
+    fun focusAfterAction(serverTab: String, located: String, hint: String, tabs: List<Tab>): String {
+        val known = tabs.map { it.id }.toSet()
+        if (keepTab(located, known)) return located
+        if (keepTab(serverTab, known)) return serverTab
+        if (keepTab(hint, known)) return hint
+        return tabs.firstOrNull()?.id ?: "requests"
+    }
+
+    fun requestIdFromPath(path: String): String {
+        val parts = path.substringBefore('?').trim().trim('/').split('/')
+        val index = parts.indexOfLast { it == "requests" }
+        if (index < 0 || index + 1 >= parts.size) return ""
+        val id = parts[index + 1].trim()
+        return if (id.isBlank() || id.equals("data", true)) "" else id
+    }
+
+    /** حذف، رد، عدم حضور و بی‌علاقگی کارت را به تب بعدی نمی‌برند. */
+    fun movesCard(path: String, body: JSONObject): Boolean {
+        val bare = path.substringBefore('?')
+        if (!bare.contains("/requests/")) return false
+        if (bare.endsWith("/remove") || bare.endsWith("/deal-reject") || bare.endsWith("/no-show")) return false
+        if (bare.endsWith("/visit-result")) {
+            val outcome = body.optString("outcome").trim()
+            return outcome == "interested" || outcome == "follow_up"
+        }
+        return bare.endsWith("/complete") ||
+            bare.endsWith("/revisit") ||
+            bare.endsWith("/deal-confirm") ||
+            bare.endsWith("/deal-close")
+    }
+
+    fun stageHint(path: String, body: JSONObject, tabs: List<Tab>): String {
+        val known = tabs.map { it.id }
+        fun pick(vararg ids: String): String = ids.firstOrNull { known.isEmpty() || it in known }.orEmpty()
+        val bare = path.substringBefore('?')
+        val outcome = body.optString("outcome").trim()
+        return when {
+            bare.endsWith("/deal-confirm") || bare.endsWith("/deal-close") -> pick("deals", "deal")
+            bare.endsWith("/visit-result") && outcome == "interested" -> pick("deals", "deal")
+            bare.endsWith("/visit-result") && outcome == "follow_up" -> pick("visits", "visit")
+            bare.endsWith("/complete") || bare.endsWith("/revisit") -> pick("visits", "visit")
+            else -> ""
+        }
+    }
+
+    fun locateTab(payload: JSONObject, id: String, tabs: List<Tab>): String {
+        if (id.isBlank()) return ""
+        val names = LinkedHashSet<String>()
+        if (tabs.isNotEmpty()) {
+            tabs.forEach { if (it.id.isNotBlank()) names.add(it.id) }
+        } else {
+            groupedOf(payload)?.keys()?.forEach { names.add(it) }
+            names.addAll(listOf("requests", "visits", "deals", "deal"))
+        }
+        for (tab in names) {
+            if (items(payload, tab).any { idOf(it) == id }) return tab
+        }
+        return ""
+    }
+
+    fun refreshesWallet(path: String): Boolean = path.substringBefore('?').endsWith("/deal-close")
+
+    fun walletRefreshPaths(): List<String> = listOf(
+        "/express/partner/commissions/data",
+        WalletWithdraw.HOME_DATA,
+    )
+
     fun items(payload: JSONObject, tab: String): List<JSONObject> {
-        val grouped = payload.optJSONObject("items_by_tab")
-            ?: payload.optJSONObject("pipeline")
-            ?: payload.optJSONObject("tabs_items")
+        val grouped = groupedOf(payload)
         val scoped = grouped?.optJSONArray(tab)
             ?: payload.optJSONArray(tab)
         val array = scoped
@@ -117,7 +182,6 @@ object FollowRequests {
             if (!flag(item, flag)) return
             all.add(Action(label, base + suffix, body, tone, confirm))
         }
-        add("can_complete", "انجام شد", "/complete", Tone.PRIMARY)
         add(
             "can_register_result",
             "علاقه‌مند",
@@ -125,6 +189,7 @@ object FollowRequests {
             Tone.PRIMARY,
             body = JSONObject().put("outcome", "interested"),
         )
+        add("can_complete", "انجام شد", "/complete", Tone.PRIMARY)
         add(
             "can_confirm_deal",
             "تأیید نهایی",
@@ -247,13 +312,27 @@ object FollowRequests {
 
     private fun depositReady(item: JSONObject, tab: String): Boolean {
         val key = text(item, "commission_status").ifBlank { text(item, "payout_status") }.lowercase()
+        if (key == "rejected") return false
         if (key in setOf("paid", "deposited", "credited", "settled")) return true
         if (flag(item, "can_open_commission") || flag(item, "commission_credited")) return true
         if (flag(item, "can_confirm_deal") || flag(item, "can_close_deal")) return false
         val stage = text(item, "pipeline_tab").ifBlank { tab }
         if (stage != "deals" && stage != "deal") return false
         val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
-        return amount > 0L || key in setOf("pending", "approved", "waiting", "processing")
+        val awaiting = amount > 0L || key in setOf("pending", "approved", "waiting", "processing")
+        if (flag(item, "can_register_result") || flag(item, "can_reject_deal")) return awaiting
+        return true
+    }
+
+    private fun groupedOf(payload: JSONObject): JSONObject? =
+        payload.optJSONObject("items_by_tab")
+            ?: payload.optJSONObject("pipeline")
+            ?: payload.optJSONObject("tabs_items")
+
+    private fun keepTab(id: String, known: Set<String>): Boolean {
+        val clean = id.trim()
+        if (clean.isBlank() || clean.equals("null", true)) return false
+        return known.isEmpty() || clean in known
     }
 
     private fun flag(obj: JSONObject, key: String): Boolean {

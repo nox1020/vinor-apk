@@ -176,6 +176,11 @@ object PartnerApi {
         return VinorApiCacheStore.isFresh(context.applicationContext, absoluteUrl(path))
     }
 
+    fun forget(path: String, context: Context?) {
+        if (context == null) return
+        VinorApiCacheStore.forget(context.applicationContext, absoluteUrl(path))
+    }
+
     fun remember(path: String, obj: JSONObject, context: Context?) {
         if (context == null || obj.optBoolean("from_cache")) return
         val code = obj.optInt("http_status", 200)

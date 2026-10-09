@@ -52,12 +52,13 @@ class FollowRequestsTest {
         assertEquals("مریم", card.customer)
         assertEquals("فردا ۱۰", card.whenText)
         assertEquals("A1", card.landCode)
-        assertEquals("انجام شد", card.actions.first().label)
+        assertEquals("علاقه‌مند", card.actions.first().label)
         assertEquals(FollowRequests.Tone.PRIMARY, card.actions.first().tone)
-        assertEquals("/express/partner/requests/15/complete", card.actions.first().path)
-        val interested = card.actions.first { it.label == "علاقه‌مند" }
-        assertEquals(FollowRequests.Tone.SECONDARY, interested.tone)
-        assertEquals("interested", interested.body.optString("outcome"))
+        assertEquals("/express/partner/requests/15/visit-result", card.actions.first().path)
+        assertEquals("interested", card.actions.first().body.optString("outcome"))
+        val done = card.actions.first { it.label == "انجام شد" }
+        assertEquals(FollowRequests.Tone.SECONDARY, done.tone)
+        assertEquals("/express/partner/requests/15/complete", done.path)
         val remove = card.actions.first { it.label == "حذف" }
         assertEquals(FollowRequests.Tone.DANGER, remove.tone)
         assertEquals("این مورد از پیگیری حذف شود؟", remove.confirm)
@@ -148,6 +149,52 @@ class FollowRequestsTest {
         assertEquals("پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز", card.commission)
         assertTrue(card.actions.none { it.opensWallet })
         assertEquals("انجام معامله", card.actions.first { it.path.endsWith("/deal-close") }.label)
+    }
+
+    @Test
+    fun finishedDealWithoutAmountStillOpensWallet() {
+        val card = FollowRequests.card(JSONObject().put("id", 8).put("pipeline_tab", "deals"), "deals")
+        val deposit = card.actions.single()
+        assertEquals("واریز پورسانت", deposit.label)
+        assertTrue(deposit.opensWallet)
+        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+        val rejected = FollowRequests.card(
+            JSONObject().put("id", 8).put("pipeline_tab", "deals").put("commission_status", "rejected"),
+            "deals",
+        )
+        assertTrue(rejected.actions.none { it.opensWallet })
+    }
+
+    @Test
+    fun stageChangeKeepsTheMovedCardInView() {
+        val tabs = FollowRequests.tabs(
+            JSONArray()
+                .put(JSONObject().put("id", "requests").put("title", "درخواست"))
+                .put(JSONObject().put("id", "visits").put("title", "بازدید"))
+                .put(JSONObject().put("id", "deals").put("title", "معامله")),
+        )
+        val interest = "/express/partner/requests/15/visit-result"
+        val interested = JSONObject().put("outcome", "interested")
+        assertTrue(FollowRequests.movesCard(interest, interested))
+        assertEquals("15", FollowRequests.requestIdFromPath(interest))
+        assertEquals("deals", FollowRequests.stageHint(interest, interested, tabs))
+        val payload = JSONObject().put(
+            "items_by_tab",
+            JSONObject().put("deals", JSONArray().put(JSONObject().put("id", 15).put("title", "معامله"))),
+        )
+        assertEquals("deals", FollowRequests.locateTab(payload, "15", tabs))
+        assertEquals("deals", FollowRequests.focusAfterAction("", "deals", "visits", tabs))
+        assertEquals("deals", FollowRequests.focusAfterAction("", "", "deals", tabs))
+        assertEquals("visits", FollowRequests.focusAfterAction("visits", "", "deals", tabs))
+        assertFalse(FollowRequests.movesCard(interest, JSONObject().put("outcome", "not_interested")))
+        assertFalse(FollowRequests.movesCard("/express/partner/requests/15/remove", JSONObject()))
+        assertFalse(FollowRequests.movesCard("/express/partner/requests/15/no-show", JSONObject()))
+        assertFalse(FollowRequests.movesCard("/express/partner/requests/15/deal-reject", JSONObject()))
+        assertEquals("visits", FollowRequests.stageHint("/express/partner/requests/15/complete", JSONObject(), tabs))
+        assertTrue(FollowRequests.refreshesWallet("/express/partner/requests/15/deal-close"))
+        assertFalse(FollowRequests.refreshesWallet("/express/partner/requests/15/deal-confirm"))
+        val singular = FollowRequests.tabs(JSONArray().put(JSONObject().put("id", "deal").put("title", "معامله")))
+        assertEquals("deal", FollowRequests.stageHint("/express/partner/requests/15/deal-close", JSONObject(), singular))
     }
 
     @Test
