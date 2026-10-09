@@ -127,6 +127,7 @@ class FollowRequestsTest {
             .put("commission_amount", 3_000_000_000L)
             .put("commission_status", "paid")
         val card = FollowRequests.card(item, "deals")
+        assertEquals("معامله موفق", card.status)
         assertEquals(
             "پورسانت ${PartnerFormat.toman(3_000_000_000L)} تومان · واریز شده",
             card.commission,
@@ -147,6 +148,7 @@ class FollowRequestsTest {
             .put("commission_status", "pending")
         val card = FollowRequests.card(item, "deals")
         assertEquals("پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز", card.commission)
+        assertEquals("", card.status)
         assertTrue(card.actions.none { it.opensWallet })
         assertEquals("انجام معامله", card.actions.first { it.path.endsWith("/deal-close") }.label)
     }
@@ -154,10 +156,18 @@ class FollowRequestsTest {
     @Test
     fun finishedDealWithoutAmountStillOpensWallet() {
         val card = FollowRequests.card(JSONObject().put("id", 8).put("pipeline_tab", "deals"), "deals")
+        assertEquals("معامله موفق", card.status)
         val deposit = card.actions.single()
         assertEquals("واریز پورسانت", deposit.label)
         assertTrue(deposit.opensWallet)
         assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+        val won = FollowRequests.card(
+            JSONObject().put("id", 3).put("deal_status", "success").put("pipeline_tab", "deals"),
+            "deals",
+        )
+        assertEquals("معامله موفق", won.status)
+        assertEquals("پورسانت · معامله موفق", won.commission)
+        assertTrue(won.actions.any { it.opensWallet })
         val rejected = FollowRequests.card(
             JSONObject().put("id", 8).put("pipeline_tab", "deals").put("commission_status", "rejected"),
             "deals",
@@ -195,6 +205,12 @@ class FollowRequestsTest {
         assertFalse(FollowRequests.refreshesWallet("/express/partner/requests/15/deal-confirm"))
         val singular = FollowRequests.tabs(JSONArray().put(JSONObject().put("id", "deal").put("title", "معامله")))
         assertEquals("deal", FollowRequests.stageHint("/express/partner/requests/15/deal-close", JSONObject(), singular))
+        val done = FollowRequests.tabs(
+            JSONArray()
+                .put(JSONObject().put("id", "deals").put("title", "معامله"))
+                .put(JSONObject().put("id", "done").put("title", "موفق")),
+        )
+        assertEquals("done", FollowRequests.stageHint("/express/partner/requests/15/deal-close", JSONObject(), done))
     }
 
     @Test

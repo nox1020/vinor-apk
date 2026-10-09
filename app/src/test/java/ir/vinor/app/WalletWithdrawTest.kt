@@ -105,6 +105,22 @@ class WalletWithdrawTest {
         assertEquals(4500L, WalletWithdraw.readBalance(commissions))
         assertEquals(1200L, WalletWithdraw.readBalance(JSONObject().put("withdrawable_balance", 1200)))
         assertNull(WalletWithdraw.readBalance(JSONObject().put("total_commission", 9000)))
+        assertEquals("واریز شده", WalletWithdraw.commissionStatusText("credited"))
+        assertEquals("معامله موفق", WalletWithdraw.commissionStatusText("success"))
+        assertEquals("در انتظار واریز", WalletWithdraw.commissionStatusText("در انتظار واریز"))
+        assertEquals("pending", WalletWithdraw.commissionKind("در انتظار واریز"))
+        val nested = JSONObject().put(
+            "data",
+            JSONObject()
+                .put("sold_count", "۴")
+                .put("commissions", JSONArray().put(JSONObject().put("payout_amount", "1500").put("status", "deposited"))),
+        )
+        assertTrue(WalletWithdraw.hasCommissionPayload(nested))
+        assertEquals(4L, WalletWithdraw.money(WalletWithdraw.commissionRoot(nested), "sold_count"))
+        assertEquals(1500L, WalletWithdraw.money(WalletWithdraw.commissionItems(nested).getJSONObject(0), "commission_amount", "payout_amount"))
+        assertEquals(4500L, HomePulse.withdrawable(JSONObject().put("withdrawable_balance", "4500")))
+        assertEquals(2L, HomePulse.deals(JSONObject().put("home_deals_done", "۲")))
+        assertEquals(7L, HomePulse.visits(JSONObject().put("home_visits_done", 7)))
         assertEquals(3_000_000_000L, WalletWithdraw.money(JSONObject().put("commission_amount", 3_000_000_000L), "commission_amount"))
         assertEquals(0L, WalletWithdraw.money(JSONObject().put("commission_amount", -5), "commission_amount"))
     }

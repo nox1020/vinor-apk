@@ -977,15 +977,15 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardWallet.isVisible = isApproved
         binding.dashboardPerf.isVisible = isApproved
-        val reqCount = obj.optInt("home_requests_pipeline_count")
+        val reqCount = HomePulse.requests(obj).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
         if (isApproved) {
-            binding.dashboardWalletAmount.text = PartnerFormat.toman(obj.optLong("withdrawable_balance")) + " تومان"
+            binding.dashboardWalletAmount.text = PartnerFormat.toman(HomePulse.withdrawable(obj)) + " تومان"
             val hasGrowth = obj.has("home_month_growth_pct") && !obj.isNull("home_month_growth_pct")
             binding.dashboardWalletGrowth.isVisible = hasGrowth
             if (hasGrowth) binding.dashboardWalletGrowth.text = monthGrowthLabel(obj.optInt("home_month_growth_pct"))
-            binding.dashboardPerfDeals.text = PartnerFormat.toman(obj.optInt("home_deals_done"))
-            binding.dashboardPerfVisits.text = PartnerFormat.toman(obj.optInt("home_visits_done"))
-            binding.dashboardPerfCustomers.text = PartnerFormat.toman(obj.optInt("home_active_customers"))
+            binding.dashboardPerfDeals.text = PartnerFormat.toman(HomePulse.deals(obj))
+            binding.dashboardPerfVisits.text = PartnerFormat.toman(HomePulse.visits(obj))
+            binding.dashboardPerfCustomers.text = PartnerFormat.toman(HomePulse.customers(obj))
             binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
             binding.dashboardShortcutFollow.contentDescription = "پیگیری مشتری‌ها"
             binding.dashboardFollowBadge.isVisible = reqCount > 0

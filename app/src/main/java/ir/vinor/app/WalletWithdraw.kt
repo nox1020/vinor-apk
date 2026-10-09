@@ -229,6 +229,62 @@ object WalletWithdraw {
         return "مشکلی پیش آمد؛ دوباره تلاش کنید."
     }
 
+    fun commissionKind(raw: String): String {
+        val key = raw.trim().lowercase()
+        if (key.isEmpty() || key == "null") return ""
+        return when (key) {
+            "paid", "deposited", "credited", "settled" -> "paid"
+            "approved" -> "approved"
+            "rejected", "failed", "cancelled", "canceled" -> "rejected"
+            "success", "successful", "completed", "done", "sold", "closed", "won" -> "success"
+            "pending", "waiting", "processing" -> "pending"
+            else -> when {
+                key.contains("انتظار") -> "pending"
+                key.contains("ناموفق") || key.contains("رد شد") || key == "رد" -> "rejected"
+                key.contains("موفق") || key.contains("واریز") || key.contains("تسویه") || key.contains("پرداخت") -> "success"
+                else -> ""
+            }
+        }
+    }
+
+    fun commissionStatusText(raw: String): String = when (commissionKind(raw)) {
+        "paid" -> "واریز شده"
+        "success" -> "معامله موفق"
+        "approved" -> "تأیید شده"
+        "rejected" -> "رد شده"
+        "pending" -> "در انتظار واریز"
+        else -> raw.trim().let { if (it.isEmpty() || it.equals("null", true)) "" else it }
+    }
+
+    fun hasCommissionPayload(obj: JSONObject): Boolean {
+        if (obj.optBoolean("success")) return true
+        val root = commissionRoot(obj)
+        if (root.has("total_commission") || root.has("paid_commission") || root.has("sold_count")) return true
+        return commissionItems(obj).length() > 0
+    }
+
+    fun commissionRoot(obj: JSONObject): JSONObject {
+        if (obj.has("items") || obj.has("commissions") || obj.has("total_commission") || obj.has("sold_count")) {
+            return obj
+        }
+        val data = obj.optJSONObject("data") ?: return obj
+        return if (
+            data.has("items") || data.has("commissions") || data.has("total_commission") || data.has("sold_count")
+        ) {
+            data
+        } else {
+            obj
+        }
+    }
+
+    fun commissionItems(obj: JSONObject): JSONArray {
+        val root = commissionRoot(obj)
+        return root.optJSONArray("items")
+            ?: root.optJSONArray("commissions")
+            ?: root.optJSONArray("rows")
+            ?: JSONArray()
+    }
+
     fun statusLabel(status: String): String = when (status) {
         "paid" -> "پرداخت‌شده"
         "approved" -> "تایید شده"

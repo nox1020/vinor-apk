@@ -94,11 +94,6 @@ class CommissionsFragment : Fragment() {
 
     private fun formatToman(value: Long): String = PartnerFormat.toman(value)
 
-    private fun toPersianDigits(s: String): String {
-        val persian = "۰۱۲۳۴۵۶۷۸۹"
-        return s.map { c -> if (c in '0'..'9') persian[c - '0'] else c }.joinToString("")
-    }
-
     private fun formatDate(iso: String?): String {
         if (iso.isNullOrBlank()) return "—"
         val raw = iso.trim().replace("Z", "")
@@ -117,15 +112,11 @@ class CommissionsFragment : Fragment() {
         return raw.take(10).replace("-", "/")
     }
 
-    private fun statusText(status: String): String = when (status) {
-        "paid" -> "پرداخت‌شده"
-        "approved" -> "تایید شده"
-        "rejected" -> "رد شده"
-        else -> "در انتظار"
-    }
+    private fun statusText(status: String): String =
+        WalletWithdraw.commissionStatusText(status).ifBlank { "در انتظار" }
 
-    private fun statusColor(status: String): Int = when (status) {
-        "paid" -> 0xFF16a34a.toInt()
+    private fun statusColor(status: String): Int = when (WalletWithdraw.commissionKind(status)) {
+        "paid", "success" -> 0xFF16a34a.toInt()
         "approved" -> 0xFF2563EB.toInt()
         "rejected" -> 0xFFDC2626.toInt()
         else -> 0xFFD97706.toInt()
@@ -141,11 +132,11 @@ class CommissionsFragment : Fragment() {
             try {
                 val obj = PartnerApi.loadDisplay(COMMISSIONS_DATA, ctx) { data ->
                     if (_binding == null) return@loadDisplay
-                    if (!data.optBoolean("success", false) && !data.has("total_commission")) return@loadDisplay
+                    if (!WalletWithdraw.hasCommissionPayload(data)) return@loadDisplay
                     bindCommissionPayload(data)
                 }
                 if (_binding == null) return@launch
-                if (!obj.optBoolean("success", false) && !obj.has("total_commission")) {
+                if (!WalletWithdraw.hasCommissionPayload(obj)) {
                     showError()
                     return@launch
                 }
@@ -166,14 +157,15 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun bindCommissionPayload(obj: JSONObject) {
-        val total = WalletWithdraw.money(obj, "total_commission")
-        val pending = WalletWithdraw.money(obj, "pending_commission")
-        val paid = WalletWithdraw.money(obj, "paid_commission")
-        val soldCount = obj.optInt("sold_count", 0)
-        val itemsArr = obj.optJSONArray("items") ?: org.json.JSONArray()
+        val root = WalletWithdraw.commissionRoot(obj)
+        val total = WalletWithdraw.money(root, "total_commission")
+        val pending = WalletWithdraw.money(root, "pending_commission")
+        val paid = WalletWithdraw.money(root, "paid_commission")
+        val soldCount = WalletWithdraw.money(root, "sold_count")
+        val itemsArr = WalletWithdraw.commissionItems(obj)
         val items = mutableListOf<JSONObject>()
         for (i in 0 until itemsArr.length()) {
-            items.add(itemsArr.getJSONObject(i))
+            itemsArr.optJSONObject(i)?.let { items.add(it) }
         }
         bind(total, pending, paid, soldCount, items)
         WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
@@ -211,7 +203,7 @@ class CommissionsFragment : Fragment() {
         total: Long,
         pending: Long,
         paid: Long,
-        soldCount: Int,
+        soldCount: Long,
         items: List<JSONObject>
     ) {
         if (_binding == null) return
@@ -219,7 +211,7 @@ class CommissionsFragment : Fragment() {
         binding.commissionsTotal.text = formatToman(total) + " تومان"
         binding.commissionsPending.text = formatToman(pending) + " تومان"
         binding.commissionsPaid.text = formatToman(paid) + " تومان"
-        binding.commissionsSoldCount.text = toPersianDigits(soldCount.toString())
+        binding.commissionsSoldCount.text = formatToman(soldCount)
 
         val list = binding.commissionsList
         list.removeAllViews()
@@ -238,12 +230,13 @@ class CommissionsFragment : Fragment() {
             val itemBinding = ItemCommissionBinding.inflate(layoutInflater, list, false)
             itemBinding.itemCommissionLandCode.text = "کد فایل: ${c.optString("land_code", "—")}"
             itemBinding.itemCommissionDate.text = formatDate(c.optString("created_at"))
-            val status = (c.optString("status", "pending")).trim()
+            val status = c.optString("status").trim().ifBlank { c.optString("commission_status").trim() }
+                .ifBlank { "pending" }
             itemBinding.itemCommissionStatus.text = statusText(status)
             itemBinding.itemCommissionStatus.setTextColor(statusColor(status))
             val pct = c.optDouble("commission_pct", 0.0)
             itemBinding.itemCommissionPct.text = if (pct == pct.toLong().toDouble()) "${pct.toLong()}%" else "$pct%"
-            val amount = WalletWithdraw.money(c, "commission_amount")
+            val amount = WalletWithdraw.money(c, "commission_amount", "payout_amount", "amount", "commission")
             itemBinding.itemCommissionAmount.text = formatToman(amount) + " تومان"
             val saleAmount = WalletWithdraw.money(c, "sale_amount")
             if (saleAmount > 0) {

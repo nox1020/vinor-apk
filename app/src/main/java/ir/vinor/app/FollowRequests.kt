@@ -91,7 +91,9 @@ object FollowRequests {
         val bare = path.substringBefore('?')
         val outcome = body.optString("outcome").trim()
         return when {
-            bare.endsWith("/deal-confirm") || bare.endsWith("/deal-close") -> pick("deals", "deal")
+            bare.endsWith("/deal-close") ->
+                pick("done", "success", "closed", "sold", "completed", "deals", "deal")
+            bare.endsWith("/deal-confirm") -> pick("deals", "deal")
             bare.endsWith("/visit-result") && outcome == "interested" -> pick("deals", "deal")
             bare.endsWith("/visit-result") && outcome == "follow_up" -> pick("visits", "visit")
             bare.endsWith("/complete") || bare.endsWith("/revisit") -> pick("visits", "visit")
@@ -148,7 +150,7 @@ object FollowRequests {
         return Card(
             id = id,
             title = title,
-            status = text(item, "status_label"),
+            status = displayStatus(item, tab),
             customer = text(item, "customer_name"),
             whenText = text(item, "visit_when"),
             landCode = text(item, "land_code"),
@@ -299,30 +301,44 @@ object FollowRequests {
         }
     }
 
-    private fun commissionStatus(item: JSONObject): String {
-        val raw = text(item, "commission_status").ifBlank { text(item, "payout_status") }
-        return when (raw.lowercase()) {
-            "paid", "deposited", "credited", "settled" -> "واریز شده"
-            "approved" -> "تأیید شده"
-            "pending", "waiting", "processing" -> "در انتظار واریز"
-            "rejected" -> "رد شده"
-            else -> raw
-        }
+    private fun commissionKey(item: JSONObject): String =
+        text(item, "commission_status")
+            .ifBlank { text(item, "payout_status") }
+            .ifBlank { text(item, "deal_status") }
+            .ifBlank { text(item, "result") }
+
+    private fun commissionStatus(item: JSONObject): String =
+        WalletWithdraw.commissionStatusText(commissionKey(item))
+
+    private fun displayStatus(item: JSONObject, tab: String): String {
+        val server = text(item, "status_label")
+        if (server.isNotBlank()) return server
+        return if (dealSucceeded(item, tab)) "معامله موفق" else ""
+    }
+
+    private fun dealSucceeded(item: JSONObject, tab: String): Boolean {
+        val kind = WalletWithdraw.commissionKind(commissionKey(item))
+        if (kind == "paid" || kind == "success") return true
+        if (!depositReady(item, tab)) return false
+        val stage = text(item, "pipeline_tab").ifBlank { tab }
+        return stage in DEAL_STAGES
     }
 
     private fun depositReady(item: JSONObject, tab: String): Boolean {
-        val key = text(item, "commission_status").ifBlank { text(item, "payout_status") }.lowercase()
-        if (key == "rejected") return false
-        if (key in setOf("paid", "deposited", "credited", "settled")) return true
+        val kind = WalletWithdraw.commissionKind(commissionKey(item))
+        if (kind == "rejected") return false
+        if (kind == "paid" || kind == "success") return true
         if (flag(item, "can_open_commission") || flag(item, "commission_credited")) return true
         if (flag(item, "can_confirm_deal") || flag(item, "can_close_deal")) return false
         val stage = text(item, "pipeline_tab").ifBlank { tab }
-        if (stage != "deals" && stage != "deal") return false
+        if (stage !in DEAL_STAGES) return false
         val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
-        val awaiting = amount > 0L || key in setOf("pending", "approved", "waiting", "processing")
+        val awaiting = amount > 0L || kind == "pending" || kind == "approved"
         if (flag(item, "can_register_result") || flag(item, "can_reject_deal")) return awaiting
         return true
     }
+
+    private val DEAL_STAGES = setOf("deals", "deal", "done", "success", "closed", "sold", "completed")
 
     private fun groupedOf(payload: JSONObject): JSONObject? =
         payload.optJSONObject("items_by_tab")
