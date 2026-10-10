@@ -131,6 +131,19 @@ object MyPropertyManage {
     fun deleteBody(code: String): JSONObject =
         JSONObject().put("action", "delete").put("code", code.trim())
 
+    /** فیلدهای فرم وب. صفحهٔ ملک JSON را نمی‌خواند و HTML برمی‌گرداند. */
+    fun formFields(call: DeleteCall): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        val keys = call.body.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key == "csrf_token") continue
+            val value = call.body.optString(key).trim()
+            if (value.isNotBlank()) out[key] = value
+        }
+        return out
+    }
+
     /**
      * موفقیت فقط وقتی است که فهرست ملک من این کد را دیگر نداشته باشد.
      * پاسخ خام POST کافی نیست؛ ریدایرکت HTML هم نباید حذف‌نشده را موفق نشان دهد.
@@ -152,6 +165,10 @@ object MyPropertyManage {
 
     fun deleteFailure(post: JSONObject, fallback: String): String {
         if (post.optBoolean("ok") || post.optBoolean("success")) return fallback
+        val err = post.optString("error").trim()
+        if (err.isBlank() || err == "پاسخ نامعتبر" || err.equals("Not Found", ignoreCase = true)) {
+            return fallback
+        }
         return failureMessage(post, fallback)
     }
 

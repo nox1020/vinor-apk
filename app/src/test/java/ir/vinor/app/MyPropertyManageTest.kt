@@ -243,7 +243,13 @@ class MyPropertyManageTest {
         assertFalse(MyPropertyManage.removedFromPortfolio(unshaped, "4"))
         assertFalse(MyPropertyManage.removedFromPortfolio(offline, "4"))
         val optimistic = JSONObject().put("ok", true).put("message", "آگهی حذف شد.")
-        assertEquals("حذف ملک انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف ملک انجام نشد."))
+        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف آگهی انجام نشد."))
+        val html = JSONObject().put("http_status", 200).put("ok", false).put("error", "پاسخ نامعتبر")
+        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(html, "حذف آگهی انجام نشد."))
+        val fields = MyPropertyManage.formFields(MyPropertyManage.deleteCall("", "4"))
+        assertEquals("delete", fields["action"])
+        assertEquals("4", fields["code"])
+        assertFalse(fields.containsKey("csrf_token"))
     }
 
     @Test

@@ -404,11 +404,13 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 val call = MyPropertyManage.deleteCall(page.body, code)
                 val fresh = withContext(Dispatchers.IO) {
-                    val body = JSONObject(call.body.toString())
-                    if (call.csrf.isNotBlank() && !body.has("csrf_token")) {
-                        body.put("csrf_token", call.csrf)
-                    }
-                    PartnerApi.postPage(call.path, body, call.csrf, MyPropertyManage.PAGE_PATH, ctx)
+                    PartnerApi.postForm(
+                        call.path,
+                        MyPropertyManage.formFields(call),
+                        call.csrf,
+                        MyPropertyManage.PAGE_PATH,
+                        ctx,
+                    )
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401 || fresh.optString("error") == "unauthorized") {
@@ -431,7 +433,7 @@ class MyPropertyManageFragment : Fragment() {
                         (activity as? MainActivity)?.openMyProperty()
                     }
                 } else {
-                    toast(MyPropertyManage.deleteFailure(fresh, "حذف ملک انجام نشد."))
+                    toast(MyPropertyManage.deleteFailure(fresh, "حذف آگهی انجام نشد."))
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
