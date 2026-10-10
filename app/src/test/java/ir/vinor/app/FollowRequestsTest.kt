@@ -154,6 +154,40 @@ class FollowRequestsTest {
     }
 
     @Test
+    fun awaitingCommissionPostsTheDepositInsteadOfOpeningTheWallet() {
+        val item = JSONObject()
+            .put("id", 8)
+            .put("pipeline_tab", "deals")
+            .put("commission_amount", 1_500_000)
+            .put("commission_status", "در انتظار واریز")
+        val card = FollowRequests.card(item, "deals")
+        assertEquals("", card.status)
+        assertEquals(
+            "پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز",
+            card.commission,
+        )
+        val deposit = card.actions.single()
+        assertEquals("واریز پورسانت", deposit.label)
+        assertFalse(deposit.opensWallet)
+        assertEquals("/express/partner/requests/8/deal-close", deposit.path)
+        assertEquals("پورسانت این پرونده به کیف پول واریز شود؟", deposit.confirm)
+        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+        assertTrue(FollowRequests.refreshesWallet(deposit.path))
+        assertTrue(FollowRequests.movesCard(deposit.path, deposit.body))
+    }
+
+    @Test
+    fun yesFlagStillClosesTheDealInsteadOfAWalletShortcut() {
+        val actions = FollowRequests.actions(
+            JSONObject().put("can_close_deal", "yes").put("commission_status", "pending"),
+            "8",
+            "deals",
+        )
+        assertTrue(actions.none { it.opensWallet })
+        assertEquals("انجام معامله", actions.single { it.path.endsWith("/deal-close") }.label)
+    }
+
+    @Test
     fun finishedDealWithoutAmountStillOpensWallet() {
         val card = FollowRequests.card(JSONObject().put("id", 8).put("pipeline_tab", "deals"), "deals")
         assertEquals("معامله موفق", card.status)

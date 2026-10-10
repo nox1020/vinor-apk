@@ -596,7 +596,7 @@ class MainActivity : AppCompatActivity() {
             low.contains("/notifications") -> openNotifications()
             low.contains("/commissions") -> {
                 if (navController.currentDestination?.id != R.id.commissionsFragment) {
-                    navController.navigate(R.id.commissionsFragment)
+                    navigateTab(R.id.commissionsFragment)
                 }
             }
             low.contains("/profile/edit") -> openProfileEdit()

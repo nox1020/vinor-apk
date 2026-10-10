@@ -698,9 +698,20 @@ class NativePartnerFragment : Fragment() {
         setFollowBusy(true)
         scope.launch {
             try {
-                val token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx) }
-                val resp = withContext(Dispatchers.IO) {
+                var token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx) }
+                var resp = withContext(Dispatchers.IO) {
                     PartnerApi.postPage(path, body, token, FollowRequests.PAGE_PATH, ctx)
+                }
+                if (PartnerCustomers.isCsrfExpired(resp)) {
+                    val rejected = token
+                    val rotated = resp.optString("csrf_token").trim()
+                    followCsrf = rotated.takeIf { it.isNotBlank() && it != rejected }.orEmpty()
+                    token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx, rejected) }
+                    if (token.isNotBlank() && token != rejected) {
+                        resp = withContext(Dispatchers.IO) {
+                            PartnerApi.postPage(path, body, token, FollowRequests.PAGE_PATH, ctx)
+                        }
+                    }
                 }
                 if (_binding == null) return@launch
                 val freshCsrf = resp.optString("csrf_token").trim()
@@ -741,18 +752,20 @@ class NativePartnerFragment : Fragment() {
         }
     }
 
-    private fun ensureFollowCsrf(ctx: Context): String {
-        if (followCsrf.isNotBlank()) return followCsrf
+    private fun ensureFollowCsrf(ctx: Context, reject: String = ""): String {
+        if (followCsrf.isNotBlank() && followCsrf != reject) return followCsrf
         val profile = try {
             PartnerApi.get("/express/partner/profile/data", ctx)
         } catch (_: Exception) {
             JSONObject()
         }
         var token = profile.optString("csrf_token").trim()
-        if (token.isBlank()) {
+        if (token.isBlank() || token == reject) {
             val page = PartnerApi.getPage(FollowRequests.PAGE_PATH, ctx)
-            token = PartnerCustomers.csrfFromHtml(page.body)
+            val htmlToken = PartnerCustomers.csrfFromHtml(page.body)
+            if (htmlToken.isNotBlank()) token = htmlToken
         }
+        if (token == reject) token = ""
         followCsrf = token
         return token
     }

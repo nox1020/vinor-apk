@@ -272,7 +272,17 @@ object FollowRequests {
         )
         add("can_reject_deal", "رد معامله", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
         add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
-        if (depositReady(item, tab)) {
+        if (depositAwaiting(item, tab)) {
+            all.add(
+                Action(
+                    label = "واریز پورسانت",
+                    path = "$base/deal-close",
+                    body = JSONObject(),
+                    tone = Tone.PRIMARY,
+                    confirm = "پورسانت این پرونده به کیف پول واریز شود؟",
+                ),
+            )
+        } else if (depositReady(item, tab)) {
             all.add(
                 Action(
                     label = "واریز پورسانت",
@@ -339,7 +349,7 @@ object FollowRequests {
     }
 
     private fun commissionLine(item: JSONObject): String {
-        val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
+        val amount = commissionAmount(item)
         val status = commissionStatus(item)
         return when {
             amount > 0L && status.isNotBlank() -> "پورسانت ${PartnerFormat.toman(amount)} تومان · $status"
@@ -367,24 +377,41 @@ object FollowRequests {
     private fun dealSucceeded(item: JSONObject, tab: String): Boolean {
         val kind = WalletWithdraw.commissionKind(commissionKey(item))
         if (kind == "paid" || kind == "success") return true
+        if (kind == "rejected" || kind == "pending" || kind == "approved") return false
+        if (commissionAmount(item) > 0L) return false
         if (!depositReady(item, tab)) return false
-        return normalizeStage(stageOf(item).ifBlank { tab }) == "done" ||
-            normalizeStage(stageOf(item).ifBlank { tab }) == "deals"
+        val stage = normalizeStage(stageOf(item).ifBlank { tab })
+        return stage == "done" || stage == "deals"
+    }
+
+    /** پورسانت هنوز به کیف پول نرسیده و دکمه باید همان ثبت معامله را بزند. */
+    private fun depositAwaiting(item: JSONObject, tab: String): Boolean {
+        if (!depositReady(item, tab) || commissionCredited(item)) return false
+        val kind = WalletWithdraw.commissionKind(commissionKey(item))
+        return commissionAmount(item) > 0L || kind == "pending" || kind == "approved"
+    }
+
+    private fun commissionCredited(item: JSONObject): Boolean {
+        val kind = WalletWithdraw.commissionKind(commissionKey(item))
+        return kind == "paid" || kind == "success" ||
+            flag(item, "can_open_commission") ||
+            flag(item, "commission_credited")
     }
 
     private fun depositReady(item: JSONObject, tab: String): Boolean {
         val kind = WalletWithdraw.commissionKind(commissionKey(item))
         if (kind == "rejected") return false
-        if (kind == "paid" || kind == "success") return true
-        if (flag(item, "can_open_commission") || flag(item, "commission_credited")) return true
+        if (commissionCredited(item)) return true
         if (flag(item, "can_confirm_deal") || flag(item, "can_close_deal")) return false
         val stage = normalizeStage(stageOf(item).ifBlank { tab })
         if (stage != "deals" && stage != "done") return false
-        val amount = WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
-        val awaiting = amount > 0L || kind == "pending" || kind == "approved"
+        val awaiting = commissionAmount(item) > 0L || kind == "pending" || kind == "approved"
         if (flag(item, "can_register_result") || flag(item, "can_reject_deal")) return awaiting
         return true
     }
+
+    private fun commissionAmount(item: JSONObject): Long =
+        WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
 
     private fun readTabs(array: JSONArray?): List<Tab> {
         if (array == null) return emptyList()
@@ -456,7 +483,10 @@ object FollowRequests {
         return when (val value = obj.opt(key)) {
             is Boolean -> value
             is Number -> value.toDouble() != 0.0
-            is String -> value.equals("true", true) || value == "1"
+            is String -> {
+                val text = value.trim().lowercase()
+                text == "true" || text == "1" || text == "yes" || text == "y" || text == "on" || text == "بله"
+            }
             else -> false
         }
     }
