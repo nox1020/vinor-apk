@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -315,6 +316,67 @@ object PartnerApi {
             .addHeader("X-Requested-With", "XMLHttpRequest")
             .addHeader("Origin", PartnerCustomers.ORIGIN)
             .addHeader("Referer", PartnerCustomers.ORIGIN + refererPath)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
+    }
+
+    /**
+     * POST فرم وب (بازدید ملک). در صف آفلاین نمی‌رود و موفقیت جعلی نمی‌سازد.
+     */
+    fun postForm(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context? = null,
+    ): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executeForm(path, fields, token, refererPath, context)
+            if (PartnerCustomers.isCsrfExpired(resp)) {
+                val next = resp.optString("csrf_token").trim()
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executeForm(path, fields, token, refererPath, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executeForm(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context?,
+    ): JSONObject {
+        val form = FormBody.Builder()
+        if (csrf.isNotBlank()) form.add("csrf_token", csrf)
+        for ((key, value) in fields) {
+            if (key == "csrf_token") continue
+            form.add(key, value)
+        }
+        val referer = if (refererPath.startsWith("http")) refererPath else PartnerCustomers.ORIGIN + refererPath
+        val builder = requestBuilder(path, context)
+            .post(form.build())
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", PartnerCustomers.ORIGIN)
+            .addHeader("Referer", referer)
         if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
         return execute(builder.build())
     }

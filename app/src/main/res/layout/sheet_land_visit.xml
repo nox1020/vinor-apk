@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_search_sheet"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:paddingBottom="16dp">
+
+    <TextView
+        android:id="@+id/landVisitTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:text="تعیین وقت بازدید"
+        android:textColor="@color/vinor_text"
+        android:textSize="17sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/landVisitPrev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_flat_outline_card"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:gravity="center"
+            android:text="›"
+            android:textColor="@color/vinor_text"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/landVisitMonth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:gravity="center"
+            android:textColor="@color/vinor_text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/landVisitNext"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_flat_outline_card"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:gravity="center"
+            android:text="‹"
+            android:textColor="@color/vinor_text"
+            android:textSize="18sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="ش"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="ی"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="د"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="س"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="چ"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="پ"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="ج"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/landVisitGrid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/landVisitSelected"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:text="تاریخ انتخاب نشده"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/vazirmatn"
+        android:text="نام"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/landVisitFirst"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_invite_link"
+        android:fontFamily="@font/vazirmatn"
+        android:hint="نام مشتری"
+        android:imeOptions="actionNext"
+        android:inputType="textPersonName|textCapWords"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:textAlignment="viewStart"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textDirection="rtl"
+        android:textSize="15sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/vazirmatn"
+        android:text="نام خانوادگی"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/landVisitLast"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_invite_link"
+        android:fontFamily="@font/vazirmatn"
+        android:hint="نام خانوادگی مشتری"
+        android:imeOptions="actionNext"
+        android:inputType="textPersonName|textCapWords"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:textAlignment="viewStart"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textDirection="rtl"
+        android:textSize="15sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/vazirmatn"
+        android:text="موبایل"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/landVisitPhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_invite_link"
+        android:fontFamily="@font/vazirmatn"
+        android:hint="۰۹۱۲…"
+        android:imeOptions="actionDone"
+        android:inputType="phone"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:textAlignment="viewStart"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textDirection="ltr"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/landVisitError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/vinor_error"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/landVisitSubmit"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_hub_start"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:text="ثبت درخواست بازدید"
+        android:textColor="@color/vinor_customer_bg"
+        android:textSize="15sp" />
+</LinearLayout>
