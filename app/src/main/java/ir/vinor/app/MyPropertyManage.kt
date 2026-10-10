@@ -1,5 +1,6 @@
 package ir.vinor.app
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -7,7 +8,9 @@ import java.net.URLEncoder
 object MyPropertyManage {
 
     const val PAGE_TITLE = "مدیریت ملک"
-    const val DELETE_PATH = "/express/partner/api/my-property/delete"
+    /** صفحهٔ ملک؛ مسیر `/api/my-property/delete` روی سرور نیست و ۴۰۴ می‌دهد. */
+    const val PAGE_PATH = "/express/partner/my-property"
+    const val PORTFOLIO_PATH = "/express/partner/api/my-property/data"
     const val SUBMIT_PATH = "/express/partner/api/my-property/submit"
     const val PUBLISH_PATH = "/express/partner/api/my-property/publish"
     /** همان مسیر انتشار؛ توقف با published_for_sale=false. مسیر جداگانه روی سرور نیست. */
@@ -112,7 +115,45 @@ object MyPropertyManage {
         return body
     }
 
-    fun deleteBody(code: String): JSONObject = JSONObject().put("code", code.trim())
+    data class DeleteCall(val path: String, val body: JSONObject, val csrf: String)
+
+    /**
+     * حذف از خود صفحهٔ ملک می‌رود، با همان فیلدهای فرم حذف.
+     * اگر فرم در HTML نباشد، قرارداد بقیهٔ پنل است: action=delete و code.
+     */
+    fun deleteCall(html: String, code: String): DeleteCall {
+        val wanted = code.trim()
+        parseDeleteForm(html, wanted)?.let { return it }
+        parseDeleteButton(html, wanted)?.let { return it }
+        return DeleteCall(PAGE_PATH, deleteBody(wanted), PartnerCustomers.csrfFromHtml(html))
+    }
+
+    fun deleteBody(code: String): JSONObject =
+        JSONObject().put("action", "delete").put("code", code.trim())
+
+    /**
+     * موفقیت فقط وقتی است که فهرست ملک من این کد را دیگر نداشته باشد.
+     * پاسخ خام POST کافی نیست؛ ریدایرکت HTML هم نباید حذف‌نشده را موفق نشان دهد.
+     */
+    fun removedFromPortfolio(data: JSONObject, code: String): Boolean {
+        val wanted = code.trim()
+        if (wanted.isEmpty()) return false
+        val status = data.optInt("http_status", 200)
+        if (status !in 200..299) return false
+        if (data.optBoolean("offline")) return false
+        if (data.optString("error") == "unauthorized") return false
+        val items = data.optJSONArray("items") ?: data.optJSONArray("listings")
+        val property = data.optJSONObject("property")
+        val shaped = items != null || property != null || data.has("has_property")
+        if (!shaped) return false
+        if (data.optBoolean("has_property") && property == null && items == null) return false
+        return !portfolioContains(items, property, wanted)
+    }
+
+    fun deleteFailure(post: JSONObject, fallback: String): String {
+        if (post.optBoolean("ok") || post.optBoolean("success")) return fallback
+        return failureMessage(post, fallback)
+    }
 
     /**
      * توقف همان مسیر انتشار است. سرور قبل از خواندن پرچم توقف، نحوهٔ پرداخت را اجباری می‌کند؛
@@ -268,6 +309,132 @@ object MyPropertyManage {
         val err = obj.optString("error").trim().ifBlank { obj.optString("message").trim() }
         if (err.isBlank() || err.equals("Not Found", ignoreCase = true)) return fallback
         return err
+    }
+
+    private fun portfolioContains(items: JSONArray?, property: JSONObject?, code: String): Boolean {
+        if (items != null) {
+            for (i in 0 until items.length()) {
+                val row = items.optJSONObject(i) ?: continue
+                if (codeOf(row) == code) return true
+            }
+        }
+        if (property != null && !property.optBoolean("is_demo") && codeOf(property) == code) return true
+        return false
+    }
+
+    private fun parseDeleteForm(html: String, code: String): DeleteCall? {
+        val forms = Regex(
+            """<form\b([^>]*)>(.*?)</form>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        var loose: DeleteCall? = null
+        for (form in forms.findAll(html)) {
+            val attrs = form.groupValues[1]
+            val inner = form.groupValues[2]
+            if (!mentionsDelete(inner)) continue
+            val fields = LinkedHashMap<String, String>()
+            for (input in Regex("""<input\b([^>]*)>""", RegexOption.IGNORE_CASE).findAll(inner)) {
+                val tag = input.groupValues[1]
+                val name = attr(tag, "name")
+                if (name.isBlank() || name == "csrf_token") continue
+                val type = attr(tag, "type").lowercase()
+                if (type.isNotEmpty() && type != "hidden" && type != "submit") continue
+                val value = attr(tag, "value")
+                if (value.isNotBlank()) fields[name] = value
+            }
+            for (button in Regex(
+                """<button\b([^>]*)>(.*?)</button>""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+            ).findAll(inner)) {
+                val tag = button.groupValues[1]
+                val name = attr(tag, "name")
+                val value = attr(tag, "value").ifBlank {
+                    if (plain(button.groupValues[2]).contains("حذف")) "delete" else ""
+                }
+                if (name.isNotBlank() && value.isNotBlank()) fields[name] = value
+            }
+            val formCode = fields["code"].orEmpty().ifBlank { fields["id"].orEmpty() }
+            if (formCode.isNotBlank() && formCode != code) continue
+            if (fields["code"].isNullOrBlank() && fields["id"].isNullOrBlank()) fields["code"] = code
+            if (fields["action"].isNullOrBlank() && !fields.containsKey("delete")) fields["action"] = "delete"
+            val call = DeleteCall(formPath(attr(attrs, "action")), jsonOf(fields), csrfIn(inner, html))
+            if (formCode == code) return call
+            if (loose == null) loose = call
+        }
+        return loose
+    }
+
+    private fun parseDeleteButton(html: String, code: String): DeleteCall? {
+        val tags = Regex(
+            """<(?:button|a)\b([^>]*)>(.*?)</(?:button|a)>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        for (tag in tags.findAll(html)) {
+            val attrs = tag.groupValues[1]
+            val action = attr(attrs, "data-action").lowercase()
+            val text = plain(tag.groupValues[2])
+            if (action != "delete" && !text.contains("حذف")) continue
+            val url = attr(attrs, "data-delete-url").ifBlank { attr(attrs, "data-url") }.ifBlank { attr(attrs, "href") }
+            if (!url.contains("my-property") && !url.contains("delete")) continue
+            val tagged = attr(attrs, "data-code").ifBlank { attr(attrs, "data-id") }
+            if (tagged.isNotBlank() && tagged != code) continue
+            val fields = linkedMapOf("action" to "delete", "code" to code)
+            return DeleteCall(formPath(url), jsonOf(fields), PartnerCustomers.csrfFromHtml(html))
+        }
+        return null
+    }
+
+    private fun mentionsDelete(inner: String): Boolean {
+        if (inner.contains("حذف")) return true
+        return Regex("""value\s*=\s*["']delete["']""", RegexOption.IGNORE_CASE).containsMatchIn(inner)
+    }
+
+    private fun csrfIn(inner: String, html: String): String {
+        val local = Regex(
+            """<input\b[^>]*name\s*=\s*["']csrf_token["'][^>]*>""",
+            RegexOption.IGNORE_CASE,
+        ).find(inner)?.value.orEmpty()
+        val value = attr(local, "value")
+        return value.ifBlank { PartnerCustomers.csrfFromHtml(html) }
+    }
+
+    private fun formPath(action: String): String {
+        val raw = action.trim()
+        if (raw.isBlank() || raw == "#") return PAGE_PATH
+        val noQuery = raw.substringBefore('?').substringBefore('#')
+        val path = when {
+            "://" in noQuery -> {
+                val after = noQuery.substringAfter("://")
+                val slash = after.indexOf('/')
+                if (slash < 0) PAGE_PATH else after.substring(slash)
+            }
+            noQuery.startsWith("/") -> noQuery
+            else -> "/$noQuery"
+        }
+        return if (path.startsWith("/express/partner/")) path else PAGE_PATH
+    }
+
+    private fun jsonOf(fields: Map<String, String>): JSONObject {
+        val body = JSONObject()
+        for ((key, value) in fields) {
+            if (value.isNotBlank()) body.put(key, value)
+        }
+        return body
+    }
+
+    private fun plain(html: String): String =
+        html.replace(Regex("""<[^>]+>"""), " ").replace(Regex("\\s+"), " ").trim()
+
+    private fun attr(tag: String, name: String): String {
+        if (tag.isBlank()) return ""
+        val match = Regex(
+            """\b$name\s*=\s*["']([^"']*)["']""",
+            RegexOption.IGNORE_CASE,
+        ).find(tag) ?: return ""
+        return match.groupValues[1].trim()
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
     }
 
     private fun isChosenPayment(value: String): Boolean {

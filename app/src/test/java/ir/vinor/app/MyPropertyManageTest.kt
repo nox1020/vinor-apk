@@ -190,6 +190,63 @@ class MyPropertyManageTest {
     }
 
     @Test
+    fun deleteUsesThePropertyPageInsteadOfTheMissingApi() {
+        val html = """
+            <form action="/express/partner/my-property" method="post">
+              <input type="hidden" name="csrf_token" value="tok">
+              <input type="hidden" name="title" value="ذخیره">
+              <button type="submit">ذخیره</button>
+            </form>
+            <form action="/express/partner/my-property" method="post">
+              <input type="hidden" name="csrf_token" value="tok">
+              <input type="hidden" name="code" value="12">
+              <button type="submit" name="action" value="delete">حذف ملک</button>
+            </form>
+            <form action="/express/partner/my-property">
+              <input type="hidden" name="code" value="99">
+              <button type="submit" name="action" value="delete">حذف</button>
+            </form>
+        """.trimIndent()
+        val call = MyPropertyManage.deleteCall(html, "12")
+        assertEquals("/express/partner/my-property", call.path)
+        assertEquals("tok", call.csrf)
+        assertEquals("12", call.body.getString("code"))
+        assertEquals("delete", call.body.getString("action"))
+        assertFalse(call.body.has("title"))
+        val other = MyPropertyManage.deleteCall(html, "99")
+        assertEquals("99", other.body.getString("code"))
+    }
+
+    @Test
+    fun deleteWithoutAFormStillPostsActionAndCode() {
+        val html = """<meta name="csrf-token" content="abc">"""
+        val call = MyPropertyManage.deleteCall(html, "4")
+        assertEquals(MyPropertyManage.PAGE_PATH, call.path)
+        assertEquals("abc", call.csrf)
+        assertEquals("delete", call.body.getString("action"))
+        assertEquals("4", call.body.getString("code"))
+        assertFalse(call.path.contains("/api/my-property/delete"))
+    }
+
+    @Test
+    fun removedFromPortfolioRequiresTheListingToDisappear() {
+        val gone = JSONObject().put("ok", true).put("http_status", 200).put("items", JSONArray())
+        val stay = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "4")))
+        val other = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "9")))
+        val property = JSONObject().put("has_property", true).put("property", JSONObject().put("code", "4"))
+        val unshaped = JSONObject().put("ok", true).put("message", "ملک حذف شد.")
+        val offline = JSONObject().put("offline", true).put("items", JSONArray())
+        assertTrue(MyPropertyManage.removedFromPortfolio(gone, "4"))
+        assertTrue(MyPropertyManage.removedFromPortfolio(other, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(stay, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(property, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(unshaped, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(offline, "4"))
+        val optimistic = JSONObject().put("ok", true).put("message", "آگهی حذف شد.")
+        assertEquals("حذف ملک انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف ملک انجام نشد."))
+    }
+
+    @Test
     fun failureMessage_hidesRawNotFound() {
         val missing = JSONObject().put("http_status", 404).put("error", "Not Found")
         assertEquals("حذف آگهی ناموفق بود.", MyPropertyManage.failureMessage(missing, "حذف آگهی ناموفق بود."))

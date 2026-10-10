@@ -385,14 +385,59 @@ class MyPropertyManageFragment : Fragment() {
 
     private fun postDelete() {
         val code = MyPropertyManage.codeOf(snapshot)
+        val ctx = context ?: return
         if (code.isBlank()) {
             toast("کد ملک نامعتبر است.")
             return
         }
-        post(MyPropertyManage.DELETE_PATH, MyPropertyManage.deleteBody(code), "حذف آگهی ناموفق بود.") {
-            toast("آگهی حذف شد.")
-            if (!findNavController().navigateUp()) {
-                (activity as? MainActivity)?.openMyProperty()
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                val page = withContext(Dispatchers.IO) {
+                    PartnerApi.getPage(MyPropertyManage.PAGE_PATH, ctx)
+                }
+                if (PartnerCustomers.isLoginDocument(page.url, page.body)) {
+                    toast("برای این کار وارد شوید.")
+                    (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                val call = MyPropertyManage.deleteCall(page.body, code)
+                val fresh = withContext(Dispatchers.IO) {
+                    val body = JSONObject(call.body.toString())
+                    if (call.csrf.isNotBlank() && !body.has("csrf_token")) {
+                        body.put("csrf_token", call.csrf)
+                    }
+                    PartnerApi.postPage(call.path, body, call.csrf, MyPropertyManage.PAGE_PATH, ctx)
+                }
+                if (_binding == null) return@launch
+                if (fresh.optInt("http_status") == 401 || fresh.optString("error") == "unauthorized") {
+                    toast("برای این کار وارد شوید.")
+                    (activity as? MainActivity)?.openDrawer()
+                    return@launch
+                }
+                PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                val list = withContext(Dispatchers.IO) {
+                    PartnerApi.get(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                }
+                if (MyPropertyManage.removedFromPortfolio(list, code)) {
+                    PartnerApi.forget(MyPropertyManage.landDataPath(code), ctx)
+                    val note = fresh.optString("message").trim()
+                    val announced = note.isNotBlank() &&
+                        fresh.optString("error").isBlank() &&
+                        (fresh.optBoolean("ok") || fresh.optBoolean("success"))
+                    toast(if (announced) note else "ملک حذف شد.")
+                    if (!findNavController().navigateUp()) {
+                        (activity as? MainActivity)?.openMyProperty()
+                    }
+                } else {
+                    toast(MyPropertyManage.deleteFailure(fresh, "حذف ملک انجام نشد."))
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                toast(e.message ?: "حذف ملک انجام نشد.")
+            } finally {
+                busy = false
             }
         }
     }
