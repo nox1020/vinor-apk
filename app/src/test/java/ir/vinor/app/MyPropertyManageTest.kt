@@ -154,9 +154,14 @@ class MyPropertyManageTest {
         val ok = JSONObject().put("ok", true).put("http_status", 200)
         val stillPrivate = JSONObject().put("ok", true).put("published_for_sale", false)
         val live = JSONObject().put("ok", true).put("published_for_sale", true)
+        val cachedPrivate = JSONObject()
+            .put("ok", true)
+            .put("published_for_sale", false)
+            .put("from_cache", true)
         assertFalse(MyPropertyManage.publishAccepted(ok, stillPrivate))
         assertTrue(MyPropertyManage.publishAccepted(ok, live))
         assertTrue(MyPropertyManage.publishAccepted(ok, null))
+        assertTrue(MyPropertyManage.publishAccepted(ok, cachedPrivate))
     }
 
     @Test
