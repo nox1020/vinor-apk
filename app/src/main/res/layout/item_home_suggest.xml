@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="10dp"
+    android:background="@drawable/bg_flat_outline_card"
+    android:clickable="true"
+    android:focusable="true"
+    android:baselineAligned="false"
+    android:layoutDirection="rtl"
+    android:minHeight="112dp"
+    android:orientation="horizontal">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/suggestTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:maxLines="2"
+            android:textAlignment="viewStart"
+            android:textColor="@color/vinor_text"
+            android:textDirection="rtl"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/suggestSpec"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:maxLines="1"
+            android:paddingTop="2dp"
+            android:textAlignment="viewStart"
+            android:textColor="@color/vinor_text_muted"
+            android:textDirection="rtl"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/suggestLocBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="4dp">
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_pin"
+                app:tint="@color/vinor_text_muted" />
+
+            <TextView
+                android:id="@+id/suggestLocation"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:textAlignment="viewStart"
+                android:textColor="@color/vinor_text_muted"
+                android:textDirection="rtl"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/suggestPrice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:maxLines="1"
+            android:paddingTop="4dp"
+            android:textAlignment="viewStart"
+            android:textColor="@color/vinor_text"
+            android:textDirection="rtl"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/suggestCommissionRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:background="@drawable/bg_suggest_percent"
+                android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
+                android:text="٪"
+                android:textColor="@color/vinor_on_primary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/suggestCommission"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:textColor="@color/vinor_accent_green"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="104dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="fill_vertical"
+        android:minHeight="112dp">
+
+        <ImageView
+            android:id="@+id/suggestImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/vinor_skeleton_bg"
+            android:contentDescription=""
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/suggestBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="6dp"
+            android:background="@drawable/bg_suggest_pill"
+            android:fontFamily="@font/vazirmatn"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:textColor="@color/vinor_on_primary"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

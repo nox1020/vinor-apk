@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="10dp">
+
+    <LinearLayout
+        android:id="@+id/bankAccountMain"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/bankAccountTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/vinor_text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/bankAccountSheba"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textDirection="ltr"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/bankAccountDefault"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:padding="8dp"
+        android:text="پیش‌فرض"
+        android:textColor="@color/vinor_accent_green"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/bankAccountDelete"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="حذف"
+        android:textColor="@color/vinor_error"
+        android:textSize="13sp" />
+</LinearLayout>

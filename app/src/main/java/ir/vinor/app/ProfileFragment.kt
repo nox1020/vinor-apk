@@ -1,7 +1,7 @@
 package ir.vinor.app
 
 import android.animation.ValueAnimator
-import android.graphics.BitmapFactory
+import android.content.Context
 import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -26,10 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 import android.webkit.CookieManager
 
 /**
@@ -42,10 +39,6 @@ class ProfileFragment : Fragment() {
 
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
 
     private var latestProfile: JSONObject? = null
     private var loadGen = 0
@@ -93,7 +86,15 @@ class ProfileFragment : Fragment() {
         binding.profileAvatarFrame.clipToOutline = true
         binding.profileGuestLogin.setOnClickListener { openLoginScreen() }
         binding.profileRetry.setOnClickListener { loadData(forceSkeleton = true) }
-        loadData(forceSkeleton = !rendered)
+        rememberedProfile?.let { applyPayload(it, loadGen) }
+        loadData(forceSkeleton = !rendered && rememberedProfile == null)
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        val snap = rememberedProfile ?: return
+        if (_binding == null) return
+        applyPayload(snap, loadGen)
     }
 
     override fun onResume() {
@@ -117,16 +118,17 @@ class ProfileFragment : Fragment() {
         val ctx = context ?: return
         if (_binding == null) return
         val gen = ++loadGen
+        val stamp = sessionStamp
         if (forceSkeleton || !rendered) render(ViewState.Loading)
         scope.launch {
             val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(PROFILE_DATA, ctx) }
             var showedCache = false
             try {
                 val obj = PartnerApi.loadDisplay(PROFILE_DATA, ctx) { data ->
-                    if (gen != loadGen || _binding == null) return@loadDisplay
+                    if (gen != loadGen || stamp != sessionStamp || _binding == null) return@loadDisplay
                     if (applyPayload(data, gen)) showedCache = true
                 }
-                if (gen != loadGen || _binding == null) return@launch
+                if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
                 applyPayload(obj, gen)
                 val renderedPayload = isGuest(obj) || isContent(obj)
                 val networkFailed = !wasFresh && (
@@ -142,7 +144,7 @@ class ProfileFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                if (gen != loadGen || _binding == null) return@launch
+                if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
                 if (showedCache || rendered) showOfflineSnackbar() else render(ViewState.Error)
             }
         }
@@ -157,7 +159,10 @@ class ProfileFragment : Fragment() {
             return true
         }
         if (!isContent(obj)) return false
-        latestProfile = obj
+        val copy = JSONObject(obj.toString())
+        copy.remove("from_cache")
+        rememberedProfile = copy
+        latestProfile = copy
         val crm = customersMenuVisible(obj)
         val profile = menuProfile(obj, crm, unreadCount)
         val name = obj.optString("me_name", "").trim()
@@ -492,23 +497,30 @@ class ProfileFragment : Fragment() {
     }
 
     private fun loadAvatar(path: String) {
-        val full = if (path.startsWith("http")) path else "$BASE$path"
+        val full = VinorAvatarCache.resolve(path)
+        if (full.isEmpty()) return
+        VinorAvatarCache.peek(full)?.let { instant ->
+            binding.profileAvatar.setImageBitmap(instant)
+            binding.profileAvatar.isVisible = true
+            binding.profileInitials.isVisible = false
+            return
+        }
+        val ctx = context ?: return
         scope.launch {
             try {
                 val cookie = runCatching { CookieManager.getInstance().getCookie(BASE) }.getOrNull().orEmpty()
-                val req = Request.Builder().url(full).apply {
-                    if (cookie.isNotBlank()) addHeader("Cookie", cookie)
-                }.build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                if (!resp.isSuccessful) return@launch
-                val bytes = resp.body?.bytes() ?: return@launch
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@launch
-                withContext(Dispatchers.Main) {
-                    if (_binding == null || !binding.profileRow.isVisible) return@withContext
-                    binding.profileAvatar.setImageBitmap(bmp)
-                    binding.profileAvatar.visibility = View.VISIBLE
-                    binding.profileInitials.visibility = View.GONE
-                }
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, full)
+                        ?: VinorAvatarCache.fetch(full, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, full, fresh)
+                        }
+                } ?: return@launch
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(full, bmp)
+                if (_binding == null || !binding.profileRow.isVisible) return@launch
+                binding.profileAvatar.setImageBitmap(bmp)
+                binding.profileAvatar.isVisible = true
+                binding.profileInitials.isVisible = false
             } catch (_: Exception) {
             }
         }
@@ -612,8 +624,70 @@ class ProfileFragment : Fragment() {
     companion object {
         private const val BASE = "https://vinor.ir"
         private const val PROFILE_DATA = "/express/partner/profile/data"
+        private const val PROFILE_EDIT_DATA = "/express/partner/profile/edit/data"
         private const val HOME_DATA = "/express/partner/home/data"
         private const val UNREAD = "/express/partner/api/notifications/unread-count"
         private val PHASE_A_FLAGS = VinorManMenu.Flags(consultantApiEnabled = true)
+
+        private var rememberedProfile: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            rememberedProfile = null
+            sessionStamp++
+        }
+
+        /** نام یا عکس تازه را روی کش پروفایل می‌نویسد تا برگشت به این صفحه نسخهٔ قدیمی را نشان ندهد. */
+        fun noteLocalEdit(context: Context, name: String? = null, avatarUrl: String? = null) {
+            if (name == null && avatarUrl.isNullOrEmpty()) return
+            patchCached(context, PROFILE_DATA, name, avatarUrl, keep = true)
+            patchCached(context, PROFILE_EDIT_DATA, name, avatarUrl, keep = false)
+        }
+
+        private fun patchCached(
+            context: Context,
+            path: String,
+            name: String?,
+            avatarUrl: String?,
+            keep: Boolean,
+        ) {
+            val current = PartnerApi.peekJson(path, context)
+            val source = current ?: (if (keep) rememberedProfile else null) ?: return
+            val obj = JSONObject(source.toString())
+            obj.remove("from_cache")
+            if (name != null) obj.put("me_name", name)
+            if (!avatarUrl.isNullOrEmpty()) obj.put("avatar_url", avatarUrl)
+            if (keep) rememberedProfile = JSONObject(obj.toString())
+            PartnerApi.remember(path, obj, context)
+        }
     }
+}
+
+/** ردیف‌های منو به نام، شماره و عکس وابسته نیستند تا عوض شدنشان کل لیست را از نو نسازد. */
+internal object ProfileMenu {
+    fun rowsKey(
+        isApproved: Boolean,
+        isSpecial: Boolean,
+        hasPendingApp: Boolean,
+        plusOn: Boolean,
+        lawyerOn: Boolean,
+        showAppUpdate: Boolean,
+        apkUrl: String,
+        apkVersion: String,
+        showCustomers: Boolean,
+    ): String = listOf(
+        "user",
+        isApproved,
+        isSpecial,
+        hasPendingApp,
+        plusOn,
+        lawyerOn,
+        showAppUpdate,
+        apkUrl,
+        apkVersion,
+        showCustomers,
+    ).joinToString("\u0001")
+
+    fun guestKey(plusOn: Boolean, lawyerOn: Boolean): String =
+        listOf("guest", plusOn, lawyerOn).joinToString("\u0001")
 }

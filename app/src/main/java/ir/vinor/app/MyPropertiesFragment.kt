@@ -51,7 +51,7 @@ class MyPropertiesFragment : Fragment() {
                 ContextCompat.getColor(context, R.color.vinor_text),
             )
             contentDescription = "ثبت ملک"
-            setPadding(dp(11), dp(11), dp(11), dp(11))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             setOnClickListener { (activity as? MainActivity)?.openOwnerHomeForm() }
         }
@@ -179,9 +179,9 @@ class MyPropertiesFragment : Fragment() {
             card.landCardCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
         PartnerImages.bind(scope, card.landCardImage, land.optString("image_url"), card.landCardImagePlaceholder)
-        val code = land.optString("code")
+        val code = MyPropertyManage.codeOf(land)
         card.root.setOnClickListener {
-            if (code.isNotBlank()) (activity as? MainActivity)?.openLand(code)
+            if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
         binding.mpList.addView(card.root)
     }

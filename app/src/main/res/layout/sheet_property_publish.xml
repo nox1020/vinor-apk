@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_search_sheet"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:paddingBottom="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:text="انتشار برای فروش"
+            android:textColor="@color/vinor_text"
+            android:textSize="15sp" />
+
+        <ImageButton
+            android:id="@+id/publishSheetClose"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="بستن"
+            android:src="@drawable/ic_close"
+            android:tint="@color/vinor_text" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:fontFamily="@font/vazirmatn"
+        android:text="بعد از انتشار، این ملک در آگهی‌های وینور دیده می‌شود."
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/publishPayCash"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_ld_chip"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="نقدی"
+            android:textColor="@color/vinor_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/publishPayDeal"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_ld_chip"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="توافقی"
+            android:textColor="@color/vinor_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/publishPaySwap"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_ld_chip"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:text="معاوضه"
+            android:textColor="@color/vinor_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/vazirmatn"
+            android:text="پورسانت"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/publishCommission"
+            android:layout_width="72dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_ld_chip"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:importantForAutofill="no"
+            android:inputType="numberDecimal"
+            android:text="2"
+            android:textColor="@color/vinor_text"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/vazirmatn"
+            android:text="٪"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/publishSendAll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:buttonTint="@color/vinor_accent_green"
+        android:fontFamily="@font/vazirmatn"
+        android:text="ارسال به همه همکاران"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/publishSheetSave"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_hub_start"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:text="انتشار برای فروش"
+        android:textColor="#052E16"
+        android:textSize="15sp" />
+</LinearLayout>

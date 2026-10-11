@@ -19,7 +19,7 @@
         android:paddingBottom="6dp"
         android:text="قیمت‌گذاری شخصی — منتشر نمی‌شود و فقط تغییرات قیمت را برای شما نشان می‌دهد"
         android:textColor="@color/vinor_text_muted"
-        android:textSize="11sp" />
+        android:textSize="13sp" />
 
     <ProgressBar
         android:id="@+id/mpFormProgress"

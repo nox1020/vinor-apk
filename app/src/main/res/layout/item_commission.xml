@@ -1,133 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
-    android:background="@drawable/bg_routine_card"
-    android:padding="16dp">
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:minHeight="72dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/itemCommissionLandCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="کد فایل: —"
+                android:textColor="@color/vinor_text"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/itemCommissionDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/itemCommissionSaleRow"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/itemCommissionLandCode"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="کد فایل: —"
-                    android:textColor="#F9FAFB"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:text="مبلغ فروش"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="13sp" />
+
                 <TextView
-                    android:id="@+id/itemCommissionDate"
+                    android:id="@+id/itemCommissionSaleAmount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="#9CA3AF"
-                    android:textSize="12sp" />
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="13sp" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/itemCommissionStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:text="در انتظار"
-                android:textColor="#D97706"
-                android:textSize="11sp"
-                android:background="@drawable/bg_routine_badge" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="12dp"
-            android:background="#374151" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="درصد پورسانت"
-                android:textColor="#9CA3AF"
-                android:textSize="12sp" />
-            <TextView
-                android:id="@+id/itemCommissionPct"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0%"
-                android:textColor="#F9FAFB"
-                android:textSize="12sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_marginStart="12dp"
+            android:gravity="end"
+            android:orientation="vertical">
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="مبلغ پورسانت"
-                android:textColor="#9CA3AF"
-                android:textSize="12sp" />
             <TextView
                 android:id="@+id/itemCommissionAmount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="۰ تومان"
-                android:textColor="#F9FAFB"
-                android:textSize="14sp"
+                android:textColor="@color/vinor_accent_green"
+                android:textSize="16sp"
                 android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/itemCommissionSaleRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:visibility="gone">
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="مبلغ فروش"
-                android:textColor="#9CA3AF"
-                android:textSize="12sp" />
-            <TextView
-                android:id="@+id/itemCommissionSaleAmount"
+                android:id="@+id/itemCommissionPct"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#F9FAFB"
+                android:layout_gravity="end"
+                android:layout_marginTop="2dp"
+                android:text="0%"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/itemCommissionStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_routine_badge"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="در انتظار"
+                android:textColor="#D97706"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
-</FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="16dp"
+        android:background="@color/vinor_border" />
+</LinearLayout>

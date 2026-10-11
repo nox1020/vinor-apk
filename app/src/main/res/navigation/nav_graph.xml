@@ -116,6 +116,25 @@
             android:name="publicListing"
             app:argType="boolean"
             android:defaultValue="false" />
+        <argument
+            android:name="editCode"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/myPropertyManageFragment"
+        android:name="ir.vinor.app.MyPropertyManageFragment"
+        android:label="مدیریت ملک"
+        tools:layout="@layout/fragment_my_property_manage">
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
     </fragment>
 
     <fragment
@@ -145,6 +164,17 @@
         android:name="ir.vinor.app.ConsultantOnboardingFragment"
         android:label="بازاریاب وینور"
         tools:layout="@layout/fragment_consultant_onboarding" />
+
+    <fragment
+        android:id="@+id/customersFragment"
+        android:name="ir.vinor.app.CustomersFragment"
+        android:label="مشتریان"
+        tools:layout="@layout/fragment_customers">
+        <argument
+            android:name="url"
+            app:argType="string"
+            android:defaultValue="https://vinor.ir/express/partner/customers" />
+    </fragment>
 
     <fragment
         android:id="@+id/partnerPageFragment"

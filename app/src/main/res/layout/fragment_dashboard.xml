@@ -14,27 +14,31 @@
             android:id="@+id/dashboardHomeHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/vinor_bg"
+            android:background="@color/vinor_chrome"
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="6dp">
+            android:paddingVertical="8dp">
 
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:id="@+id/dashboardHomeAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/bg_hub_avatar"
-                android:contentDescription=""
-                android:padding="10dp"
+                android:clickable="true"
+                android:contentDescription="پروفایل"
+                android:focusable="true"
+                android:padding="9dp"
+                android:scaleType="centerCrop"
                 android:src="@drawable/ic_profile"
-                app:tint="#E4E4E7" />
+                app:tint="@color/vinor_text" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -45,8 +49,8 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="سلام، همکار عزیز"
-                    android:textColor="#FAFAFA"
-                    android:textSize="14sp"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="17sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -57,51 +61,25 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:text="آماده‌ای بفروشی؟"
-                    android:textColor="#A1A1AA"
-                    android:textSize="12sp" />
+                    android:textColor="@color/vinor_accent_green"
+                    android:textSize="13sp" />
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="وینور"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="108dp"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="فرصت بیشتر، درآمد بالاتر"
-                        android:textColor="#71717A"
-                        android:textSize="9sp" />
-                </LinearLayout>
-
-                <ImageButton
-                    android:id="@+id/dashboardBell"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_hub_avatar"
-                    android:contentDescription="اعلان‌ها"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_stat_notify"
-                    app:tint="#FAFAFA" />
-            </LinearLayout>
+            <ImageButton
+                android:id="@+id/dashboardBell"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="اعلان‌ها"
+                android:padding="12dp"
+                android:src="@drawable/ic_stat_notify"
+                app:tint="@color/vinor_text" />
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/vinor_border" />
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -120,7 +98,7 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingTop="8dp">
+            android:scrollbars="none">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -132,478 +110,595 @@
                     android:id="@+id/dashboardEmpty"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:layoutDirection="rtl"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="12dp">
+                    android:orientation="vertical">
 
                     <LinearLayout
                         android:id="@+id/dashboardWallet"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:minHeight="104dp"
-                        android:background="@drawable/bg_hub_card"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="12dp"
-                        android:visibility="gone">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="پورسانت‌های قابل دریافت"
-                                android:textColor="#A1A1AA"
-                                android:textSize="12sp" />
-
-                            <TextView
-                                android:id="@+id/dashboardWalletAmount"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:ellipsize="end"
-                                android:maxLines="1"
-                                android:textColor="#FAFAFA"
-                                android:textSize="22sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/dashboardWalletGrowth"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/bg_hub_growth"
-                            android:gravity="center"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="6dp"
-                            android:textColor="#4ADE80"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:visibility="gone" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/dashboardHero"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
                         android:layout_marginTop="12dp"
-                        android:minHeight="150dp"
-                        android:background="@drawable/bg_hub_hero"
+                        android:background="@drawable/bg_flat_outline_card"
                         android:clickable="true"
                         android:focusable="true"
                         android:orientation="vertical"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="16dp"
-                        android:paddingBottom="14dp">
-
-                        <TextView
-                            android:id="@+id/dashboardHeroKicker"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="فرصت در دستان شماست"
-                            android:textColor="#86EFAC"
-                            android:textSize="12sp"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/dashboardHeroIcon"
-                            android:layout_width="0dp"
-                            android:layout_height="0dp"
-                            android:contentDescription=""
-                            android:src="@drawable/ic_handshake"
-                            android:visibility="gone" />
+                        android:paddingTop="4dp"
+                        android:paddingBottom="6dp"
+                        android:visibility="gone">
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
                             android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:minHeight="64dp"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="16dp"
+                            android:paddingVertical="10dp">
 
-                            <TextView
-                                android:id="@+id/dashboardHeroTitle"
+                            <ImageView
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_hub_avatar"
+                                android:contentDescription=""
+                                android:padding="9dp"
+                                android:src="@drawable/ic_wallet"
+                                app:tint="@color/vinor_accent_green" />
+
+                            <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
                                 android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:maxLines="2"
-                                android:text="مشتری دارم"
-                                android:textColor="#FFFFFF"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/dashboardWalletAmount"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:text="پورسانت قابل برداشت"
+                                    android:textColor="@color/vinor_text_muted"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
 
                             <TextView
-                                android:id="@+id/dashboardHeroCount"
+                                android:id="@+id/dashboardWalletGrowth"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="8dp"
-                                android:background="@drawable/bg_count_badge"
-                                android:minWidth="20dp"
-                                android:paddingHorizontal="6dp"
-                                android:paddingVertical="2dp"
-                                android:textColor="#FFFFFF"
+                                android:background="@drawable/bg_hub_growth"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="1"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="6dp"
+                                android:textColor="@color/vinor_accent_green"
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:visibility="gone" />
                         </LinearLayout>
 
-                        <TextView
-                            android:id="@+id/dashboardHeroSub"
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginHorizontal="16dp"
+                            android:layout_marginTop="2dp"
+                            android:layout_marginBottom="2dp"
+                            android:background="@color/vinor_border" />
+
+                        <LinearLayout
+                            android:id="@+id/dashboardPerf"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="برای مشتری فایل مناسب پیدا کن"
-                            android:textColor="#D1FAE5"
-                            android:textSize="13sp" />
+                            android:orientation="vertical"
+                            android:visibility="gone">
 
-                        <TextView
-                            android:id="@+id/dashboardHeroStart"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:background="@drawable/bg_hub_start"
-                            android:gravity="center"
-                            android:minHeight="44dp"
-                            android:paddingHorizontal="16dp"
-                            android:text="شروع کنید"
-                            android:textColor="#052E16"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingTop="12dp"
+                                android:paddingBottom="12dp">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical"
+                                    android:paddingHorizontal="4dp"
+                                    android:paddingVertical="2dp">
+
+                                    <TextView
+                                        android:id="@+id/dashboardPerfCustomers"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="۰"
+                                        android:textColor="@color/vinor_text"
+                                        android:textSize="18sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center"
+                                        android:maxLines="2"
+                                        android:text="مشتری فعال"
+                                        android:textColor="@color/vinor_text_muted"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+
+                                <View
+                                    android:layout_width="1dp"
+                                    android:layout_height="32dp"
+                                    android:background="@color/vinor_border" />
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical"
+                                    android:paddingHorizontal="4dp"
+                                    android:paddingVertical="2dp">
+
+                                    <TextView
+                                        android:id="@+id/dashboardPerfVisits"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="۰"
+                                        android:textColor="@color/vinor_text"
+                                        android:textSize="18sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center"
+                                        android:maxLines="2"
+                                        android:text="بازدید انجام‌شده"
+                                        android:textColor="@color/vinor_text_muted"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+
+                                <View
+                                    android:layout_width="1dp"
+                                    android:layout_height="32dp"
+                                    android:background="@color/vinor_border" />
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center"
+                                    android:orientation="vertical"
+                                    android:paddingHorizontal="4dp"
+                                    android:paddingVertical="2dp">
+
+                                    <TextView
+                                        android:id="@+id/dashboardPerfDeals"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="۰"
+                                        android:textColor="@color/vinor_text"
+                                        android:textSize="18sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center"
+                                        android:maxLines="2"
+                                        android:text="معامله موفق"
+                                        android:textColor="@color/vinor_text_muted"
+                                        android:textSize="12sp" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </LinearLayout>
                     </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/dashboardShortcuts"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="12dp"
                         android:orientation="vertical">
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:baselineAligned="false"
                             android:orientation="horizontal">
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutTrain"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginEnd="5dp"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="آموزش فروش"
                                 android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
+                                android:gravity="center_horizontal"
+                                android:orientation="vertical"
+                                android:paddingHorizontal="8dp"
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_graduation"
-                                    app:tint="#E4E4E7" />
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
+
+                                    <ImageView
+                                        android:layout_width="36dp"
+                                        android:layout_height="36dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription=""
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_cap" />
+                                </FrameLayout>
 
                                 <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
+                                    android:layout_weight="1"
+                                    android:ellipsize="end"
+                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:gravity="center"
+                                    android:maxLines="1"
                                     android:text="آموزش فروش"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
+                                    android:textColor="@color/vinor_text"
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="11sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
+
+                            <View
+                                android:layout_width="12dp"
+                                android:layout_height="1dp" />
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutNews"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="5dp"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="خبر وینور"
                                 android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
+                                android:gravity="center_horizontal"
+                                android:orientation="vertical"
+                                android:paddingHorizontal="8dp"
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_news"
-                                    app:tint="#E4E4E7" />
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
+
+                                    <ImageView
+                                        android:layout_width="34dp"
+                                        android:layout_height="34dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription=""
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_news" />
+                                </FrameLayout>
 
                                 <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:text="خبر وینور"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:orientation="horizontal">
-
-                            <LinearLayout
-                                android:id="@+id/dashboardShortcutFiles"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginEnd="5dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_home"
-                                    app:tint="#E4E4E7" />
-
-                                <TextView
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
                                     android:layout_weight="1"
                                     android:ellipsize="end"
+                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:gravity="center"
                                     android:maxLines="1"
-                                    android:text="فایل‌های من"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
+                                    android:text="خبر وینور"
+                                    android:textColor="@color/vinor_text"
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="11sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
+
+                            <View
+                                android:layout_width="12dp"
+                                android:layout_height="1dp" />
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutFollow"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="5dp"
+                                android:layout_height="118dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
+                                android:background="@drawable/bg_dash_tile"
                                 android:clickable="true"
+                                android:contentDescription="پیگیری مشتری‌ها"
                                 android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="10dp">
+                                android:gravity="center_horizontal"
+                                android:orientation="vertical"
+                                android:paddingHorizontal="6dp"
+                                android:paddingTop="16dp"
+                                android:paddingBottom="12dp">
 
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_clipboard"
-                                    app:tint="#E4E4E7" />
+                                <FrameLayout
+                                    android:layout_width="56dp"
+                                    android:layout_height="52dp"
+                                    android:layoutDirection="ltr">
+
+                                    <View
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:layout_gravity="center"
+                                        android:background="@drawable/bg_tile_icon_glow" />
+
+                                    <ImageView
+                                        android:layout_width="30dp"
+                                        android:layout_height="30dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription=""
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_tile_phone" />
+
+                                    <TextView
+                                        android:id="@+id/dashboardFollowBadge"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="22dp"
+                                        android:layout_gravity="top|end"
+                                        android:background="@drawable/bg_tile_badge"
+                                        android:fontFamily="@font/vazirmatn_bold"
+                                        android:gravity="center"
+                                        android:includeFontPadding="false"
+                                        android:minWidth="22dp"
+                                        android:paddingHorizontal="4dp"
+                                        android:textColor="@color/vinor_on_primary"
+                                        android:textSize="12sp"
+                                        android:visibility="gone" />
+                                </FrameLayout>
 
                                 <TextView
                                     android:id="@+id/dashboardShortcutFollowTitle"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="6dp"
                                     android:layout_weight="1"
                                     android:ellipsize="end"
+                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:gravity="center"
                                     android:maxLines="1"
                                     android:text="پیگیری مشتری‌ها"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/dashboardFollowBadge"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:background="@drawable/bg_count_badge"
-                                    android:minWidth="18dp"
-                                    android:paddingHorizontal="5dp"
-                                    android:paddingVertical="1dp"
-                                    android:textColor="#FFFFFF"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold"
-                                    android:visibility="gone" />
+                                    android:textColor="@color/vinor_text"
+                                    app:autoSizeMaxTextSize="15sp"
+                                    app:autoSizeMinTextSize="10sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
 
-                    <LinearLayout
-                        android:id="@+id/dashboardFilesHead"
+                    <View
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="فایل‌های پیشنهادی برای فروش"
-                            android:textColor="#FAFAFA"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/dashboardSeeAll"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:padding="4dp"
-                            android:text="مشاهده همه"
-                            android:textColor="#60A5FA"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <HorizontalScrollView
-                        android:id="@+id/dashboardAdsScroll"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:clipToPadding="false"
-                        android:layoutDirection="rtl"
-                        android:scrollbars="none"
-                        android:visibility="gone">
-
-                        <LinearLayout
-                            android:id="@+id/dashboardAds"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layoutDirection="rtl"
-                            android:orientation="horizontal"
-                            android:paddingBottom="4dp" />
-                    </HorizontalScrollView>
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <LinearLayout
-                        android:id="@+id/dashboardPerf"
+                        android:id="@+id/dashboardSuggestBlock"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="10dp"
                         android:orientation="vertical"
                         android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="عملکرد من"
-                            android:textColor="#FAFAFA"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:orientation="horizontal">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="16dp"
+                            android:paddingBottom="8dp">
 
-                            <LinearLayout
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_home"
+                                app:tint="@color/vinor_text" />
+
+                            <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginEnd="4dp"
+                                android:layout_marginStart="6dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:gravity="center"
-                                android:orientation="vertical"
-                                android:paddingVertical="10dp">
-
-                                <TextView
-                                    android:id="@+id/dashboardPerfCustomers"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="۰"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:gravity="center"
-                                    android:text="مشتری فعال"
-                                    android:textColor="#A1A1AA"
-                                    android:textSize="11sp" />
-                            </LinearLayout>
+                                android:ellipsize="end"
+                                android:fontFamily="@font/vazirmatn"
+                                android:maxLines="1"
+                                android:text="فایل‌های پیشنهادی برای شما"
+                                android:textColor="@color/vinor_text"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
 
                             <LinearLayout
-                                android:layout_width="0dp"
+                                android:id="@+id/dashboardSuggestSeeAll"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="4dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
-                                android:gravity="center"
-                                android:orientation="vertical"
-                                android:paddingVertical="10dp">
-
-                                <TextView
-                                    android:id="@+id/dashboardPerfVisits"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="۰"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="4dp"
+                                android:paddingVertical="4dp">
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:gravity="center"
-                                    android:text="بازدید انجام‌شده"
-                                    android:textColor="#A1A1AA"
-                                    android:textSize="11sp" />
+                                    android:fontFamily="@font/vazirmatn"
+                                    android:text="مشاهده همه"
+                                    android:textColor="@color/vinor_accent_green"
+                                    android:textSize="13sp" />
+
+                                <ImageView
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
+                                    android:layout_marginStart="2dp"
+                                    android:contentDescription=""
+                                    android:src="@drawable/ic_chevron_left"
+                                    app:tint="@color/vinor_accent_green" />
                             </LinearLayout>
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:id="@+id/dashboardSuggestScroll"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:clipToPadding="false"
+                            android:layoutDirection="rtl"
+                            android:overScrollMode="never"
+                            android:paddingHorizontal="16dp"
+                            android:paddingBottom="4dp"
+                            android:scrollbars="none">
 
                             <LinearLayout
-                                android:layout_width="0dp"
+                                android:id="@+id/dashboardSuggest"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_hub_card"
+                                android:layoutDirection="rtl"
+                                android:orientation="horizontal" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/dashboardHero"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_customer_card"
+                        android:clickable="true"
+                        android:contentDescription="مشتری دارم"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:layoutDirection="rtl"
+                        android:minHeight="76dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="10dp">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layoutDirection="ltr"
+                            android:background="@drawable/bg_customer_start"
+                            android:gravity="center_vertical"
+                            android:minHeight="48dp"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="8dp">
+
+                            <ImageView
+                                android:id="@+id/dashboardHeroIcon"
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:contentDescription=""
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_customer_plus" />
+
+                            <TextView
+                                android:id="@+id/dashboardHeroStart"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:fontFamily="@font/vazirmatn_bold"
+                                android:text="ادامه"
+                                android:textColor="@color/vinor_customer_bg"
+                                android:textSize="15sp"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/dashboardHeroKicker"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="فرصت در دستان شماست"
+                                android:textColor="@color/vinor_on_primary"
+                                android:textSize="12sp"
+                                android:visibility="gone" />
+
+                            <TextView
+                                android:id="@+id/dashboardHeroTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/vazirmatn_bold"
                                 android:gravity="center"
-                                android:orientation="vertical"
-                                android:paddingVertical="10dp">
+                                android:maxLines="1"
+                                android:text="مشتری دارم"
+                                android:textColor="@color/vinor_on_primary"
+                                android:textSize="26sp" />
 
-                                <TextView
-                                    android:id="@+id/dashboardPerfDeals"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="۰"
-                                    android:textColor="#FAFAFA"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
+                            <TextView
+                                android:id="@+id/dashboardHeroSub"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:ellipsize="end"
+                                android:maxLines="2"
+                                android:text="برای مشتری فایل مناسب پیدا کن"
+                                android:textColor="@color/vinor_text"
+                                android:textSize="13sp"
+                                android:visibility="gone" />
 
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:gravity="center"
-                                    android:text="معامله موفق"
-                                    android:textColor="#A1A1AA"
-                                    android:textSize="11sp" />
-                            </LinearLayout>
+                            <TextView
+                                android:id="@+id/dashboardHeroCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_count_badge"
+                                android:minWidth="18dp"
+                                android:paddingHorizontal="6dp"
+                                android:textColor="@color/vinor_on_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:visibility="gone" />
                         </LinearLayout>
                     </LinearLayout>
 
@@ -611,89 +706,130 @@
                         android:id="@+id/dashboardTiles"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
+                        android:orientation="vertical"
                         android:visibility="gone">
 
                         <LinearLayout
                             android:id="@+id/dashboardTileBuy"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
+                            android:background="?attr/selectableItemBackground"
+                            android:gravity="center_vertical"
+                            android:minHeight="52dp"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="8dp"
                             android:visibility="gone">
 
                             <ImageView
                                 android:id="@+id/dashboardTileBuyIcon"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
+                                android:padding="9dp"
                                 android:src="@drawable/ic_search_stroke" />
 
-                            <TextView
-                                android:id="@+id/dashboardTileBuyTitle"
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:textColor="#F4F4F5"
-                                android:textSize="14sp" />
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/dashboardTileBuySub"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="#8E8E93"
-                                android:textSize="11sp" />
+                                <TextView
+                                    android:id="@+id/dashboardTileBuyTitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="16sp" />
+
+                                <TextView
+                                    android:id="@+id/dashboardTileBuySub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text_muted"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
 
                             <TextView
                                 android:id="@+id/dashboardTileBuyCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:textColor="@color/vinor_on_primary"
                                 android:visibility="gone" />
                         </LinearLayout>
 
                         <View
                             android:id="@+id/dashboardTilesDivider"
-                            android:layout_width="1dp"
+                            android:layout_width="match_parent"
                             android:layout_height="1dp"
+                            android:layout_marginStart="64dp"
+                            android:background="@color/vinor_border"
                             android:visibility="gone" />
 
                         <LinearLayout
                             android:id="@+id/dashboardTileLevels"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
+                            android:background="?attr/selectableItemBackground"
+                            android:gravity="center_vertical"
+                            android:minHeight="52dp"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="8dp"
                             android:visibility="gone">
 
                             <ImageView
                                 android:id="@+id/dashboardTileLevelsIcon"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_hub_avatar"
                                 android:contentDescription=""
+                                android:padding="9dp"
                                 android:src="@drawable/ic_users_stroke" />
 
-                            <TextView
-                                android:id="@+id/dashboardTileLevelsTitle"
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:textColor="#F4F4F5"
-                                android:textSize="14sp" />
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/dashboardTileLevelsSub"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="#8E8E93"
-                                android:textSize="11sp" />
+                                <TextView
+                                    android:id="@+id/dashboardTileLevelsTitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="16sp" />
+
+                                <TextView
+                                    android:id="@+id/dashboardTileLevelsSub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text_muted"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
 
                             <TextView
                                 android:id="@+id/dashboardTileLevelsCount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:textColor="@color/vinor_on_primary"
                                 android:visibility="gone" />
                         </LinearLayout>
                     </LinearLayout>
-                </LinearLayout>
-
+</LinearLayout>
                 <LinearLayout
                     android:id="@+id/dashboardChatList"
                     android:layout_width="match_parent"
@@ -974,6 +1110,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
+        android:background="@color/vinor_chrome"
+        android:minHeight="56dp"
         android:visibility="gone"
         android:gravity="center_vertical"
         android:layoutDirection="rtl"
@@ -1026,134 +1164,238 @@
             android:clickable="true"
             android:focusable="true" />
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:background="@drawable/bg_customer_panel"
-            android:clickable="true"
-            android:layoutDirection="rtl"
-            android:orientation="vertical"
-            android:paddingBottom="18dp">
-
-            <View
-                android:layout_width="40dp"
-                android:layout_height="4dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="9dp"
-                android:background="#33FFFFFF" />
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="ثبت مشتری جدید"
-                    android:textColor="#F4F4F5"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/dashboardCustomerClose"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="start|center_vertical"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="بستن"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_close" />
-            </FrameLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#14FFFFFF" />
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
+                android:id="@+id/dashboardCustomerSheetHost"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="12dp">
+                android:gravity="bottom"
+                android:orientation="vertical">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerFirst"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="نام"
-                    android:inputType="textPersonName"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                    android:background="@drawable/bg_customer_panel"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layoutDirection="rtl"
+                    android:orientation="vertical">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerLast"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="نام خانوادگی"
-                    android:inputType="textPersonName"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="4dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
+                        android:background="#33FFFFFF" />
 
-                <EditText
-                    android:id="@+id/dashboardCustomerPhone"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="0912…"
-                    android:inputType="phone"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="ltr"
-                    android:textSize="15sp" />
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="56dp">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerNotes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:gravity="top|start"
-                    android:hint="مثلاً ترجیح منطقه یا نکتهٔ مهم برای بازدید"
-                    android:inputType="textMultiLine"
-                    android:minLines="3"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                        <ImageButton
+                            android:id="@+id/dashboardCustomerClose"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="start|center_vertical"
+                            android:layout_marginStart="4dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="بستن"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_close"
+                            app:tint="@color/vinor_text" />
 
-                <Button
-                    android:id="@+id/dashboardCustomerSubmit"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_customer_submit"
-                    android:text="ارسال درخواست تعیین وقت بازدید"
-                    android:textColor="#042F2E"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:fontFamily="@font/vazirmatn_bold"
+                            android:gravity="center"
+                            android:paddingHorizontal="56dp"
+                            android:text="ثبت مشتری جدید"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="17sp" />
+
+                        <ProgressBar
+                            android:id="@+id/dashboardCustomerProgress"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="end|center_vertical"
+                            android:layout_marginEnd="16dp"
+                            android:indeterminateTint="@color/vinor_accent_green"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/vinor_border" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:paddingTop="12dp"
+                        android:text="نام و موبایل مشتری را برای تعیین وقت بازدید وارد کنید."
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="نام"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerFirst"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="personGivenName"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="نام"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPersonName|textCapWords"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="نام خانوادگی"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerLast"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="personFamilyName"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="نام خانوادگی"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPersonName|textCapWords"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="موبایل"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerPhone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="phone"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="۰۹۱۲…"
+                        android:imeOptions="actionNext"
+                        android:inputType="phone"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="ltr"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="یادداشت"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerNotes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:gravity="top|start"
+                        android:hint="منطقه یا نکتهٔ مهم برای بازدید"
+                        android:imeOptions="actionDone"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:maxLines="6"
+                        android:minLines="3"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/dashboardCustomerError"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:textColor="@color/vinor_error"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/dashboardCustomerSubmit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/bg_hub_start"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:minHeight="48dp"
+                        android:stateListAnimator="@null"
+                        android:text="ثبت مشتری"
+                        android:textAllCaps="false"
+                        android:textColor="@color/vinor_customer_bg"
+                        android:textSize="16sp" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </FrameLayout>
 </FrameLayout>

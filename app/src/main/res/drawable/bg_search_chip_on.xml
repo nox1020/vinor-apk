@@ -3,7 +3,7 @@
     android:insetTop="6dp"
     android:insetBottom="6dp">
     <shape android:shape="rectangle">
-        <solid android:color="@color/vinor_primary_red" />
+        <solid android:color="@color/vinor_accent_green" />
         <corners android:radius="999dp" />
     </shape>
 </inset>

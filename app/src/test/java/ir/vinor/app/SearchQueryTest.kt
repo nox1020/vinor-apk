@@ -1,5 +1,7 @@
 package ir.vinor.app
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -165,5 +167,207 @@ class SearchQueryTest {
         )
         val byArea = SearchAds.apply(areas, SearchQuery(areaMin = 75, areaMax = 120))
         assertEquals(listOf("مناسب"), byArea.map { it.title })
+    }
+
+    @Test
+    fun defaultCity_isAllProvincesAndNewestKeepsServerOrder() {
+        assertEquals("همه استان‌ها", SearchQuery.ALL_PROVINCES)
+        assertEquals("", SearchQuery().city)
+        assertEquals(SearchSort.NEWEST, SearchQuery().sort)
+        val plain = listOf(
+            SearchAd(title = "دوم", index = 1),
+            SearchAd(title = "اول", index = 0),
+        )
+        assertEquals(listOf("اول", "دوم"), SearchAds.newest(plain).map { it.title })
+        assertEquals(listOf("اول", "دوم"), SearchAds.apply(plain, SearchQuery()).map { it.title })
+    }
+
+    @Test
+    fun newest_sortsCreatedAtDescending() {
+        val ads = listOf(
+            SearchAd(title = "قدیم", createdAt = 1_000, index = 0),
+            SearchAd(title = "بدون", index = 1),
+            SearchAd(title = "جدید", createdAt = 5_000, index = 2),
+        )
+        assertEquals(listOf("جدید", "قدیم", "بدون"), SearchAds.newest(ads).map { it.title })
+        assertEquals(1_710_000_000_000L, SearchAds.parseTime("1710000000"))
+        assertEquals(1_710_000_000_000L, SearchAds.parseTime("1710000000000"))
+        assertTrue(SearchAds.parseTime("2026-03-01T10:00:00") > 0L)
+        assertTrue(SearchAds.parseTime("2026-03-01") > 0L)
+        assertEquals(0L, SearchAds.parseTime(""))
+        assertEquals(0L, SearchAds.parseTime("null"))
+    }
+
+    @Test
+    fun catalog_prefersPublishedSearchRowsNewestFirst() {
+        val html = """
+            <a class="vn-search-row" href="/express/partner/lands/20" data-land-code="20" data-city="اصفهان" data-created="2026-04-02T08:00:00">
+              <img src="/a.jpg">
+              <p class="vn-search-name">جدید اصفهان</p>
+              <p class="vn-search-price">۴٬۰۰۰٬۰۰۰٬۰۰۰</p>
+              <p class="vn-search-loc">در نقش‌جهان</p>
+              <p class="vn-search-comm">پورسانت ۱۲۰۰۰۰۰</p>
+              <span class="vn-search-shots">۲</span>
+            </a>
+            <a class="vn-search-row" href="/express/partner/divar/tok" data-divar-token="tok" data-city="تهران" data-created="2026-01-01">
+              <p class="vn-search-name">قدیم تهران</p>
+              <p class="vn-search-price">توافقی</p>
+            </a>
+            <a class="vn-search-row" href="/express/partner/lands/9" data-land-code="9" data-published-for-sale="false">
+              <p class="vn-search-name">خصوصی</p>
+            </a>
+        """.trimIndent()
+        val rows = SearchPageHtml.parse(html)
+        assertEquals(listOf("جدید اصفهان", "قدیم تهران"), rows.map { it.title })
+        assertEquals("vinor", rows[0].source)
+        assertEquals("20", rows[0].token)
+        assertEquals("اصفهان", rows[0].city)
+        assertEquals("نقش‌جهان", rows[0].district)
+        assertEquals(1_200_000, rows[0].commissionAmount)
+        assertEquals(2, rows[0].imageCount)
+        assertEquals("divar", rows[1].source)
+        assertTrue(rows[0].createdAt > rows[1].createdAt)
+        val home = listOf(SearchAd(title = "فقط خانه", index = 0))
+        val chosen = SearchAds.catalog(rows, home, emptyList())
+        assertEquals(listOf("جدید اصفهان", "قدیم تهران"), SearchAds.apply(chosen, SearchQuery()).map { it.title })
+    }
+
+    @Test
+    fun homeJson_dropsUnpublishedAndSortsByCreatedAt() {
+        val array = JSONArray()
+            .put(
+                JSONObject()
+                    .put("title", "خصوصی")
+                    .put("published_for_sale", false)
+                    .put("token", "1"),
+            )
+            .put(
+                JSONObject()
+                    .put("title", "قدیمی")
+                    .put("published_for_sale", true)
+                    .put("created_at", "2026-01-01T00:00:00")
+                    .put("token", "2")
+                    .put("price_toman", 3_000_000_000L),
+            )
+            .put(
+                JSONObject()
+                    .put("title", "تازه")
+                    .put("created_at", "2026-06-01T00:00:00")
+                    .put("token", "3"),
+            )
+        val ads = SearchAds.fromObjects(array)
+        assertEquals(listOf("قدیمی", "تازه"), ads.map { it.title })
+        assertEquals(listOf("تازه", "قدیمی"), SearchAds.apply(ads, SearchQuery()).map { it.title })
+        val again = SearchAds.dedupe(ads + ads.first())
+        assertEquals(2, again.size)
+    }
+
+    @Test
+    fun partnerCard_opensFromCodeWhenTokenIsMissing() {
+        val partner = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "250متر زمین ویلایی دماوند")
+                    .put("code", "2")
+                    .put("source", "vinor")
+                    .put("published_for_sale", true),
+            ),
+        )
+        assertEquals(1, partner.size)
+        assertEquals("2", partner[0].token)
+        assertEquals("vinor", partner[0].source)
+        assertEquals("/express/partner/lands/2", partner[0].url)
+        assertEquals("2", SearchAds.openCode(partner[0]))
+        val onlyUrl = SearchAd(url = "/express/partner/lands/9")
+        assertEquals("9", SearchAds.openCode(onlyUrl))
+        val query = SearchAd(url = "/express/partner/home?land=4")
+        assertEquals("4", SearchAds.openCode(query))
+        val divar = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "دیوار")
+                    .put("divar_token", "tok")
+                    .put("source", "divar"),
+            ),
+        )
+        assertEquals("divar:tok", SearchAds.openCode(divar[0]))
+    }
+
+    @Test
+    fun cardText_formatsPriceAreaAndPlace() {
+        val partner = SearchAds.fromObjects(
+            JSONArray().put(
+                JSONObject()
+                    .put("title", "250متر زمین ویلایی دماوند")
+                    .put("code", "2")
+                    .put("city", "تهران")
+                    .put("location", "تهرانپارس")
+                    .put("size", 250)
+                    .put("price_toman", 1_000_000_000L)
+                    .put("published_for_sale", true),
+            ),
+        )[0]
+        assertEquals("۱،۰۰۰،۰۰۰،۰۰۰ تومان", SearchAds.cardPrice(partner.priceRaw))
+        assertEquals("۲۵۰ متر", SearchAds.cardArea(partner.areaRaw))
+        assertEquals("در تهران، تهرانپارس", SearchAds.cardPlace(partner))
+        assertEquals("توافقی", SearchAds.cardPrice(""))
+        assertEquals("توافقی", SearchAds.cardPrice("توافقی"))
+        assertEquals("۱،۰۰۰،۰۰۰،۰۰۰ تومان", SearchAds.cardPrice("۱،۰۰۰،۰۰۰،۰۰۰ تومان"))
+        assertEquals("۲۵۰ متر مربع", SearchAds.cardArea("۲۵۰ متر مربع"))
+        assertEquals("", SearchAds.cardArea(""))
+        val timed = SearchAd(location = "۲ ساعت پیش", city = "تهران")
+        assertEquals("۲ ساعت پیش", SearchAds.cardPlace(timed))
+        val hood = SearchAd(location = "در نقش‌جهان", city = "اصفهان")
+        assertEquals("در اصفهان، نقش‌جهان", SearchAds.cardPlace(hood))
+        val already = SearchAd(location = "تهران، تهرانپارس", city = "تهران")
+        assertEquals("در تهران، تهرانپارس", SearchAds.cardPlace(already))
+    }
+
+    @Test
+    fun publicSitemap_listsPublishedLandsNewestFirst() {
+        val xml = """
+            <urlset>
+              <url><loc>https://vinor.ir/express/partner/home</loc></url>
+              <url><loc>https://vinor.ir/express/partner/lands/1</loc><lastmod>2026-09-19</lastmod></url>
+              <url><loc>https://vinor.ir/express/partner/lands/2</loc><lastmod>2026-10-08</lastmod></url>
+              <url><loc>https://vinor.ir/partners</loc></url>
+            </urlset>
+        """.trimIndent()
+        val refs = PublicSearchCatalog.landRefs(xml)
+        assertEquals(listOf("2", "1"), refs.map { it.code })
+        val fresh = PublicSearchCatalog.fromDetail(
+            JSONObject()
+                .put("published_for_sale", true)
+                .put("code", "2")
+                .put("title", "250متر زمین ویلایی دماوند")
+                .put("city", "تهران")
+                .put("location", "تهرانپارس")
+                .put("size", 250)
+                .put("price_toman", 1_000_000_000L)
+                .put("image_url", "/uploads/a.jpg")
+                .put("images", org.json.JSONArray().put("/uploads/a.jpg"))
+                .put("source", "vinor"),
+            refs[0].lastmod,
+            0,
+        )
+        assertEquals("2", fresh?.token)
+        assertEquals("vinor", fresh?.source)
+        assertEquals("/express/partner/lands/2", fresh?.url)
+        assertEquals("250", fresh?.areaRaw)
+        assertEquals("تهران", fresh?.city)
+        assertTrue((fresh?.createdAt ?: 0L) > 0L)
+        assertTrue(fresh?.priceRaw?.contains("تومان") == true)
+        val hidden = PublicSearchCatalog.fromDetail(
+            JSONObject().put("published_for_sale", false).put("code", "9").put("title", "خصوصی"),
+            "",
+            1,
+        )
+        assertNull(hidden)
+        val unmarked = PublicSearchCatalog.fromDetail(
+            JSONObject().put("code", "8").put("title", "بدون پرچم"),
+            "",
+            2,
+        )
+        assertNull(unmarked)
     }
 }

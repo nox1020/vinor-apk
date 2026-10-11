@@ -87,6 +87,7 @@ data class SearchQuery(
 
     companion object {
         const val DEAL = "buy"
+        const val ALL_PROVINCES = "همه استان‌ها"
         private const val EN_DASH = "\u2013"
         private const val DECIMAL = "\u066B"
         private const val BILLION = 1_000_000_000L

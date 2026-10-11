@@ -9,6 +9,7 @@ import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /** کش GETهای نمایشی همکار — نه POST و نه مسیرهای مالی. */
 object VinorApiCacheStore {
@@ -16,6 +17,7 @@ object VinorApiCacheStore {
     private data class MemEntry(val bytes: ByteArray, val ct: String, val createdAt: Long)
 
     private val memLock = Any()
+    private val cacheEpoch = AtomicInteger(0)
     private val mem = object : LinkedHashMap<String, MemEntry>(VinorCachePolicy.MAX_API_ENTRIES + 2, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MemEntry>?): Boolean =
             size > VinorCachePolicy.MAX_API_ENTRIES
@@ -31,6 +33,17 @@ object VinorApiCacheStore {
         } else {
             VinorCacheSession.scopeForRead(context)
         }
+        return directory(context, fp)
+    }
+
+    /** حافظهٔ RAM با اثر انگشت حساب جدا می‌شود تا تاریخچهٔ چت حساب قبلی نماند. */
+    internal fun sessionMemoryKey(session: String, normalizedUrl: String): String {
+        val fp = session.trim().ifBlank { VinorCacheSession.ANON }
+        return "$fp\u0000$normalizedUrl"
+    }
+
+    private fun directory(context: Context, session: String): File {
+        val fp = session.trim().ifBlank { VinorCacheSession.ANON }
         val d = File(
             context.filesDir,
             "${VinorCachePolicy.ROOT_DIR}/v${VinorCachePolicy.SCHEMA_VERSION}/api/$fp",
@@ -52,10 +65,14 @@ object VinorApiCacheStore {
         val ct = contentType.ifBlank { "application/json" }
         val copy = body.copyOf()
         val now = System.currentTimeMillis()
-        synchronized(memLock) { mem[n] = MemEntry(copy, ct, now) }
+        val session = VinorCacheSession.scopeForRead(context)
+        val ticket = cacheEpoch.get()
+        synchronized(memLock) { mem[sessionMemoryKey(session, n)] = MemEntry(copy, ct, now) }
         io.execute {
             runCatching {
-                val dir = root(context, forWrite = false)
+                if (ticket != cacheEpoch.get()) return@runCatching
+                if (VinorCacheSession.scopeForRead(context) != session) return@runCatching
+                val dir = directory(context, session)
                 val id = key(url)
                 val bin = File(dir, "$id.bin")
                 val meta = File(dir, "$id.json")
@@ -66,7 +83,7 @@ object VinorApiCacheStore {
                     .put("createdAt", now)
                     .put("lastAccessedAt", now)
                     .put("size", copy.size)
-                    .put("session", VinorCacheSession.scopeForRead(context))
+                    .put("session", session)
                 VinorCacheIo.writeAtomicText(meta, json.toString())
                 VinorCacheLog.event("CACHE_WRITE", "api size=${copy.size}")
                 trim(dir)
@@ -84,11 +101,25 @@ object VinorApiCacheStore {
         return runCatching { JSONObject(String(hit.first, Charsets.UTF_8)) }.getOrNull()
     }
 
+    /** آخرین پاسخ نمایشی را دور می‌ریزد تا موجودی و پورسانت بعد از معامله کهنه نماند. */
+    fun forget(context: Context, url: String) {
+        val raw = url.trim()
+        if (raw.isEmpty() || !VinorCachePolicy.isSafeGetApi(raw)) return
+        val normalized = VinorCachePolicy.normalizeUrl(raw)
+        val session = VinorCacheSession.scopeForRead(context)
+        synchronized(memLock) { mem.remove(sessionMemoryKey(session, normalized)) }
+        val dir = directory(context, session)
+        val id = key(raw)
+        VinorCacheIo.deleteQuiet(File(dir, "$id.bin"))
+        VinorCacheIo.deleteQuiet(File(dir, "$id.json"))
+    }
+
     fun isFresh(context: Context, url: String?): Boolean {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return false
         val n = VinorCachePolicy.normalizeUrl(raw)
-        val memCreated = synchronized(memLock) { mem[n]?.createdAt }
+        val memId = sessionMemoryKey(VinorCacheSession.scopeForRead(context), n)
+        val memCreated = synchronized(memLock) { mem[memId]?.createdAt }
         if (memCreated != null) {
             val age = System.currentTimeMillis() - memCreated
             return age in 0 until VinorCachePolicy.API_STALE_MS
@@ -110,11 +141,12 @@ object VinorApiCacheStore {
         val raw = (url ?: "").trim()
         if (!VinorCachePolicy.isSafeGetApi(raw)) return null
         val n = VinorCachePolicy.normalizeUrl(raw)
-        val memHit = synchronized(memLock) { mem[n] }
+        val memId = sessionMemoryKey(VinorCacheSession.scopeForRead(context), n)
+        val memHit = synchronized(memLock) { mem[memId] }
         if (memHit != null) {
             val age = System.currentTimeMillis() - memHit.createdAt
             if (age > VinorCachePolicy.API_KEEP_MS && !allowExpired) {
-                synchronized(memLock) { mem.remove(n) }
+                synchronized(memLock) { mem.remove(memId) }
             } else {
                 VinorCacheLog.event("CACHE_HIT", "api mem stale=${age > VinorCachePolicy.API_STALE_MS}")
                 return memHit.bytes to memHit.ct
@@ -136,7 +168,7 @@ object VinorApiCacheStore {
         touch(meta)
         val ct = obj?.optString("ct").orEmpty().ifBlank { "application/json; charset=utf-8" }
         val created = obj?.optLong("createdAt") ?: System.currentTimeMillis()
-        synchronized(memLock) { mem[n] = MemEntry(bytes, ct, created) }
+        synchronized(memLock) { mem[memId] = MemEntry(bytes, ct, created) }
         VinorCacheLog.event("CACHE_HIT", "api stale=${age > VinorCachePolicy.API_STALE_MS}")
         return bytes to ct
     }
@@ -203,6 +235,7 @@ object VinorApiCacheStore {
     }
 
     fun clearUser(context: Context) {
+        cacheEpoch.incrementAndGet()
         synchronized(memLock) { mem.clear() }
         runCatching { root(context).deleteRecursively() }
     }

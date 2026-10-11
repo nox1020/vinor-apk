@@ -179,9 +179,14 @@ class LoginStep2Fragment : Fragment() {
                         if (host is MainActivity) {
                             host.requestNotificationPermission()
                             host.openPartnerHome()
-                            host.consumePendingDeepLink()
+                            val openedLink = host.consumePendingDeepLink()
                             if (ConsultantResume.consume(host)) {
+                                host.clearChatResume()
                                 host.openConsultantOnboarding()
+                            } else if (!openedLink) {
+                                host.openChatIfResumed()
+                            } else {
+                                host.clearChatResume()
                             }
                             return@withContext
                         }

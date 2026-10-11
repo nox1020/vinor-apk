@@ -49,6 +49,16 @@
                     android:textSize="15sp" />
 
                 <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:gravity="center"
+                    android:text="ملک را ثبت کنید؛ بعد از ثبت می‌توانید برای فروش منتشر کنید."
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="14sp" />
+
+                <TextView
                     android:id="@+id/mpEmptyCta"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"

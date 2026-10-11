@@ -5,7 +5,7 @@ APK شِل نیتیو خانه است (نه WebView-shell)، مطابق `roadmap
 
 - **خانه / چت / ورود OTP / کیف پول / روتین / پروفایل / اعلان / جزئیات ملک:** نیتیو + همان API وب.
 - **صفحات فرعی با منطق وب (آموزش، پیگیری، دعوت، نشان‌ها، آگهی، سطوح، تنظیمات، پلاس، درخواست همکاری):** از نسخهٔ **1.0.286** داخل اپ با WebView همان HTML وب.
-- **CRM مشتریان (`/customers`):** از **1.0.319** در منوی «من» برای همکار تأییدشده وقتی `crm_ui_enabled` روشن است؛ همان HTML داخل `PartnerPageFragment`.
+- **CRM مشتریان (`/customers`):** از **1.0.345** صفحهٔ نیتیو `CustomersFragment` است. منو همان شرط تأیید + `crm_ui_enabled` را دارد. داده از HTML همان مسیر خوانده می‌شود.
 - **ادمین `/admin`:** خارج از محدودهٔ APK همکار.
 - **Bottom tab وب وجود ندارد.** چیپ دانلود APK روی نیتیو نیست (عمدی).
 
@@ -59,7 +59,7 @@ Cookie جلسه: `vinor_session` (Flask). هویت: `user_phone`.
 | اعلان / پستچی | `/notifications` → `home?thread=__postchi__` | home | pending+ | همکار | Native `NotificationsFragment` | D: لیست نیتیو نه ترد پستچی داخل چت |
 | جزئیات ملک | `/lands/<code>` → `home?land=` | chat-detail | مهمان+ | همه | Native `LandDetailFragment` | D: کارت نیتیو به‌جای تزریق چت |
 | دیوار | `/divar/<token>` → `home?divar=` | chat-detail | مهمان+ | همه | ACTION_VIEW دیوار / کارت آگهی | Partial |
-| CRM مشتری | `/customers` | `customers.html` | approved+`crm_ui_enabled` | همکار | InAppWeb `PartnerPageFragment`؛ ردیف «مشتریان» فقط اگر تأییدشده و فلگ روشن | OK از 1.0.319 |
+| CRM مشتری | `/customers` | `customers.html` | approved+`crm_ui_enabled` | همکار | نیتیو `CustomersFragment`؛ فهرست و فرم از همان HTML؛ ردیف منو فقط اگر تأییدشده و فلگ روشن | OK از 1.0.345 |
 | آفلاین PWA | `/offline` | `offline.html` | any | — | `VinorOfflineUi` + بنر | H جدا |
 | شرایط همکاری | `/cooperation-terms` | `cooperation_terms.html` | مهمان+ | — | InAppWeb | OK |
 | شرایط استفاده | `/legal/terms` | `legal/terms.html` | any | — | InAppWeb | قبلاً Browser |
@@ -85,7 +85,7 @@ APK همان گراف را دنبال می‌کند؛ پیگیری از 1.0.286 
 
 ورود: `POST /api/login-request`, `POST /api/verify`, `POST /otp/resend`, `POST /api/logout`.  
 خانه: `GET /home/data` (شامل `crm_ui_enabled`)، `GET /home` HTML آگهی، `POST /home/register-customer`, `GET /ai/history`, `POST /ai/chat`, `POST /ai/upload`.  
-مشتریان CRM: HTML `/customers` (API JSON جدا در APK نیست). فلگ منو: `crm_ui_enabled` از `home/data`، و از `profile/data` اگر همان کلید آنجا باشد.  
+مشتریان CRM: HTML `GET/POST /customers` (API JSON جدا نیست). فلگ منو: `crm_ui_enabled` از `home/data`، و از `profile/data` اگر همان کلید آنجا باشد. POST با `X-CSRFToken` و Referer همان صفحه.  
 ملک: `GET /api/express/{code}`, `GET /lands/{code}/chat-detail`.  
 کیف پول / روتین / پروفایل / اعلان / یادداشت: همان endpointهای وب.
 
@@ -100,7 +100,7 @@ CSRF در API JSON همکار عمدتاً session cookie است؛ APK کوکی 
 | `/property/{id}`, `/express/{code}`, `/express/partner/lands/{id}`, `home?land=` | `LandDetailFragment` — مهمان مجاز |
 | `/express/partner/home` | داشبورد نیتیو |
 | `/express/partner/requests` و بقیهٔ صفحات فرعی | `PartnerPageFragment` |
-| `/express/partner/customers` | `PartnerPageFragment` (نیاز به نشست؛ از 1.0.319) |
+| `/express/partner/customers` | نیتیو `CustomersFragment` (نیاز به نشست؛ از 1.0.345) |
 | `/express/partner/commissions` | نیتیو کیف پول |
 | `/express/partner/routine` | نیتیو روتین |
 | `/express/partner/notifications` | نیتیو اعلان |
