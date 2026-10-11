@@ -250,7 +250,7 @@ class DashboardFragment : Fragment() {
         return isChatOpen() && account != null && chatAccount == account
     }
 
-    /** تب آگهی‌ها: لایهٔ چت را ببند، آگهی‌ها را نشان بده. */
+    /** تب خانه: لایهٔ چت را ببند و خانه را نشان بده. */
     fun showHomeEntry() {
         wantChatLayer = false
         chatBindGen += 1
@@ -821,7 +821,7 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    /** آخرین خانهٔ دیده‌شده — ورود بعدی به تب آگهی‌ها منتظر شبکه نمی‌ماند. */
+    /** آخرین خانهٔ دیده‌شده — ورود بعدی به تب خانه منتظر شبکه نمی‌ماند. */
     private fun paintRememberedHome() {
         val snap = rememberedHome ?: return
         bindHome(snap)

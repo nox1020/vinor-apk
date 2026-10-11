@@ -30,7 +30,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clipChildren="false"
             android:clickable="true"
-            android:contentDescription="آگهی‌ها"
+            android:contentDescription="خانه"
             android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
@@ -61,7 +61,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="آگهی‌ها"
+                android:text="خانه"
                 android:textColor="@color/vinor_nav_selected"
                 android:textSize="11sp"
                 android:textStyle="bold" />
