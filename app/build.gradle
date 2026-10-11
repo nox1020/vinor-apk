@@ -24,6 +24,7 @@ def computeVersionCode(String ver) {
     def minor = parts.length > 1 ? parts[1].toInteger() : 0
     def patch = parts.length > 2 ? parts[2].toInteger() : 0
     // versionCode = MMmmpp (e.g., 1.0.4 -> 10004)
+    // بستهٔ ۱.۰.۱۴۷۲ با کد ۱۱۴۷۲ روی گوشی نصب شده است. نام نسخه نباید از ۱.۰.۱۴۷۳ پایین‌تر برود.
     return major * 10000 + minor * 100 + patch
 }
 
