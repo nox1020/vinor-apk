@@ -216,7 +216,7 @@ class MainActivity : AppCompatActivity() {
         revealPendingHome()
     }
 
-    /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب آگهی‌ها روی چت می‌ماند. */
+    /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب خانه روی چت می‌ماند. */
     private fun revealPendingHome(left: Int = 12) {
         if (!pendingShowHome) {
             syncDivarTab()
