@@ -705,7 +705,11 @@ class LandDetailFragment : Fragment() {
                     )
                 }
                 val land = if (fresh.optBoolean("ok")) {
-                    withContext(Dispatchers.IO) { PartnerApi.get(apiPath(code), ctx) }
+                    withContext(Dispatchers.IO) {
+                        val path = apiPath(code)
+                        PartnerApi.forget(path, ctx)
+                        PartnerApi.get(path, ctx)
+                    }
                 } else {
                     null
                 }
