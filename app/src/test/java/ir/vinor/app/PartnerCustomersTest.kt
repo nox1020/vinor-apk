@@ -91,10 +91,29 @@ class PartnerCustomersTest {
         assertEquals("09121234567", body.getString("customer_phone"))
         assertFalse(body.has("notes"))
         assertFalse(body.has("csrf_token"))
-        assertEquals(4L, PartnerCustomers.deleteBody("4", "id").getLong("id"))
+        val delete = PartnerCustomers.deleteBody("4", "id")
+        assertEquals(4L, delete.getLong("id"))
+        assertEquals("delete", delete.getString("action"))
         assertEquals("نام را وارد کنید.", PartnerCustomers.fieldError(page.fields[0], " "))
         assertEquals("شماره موبایل را درست وارد کنید.", PartnerCustomers.fieldError(page.fields[2], "123"))
         assertNull(PartnerCustomers.fieldError(page.fields[3], ""))
+    }
+
+    @Test
+    fun responseWithErrorOrFieldErrorsIsNotSuccessful() {
+        assertFalse(
+            PartnerCustomers.isOk(
+                JSONObject().put("http_status", 200).put("error", "شماره موبایل تکراری است."),
+            ),
+        )
+        assertFalse(
+            PartnerCustomers.isOk(
+                JSONObject()
+                    .put("http_status", 200)
+                    .put("fields", JSONObject().put("customer_phone", "موبایل نامعتبر است.")),
+            ),
+        )
+        assertTrue(PartnerCustomers.isOk(JSONObject().put("http_status", 200).put("ok", true)))
     }
 
     @Test

@@ -54,8 +54,9 @@ class HomeSuggestTest {
         assertEquals("زمین ۲۰۰ متری به بالا", HomeSuggest.displayTitle(titled))
         assertEquals("آب و برق | ۲۰۰ م²", HomeSuggest.specLine(titled))
         assertEquals("دماوند - گرمابسرد", HomeSuggest.locationLine(titled))
-        assertEquals("پیشنهادی", HomeSuggest.badge(titled))
-        assertEquals("green", HomeSuggest.badgeTone(HomeSuggest.badge(titled)))
+        assertEquals("", HomeSuggest.badge(titled))
+        assertEquals("آب و برق", HomeSuggest.cardSpec(titled))
+        assertEquals("green", HomeSuggest.badgeTone("پیشنهادی"))
 
         val facts = JSONObject()
             .put("title", "فایل")
@@ -64,6 +65,8 @@ class HomeSuggestTest {
             .put("listed_label", "ویژه")
         assertEquals("زمین ۵۰۰ متری", HomeSuggest.displayTitle(facts))
         assertEquals("کاربری مسکونی | ۵۰۰ م²", HomeSuggest.specLine(facts))
+        assertEquals("کاربری مسکونی", HomeSuggest.cardSpec(facts))
+        assertEquals("", HomeSuggest.cardSpec(JSONObject().put("title", "زمین ۵۰۰ متری")))
         assertEquals("ویژه", HomeSuggest.badge(facts))
         assertEquals("gold", HomeSuggest.badgeTone("ویژه"))
         assertEquals(0, HomeSuggest.commissionPercent(JSONObject().put("price_toman", 100)))
@@ -83,6 +86,73 @@ class HomeSuggestTest {
             ),
         )
         assertEquals("L12", HomeSuggest.landCode(JSONObject().put("token", "L12").put("source", "vinor")))
-        assertEquals("", HomeSuggest.landCode(JSONObject().put("url", "/express/partner/lands/L12")))
+        assertEquals("L12", HomeSuggest.landCode(JSONObject().put("url", "/express/partner/lands/L12")))
+        assertEquals("L12", HomeSuggest.landCode(JSONObject().put("code", "L12")))
+        assertEquals("L12", HomeSuggest.landCode(JSONObject().put("land_code", "L12")))
+    }
+
+    @Test
+    fun files_skipUnpublishedAndDuplicatesThenFallBack() {
+        val hidden = JSONObject()
+            .put("suggested_files", JSONArray().put(JSONObject().put("code", "A").put("published_for_sale", false)))
+            .put("divar_pro_ads", JSONArray().put(JSONObject().put("token", "d1").put("title", "دیوار").put("source", "divar")))
+        assertEquals("دیوار", HomeSuggest.files(hidden).optJSONObject(0)?.optString("title"))
+
+        val mixed = JSONObject().put(
+            "suggested_files",
+            JSONArray()
+                .put(JSONObject().put("code", "A").put("title", "مخفی").put("published_for_sale", false))
+                .put(JSONObject().put("code", "B").put("title", "دوم"))
+                .put(JSONObject().put("land_code", "B").put("title", "تکرار"))
+                .put(JSONObject().put("title", "سوم").put("url", "/express/partner/lands/C")),
+        )
+        val files = HomeSuggest.files(mixed)
+        assertEquals(2, files.length())
+        assertEquals("دوم", files.optJSONObject(0)?.optString("title"))
+        assertEquals("سوم", files.optJSONObject(1)?.optString("title"))
+    }
+
+    @Test
+    fun commission_usesPriceTextOrExplicitPercent() {
+        val fromText = JSONObject()
+            .put("price", "۱٬۵۵۰٬۰۰۰٬۰۰۰ تومان")
+            .put("commission_amount", 31_000_000L)
+        assertEquals(2, HomeSuggest.commissionPercent(fromText))
+        assertEquals("۲٪ پورسانت", HomeSuggest.commissionLabel(fromText))
+        val explicit = JSONObject()
+            .put("price_toman", 1_000_000)
+            .put("commission_amount", 10)
+            .put("commission_pct", "3.2")
+        assertEquals(3, HomeSuggest.commissionPercent(explicit))
+        assertEquals(
+            PartnerFormat.toman(1500) + " تومان",
+            HomeSuggest.priceLine(JSONObject().put("price", "1500")),
+        )
+    }
+
+    @Test
+    fun displayTitle_keepsApartmentAndHouse() {
+        assertEquals(
+            "آپارتمان ۸۵ متری",
+            HomeSuggest.displayTitle(JSONObject().put("title", "آپارتمان ۸۵ متری جردن")),
+        )
+        assertEquals(
+            "خانه ۱۲۰ متری",
+            HomeSuggest.displayTitle(JSONObject().put("title", "خانه ۱۲۰ متری دماوند")),
+        )
+    }
+
+    @Test
+    fun startScroll_keepsFirstCardAtTheRtlEdge() {
+        assertEquals(400, HomeSuggest.startScrollX(700, 300, rtl = true))
+        assertEquals(0, HomeSuggest.startScrollX(700, 300, rtl = false))
+        assertEquals(0, HomeSuggest.startScrollX(200, 300, rtl = true))
+    }
+
+    @Test
+    fun fingerprint_changesWhenPriceChanges() {
+        val first = JSONArray().put(JSONObject().put("code", "B").put("title", "زمین").put("price_toman", 1000))
+        val second = JSONArray().put(JSONObject().put("code", "B").put("title", "زمین").put("price_toman", 2000))
+        assertTrue(HomeSuggest.fingerprint(first) != HomeSuggest.fingerprint(second))
     }
 }

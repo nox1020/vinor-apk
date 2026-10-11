@@ -74,6 +74,20 @@ class MyPropertyManageTest {
         assertFalse(MyPropertyManage.unpublishStopped(ok, stillLive))
         assertFalse(MyPropertyManage.unpublishStopped(ok, null))
         assertTrue(MyPropertyManage.unpublishStopped(ok, stopped))
+        val cachedLive = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("from_cache", true)
+            .put("published_for_sale", true)
+        val proved = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("code", "4")
+            .put("items", JSONArray().put(JSONObject().put("code", "4").put("published_for_sale", false)))
+        assertFalse(MyPropertyManage.unpublishStopped(ok, cachedLive))
+        assertTrue(MyPropertyManage.unpublishStopped(proved, null))
+        assertTrue(MyPropertyManage.unpublishStopped(proved, cachedLive))
+        assertFalse(MyPropertyManage.unpublishStopped(proved, stillLive))
     }
 
     @Test
@@ -187,6 +201,69 @@ class MyPropertyManageTest {
         val merged = MyPropertyManage.mergeDetail(card, JSONObject().put("ok", false))
         assertEquals("ملک", merged.getString("title"))
         assertFalse(merged.has("city"))
+    }
+
+    @Test
+    fun deleteUsesThePropertyPageInsteadOfTheMissingApi() {
+        val html = """
+            <form action="/express/partner/my-property" method="post">
+              <input type="hidden" name="csrf_token" value="tok">
+              <input type="hidden" name="title" value="ذخیره">
+              <button type="submit">ذخیره</button>
+            </form>
+            <form action="/express/partner/my-property" method="post">
+              <input type="hidden" name="csrf_token" value="tok">
+              <input type="hidden" name="code" value="12">
+              <button type="submit" name="action" value="delete">حذف ملک</button>
+            </form>
+            <form action="/express/partner/my-property">
+              <input type="hidden" name="code" value="99">
+              <button type="submit" name="action" value="delete">حذف</button>
+            </form>
+        """.trimIndent()
+        val call = MyPropertyManage.deleteCall(html, "12")
+        assertEquals("/express/partner/my-property", call.path)
+        assertEquals("tok", call.csrf)
+        assertEquals("12", call.body.getString("code"))
+        assertEquals("delete", call.body.getString("action"))
+        assertFalse(call.body.has("title"))
+        val other = MyPropertyManage.deleteCall(html, "99")
+        assertEquals("99", other.body.getString("code"))
+    }
+
+    @Test
+    fun deleteWithoutAFormStillPostsActionAndCode() {
+        val html = """<meta name="csrf-token" content="abc">"""
+        val call = MyPropertyManage.deleteCall(html, "4")
+        assertEquals(MyPropertyManage.PAGE_PATH, call.path)
+        assertEquals("abc", call.csrf)
+        assertEquals("delete", call.body.getString("action"))
+        assertEquals("4", call.body.getString("code"))
+        assertFalse(call.path.contains("/api/my-property/delete"))
+    }
+
+    @Test
+    fun removedFromPortfolioRequiresTheListingToDisappear() {
+        val gone = JSONObject().put("ok", true).put("http_status", 200).put("items", JSONArray())
+        val stay = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "4")))
+        val other = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "9")))
+        val property = JSONObject().put("has_property", true).put("property", JSONObject().put("code", "4"))
+        val unshaped = JSONObject().put("ok", true).put("message", "ملک حذف شد.")
+        val offline = JSONObject().put("offline", true).put("items", JSONArray())
+        assertTrue(MyPropertyManage.removedFromPortfolio(gone, "4"))
+        assertTrue(MyPropertyManage.removedFromPortfolio(other, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(stay, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(property, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(unshaped, "4"))
+        assertFalse(MyPropertyManage.removedFromPortfolio(offline, "4"))
+        val optimistic = JSONObject().put("ok", true).put("message", "آگهی حذف شد.")
+        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف آگهی انجام نشد."))
+        val html = JSONObject().put("http_status", 200).put("ok", false).put("error", "پاسخ نامعتبر")
+        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(html, "حذف آگهی انجام نشد."))
+        val fields = MyPropertyManage.formFields(MyPropertyManage.deleteCall("", "4"))
+        assertEquals("delete", fields["action"])
+        assertEquals("4", fields["code"])
+        assertFalse(fields.containsKey("csrf_token"))
     }
 
     @Test

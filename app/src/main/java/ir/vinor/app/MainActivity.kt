@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -478,7 +477,7 @@ class MainActivity : AppCompatActivity() {
         icon.setImageResource(if (on) fill else outline)
         val c = ContextCompat.getColor(
             this,
-            if (on) R.color.vinor_accent_green else R.color.vinor_text_muted,
+            if (on) R.color.vinor_nav_selected else R.color.vinor_nav_unselected,
         )
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
@@ -495,7 +494,18 @@ class MainActivity : AppCompatActivity() {
 
     fun openMyProperty() {
         if (navController.currentDestination?.id == R.id.myPropertiesFragment) return
+        if (navController.currentDestination?.id == R.id.profileFragment) {
+            navController.navigate(R.id.myPropertiesFragment)
+            return
+        }
         navigateTab(R.id.myPropertiesFragment)
+    }
+
+    /** بازگشت هدر تنظیمات، نشان‌شده‌ها و آگهی‌های من به تب وینور من. */
+    fun returnToVinorMan() {
+        if (!navController.popBackStack(R.id.profileFragment, false)) {
+            openProfile()
+        }
     }
 
     fun openMyPropertyManage(snapshot: org.json.JSONObject) {
@@ -549,6 +559,7 @@ class MainActivity : AppCompatActivity() {
                 when {
                     !land.isNullOrBlank() -> openLand(land)
                     !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    uri.getQueryParameter("ai") == "1" -> openVinorChat()
                     else -> openPartnerHome()
                 }
             }
@@ -576,7 +587,8 @@ class MainActivity : AppCompatActivity() {
                     else -> openSearch()
                 }
             }
-            low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low == "/express/partner/requests" || low.startsWith("/express/partner/requests/") ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
@@ -586,7 +598,8 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.myPropertiesFragment)
                 }
             }
-            low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
+            low.endsWith("/consultant") || low.contains("/consultant/") ||
+                low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
                 openConsultantOnboarding()
             low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
                 openNativePage(NativePartnerFragment.PAGE_TERMS)
@@ -595,7 +608,7 @@ class MainActivity : AppCompatActivity() {
             low.contains("/notifications") -> openNotifications()
             low.contains("/commissions") -> {
                 if (navController.currentDestination?.id != R.id.commissionsFragment) {
-                    navController.navigate(R.id.commissionsFragment)
+                    navigateTab(R.id.commissionsFragment)
                 }
             }
             low.contains("/profile/edit") -> openProfileEdit()
@@ -616,24 +629,22 @@ class MainActivity : AppCompatActivity() {
 
     fun consumePendingDeepLink(): Boolean {
         val pending = DeepLinkPendingStore.consume(this) ?: return false
+        if (VinorManMenu.isSafeInternalPath(pending)) {
+            openPath(pending)
+            return true
+        }
         handleDeepLink(Intent(Intent.ACTION_VIEW, Uri.parse(pending)))
         return true
     }
 
-    fun logoutFromDrawer() {
-        lifecycleScope.launch {
-            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
+    fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
+        VinorSessionLogout.perform(this, lifecycleScope) {
             try {
-                withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/api/logout", JSONObject(), this@MainActivity)
-                }
-            } catch (_: Exception) {
-            }
-            PartnerApi.clearCookies {
                 dropChatForSignedOutAccount()
-                Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
                 refreshPartnerFlags()
                 openPartnerHome()
+            } finally {
+                onFinished?.invoke()
             }
         }
     }
@@ -692,6 +703,8 @@ class MainActivity : AppCompatActivity() {
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
             DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS -> openPath(route.targetUrl)
+            DeepLinkRouter.DestinationType.PARTNER_REQUESTS ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             DeepLinkRouter.DestinationType.PARTNER_LOGIN -> openLogin()
             DeepLinkRouter.DestinationType.PARTNER_WEB -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.APK_DOWNLOAD -> {

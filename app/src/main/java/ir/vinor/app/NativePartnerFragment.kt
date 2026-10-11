@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -43,9 +44,15 @@ class NativePartnerFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var activeTab = ""
+    private var pendingFollowId = ""
+    private var pendingFollowPath = ""
+    private var pendingFollowBody = JSONObject()
+    private var followEpoch = 0
+    private var followReload = false
     private var lastPayload = JSONObject()
     private var searchQuery = ""
     private var followBusy = false
+    private var followCsrf = ""
     private var followSheet: BottomSheetDialog? = null
 
     val page: String
@@ -72,10 +79,20 @@ class NativePartnerFragment : Fragment() {
             }
             return
         }
-        binding.nativeRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
-        binding.nativeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
-        binding.nativeRefresh.setOnRefreshListener { load(forceNet = true) }
+        binding.nativeRefresh.setColorSchemeColors(
+            ContextCompat.getColor(requireContext(), R.color.vinor_primary_red),
+        )
+        binding.nativeRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(requireContext(), R.color.vinor_raised),
+        )
+        binding.nativeRefresh.setOnRefreshListener {
+            if (page == PAGE_REQUESTS) followEpoch++
+            load(forceNet = true)
+        }
         binding.nativeApplySubmit.setOnClickListener { submitApply() }
+        binding.nativeFavoritesCta.setOnClickListener {
+            (activity as? MainActivity)?.openSearch()
+        }
         binding.nativeInviteCopy.setOnClickListener { copyInvite() }
         binding.nativeInviteShare.setOnClickListener { shareInvite() }
         binding.nativeSearch.addTextChangedListener(object : TextWatcher {
@@ -102,6 +119,10 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun goBack() {
+        if (page == PAGE_SETTINGS || page == PAGE_FAVORITES) {
+            (activity as? MainActivity)?.returnToVinorMan() ?: findNavController().navigateUp()
+            return
+        }
         if (!findNavController().navigateUp()) {
             (activity as? MainActivity)?.openPartnerHome()
         }
@@ -123,15 +144,20 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun loadJson(forceNet: Boolean) {
-        val ctx = context ?: return
+        val epoch = followEpoch
+        val ctx = context ?: run {
+            finishFollowReload(epoch)
+            return
+        }
         val path = dataPath(page) ?: return bindEmpty("صفحه پیدا نشد.")
         scope.launch {
             if (!forceNet) {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
+                if (!followCurrent(epoch)) return@launch
                 if (_binding != null && cached != null) bindPayload(cached)
                 else if (_binding != null) binding.nativeProgress.isVisible = true
                 if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) {
-                    if (_binding != null) {
+                    if (_binding != null && followCurrent(epoch)) {
                         binding.nativeProgress.isVisible = false
                         binding.nativeRefresh.isRefreshing = false
                     }
@@ -140,33 +166,47 @@ class NativePartnerFragment : Fragment() {
             }
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
-                if (_binding == null) return@launch
+                if (_binding == null || !followCurrent(epoch)) return@launch
                 val code = fresh.optInt("http_status")
-                if (code == 401 || fresh.optString("error") == "unauthorized") {
+                val followUnauthorized = page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh)
+                if (code == 401 || fresh.optString("error") == "unauthorized" || followUnauthorized) {
                     bindEmpty("برای ادامه وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
+                    (activity as? MainActivity)?.openLogin()
                     return@launch
                 }
                 if (code == 403) {
                     bindEmpty(fresh.optString("error").ifBlank { "دسترسی ندارید." })
                     return@launch
                 }
+                if (page == PAGE_REQUESTS && !FollowRequests.isOk(fresh)) {
+                    bindEmpty(FollowRequests.userMessage(fresh, "بارگذاری پیگیری ناموفق بود."))
+                    return@launch
+                }
                 bindPayload(fresh)
-            } catch (e: Exception) {
-                if (_binding == null) return@launch
+            } catch (_: Exception) {
+                if (_binding == null || !followCurrent(epoch)) return@launch
                 val showing = binding.nativeList.childCount > 0 || binding.nativeInviteBox.isVisible
                 if (showing) {
-                    Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
                 } else {
-                    bindEmpty(e.message ?: "خطای شبکه")
+                    bindEmpty("اتصال برقرار نشد")
                 }
             } finally {
-                if (_binding != null) {
+                if (_binding != null && followCurrent(epoch)) {
                     binding.nativeProgress.isVisible = false
                     binding.nativeRefresh.isRefreshing = false
                 }
+                finishFollowReload(epoch)
             }
         }
+    }
+
+    private fun followCurrent(epoch: Int): Boolean = page != PAGE_REQUESTS || epoch == followEpoch
+
+    private fun finishFollowReload(epoch: Int) {
+        if (page != PAGE_REQUESTS || epoch != followEpoch || !followReload) return
+        followReload = false
+        if (_binding != null) setFollowBusy(false) else followBusy = false
     }
 
     private fun loadFavorites() {
@@ -178,7 +218,7 @@ class NativePartnerFragment : Fragment() {
         }
         val codes = VinorFavoritesStore.codes(ctx)
         if (codes.isEmpty()) {
-            bindEmpty("هنوز فایلی نشان نکرده‌اید.")
+            bindEmpty(FAVORITES_EMPTY)
             binding.nativeRefresh.isRefreshing = false
             return
         }
@@ -192,9 +232,9 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/favorites/cards", body, ctx)
                 }
                 if (_binding == null) return@launch
-                bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = "فایل نشان‌شده‌ای پیدا نشد.")
-            } catch (e: Exception) {
-                if (_binding != null) bindEmpty(e.message ?: "خطای شبکه")
+                bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
+            } catch (_: Exception) {
+                if (_binding != null) bindEmpty("اتصال برقرار نشد")
             } finally {
                 if (_binding != null) {
                     binding.nativeProgress.isVisible = false
@@ -206,6 +246,10 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindPayload(obj: JSONObject) {
         lastPayload = obj
+        if (page == PAGE_REQUESTS) {
+            val freshCsrf = obj.optString("csrf_token").trim()
+            if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+        }
         hideSpecials()
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
@@ -227,7 +271,11 @@ class NativePartnerFragment : Fragment() {
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
         addActionRow("ویرایش پروفایل") { (activity as? MainActivity)?.openProfileEdit() }
-        addActionRow("خروج", danger = true) { (activity as? MainActivity)?.logoutFromDrawer() }
+        addActionRow("خروج", danger = true) {
+            VinorLogoutSheet.show(this) { finish ->
+                (activity as? MainActivity)?.logoutFromDrawer(finish) ?: finish()
+            }
+        }
     }
 
     private fun bindNews(obj: JSONObject) {
@@ -383,8 +431,17 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
-        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"))
-        activeTab = FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
+        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"), obj)
+        activeTab = if (pendingFollowId.isNotBlank()) {
+            val located = FollowRequests.locateTab(obj, pendingFollowId, tabs)
+            val hint = FollowRequests.stageHint(pendingFollowPath, pendingFollowBody, tabs)
+            pendingFollowId = ""
+            pendingFollowPath = ""
+            pendingFollowBody = JSONObject()
+            FollowRequests.focusAfterAction(obj.optString("active_tab"), located, hint, tabs)
+        } else {
+            FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
+        }
         bindRequestTabs(tabs)
         renderRequestItems(obj, activeTab)
     }
@@ -395,7 +452,11 @@ class NativePartnerFragment : Fragment() {
         for (tab in tabs) {
             val on = tab.id == activeTab
             val chip = TextView(requireContext()).apply {
-                text = tab.title
+                text = if (tab.count > 0) {
+                    "${tab.title} ${PartnerFormat.toman(tab.count.toLong())}"
+                } else {
+                    tab.title
+                }
                 textSize = 14f
                 gravity = android.view.Gravity.CENTER
                 minHeight = dp(36)
@@ -412,6 +473,13 @@ class NativePartnerFragment : Fragment() {
                     activeTab = tab.id
                     bindRequestTabs(tabs)
                     renderRequestItems(lastPayload, activeTab)
+                }
+                if (on) {
+                    post {
+                        val scroller = binding.nativeTabsScroll
+                        val target = (left + width / 2 - scroller.width / 2).coerceAtLeast(0)
+                        scroller.smoothScrollTo(target, 0)
+                    }
                 }
             }
             val lp = LinearLayout.LayoutParams(
@@ -444,7 +512,7 @@ class NativePartnerFragment : Fragment() {
             )
             return
         }
-        for (row in rows) addRequestCard(FollowRequests.card(row))
+        for (row in rows) addRequestCard(FollowRequests.card(row, tab))
     }
 
     private fun bindLegal(obj: JSONObject) {
@@ -459,9 +527,13 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindLandItems(items: JSONArray, emptyMsg: String) {
         hideSpecials()
-        binding.nativeEmpty.isVisible = items.length() == 0
-        binding.nativeEmpty.text = emptyMsg
         binding.nativeList.removeAllViews()
+        if (items.length() == 0) {
+            if (page == PAGE_FAVORITES) bindEmpty(FAVORITES_EMPTY) else bindEmpty(emptyMsg)
+            return
+        }
+        binding.nativeFavoritesEmpty.isVisible = false
+        binding.nativeEmpty.isVisible = false
         for (i in 0 until items.length()) {
             val land = items.optJSONObject(i) ?: continue
             val card = ItemLandCardBinding.inflate(layoutInflater, binding.nativeList, false)
@@ -500,7 +572,12 @@ class NativePartnerFragment : Fragment() {
     private fun addActionRow(title: String, danger: Boolean = false, onClick: () -> Unit) {
         val row = TextView(requireContext()).apply {
             text = title
-            setTextColor(Color.parseColor(if (danger) "#FB7185" else "#FFFFFF"))
+            setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (danger) R.color.vinor_error else R.color.vinor_on_primary,
+                ),
+            )
             textSize = 15f
             setPadding(dp(16), dp(16), dp(16), dp(16))
             setBackgroundResource(R.drawable.bg_routine_card)
@@ -515,18 +592,41 @@ class NativePartnerFragment : Fragment() {
         val card = ItemNativeRequestBinding.inflate(layoutInflater, binding.nativeList, false)
         card.requestCardStatus.isVisible = item.status.isNotBlank()
         card.requestCardStatus.text = item.status
+        card.requestCardStatus.setTextColor(
+            ContextCompat.getColor(
+                requireContext(),
+                when (FollowRequests.statusMark(item.status)) {
+                    FollowRequests.Mark.GOOD -> R.color.vinor_accent_green
+                    FollowRequests.Mark.BAD -> R.color.vinor_error
+                    FollowRequests.Mark.NEUTRAL -> R.color.vinor_text_muted
+                },
+            ),
+        )
         card.requestCardTitle.text = item.title
         val titleLp = card.requestCardTitle.layoutParams as ViewGroup.MarginLayoutParams
         titleLp.topMargin = if (item.status.isNotBlank()) dp(8) else 0
         card.requestCardTitle.layoutParams = titleLp
-        val showPerson = item.customer.isNotBlank() || item.whenText.isNotBlank()
+        val meta = listOf(item.whenText, item.phone).filter { it.isNotBlank() }.joinToString(" · ")
+        val showPerson = item.customer.isNotBlank() || meta.isNotBlank()
         card.requestCardPerson.isVisible = showPerson
         card.requestCardAvatar.isVisible = item.customer.isNotBlank()
         card.requestCardAvatar.text = item.customer.trim().firstOrNull()?.toString().orEmpty()
         card.requestCardCustomer.isVisible = item.customer.isNotBlank()
         card.requestCardCustomer.text = item.customer
-        card.requestCardWhen.isVisible = item.whenText.isNotBlank()
-        card.requestCardWhen.text = item.whenText
+        card.requestCardWhen.isVisible = meta.isNotBlank()
+        card.requestCardWhen.text = meta
+        val dial = PartnerApi.asciiDigits(item.phone)
+        if (dial.length >= 8) {
+            card.requestCardPerson.isClickable = true
+            card.requestCardPerson.isFocusable = true
+            card.requestCardPerson.setOnClickListener {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dial")))
+                }
+            }
+        }
+        card.requestCardCommission.isVisible = item.commission.isNotBlank()
+        card.requestCardCommission.text = item.commission
         card.requestCardPersonBody.updateLayoutParams<LinearLayout.LayoutParams> {
             marginStart = if (item.customer.isNotBlank()) dp(12) else 0
         }
@@ -550,7 +650,11 @@ class NativePartnerFragment : Fragment() {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (action.confirm != null) confirmFollow(action) else postRequest(action.path, action.body)
+                    when {
+                        action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
+                        action.confirm != null -> confirmFollow(action)
+                        else -> postRequest(action.path, action.body)
+                    }
                 }
             }
             val lp = LinearLayout.LayoutParams(
@@ -582,6 +686,10 @@ class NativePartnerFragment : Fragment() {
         sheet.followConfirmTitle.text = action.label
         sheet.followConfirmMessage.text = action.confirm
         sheet.followConfirmYes.text = action.label
+        if (action.tone != FollowRequests.Tone.DANGER) {
+            sheet.followConfirmYes.setBackgroundResource(R.drawable.bg_hub_start)
+            sheet.followConfirmYes.setTextColor(Color.parseColor("#052E16"))
+        }
         val dialog = openFollowSheet(sheet.root)
         sheet.followConfirmNo.setOnClickListener { dialog.dismiss() }
         sheet.followConfirmYes.setOnClickListener {
@@ -611,24 +719,94 @@ class NativePartnerFragment : Fragment() {
     private fun postRequest(path: String, body: JSONObject) {
         val ctx = context ?: return
         if (followBusy) return
-        followBusy = true
+        setFollowBusy(true)
         scope.launch {
             try {
-                val resp = withContext(Dispatchers.IO) { PartnerApi.postJson(path, body, ctx) }
+                var token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx) }
+                var resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postPage(path, body, token, FollowRequests.PAGE_PATH, ctx)
+                }
+                if (PartnerCustomers.isCsrfExpired(resp)) {
+                    val rejected = token
+                    val rotated = resp.optString("csrf_token").trim()
+                    followCsrf = rotated.takeIf { it.isNotBlank() && it != rejected }.orEmpty()
+                    token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx, rejected) }
+                    if (token.isNotBlank() && token != rejected) {
+                        resp = withContext(Dispatchers.IO) {
+                            PartnerApi.postPage(path, body, token, FollowRequests.PAGE_PATH, ctx)
+                        }
+                    }
+                }
                 if (_binding == null) return@launch
+                val freshCsrf = resp.optString("csrf_token").trim()
+                if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+                if (FollowRequests.isUnauthorized(resp)) {
+                    followCsrf = ""
+                    Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
                 if (FollowRequests.isOk(resp)) {
-                    val note = resp.optString("message").trim()
-                    val toast = if (note.isBlank() || note.equals("null", true)) "ثبت شد." else note
-                    Toast.makeText(ctx, toast, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, FollowRequests.doneMessage(path, resp, body), Toast.LENGTH_SHORT).show()
+                    PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
+                    if (FollowRequests.refreshesWallet(path)) {
+                        FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
+                    }
+                    if (FollowRequests.movesCard(path, body)) {
+                        pendingFollowId = FollowRequests.requestIdFromPath(path)
+                        pendingFollowPath = path
+                        pendingFollowBody = JSONObject(body.toString())
+                        activeTab = ""
+                    }
+                    binding.nativeList.removeAllViews()
+                    binding.nativeRefresh.isRefreshing = true
+                    followReload = true
+                    followEpoch++
                     load(forceNet = true)
                 } else {
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                if (_binding != null) Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                if (_binding != null) Toast.makeText(ctx, "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
             } finally {
-                followBusy = false
+                if (!followReload) {
+                    if (_binding != null) setFollowBusy(false) else followBusy = false
+                }
             }
+        }
+    }
+
+    private fun ensureFollowCsrf(ctx: Context, reject: String = ""): String {
+        if (followCsrf.isNotBlank() && followCsrf != reject) return followCsrf
+        val profile = try {
+            PartnerApi.get("/express/partner/profile/data", ctx)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        var token = profile.optString("csrf_token").trim()
+        if (token.isBlank() || token == reject) {
+            val page = PartnerApi.getPage(FollowRequests.PAGE_PATH, ctx)
+            val htmlToken = PartnerCustomers.csrfFromHtml(page.body)
+            if (htmlToken.isNotBlank()) token = htmlToken
+        }
+        if (token == reject) token = ""
+        followCsrf = token
+        return token
+    }
+
+    private fun setFollowBusy(busy: Boolean) {
+        followBusy = busy
+        val b = _binding ?: return
+        b.nativeProgress.isVisible = busy
+        setEnabledRecursively(b.nativeList, !busy)
+        setEnabledRecursively(b.nativeTabs, !busy)
+        b.nativeRefresh.isEnabled = !busy
+    }
+
+    private fun setEnabledRecursively(view: View, enabled: Boolean) {
+        view.isEnabled = enabled
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) setEnabledRecursively(view.getChildAt(i), enabled)
         }
     }
 
@@ -657,8 +835,8 @@ class NativePartnerFragment : Fragment() {
                 } else {
                     Toast.makeText(requireContext(), resp.optString("error").ifBlank { "ثبت ناموفق بود." }, Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
             } finally {
                 if (_binding != null) binding.nativeApplySubmit.isEnabled = true
             }
@@ -694,6 +872,7 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun hideSpecials() {
+        binding.nativeFavoritesEmpty.isVisible = false
         binding.nativeApplyForm.isVisible = false
         binding.nativeInviteBox.isVisible = false
         binding.nativeLeadBox.isVisible = false
@@ -710,10 +889,16 @@ class NativePartnerFragment : Fragment() {
     private fun bindEmpty(msg: String) {
         hideSpecials()
         binding.nativeList.removeAllViews()
-        binding.nativeEmpty.isVisible = true
-        binding.nativeEmpty.text = msg
         binding.nativeProgress.isVisible = false
         binding.nativeRefresh.isRefreshing = false
+        if (page == PAGE_FAVORITES && msg == FAVORITES_EMPTY) {
+            binding.nativeEmpty.isVisible = false
+            binding.nativeFavoritesEmpty.isVisible = true
+            return
+        }
+        binding.nativeFavoritesEmpty.isVisible = false
+        binding.nativeEmpty.isVisible = true
+        binding.nativeEmpty.text = msg
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -738,7 +923,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_LEVELS -> "سطوح همکاری"
             PAGE_INVITE -> "دعوت"
             PAGE_SETTINGS -> "تنظیمات"
-            PAGE_FAVORITES -> "نشان‌ها"
+            PAGE_FAVORITES -> "نشان‌شده‌ها"
             PAGE_REQUESTS -> "پیگیری"
             PAGE_APPLY -> ConsultantOnboarding.UI_LABEL
             PAGE_LISTINGS -> "ملک من"
@@ -753,11 +938,13 @@ class NativePartnerFragment : Fragment() {
             PAGE_LEVELS -> "/express/partner/api/levels/data"
             PAGE_INVITE -> "/express/partner/api/invite/data"
             PAGE_APPLY -> "/express/partner/api/apply/data"
-            PAGE_REQUESTS -> "/express/partner/api/requests/data"
+            PAGE_REQUESTS -> FollowRequests.DATA_PATH
             PAGE_LISTINGS -> "/express/partner/api/listings/data"
             PAGE_TERMS -> "/express/partner/api/legal/data?doc=terms"
             PAGE_PRIVACY -> "/express/partner/api/legal/data?doc=privacy"
             else -> null
         }
+
+        private const val FAVORITES_EMPTY = "هنوز آگهی‌ای نشان نکرده‌اید"
     }
 }

@@ -39,6 +39,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -67,7 +69,19 @@ class DashboardFragment : Fragment() {
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
+    private var customerCsrf: String = ""
+    private var customerBusy = false
     private var boundMessageCount = 0
+    private var boundFingerprint = ""
+    private var lastSyncAt = ""
+    private var chatPollJob: Job? = null
+    private var historyInFlight = false
+    private var historyQueued = false
+    private var syncInFlight = false
+    private var chatSending = false
+    private var chatWriteGen = 0
+    private var emptyPollStreak = 0
+    private var pollPaused = false
     private var suggestKey = ""
     private var homeAvatarWanted: String? = null
     private var homeAvatarLoading: String? = null
@@ -133,8 +147,26 @@ class DashboardFragment : Fragment() {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
         binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
+        binding.dashboardCustomerSheetHost.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
+        binding.dashboardCustomerNotes.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submitCustomer()
+                true
+            } else {
+                false
+            }
+        }
+        val clearCustomerError = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { showCustomerError(null) }
+        }
+        binding.dashboardCustomerFirst.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerLast.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerPhone.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerNotes.addTextChangedListener(clearCustomerError)
         val headerPad = (56 * resources.displayMetrics.density).toInt()
         binding.dashboardRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
@@ -162,10 +194,13 @@ class DashboardFragment : Fragment() {
         rememberedHome?.let { bindHomeAvatar(it) }
         if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
             openVinorChat()
+        } else if (isChatOpen()) {
+            resumeChatLive()
         }
     }
 
     override fun onDestroyView() {
+        stopChatPoll()
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -184,7 +219,7 @@ class DashboardFragment : Fragment() {
             return
         }
         if (chatLayerOpen || wantChatLayer) {
-            fetchHistory(bindIfWanted = true)
+            fetchHistory(bindIfWanted = true, force = true)
             return
         }
         loadAll(fromPull = true)
@@ -208,6 +243,7 @@ class DashboardFragment : Fragment() {
     fun showHomeEntry() {
         wantChatLayer = false
         chatBindGen += 1
+        stopChatPoll()
         showHomeEmpty()
         (activity as? MainActivity)?.syncDivarTab()
     }
@@ -273,18 +309,53 @@ class DashboardFragment : Fragment() {
         if (binding.dashboardChatList.childCount > 0) {
             binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             finishRefreshUi()
-            fetchHistory(bindIfWanted = true)
+            armChatLive()
             return
         }
         val hist = cachedHistory
         if (hist != null) {
             bindChat(hist)
-            fetchHistory(bindIfWanted = true)
+            armChatLive()
             return
         }
-        chatBindGen += 1
         binding.dashboardProgress.isVisible = true
-        fetchHistory(bindIfWanted = true)
+        armChatLive()
+    }
+
+    /** لایه باز است: کش را همان لحظه نشان بده، شبکه را عقب نینداز، و poll را روشن کن. */
+    private fun armChatLive() {
+        pollPaused = false
+        emptyPollStreak = 0
+        startChatPoll()
+        fetchHistory(bindIfWanted = true, force = true)
+    }
+
+    /** برگشت به چتِ باز: همگام‌سازی فوری، بدون انتظار برای دور بعدی. */
+    private fun resumeChatLive() {
+        pollPaused = false
+        emptyPollStreak = 0
+        startChatPoll()
+        if (threadId.isNullOrBlank() || boundFingerprint.isEmpty()) {
+            fetchHistory(bindIfWanted = true, force = true)
+        } else {
+            pollSync()
+        }
+    }
+
+    private fun startChatPoll() {
+        if (chatPollJob?.isActive == true) return
+        chatPollJob = scope.launch {
+            while (isActive) {
+                delay(ChatLive.POLL_MS)
+                pollSync()
+            }
+        }
+    }
+
+    private fun stopChatPoll() {
+        chatPollJob?.cancel()
+        chatPollJob = null
+        pollPaused = true
     }
 
     fun setHeaderVisible(visible: Boolean) {
@@ -307,7 +378,13 @@ class DashboardFragment : Fragment() {
     private fun closeCustomer(): Boolean {
         val b = _binding ?: return false
         if (!b.dashboardCustomer.isVisible) return false
+        b.dashboardCustomerFirst.clearFocus()
+        b.dashboardCustomerLast.clearFocus()
+        b.dashboardCustomerPhone.clearFocus()
+        b.dashboardCustomerNotes.clearFocus()
+        hideKeyboard()
         b.dashboardCustomer.isVisible = false
+        showCustomerError(null)
         return true
     }
 
@@ -498,64 +575,110 @@ class DashboardFragment : Fragment() {
 
     private fun openCustomer() {
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
         closeAttach()
+        showCustomerError(null)
         binding.dashboardCustomer.isVisible = true
+        binding.dashboardCustomerFirst.requestFocus()
     }
 
     private fun submitCustomer() {
+        if (customerBusy) return
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
-        val body = JSONObject()
-            .put("customer_first_name", binding.dashboardCustomerFirst.text?.toString()?.trim().orEmpty())
-            .put("customer_last_name", binding.dashboardCustomerLast.text?.toString()?.trim().orEmpty())
-            .put("customer_phone", binding.dashboardCustomerPhone.text?.toString()?.trim().orEmpty())
-            .put("notes", binding.dashboardCustomerNotes.text?.toString()?.trim().orEmpty())
-        binding.dashboardCustomerSubmit.isEnabled = false
+        val first = binding.dashboardCustomerFirst.text?.toString().orEmpty()
+        val last = binding.dashboardCustomerLast.text?.toString().orEmpty()
+        val phone = binding.dashboardCustomerPhone.text?.toString().orEmpty()
+        val notes = binding.dashboardCustomerNotes.text?.toString().orEmpty()
+        val problem = CustomerRegister.error(first, last, phone, notes)
+        if (problem != null) {
+            showCustomerError(problem)
+            return
+        }
+        showCustomerError(null)
+        val body = CustomerRegister.body(first, last, phone, notes)
+        setCustomerBusy(true)
+        val ctx = requireContext()
         scope.launch {
             try {
+                val token = withContext(Dispatchers.IO) { ensureCustomerCsrf(ctx) }
                 val resp = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/home/register-customer", body, requireContext())
+                    PartnerApi.postPage(CustomerRegister.PATH, body, token, CustomerRegister.REFERER, ctx)
                 }
                 if (_binding == null) return@launch
-                val http = resp.optInt("http_status")
-                if (http == 401 || http == 403) {
-                    Toast.makeText(
-                        requireContext(),
-                        resp.optString("error").ifBlank { "برای ثبت درخواست وارد شوید." },
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    if (http == 401) (activity as? MainActivity)?.openDrawer()
+                val fresh = resp.optString("csrf_token").trim()
+                if (fresh.isNotBlank()) customerCsrf = fresh
+                if (PartnerCustomers.isUnauthorized(resp)) {
+                    customerCsrf = ""
+                    Toast.makeText(ctx, "برای ثبت مشتری وارد شوید.", Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
                     return@launch
                 }
-                if (resp.optBoolean("ok")) {
+                if (PartnerCustomers.isOk(resp)) {
+                    clearCustomerForm()
                     closeCustomer()
-                    binding.dashboardCustomerFirst.setText("")
-                    binding.dashboardCustomerLast.setText("")
-                    binding.dashboardCustomerPhone.setText("")
-                    binding.dashboardCustomerNotes.setText("")
                     Toast.makeText(
-                        requireContext(),
-                        resp.optString("message").ifBlank { "درخواست بازدید ثبت شد." },
+                        ctx,
+                        PartnerCustomers.userMessage(resp, "مشتری ثبت شد."),
                         Toast.LENGTH_SHORT,
                     ).show()
                 } else {
-                    Toast.makeText(
-                        requireContext(),
-                        resp.optString("error").ifBlank { "ثبت ناموفق بود." },
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    showCustomerError(PartnerCustomers.userMessage(resp, "ثبت ناموفق بود."))
                 }
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null) showCustomerError(e.message ?: "خطای شبکه")
             } finally {
-                if (_binding != null) binding.dashboardCustomerSubmit.isEnabled = true
+                if (_binding != null) setCustomerBusy(false)
             }
         }
+    }
+
+    private fun ensureCustomerCsrf(ctx: android.content.Context): String {
+        if (customerCsrf.isNotBlank()) return customerCsrf
+        val profile = try {
+            PartnerApi.get("/express/partner/profile/data", ctx)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        var token = profile.optString("csrf_token").trim()
+        if (token.isBlank()) {
+            val html = try {
+                PartnerApi.getHtml("/express/partner/home", ctx)
+            } catch (_: Exception) {
+                ""
+            }
+            token = PartnerCustomers.csrfFromHtml(html)
+        }
+        customerCsrf = token
+        return token
+    }
+
+    private fun showCustomerError(text: String?) {
+        val b = _binding ?: return
+        val message = text?.trim().orEmpty()
+        b.dashboardCustomerError.text = message
+        b.dashboardCustomerError.isVisible = message.isNotEmpty()
+    }
+
+    private fun setCustomerBusy(busy: Boolean) {
+        customerBusy = busy
+        val b = _binding ?: return
+        b.dashboardCustomerProgress.isVisible = busy
+        b.dashboardCustomerSubmit.isEnabled = !busy
+        b.dashboardCustomerSubmit.alpha = if (busy) 0.55f else 1f
+    }
+
+    private fun clearCustomerForm() {
+        val b = _binding ?: return
+        b.dashboardCustomerFirst.setText("")
+        b.dashboardCustomerLast.setText("")
+        b.dashboardCustomerPhone.setText("")
+        b.dashboardCustomerNotes.setText("")
+        showCustomerError(null)
     }
 
     private fun syncSendEnabled() {
@@ -670,7 +793,7 @@ class DashboardFragment : Fragment() {
         (activity as? MainActivity)?.syncDivarTab()
     }
 
-    private fun fetchHistory(bindIfWanted: Boolean) {
+    private fun fetchHistory(bindIfWanted: Boolean, force: Boolean = false) {
         val ctx = context ?: return
         val account = currentAccountKey()
         if (account == null) {
@@ -681,38 +804,178 @@ class DashboardFragment : Fragment() {
         }
         if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
         chatAccount = account
+        if (historyInFlight) {
+            if (force) historyQueued = true
+            return
+        }
         val gen = chatBindGen
+        val write = chatWriteGen
+        historyInFlight = true
         scope.launch {
             try {
                 val peeked = withContext(Dispatchers.IO) {
-                    PartnerApi.peekJson("/express/partner/ai/history", ctx)
+                    PartnerApi.peekJson(ChatLive.HISTORY, ctx)
                 }
                 if (!chatStill(account, gen)) return@launch
-                if (peeked != null && bindIfWanted && wantChatLayer) bindChatIfNeeded(peeked)
+                if (peeked != null && wantChatLayer &&
+                    (_binding?.dashboardChatList?.childCount ?: 0) == 0
+                ) {
+                    bindChatIfNeeded(peeked)
+                }
+                val urgent = force || wantChatLayer
+                if (!urgent && peeked != null && withContext(Dispatchers.IO) {
+                        PartnerApi.isFresh(ChatLive.HISTORY, ctx)
+                    }
+                ) {
+                    rememberHistory(peeked)
+                    return@launch
+                }
+                val path = ChatLive.historyPath(threadId)
                 val hist = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/ai/history", ctx)
+                    PartnerApi.get(path, ctx)
+                }
+                if (write != chatWriteGen) {
+                    PartnerApi.forget(ChatLive.HISTORY, ctx)
+                    if (path != ChatLive.HISTORY) PartnerApi.forget(path, ctx)
+                    cachedHistory?.let { snap ->
+                        if (!snap.optBoolean("from_cache")) PartnerApi.remember(ChatLive.HISTORY, snap, ctx)
+                    }
                 }
                 if (!chatStill(account, gen)) return@launch
                 val status = hist.optInt("http_status")
                 if (status == 401 || status == 403) {
                     releaseChatAccount()
-                    if (bindIfWanted) (activity as? MainActivity)?.requireChatLogin()
+                    if (wantChatLayer) (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
-                rememberHistory(hist)
-                if (bindIfWanted && wantChatLayer) bindChatIfNeeded(hist)
+                if (path != ChatLive.HISTORY && chatCacheable(hist) &&
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
+                    PartnerApi.remember(ChatLive.HISTORY, hist, ctx)
+                }
+                if (wantChatLayer) bindChatIfNeeded(hist) else if (
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
+                    rememberHistory(hist)
+                }
             } catch (_: Exception) {
-                if (chatStill(account, gen) && bindIfWanted && wantChatLayer &&
+                if (chatStill(account, gen) && wantChatLayer &&
                     binding.dashboardChatList.childCount == 0
                 ) {
                     bindChat(JSONObject())
                 }
             } finally {
-                if (wantChatLayer || _binding?.dashboardProgress?.isVisible == true) {
-                    finishRefreshUi()
+                historyInFlight = false
+                val again = historyQueued
+                historyQueued = false
+                if (wantChatLayer) finishRefreshUi()
+                if (again && _binding != null && currentAccountKey() == account) {
+                    fetchHistory(bindIfWanted = true, force = true)
                 }
             }
         }
+    }
+
+    private fun pollSync() {
+        val ctx = context ?: return
+        val account = currentAccountKey() ?: return
+        val tid = threadId ?: return
+        if (!ChatLive.shouldPoll(
+                wantChatLayer && chatLayerOpen,
+                tid,
+                chatSending,
+                historyInFlight || syncInFlight,
+                pollPaused,
+            )
+        ) {
+            return
+        }
+        val gen = chatBindGen
+        val messages = ChatLive.messagesOf(cachedHistory)
+        val path = ChatLive.syncPath(
+            tid,
+            ChatLive.syncCount(messages),
+            lastSyncAt,
+            ChatLive.escalationIds(messages),
+        )
+        syncInFlight = true
+        scope.launch {
+            try {
+                val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
+                if (!chatStill(account, gen) || !wantChatLayer) return@launch
+                when (ChatLive.syncOutcome(obj)) {
+                    ChatLive.SyncOutcome.AUTH -> {
+                        releaseChatAccount()
+                        (activity as? MainActivity)?.requireChatLogin()
+                    }
+                    ChatLive.SyncOutcome.EMPTY -> {
+                        emptyPollStreak = ChatLive.nextEmptyStreak(emptyPollStreak, false)
+                        if (ChatLive.shouldPause(emptyPollStreak)) pollPaused = true
+                    }
+                    ChatLive.SyncOutcome.MESSAGES -> {
+                        emptyPollStreak = 0
+                        pollPaused = false
+                        absorbLiveMessages(ChatLive.messagesOf(obj))
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                syncInFlight = false
+            }
+        }
+    }
+
+    private fun absorbLiveMessages(incoming: JSONArray) {
+        if (!wantChatLayer || !chatLayerOpen || _binding == null) return
+        val base = cachedHistory ?: JSONObject()
+        val existing = ChatLive.messagesOf(base)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(incoming))
+        val next = ChatLive.reconcile(existing, incoming) ?: return
+        base.put("messages", next)
+        base.remove("from_cache")
+        threadId?.let { if (base.optString("thread_id").isBlank()) base.put("thread_id", it) }
+        cachedHistory = base
+        boundMessageCount = next.length()
+        boundFingerprint = ChatLive.fingerprint(next)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(next))
+        context?.let { PartnerApi.remember(ChatLive.HISTORY, base, it) }
+        if (ChatLive.sameVisible(existing, next)) return
+        if (next.length() > existing.length() && !transcriptEdited(existing, next)) {
+            for (i in existing.length() until next.length()) {
+                val msg = next.optJSONObject(i) ?: continue
+                val att = msg.optJSONObject("attachment")
+                    ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
+                addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
+            }
+            stickToLatestIfFollowing()
+        } else {
+            renderMessages(next, stick = followingLatest() || next.length() > existing.length())
+        }
+        val codes = landCodesIn(next).filter { !landsByCode.containsKey(it) }
+        if (codes.isEmpty()) return
+        val gen = chatBindGen
+        val fp = boundFingerprint
+        scope.launch {
+            coroutineScope { codes.map { code -> async { prefetchLand(code) } }.awaitAll() }
+            if (_binding == null || gen != chatBindGen || !wantChatLayer) return@launch
+            if (fp == boundFingerprint) renderMessages(next, stick = followingLatest())
+        }
+    }
+
+    private fun transcriptEdited(before: JSONArray, after: JSONArray): Boolean {
+        val n = minOf(before.length(), after.length())
+        for (i in 0 until n) {
+            val a = before.optJSONObject(i)
+            val b = after.optJSONObject(i)
+            if (ChatLive.fingerprint(JSONArray().put(a)) != ChatLive.fingerprint(JSONArray().put(b))) return true
+        }
+        return false
+    }
+
+    private fun chatCacheable(obj: JSONObject): Boolean {
+        if (obj.optBoolean("from_cache") || obj.optBoolean("offline")) return false
+        val status = obj.optInt("http_status", 200)
+        return status in 200..299
     }
 
     private fun currentAccountKey(): String? {
@@ -740,6 +1003,11 @@ class DashboardFragment : Fragment() {
         threadId = null
         cachedHistory = null
         boundMessageCount = 0
+        boundFingerprint = ""
+        lastSyncAt = ""
+        emptyPollStreak = 0
+        chatSending = false
+        historyQueued = false
         chatAccount = null
         landsByCode.clear()
         pendingAttachment = null
@@ -754,9 +1022,15 @@ class DashboardFragment : Fragment() {
     }
 
     private fun bindChatIfNeeded(obj: JSONObject) {
-        val incoming = obj.optJSONArray("messages")?.length() ?: 0
-        if (boundMessageCount > 0 &&
-            incoming == boundMessageCount &&
+        val messages = ChatLive.messagesOf(obj)
+        val current = ChatLive.messagesOf(cachedHistory)
+        threadFrom(obj)?.let { tid ->
+            if (threadId.isNullOrBlank() || ChatLive.shouldReplaceTranscript(current, messages)) threadId = tid
+        }
+        if (!ChatLive.shouldReplaceTranscript(current, messages)) return
+        rememberHistory(obj)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(messages))
+        if (ChatLive.fingerprint(messages) == boundFingerprint &&
             (_binding?.dashboardChatList?.childCount ?: 0) > 0
         ) {
             return
@@ -766,7 +1040,12 @@ class DashboardFragment : Fragment() {
 
     private fun rememberHistory(obj: JSONObject) {
         cachedHistory = obj
+        threadFrom(obj)?.let { threadId = it }
+    }
+
+    private fun threadFrom(obj: JSONObject): String? {
         var tid = obj.optString("thread_id").takeIf { it.isNotBlank() }
+            ?: obj.optJSONObject("data")?.optString("thread_id")?.takeIf { it.isNotBlank() }
         if (tid.isNullOrBlank()) {
             val threads = obj.optJSONArray("threads") ?: JSONArray()
             for (i in 0 until threads.length()) {
@@ -778,7 +1057,7 @@ class DashboardFragment : Fragment() {
                 if (th.optBoolean("is_active")) break
             }
         }
-        if (!tid.isNullOrBlank()) threadId = tid
+        return tid
     }
 
     private fun bindHomeAvatar(home: JSONObject) {
@@ -905,15 +1184,15 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardWallet.isVisible = isApproved
         binding.dashboardPerf.isVisible = isApproved
-        val reqCount = obj.optInt("home_requests_pipeline_count")
+        val reqCount = HomePulse.requests(obj).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
         if (isApproved) {
-            binding.dashboardWalletAmount.text = PartnerFormat.toman(obj.optLong("withdrawable_balance")) + " تومان"
+            binding.dashboardWalletAmount.text = PartnerFormat.toman(HomePulse.withdrawable(obj)) + " تومان"
             val hasGrowth = obj.has("home_month_growth_pct") && !obj.isNull("home_month_growth_pct")
             binding.dashboardWalletGrowth.isVisible = hasGrowth
             if (hasGrowth) binding.dashboardWalletGrowth.text = monthGrowthLabel(obj.optInt("home_month_growth_pct"))
-            binding.dashboardPerfDeals.text = PartnerFormat.toman(obj.optInt("home_deals_done"))
-            binding.dashboardPerfVisits.text = PartnerFormat.toman(obj.optInt("home_visits_done"))
-            binding.dashboardPerfCustomers.text = PartnerFormat.toman(obj.optInt("home_active_customers"))
+            binding.dashboardPerfDeals.text = PartnerFormat.toman(HomePulse.deals(obj))
+            binding.dashboardPerfVisits.text = PartnerFormat.toman(HomePulse.visits(obj))
+            binding.dashboardPerfCustomers.text = PartnerFormat.toman(HomePulse.customers(obj))
             binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
             binding.dashboardShortcutFollow.contentDescription = "پیگیری مشتری‌ها"
             binding.dashboardFollowBadge.isVisible = reqCount > 0
@@ -945,7 +1224,7 @@ class DashboardFragment : Fragment() {
             binding.dashboardSuggest.removeAllViews()
             return
         }
-        val key = files.length().toString() + ":" + files.optJSONObject(0)?.optString("token").orEmpty()
+        val key = HomeSuggest.fingerprint(files)
         if (key == suggestKey && binding.dashboardSuggest.childCount > 0) return
         suggestKey = key
         binding.dashboardSuggest.removeAllViews()
@@ -954,7 +1233,7 @@ class DashboardFragment : Fragment() {
             val ad = files.optJSONObject(i) ?: continue
             val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
             card.suggestTitle.text = HomeSuggest.displayTitle(ad)
-            val spec = HomeSuggest.specLine(ad)
+            val spec = HomeSuggest.cardSpec(ad)
             card.suggestSpec.isVisible = spec.isNotBlank()
             card.suggestSpec.text = spec
             val price = HomeSuggest.priceLine(ad)
@@ -969,7 +1248,21 @@ class DashboardFragment : Fragment() {
             card.suggestCommission.text = commission
             PartnerImages.roundClip(card.root, 16f)
             PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
+            card.root.contentDescription = HomeSuggest.displayTitle(ad)
+            val url = ad.optString("url").trim().let { if (it.isBlank() || it == "null") "" else it }
+            card.root.isClickable = HomeSuggest.landCode(ad).isNotBlank() || url.isNotBlank()
             card.root.setOnClickListener { openSuggest(ad) }
+        }
+        binding.dashboardSuggestScroll.post {
+            val scroll = _binding?.dashboardSuggestScroll ?: return@post
+            val child = scroll.getChildAt(0) ?: return@post
+            val viewport = scroll.width - scroll.paddingLeft - scroll.paddingRight
+            val x = HomeSuggest.startScrollX(
+                child.width,
+                viewport,
+                scroll.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
+            )
+            scroll.scrollTo(x, 0)
         }
     }
 
@@ -1122,8 +1415,10 @@ class DashboardFragment : Fragment() {
         binding.dashboardHeroSub.isVisible = !customer && sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = false
-        binding.dashboardHeroStart.text = if (customer) "شروع کنید" else "ادامه"
+        binding.dashboardHeroStart.isVisible = !customer
+        if (!customer) binding.dashboardHeroStart.text = "ادامه"
         binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
+        binding.dashboardHeroTitle.gravity = if (customer) Gravity.CENTER else Gravity.START
         if (customer) {
             binding.dashboardHeroTitle.maxLines = 1
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
@@ -1267,8 +1562,10 @@ class DashboardFragment : Fragment() {
         val account = currentAccountKey() ?: return
         if (!wantChatLayer || chatAccount != account) return
         rememberHistory(obj)
-        val messages = obj.optJSONArray("messages") ?: JSONArray()
+        val messages = ChatLive.messagesOf(obj)
         boundMessageCount = messages.length()
+        boundFingerprint = ChatLive.fingerprint(messages)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(messages))
         val gen = chatBindGen
         val codes = landCodesIn(messages)
         for (code in codes) {
@@ -1285,7 +1582,9 @@ class DashboardFragment : Fragment() {
             }
             if (_binding == null) return@launch
             if (gen != chatBindGen || !wantChatLayer) return@launch
-            renderMessages(messages)
+            if (boundFingerprint == ChatLive.fingerprint(messages)) {
+                renderMessages(messages, stick = followingLatest())
+            }
         }
     }
 
@@ -1329,7 +1628,7 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun renderMessages(messages: JSONArray) {
+    private fun renderMessages(messages: JSONArray, stick: Boolean = true) {
         if (!wantChatLayer || !chatLayerOpen) {
             showHomeEmpty()
             return
@@ -1337,6 +1636,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardChatList.removeAllViews()
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
+            if (ChatLive.isHidden(msg)) continue
             val att = msg.optJSONObject("attachment")
                 ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
             addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
@@ -1344,14 +1644,27 @@ class DashboardFragment : Fragment() {
         if (chatLayerOpen && wantChatLayer) {
             hideHomeDashboardWidgets()
             syncComposerVisible()
-            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+            if (stick) binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             return
         }
         showHomeEmpty()
     }
 
-    private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null) {
-        if (content.isBlank() && (codes == null || codes.length() == 0) && attachment == null) return
+    private fun followingLatest(): Boolean {
+        val scroll = _binding?.dashboardScroll ?: return true
+        val child = scroll.getChildAt(0) ?: return true
+        val slack = (96 * resources.displayMetrics.density).toInt()
+        return child.bottom <= scroll.height + scroll.scrollY + slack
+    }
+
+    private fun stickToLatestIfFollowing() {
+        if (!followingLatest()) return
+        val scroll = _binding?.dashboardScroll ?: return
+        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null): View? {
+        if (content.isBlank() && (codes == null || codes.length() == 0) && attachment == null) return null
         val bubble = ItemChatBubbleBinding.inflate(layoutInflater, binding.dashboardChatList, false)
         val isUser = role == "user"
         bubble.chatBubbleAvatar.isVisible = !isUser
@@ -1405,13 +1718,14 @@ class DashboardFragment : Fragment() {
         }
         host.isVisible = attached > 0
         binding.dashboardChatList.addView(bubble.root)
+        return bubble.root
     }
 
     private fun inflateLandCard(land: JSONObject, parent: ViewGroup): ItemLandCardBinding {
         val card = ItemLandCardBinding.inflate(layoutInflater, parent, false)
         val code = land.optString("code")
         card.landCardTitle.text = land.optString("title", "—")
-        card.landCardPrice.text = PartnerFormat.toman(land.optInt("price_total")) + " تومان"
+        card.landCardPrice.text = PartnerFormat.toman(WalletWithdraw.money(land, "price_total", "price")) + " تومان"
         val city = land.optString("city").ifBlank { land.optString("location") }
         card.landCardMeta.text = if (city.isNotBlank()) "در $city" else ""
         PartnerImages.roundClip(card.landCardImage)
@@ -1448,6 +1762,7 @@ class DashboardFragment : Fragment() {
             Toast.makeText(requireContext(), "صبر کنید تا آپلود تمام شود.", Toast.LENGTH_SHORT).show()
             return
         }
+        if (chatSending) return
         if (text.isEmpty() && attach == null) return
         closeAttach()
         binding.dashboardChatInput.setText("")
@@ -1457,12 +1772,20 @@ class DashboardFragment : Fragment() {
         syncSendEnabled()
         wantChatLayer = true
         chatLayerOpen = true
+        chatSending = true
         chatBindGen += 1
+        chatWriteGen += 1
+        pollPaused = false
+        emptyPollStreak = 0
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
-        addBubble("user", text, null, toSend)
+        startChatPoll()
+        context?.let { PartnerApi.forget(ChatLive.HISTORY, it) }
+        val pending = addBubble("user", text, null, toSend)
+        val thinking = addBubble("assistant", "…", null, null)
         scope.launch {
+            var delivered = false
             try {
                 val body = JSONObject().put("message", text)
                 threadId?.let { body.put("thread_id", it) }
@@ -1471,8 +1794,7 @@ class DashboardFragment : Fragment() {
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
-                if (_binding == null) return@launch
-                if (!wantChatLayer || !chatLayerOpen || currentAccountKey() != account) return@launch
+                if (_binding == null || currentAccountKey() != account) return@launch
                 val http = resp.optInt("http_status")
                 if (http == 401 || http == 403) {
                     releaseChatAccount()
@@ -1480,27 +1802,77 @@ class DashboardFragment : Fragment() {
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {
-                    threadId = resp.optString("thread_id").takeIf { it.isNotBlank() } ?: threadId
-                    val codes = resp.optJSONArray("land_codes")
-                    if (codes != null) {
-                        for (i in 0 until codes.length()) prefetchLand(codes.optString(i))
+                    val stored = ChatLive.applyExchange(cachedHistory, text, toSend, resp, threadId)
+                    cachedHistory = stored
+                    threadId = stored.optString("thread_id").takeIf { it.isNotBlank() } ?: threadId
+                    val transcript = ChatLive.messagesOf(stored)
+                    boundMessageCount = transcript.length()
+                    boundFingerprint = ChatLive.fingerprint(transcript)
+                    lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(transcript))
+                    context?.let { PartnerApi.remember(ChatLive.HISTORY, stored, it) }
+                    if (wantChatLayer && chatLayerOpen) {
+                        thinking?.let { _binding?.dashboardChatList?.removeView(it) }
+                        renderMessages(transcript, stick = true)
+                        paintMissingLands(transcript)
+                    } else {
+                        _binding?.dashboardChatList?.removeAllViews()
+                        boundFingerprint = ""
                     }
-                    addBubble("assistant", resp.optString("reply"), codes)
-                    binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+                    delivered = true
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }
                     if (err.contains("ورود") || err.contains("لاگین")) {
                         releaseChatAccount()
                         (activity as? MainActivity)?.requireChatLogin()
                     } else {
+                        restoreFailedSend(pending, thinking, text, toSend)
                         Toast.makeText(requireContext(), err, Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null && wantChatLayer) {
+                    restoreFailedSend(pending, thinking, text, toSend)
+                    Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                }
             } finally {
+                chatSending = false
+                if (!delivered) {
+                    _binding?.dashboardChatList?.let { list -> thinking?.let { list.removeView(it) } }
+                }
                 if (_binding != null) syncSendEnabled()
+                if (delivered && wantChatLayer && chatLayerOpen) pollSync()
             }
         }
+    }
+
+    private fun paintMissingLands(messages: JSONArray) {
+        val missing = landCodesIn(messages).filter { !landsByCode.containsKey(it) }
+        if (missing.isEmpty()) return
+        val gen = chatBindGen
+        val fp = boundFingerprint
+        scope.launch {
+            coroutineScope { missing.map { code -> async { prefetchLand(code) } }.awaitAll() }
+            if (_binding == null || gen != chatBindGen || !wantChatLayer) return@launch
+            if (fp == boundFingerprint) renderMessages(messages, stick = followingLatest())
+        }
+    }
+
+    private fun restoreFailedSend(pending: View?, thinking: View?, text: String, attachment: JSONObject?) {
+        val b = _binding ?: return
+        thinking?.let { b.dashboardChatList.removeView(it) }
+        pending?.let { b.dashboardChatList.removeView(it) }
+        if (text.isNotBlank() && b.dashboardChatInput.text.isNullOrBlank()) {
+            b.dashboardChatInput.setText(text)
+        }
+        if (attachment != null && pendingAttachment == null) {
+            pendingAttachment = attachment
+            showAttachPreview(
+                attachment.optString("kind"),
+                attachment.optString("name"),
+                attachment.optLong("size"),
+                false,
+            )
+        }
+        syncSendEnabled()
     }
 }

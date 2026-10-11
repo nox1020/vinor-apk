@@ -109,7 +109,7 @@ object PartnerCustomers {
     }
 
     fun deleteBody(id: String, idKey: String): JSONObject {
-        val body = JSONObject()
+        val body = JSONObject().put("action", "delete")
         val trimmed = id.trim()
         val number = trimmed.toLongOrNull()
         if (number != null && trimmed.all { it.isDigit() }) body.put(idKey, number)
@@ -130,6 +130,9 @@ object PartnerCustomers {
         if (isCsrfExpired(payload) || isUnauthorized(payload)) return false
         if (payload.has("success") && !payload.optBoolean("success")) return false
         if (payload.has("ok") && !payload.optBoolean("ok")) return false
+        if (payload.optString("error").trim().isNotEmpty()) return false
+        val fields = payload.optJSONObject("fields") ?: payload.optJSONObject("errors")
+        if (fields != null && fields.length() > 0) return false
         return true
     }
 

@@ -80,11 +80,15 @@ class DeepLinkRouterTest {
     }
 
     @Test
-    fun requests_isPartnerWeb_requiresAuth() {
+    fun requests_andRequestDetails_areNativePartnerFlow_andRequireAuth() {
         val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/requests")
-        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_REQUESTS, r.type)
         assertTrue(r.requiresAuth)
         assertTrue(r.targetUrl.contains("/requests"))
+        val detail = DeepLinkRouter.resolve("https://vinor.ir/express/partner/requests/15?tab=visits")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_REQUESTS, detail.type)
+        assertTrue(detail.requiresAuth)
+        assertEquals("requests", detail.logLabel)
     }
 
     @Test

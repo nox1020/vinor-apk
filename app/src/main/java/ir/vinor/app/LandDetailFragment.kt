@@ -1,24 +1,33 @@
 package ir.vinor.app
 
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import ir.vinor.app.databinding.FragmentLandDetailBinding
+import ir.vinor.app.databinding.SheetLandVisitBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,6 +48,8 @@ class LandDetailFragment : Fragment() {
     private var listing = JSONObject()
     private var bodyExpanded = false
     private var galleryCount = 0
+    private var visitSheet: BottomSheetDialog? = null
+    private var visitBusy = false
     private val pageCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             paintCounter(position)
@@ -94,6 +105,8 @@ class LandDetailFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        visitSheet?.dismiss()
+        visitSheet = null
         _binding?.landDetailGallery?.unregisterOnPageChangeCallback(pageCallback)
         job.cancel()
         super.onDestroyView()
@@ -226,6 +239,284 @@ class LandDetailFragment : Fragment() {
                 LandDetailRole.StickyKind.CHAT -> (activity as? MainActivity)?.openVinorChat()
                 LandDetailRole.StickyKind.DIVAR -> openDivar(code, divarUrl)
                 LandDetailRole.StickyKind.MANAGE -> (activity as? MainActivity)?.openMyPropertyManage(obj)
+            }
+        }
+        val showVisit = LandVisit.showBesideChat(
+            audience,
+            isDivar,
+            obj.optBoolean("show_divar"),
+            divarUrl.isNotBlank(),
+        )
+        binding.landDetailVisit.isVisible = showVisit
+        binding.landDetailVisit.setOnClickListener {
+            if (!PartnerApi.hasSession()) {
+                (activity as? MainActivity)?.requireChatLogin()
+            } else {
+                openVisit(code)
+            }
+        }
+    }
+
+    private fun openVisit(code: String) {
+        if (visitBusy || code.isBlank()) return
+        val ctx = context ?: return
+        visitBusy = true
+        binding.landDetailVisit.isEnabled = false
+        scope.launch {
+            try {
+                val schedule = withContext(Dispatchers.IO) {
+                    val encoded = Uri.encode(code)
+                    val page = PartnerApi.getPage(LandVisit.pagePath(encoded), ctx)
+                    if (PartnerCustomers.isLoginDocument(page.url, page.body)) return@withContext null
+                    val parsed = LandVisit.parsePage(page.body)
+                    val statusPath = parsed.statusUrl.ifBlank { LandVisit.statusPath(encoded) }
+                    val status = try {
+                        PartnerApi.get(statusPath, ctx)
+                    } catch (_: Exception) {
+                        JSONObject()
+                    }
+                    if (FollowRequests.isUnauthorized(status) && parsed.requestUrl.isBlank()) {
+                        return@withContext null
+                    }
+                    if (FollowRequests.isUnauthorized(status)) parsed else LandVisit.mergeStatus(parsed, status)
+                }
+                if (_binding == null) return@launch
+                if (schedule == null) {
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
+                if (!LandVisit.canSchedule(schedule.mode, schedule.canRevisit)) {
+                    Toast.makeText(ctx, LandVisit.blockedMessage(schedule), Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                if (schedule.requestUrl.isBlank()) {
+                    Toast.makeText(ctx, LandVisit.UNAVAILABLE, Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                showVisitSheet(schedule)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null) {
+                    Toast.makeText(ctx, e.message ?: "خطا در ثبت بازدید", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                visitBusy = false
+                if (_binding != null) binding.landDetailVisit.isEnabled = true
+            }
+        }
+    }
+
+    private fun showVisitSheet(schedule: LandVisit.Schedule) {
+        val sheet = SheetLandVisitBinding.inflate(layoutInflater)
+        val today = LandVisit.todayIso()
+        val hour = LandVisit.tehranHour()
+        val (minIso, maxIso) = LandVisit.bounds(schedule.minDate, today)
+        val start = LandVisit.jalaliOf(minIso)
+        var year = start[0]
+        var month = start[1]
+        var selected = ""
+        fun paint() {
+            val maxJ = LandVisit.jalaliOf(maxIso)
+            val minJ = LandVisit.jalaliOf(minIso)
+            fun pack(y: Int, m: Int) = y * 12 + m
+            sheet.landVisitPrev.isEnabled = pack(year, month) > pack(minJ[0], minJ[1])
+            sheet.landVisitNext.isEnabled = pack(year, month) < pack(maxJ[0], maxJ[1])
+            sheet.landVisitPrev.alpha = if (sheet.landVisitPrev.isEnabled) 1f else 0.35f
+            sheet.landVisitNext.alpha = if (sheet.landVisitNext.isEnabled) 1f else 0.35f
+            sheet.landVisitMonth.text = LandVisit.monthTitle(year, month)
+            sheet.landVisitSelected.text = if (selected.isBlank()) {
+                "تاریخ انتخاب نشده"
+            } else {
+                "بازدید: ${LandVisit.display(selected)}"
+            }
+            sheet.landVisitSelected.setTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (selected.isBlank()) R.color.vinor_text_muted else R.color.vinor_accent_green,
+                ),
+            )
+            val ready = selected.isNotBlank() &&
+                LandVisit.customerError(
+                    sheet.landVisitFirst.text?.toString().orEmpty(),
+                    sheet.landVisitLast.text?.toString().orEmpty(),
+                    sheet.landVisitPhone.text?.toString().orEmpty(),
+                ).isEmpty()
+            sheet.landVisitSubmit.alpha = if (ready) 1f else 0.45f
+            val cells = LandVisit.monthCells(
+                year,
+                month,
+                selected,
+                minIso,
+                maxIso,
+                schedule.weekdays,
+                schedule.hours,
+                today,
+                hour,
+            )
+            sheet.landVisitGrid.removeAllViews()
+            val face = ResourcesCompat.getFont(requireContext(), R.font.vazirmatn)
+            for (row in cells.chunked(7)) {
+                val line = LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                }
+                val padded = row + List(7 - row.size) { null }
+                for (cell in padded) {
+                    val holder = FrameLayout(requireContext())
+                    val lp = LinearLayout.LayoutParams(0, dp(40), 1f)
+                    if (cell != null) {
+                        val day = TextView(requireContext()).apply {
+                            gravity = Gravity.CENTER
+                            text = cell.label
+                            textSize = 14f
+                            typeface = face
+                            setTypeface(typeface, Typeface.BOLD)
+                        }
+                        when {
+                            cell.selected -> {
+                                day.setBackgroundResource(R.drawable.bg_hub_start)
+                                day.setTextColor(Color.parseColor("#052E16"))
+                            }
+                            !cell.enabled -> day.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text_muted))
+                            cell.today -> day.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
+                            else -> day.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
+                        }
+                        if (cell.enabled) {
+                            day.setOnClickListener {
+                                selected = cell.iso
+                                sheet.landVisitError.isVisible = false
+                                paint()
+                            }
+                        }
+                        holder.addView(
+                            day,
+                            FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER),
+                        )
+                    }
+                    line.addView(holder, lp)
+                }
+                sheet.landVisitGrid.addView(line)
+            }
+        }
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                sheet.landVisitError.isVisible = false
+                paint()
+            }
+        }
+        sheet.landVisitFirst.addTextChangedListener(watcher)
+        sheet.landVisitLast.addTextChangedListener(watcher)
+        sheet.landVisitPhone.addTextChangedListener(watcher)
+        sheet.landVisitPrev.setOnClickListener {
+            val next = LandVisit.shiftMonth(year, month, -1)
+            year = next.first
+            month = next.second
+            paint()
+        }
+        sheet.landVisitNext.setOnClickListener {
+            val next = LandVisit.shiftMonth(year, month, 1)
+            year = next.first
+            month = next.second
+            paint()
+        }
+        sheet.landVisitSubmit.setOnClickListener {
+            if (selected.isBlank()) {
+                sheet.landVisitError.isVisible = true
+                sheet.landVisitError.text = LandVisit.NEED_DATE
+                return@setOnClickListener
+            }
+            val error = LandVisit.customerError(
+                sheet.landVisitFirst.text?.toString().orEmpty(),
+                sheet.landVisitLast.text?.toString().orEmpty(),
+                sheet.landVisitPhone.text?.toString().orEmpty(),
+            )
+            if (error.isNotEmpty()) {
+                sheet.landVisitError.isVisible = true
+                sheet.landVisitError.text = error
+                return@setOnClickListener
+            }
+            submitVisit(
+                schedule,
+                selected,
+                LandVisit.customer(
+                    sheet.landVisitFirst.text?.toString().orEmpty(),
+                    sheet.landVisitLast.text?.toString().orEmpty(),
+                    sheet.landVisitPhone.text?.toString().orEmpty(),
+                ),
+                sheet,
+            )
+        }
+        paint()
+        val dialog = BottomSheetDialog(requireContext())
+        dialog.setContentView(sheet.root)
+        dialog.setOnShowListener {
+            val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                ?: return@setOnShowListener
+            panel.setBackgroundColor(Color.TRANSPARENT)
+            BottomSheetBehavior.from(panel).apply {
+                skipCollapsed = true
+                state = BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+        visitSheet?.dismiss()
+        visitSheet = dialog
+        dialog.show()
+    }
+
+    private fun submitVisit(
+        schedule: LandVisit.Schedule,
+        dateIso: String,
+        customer: LandVisit.Customer,
+        sheet: SheetLandVisitBinding,
+    ) {
+        val ctx = context ?: return
+        if (visitBusy) return
+        visitBusy = true
+        sheet.landVisitSubmit.isEnabled = false
+        sheet.landVisitSubmit.alpha = 0.45f
+        scope.launch {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postForm(
+                        schedule.requestUrl,
+                        LandVisit.formFields(dateIso, customer),
+                        schedule.csrf,
+                        LandVisit.pagePath(Uri.encode(listingCode)),
+                        ctx,
+                    )
+                }
+                if (_binding == null) return@launch
+                if (FollowRequests.isUnauthorized(resp)) {
+                    visitSheet?.dismiss()
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
+                if (!LandVisit.isOk(resp)) {
+                    sheet.landVisitError.isVisible = true
+                    sheet.landVisitError.text = LandVisit.failureMessage(resp)
+                    return@launch
+                }
+                PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
+                Toast.makeText(ctx, LandVisit.successMessage(resp), Toast.LENGTH_SHORT).show()
+                visitSheet?.dismiss()
+                val redirect = resp.optString("redirect_url").trim()
+                if (LandVisit.shouldFollowRedirect(redirect)) {
+                    (activity as? MainActivity)?.openPath(redirect)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null && visitSheet?.isShowing == true) {
+                    sheet.landVisitError.isVisible = true
+                    sheet.landVisitError.text = e.message ?: "خطا در ثبت بازدید"
+                }
+            } finally {
+                visitBusy = false
+                if (visitSheet?.isShowing == true) {
+                    sheet.landVisitSubmit.isEnabled = true
+                    sheet.landVisitSubmit.alpha = 1f
+                }
             }
         }
     }
@@ -414,7 +705,11 @@ class LandDetailFragment : Fragment() {
                     )
                 }
                 val land = if (fresh.optBoolean("ok")) {
-                    withContext(Dispatchers.IO) { PartnerApi.get(apiPath(code), ctx) }
+                    withContext(Dispatchers.IO) {
+                        val path = apiPath(code)
+                        PartnerApi.forget(path, ctx)
+                        PartnerApi.get(path, ctx)
+                    }
                 } else {
                     null
                 }

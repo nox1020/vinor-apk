@@ -80,6 +80,16 @@
         </LinearLayout>
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/requestCardCommission"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/vinor_accent_green"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/requestCardActions"
         android:layout_width="match_parent"

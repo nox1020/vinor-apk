@@ -582,6 +582,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:clipToPadding="false"
+                            android:layoutDirection="rtl"
                             android:overScrollMode="never"
                             android:paddingHorizontal="16dp"
                             android:paddingBottom="4dp"
@@ -591,6 +592,7 @@
                                 android:id="@+id/dashboardSuggest"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layoutDirection="rtl"
                                 android:orientation="horizontal" />
                         </HorizontalScrollView>
                     </LinearLayout>
@@ -637,9 +639,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="6dp"
                                 android:fontFamily="@font/vazirmatn_bold"
-                                android:text="شروع کنید"
+                                android:text="ادامه"
                                 android:textColor="@color/vinor_customer_bg"
-                                android:textSize="15sp" />
+                                android:textSize="15sp"
+                                android:visibility="gone" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -647,7 +650,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="12dp"
                             android:layout_weight="1"
-                            android:gravity="center_vertical|start"
+                            android:gravity="center"
                             android:orientation="vertical">
 
                             <TextView
@@ -667,7 +670,7 @@
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
                                 android:fontFamily="@font/vazirmatn_bold"
-                                android:gravity="start"
+                                android:gravity="center"
                                 android:maxLines="1"
                                 android:text="مشتری دارم"
                                 android:textColor="@color/vinor_on_primary"
@@ -1161,134 +1164,238 @@
             android:clickable="true"
             android:focusable="true" />
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:background="@drawable/bg_customer_panel"
-            android:clickable="true"
-            android:layoutDirection="rtl"
-            android:orientation="vertical"
-            android:paddingBottom="18dp">
-
-            <View
-                android:layout_width="40dp"
-                android:layout_height="4dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="9dp"
-                android:background="#33FFFFFF" />
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="ثبت مشتری جدید"
-                    android:textColor="#F4F4F5"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/dashboardCustomerClose"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="start|center_vertical"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="بستن"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_close" />
-            </FrameLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#14FFFFFF" />
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
+                android:id="@+id/dashboardCustomerSheetHost"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="12dp">
+                android:gravity="bottom"
+                android:orientation="vertical">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerFirst"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="نام"
-                    android:inputType="textPersonName"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                    android:background="@drawable/bg_customer_panel"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layoutDirection="rtl"
+                    android:orientation="vertical">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerLast"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="نام خانوادگی"
-                    android:inputType="textPersonName"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="4dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="8dp"
+                        android:background="#33FFFFFF" />
 
-                <EditText
-                    android:id="@+id/dashboardCustomerPhone"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:hint="0912…"
-                    android:inputType="phone"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="ltr"
-                    android:textSize="15sp" />
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="56dp">
 
-                <EditText
-                    android:id="@+id/dashboardCustomerNotes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_drawer_input"
-                    android:gravity="top|start"
-                    android:hint="مثلاً ترجیح منطقه یا نکتهٔ مهم برای بازدید"
-                    android:inputType="textMultiLine"
-                    android:minLines="3"
-                    android:padding="12dp"
-                    android:textAlignment="viewStart"
-                    android:textColor="@color/vinor_text"
-                    android:textColorHint="#8E8E93"
-                    android:textDirection="rtl"
-                    android:textSize="15sp" />
+                        <ImageButton
+                            android:id="@+id/dashboardCustomerClose"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="start|center_vertical"
+                            android:layout_marginStart="4dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="بستن"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_close"
+                            app:tint="@color/vinor_text" />
 
-                <Button
-                    android:id="@+id/dashboardCustomerSubmit"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_customer_submit"
-                    android:text="ارسال درخواست تعیین وقت بازدید"
-                    android:textColor="#042F2E"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:fontFamily="@font/vazirmatn_bold"
+                            android:gravity="center"
+                            android:paddingHorizontal="56dp"
+                            android:text="ثبت مشتری جدید"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="17sp" />
+
+                        <ProgressBar
+                            android:id="@+id/dashboardCustomerProgress"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="end|center_vertical"
+                            android:layout_marginEnd="16dp"
+                            android:indeterminateTint="@color/vinor_accent_green"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/vinor_border" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:paddingTop="12dp"
+                        android:text="نام و موبایل مشتری را برای تعیین وقت بازدید وارد کنید."
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="نام"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerFirst"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="personGivenName"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="نام"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPersonName|textCapWords"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="نام خانوادگی"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerLast"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="personFamilyName"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="نام خانوادگی"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPersonName|textCapWords"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="موبایل"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerPhone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:autofillHints="phone"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:hint="۰۹۱۲…"
+                        android:imeOptions="actionNext"
+                        android:inputType="phone"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="ltr"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:paddingHorizontal="16dp"
+                        android:text="یادداشت"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/dashboardCustomerNotes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_invite_link"
+                        android:fontFamily="@font/vazirmatn"
+                        android:gravity="top|start"
+                        android:hint="منطقه یا نکتهٔ مهم برای بازدید"
+                        android:imeOptions="actionDone"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:maxLines="6"
+                        android:minLines="3"
+                        android:padding="12dp"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textDirection="rtl"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/dashboardCustomerError"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:textColor="@color/vinor_error"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/dashboardCustomerSubmit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/bg_hub_start"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:minHeight="48dp"
+                        android:stateListAnimator="@null"
+                        android:text="ثبت مشتری"
+                        android:textAllCaps="false"
+                        android:textColor="@color/vinor_customer_bg"
+                        android:textSize="16sp" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </FrameLayout>
 </FrameLayout>

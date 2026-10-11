@@ -111,7 +111,7 @@
                             android:inputType="text"
                             android:maxLines="1"
                             android:textColor="#111827"
-                            android:textColorHint="#9CA3AF"
+                            android:textColorHint="@color/vinor_text_muted"
                             android:textSize="15sp" />
 
                         <ImageButton
@@ -156,9 +156,50 @@
                         android:background="@drawable/bg_routine_card"
                         android:gravity="center"
                         android:padding="24dp"
-                        android:textColor="#A1A1AA"
+                        android:textColor="@color/vinor_text_muted"
                         android:textSize="13sp"
                         android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/nativeFavoritesEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingVertical="24dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_bookmark"
+                            app:tint="@color/vinor_text_muted" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:fontFamily="@font/vazirmatn"
+                            android:gravity="center"
+                            android:text="هنوز آگهی‌ای نشان نکرده‌اید"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/nativeFavoritesCta"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:layout_marginTop="16dp"
+                            android:background="@drawable/bg_search_apply"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:fontFamily="@font/vazirmatn_bold"
+                            android:gravity="center"
+                            android:text="جستجوی آگهی‌ها"
+                            android:textColor="@color/vinor_on_primary"
+                            android:textSize="15sp" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/nativeLeadBox"
@@ -173,7 +214,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:lineSpacingMultiplier="1.4"
-                            android:textColor="#A1A1AA"
+                            android:textColor="@color/vinor_text_muted"
                             android:textSize="13sp" />
                     </LinearLayout>
 
@@ -185,7 +226,7 @@
                         android:layout_marginBottom="12dp"
                         android:gravity="center"
                         android:text="مسیر موفقیت در همکاری"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="17sp"
                         android:textStyle="bold"
                         android:visibility="gone" />
@@ -205,7 +246,7 @@
                         android:layout_marginBottom="10dp"
                         android:gravity="center"
                         android:text="پرتکرارترین سؤال‌ها"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="17sp"
                         android:textStyle="bold"
                         android:visibility="gone" />
@@ -247,7 +288,7 @@
                             android:inputType="textPersonName"
                             android:padding="14dp"
                             android:textColor="#FFFFFF"
-                            android:textColorHint="#52525B"
+                            android:textColorHint="@color/vinor_text_muted"
                             android:textSize="14sp" />
 
                         <EditText
@@ -260,7 +301,7 @@
                             android:inputType="textPersonName"
                             android:padding="14dp"
                             android:textColor="#FFFFFF"
-                            android:textColorHint="#52525B"
+                            android:textColorHint="@color/vinor_text_muted"
                             android:textSize="14sp" />
 
                         <EditText
@@ -274,7 +315,7 @@
                             android:maxLength="10"
                             android:padding="14dp"
                             android:textColor="#FFFFFF"
-                            android:textColorHint="#52525B"
+                            android:textColorHint="@color/vinor_text_muted"
                             android:textDirection="ltr"
                             android:textSize="14sp" />
 
