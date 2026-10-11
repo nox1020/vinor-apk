@@ -14,12 +14,6 @@ on:
       - '.github/workflows/android.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle.properties'
-      - 'gradle/**'
 
 concurrency:
   group: android-${{ github.ref }}
@@ -307,11 +301,24 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="$(head -n1 version.txt | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-          if [ -z "$VERSION" ]; then
-            echo "version.txt is empty; cannot derive version."
+          set -euo pipefail
+          STAMP="app/build/vinor-version-name.txt"
+          if [ ! -f "$STAMP" ]; then
+            echo "Missing $STAMP. Gradle records versionName there; version.txt is not the CI version."
             exit 1
           fi
+          VERSION="$(head -n1 "$STAMP" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ -z "$VERSION" ]; then
+            echo "$STAMP is empty; cannot name the APK."
+            exit 1
+          fi
+          case "$VERSION" in
+            1.0.*) ;;
+            *)
+              echo "versionName must stay 1.0.x so vinor-<version>.apk matches the in-app updater. Got: $VERSION"
+              exit 1
+              ;;
+          esac
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Rename APK to include version
@@ -373,5 +380,45 @@ jobs:
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: warn
           retention-days: 14
+
+  android-ci-ok:
+    name: android-ci-ok
+    needs: [changes, unit-test, debug, direct]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every needed job succeeded or was skipped
+        shell: bash
+        env:
+          RESULT_CHANGES: ${{ needs.changes.result }}
+          RESULT_UNIT_TEST: ${{ needs.unit-test.result }}
+          RESULT_DEBUG: ${{ needs.debug.result }}
+          RESULT_DIRECT: ${{ needs.direct.result }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## android-ci-ok"
+            echo ""
+            echo "| Job | Result |"
+            echo "|-----|--------|"
+            echo "| changes | \`$RESULT_CHANGES\` |"
+            echo "| unit-test | \`$RESULT_UNIT_TEST\` |"
+            echo "| debug | \`$RESULT_DEBUG\` |"
+            echo "| direct | \`$RESULT_DIRECT\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          bad=0
+          for result in "$RESULT_CHANGES" "$RESULT_UNIT_TEST" "$RESULT_DEBUG" "$RESULT_DIRECT"; do
+            echo "result=$result"
+            case "$result" in
+              success|skipped) ;;
+              *) bad=1 ;;
+            esac
+          done
+          if [ "$bad" -ne 0 ]; then
+            echo "android-ci-ok failed: a needed job was not success or skipped."
+            exit 1
+          fi
+          echo "android-ci-ok passed"
 
 
