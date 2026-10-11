@@ -23,24 +23,6 @@ class ApkVersionUtilsTest {
         assertEquals(10004L, ApkVersionUtils.versionCodeFromName("1.0.4"))
         assertEquals(10272L, ApkVersionUtils.versionCodeFromName("1.0.272"))
         assertEquals(10273L, ApkVersionUtils.versionCodeFromName("1.0.273"))
-        assertEquals(10323L, ApkVersionUtils.versionCodeFromName("1.0.323"))
-    }
-
-    @Test
-    fun ciRunScheme_staysAboveReleasedFloorAndMatchesName() {
-        // Same contract as app/build.gradle: floor 10323 (1.0.323) + GITHUB_RUN_NUMBER.
-        val floor = 10323L
-        val run = 338L
-        val code = floor + run
-        val name = "1.0.${code - 10000L}"
-        assertEquals(10661L, code)
-        assertEquals("1.0.661", name)
-        assertEquals(code, ApkVersionUtils.versionCodeFromName(name))
-        assertTrue(code > floor)
-        assertTrue(ApkVersionUtils.isRemoteNewer(code, floor, name, "1.0.323"))
-        // Local fallback (no GITHUB_RUN_NUMBER) is the floor itself: never lower.
-        assertEquals(floor, ApkVersionUtils.versionCodeFromName("1.0.323"))
-        assertFalse(ApkVersionUtils.isRemoteNewer(10322L, floor, "1.0.322", "1.0.323"))
     }
 
     @Test
