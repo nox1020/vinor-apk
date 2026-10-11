@@ -95,6 +95,8 @@ class MainActivity : AppCompatActivity() {
         PartnerApi.setSessionExpiredListener {
             if (isFinishing || isDestroyed) return@setSessionExpiredListener
             DashboardFragment.clearRememberedHome()
+            SearchFragment.clearRemembered()
+            MyPropertyFormFragment.clearRemembered()
             openLogin(sessionExpired = true)
         }
         runCatching { VinorCacheSession.fingerprint(this) }
@@ -792,6 +794,8 @@ class MainActivity : AppCompatActivity() {
 
     fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
         DashboardFragment.clearRememberedHome()
+        SearchFragment.clearRemembered()
+        MyPropertyFormFragment.clearRemembered()
         VinorSessionLogout.perform(this, lifecycleScope) {
             try {
                 dropChatForSignedOutAccount()
