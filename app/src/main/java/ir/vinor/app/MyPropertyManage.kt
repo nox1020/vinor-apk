@@ -173,8 +173,7 @@ object MyPropertyManage {
     }
 
     /**
-     * توقف همان مسیر انتشار است. سرور قبل از خواندن پرچم توقف، نحوهٔ پرداخت را اجباری می‌کند؛
-     * بدون آن پاسخ «نحوه پرداخت را انتخاب کنید» می‌دهد و آگهی روشن می‌ماند.
+     * توقف همان مسیر انتشار است و پرچم توقف را می‌فرستد.
      * روش و پورسانت فعلی ملک حفظ می‌شود تا شرایط فروش عوض نشود.
      */
     fun unpublishBody(code: String, snapshot: JSONObject? = null): JSONObject {
@@ -244,15 +243,44 @@ object MyPropertyManage {
         return "/express/partner/api/lands/$encoded/data"
     }
 
-    /** موفقیت فقط وقتی پاسخ انتشار قبول شود و جزئیات ملک دیگر منتشرشده نباشد. */
+    /** موفقیت فقط وقتی پاسخ انتشار قبول شود و جزئیات تازهٔ ملک دیگر منتشرشده نباشد. */
     fun unpublishStopped(post: JSONObject, land: JSONObject?): Boolean {
         val status = post.optInt("http_status", 200)
         if (status !in 200..299) return false
         if (!post.optBoolean("ok")) return false
-        if (land == null || !land.has("published_for_sale")) return false
+        if (freshLandSays(land, published = false)) return true
+        if (freshLandSays(land, published = true)) return false
+        return postProvesStopped(post)
+    }
+
+    /**
+     * کش جزئیاتِ قبل از توقف، یا ۴۰۴ بعد از خصوصی شدن، نباید موفقیت را پس بگیرد.
+     * جزئیات تازه اگر هنوز منتشر باشد ملاک است.
+     */
+    fun postProvesStopped(post: JSONObject): Boolean {
+        val code = text(post, "code")
+        if (code.isBlank()) return false
+        listOf(post.optJSONArray("items"), post.optJSONArray("listings")).forEach { rows ->
+            if (rows == null) return@forEach
+            for (i in 0 until rows.length()) {
+                val row = rows.optJSONObject(i) ?: continue
+                if (codeOf(row) != code || !row.has("published_for_sale")) continue
+                return !row.optBoolean("published_for_sale")
+            }
+        }
+        val property = post.optJSONObject("property")
+        if (property != null && codeOf(property) == code && property.has("published_for_sale")) {
+            return !property.optBoolean("published_for_sale")
+        }
+        return false
+    }
+
+    private fun freshLandSays(land: JSONObject?, published: Boolean): Boolean {
+        if (land == null || land.optBoolean("from_cache")) return false
+        if (!land.has("published_for_sale")) return false
         val landStatus = land.optInt("http_status", 200)
         if (landStatus != 0 && landStatus !in 200..299) return false
-        return !land.optBoolean("published_for_sale")
+        return land.optBoolean("published_for_sale") == published
     }
 
     /**
