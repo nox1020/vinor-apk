@@ -15,11 +15,13 @@ on:
   pull_request:
     branches: [ main ]
     paths:
+      - 'version.txt'
       - 'app/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'
       - 'gradle/**'
+      - '.github/workflows/android.yml'
 
 concurrency:
   group: android-${{ github.ref }}
