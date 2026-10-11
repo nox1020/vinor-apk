@@ -440,13 +440,21 @@ class ProfileFragment : Fragment() {
     private fun customersMenuVisible(profile: JSONObject): Boolean {
         if (!profile.optBoolean("is_approved", false)) return false
         val profileFlag = flagOrNull(profile, PartnerCrm.FLAG)
-        if (profileFlag != null) return profileFlag
         val ctx = context
-        val home = if (ctx != null) PartnerApi.peekJson(HOME_DATA, ctx) else null
+        val home = if (ctx != null && profileFlag == null) PartnerApi.peekJson(HOME_DATA, ctx) else null
         val homeFlag = flagOrNull(home, PartnerCrm.FLAG)
-        val fresh = ctx != null && homeFlag != null && PartnerApi.isFresh(HOME_DATA, ctx)
-        if (!fresh) refreshCrmFromHome(profile, PartnerCrm.showMenu(true, null, homeFlag))
-        return PartnerCrm.showMenu(true, null, homeFlag)
+        val homeFresh = profileFlag == null && ctx != null && homeFlag != null &&
+            PartnerApi.isFresh(HOME_DATA, ctx)
+        val decision = PartnerCrm.decide(
+            isApproved = true,
+            profileFlag = profileFlag,
+            homeFlag = homeFlag,
+            homeFresh = homeFresh,
+            remembered = rememberedCustomers,
+        )
+        rememberedCustomers = decision.visible
+        if (decision.refresh) refreshCrmFromHome(profile, decision.visible)
+        return decision.visible
     }
 
     private fun refreshCrmFromHome(profile: JSONObject, shown: Boolean) {
@@ -464,6 +472,7 @@ class ProfileFragment : Fragment() {
                 null,
                 flagOrNull(home, PartnerCrm.FLAG),
             )
+            rememberedCustomers = visible
             if (visible == shown) return@launch
             latestProfile?.let { applyPayload(it, gen) }
         }
@@ -630,10 +639,12 @@ class ProfileFragment : Fragment() {
         private val PHASE_A_FLAGS = VinorManMenu.Flags(consultantApiEnabled = true)
 
         private var rememberedProfile: JSONObject? = null
+        private var rememberedCustomers: Boolean? = null
         private var sessionStamp = 0
 
         fun clearRemembered() {
             rememberedProfile = null
+            rememberedCustomers = null
             sessionStamp++
         }
 
