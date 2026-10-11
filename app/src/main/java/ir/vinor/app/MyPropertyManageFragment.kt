@@ -310,7 +310,12 @@ class MyPropertyManageFragment : Fragment() {
                     PartnerApi.postJson(MyPropertyManage.PUBLISH_PATH, body, ctx)
                 }
                 val land = if (fresh.optBoolean("ok")) {
-                    withContext(Dispatchers.IO) { PartnerApi.get(MyPropertyManage.landDataPath(code), ctx) }
+                    withContext(Dispatchers.IO) {
+                        val path = MyPropertyManage.landDataPath(code)
+                        PartnerApi.forget(path, ctx)
+                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                        PartnerApi.get(path, ctx)
+                    }
                 } else {
                     null
                 }
@@ -359,6 +364,7 @@ class MyPropertyManageFragment : Fragment() {
                     withContext(Dispatchers.IO) {
                         val path = MyPropertyManage.landDataPath(code)
                         PartnerApi.forget(path, ctx)
+                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
                         PartnerApi.get(path, ctx)
                     }
                 } else {

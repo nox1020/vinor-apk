@@ -712,6 +712,7 @@ class LandDetailFragment : Fragment() {
                     withContext(Dispatchers.IO) {
                         val path = apiPath(code)
                         PartnerApi.forget(path, ctx)
+                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
                         PartnerApi.get(path, ctx)
                     }
                 } else {
@@ -756,24 +757,34 @@ class LandDetailFragment : Fragment() {
         val ctx = context ?: return
         if (publishing) return
         val pct = binding.landDetailCommissionPct.text?.toString()?.trim().orEmpty().ifBlank { "2" }
-        val body = JSONObject()
-            .put("code", code)
-            .put("payment_method", selectedPayment)
-            .put("commission_pct", pct)
-            .put("auto_send_all_partners", binding.landDetailSendAll.isChecked)
+        val body = MyPropertyManage.publishBody(code, selectedPayment, pct, binding.landDetailSendAll.isChecked)
         publishing = true
         binding.landDetailPublishCta.alpha = 0.6f
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/api/my-property/publish", body, ctx)
+                    PartnerApi.postJson(MyPropertyManage.PUBLISH_PATH, body, ctx)
+                }
+                val land = if (fresh.optBoolean("ok")) {
+                    withContext(Dispatchers.IO) {
+                        val path = apiPath(code)
+                        PartnerApi.forget(path, ctx)
+                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                        PartnerApi.get(path, ctx)
+                    }
+                } else {
+                    null
                 }
                 if (_binding == null) return@launch
-                if (fresh.optBoolean("ok", false)) {
+                if (MyPropertyManage.publishAccepted(fresh, land)) {
                     Toast.makeText(ctx, fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." }, Toast.LENGTH_SHORT).show()
                     load(code)
                 } else {
-                    Toast.makeText(ctx, fresh.optString("error").ifBlank { "انتشار ناموفق بود." }, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        ctx,
+                        MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()

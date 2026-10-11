@@ -284,17 +284,16 @@ object MyPropertyManage {
     }
 
     /**
-     * پاسخ موفق کافی نیست اگر جزئیات ملک هنوز منتشر نشده باشد.
-     * اگر جزئیات در دسترس نباشد، همان پاسخ سرور ملاک است.
+     * پاسخ موفق کافی نیست اگر جزئیات تازه هنوز خصوصی باشد.
+     * کش قبل از انتشار، مثل توقف، نباید موفقیت را پس بگیرد.
      */
     fun publishAccepted(post: JSONObject, land: JSONObject?): Boolean {
         val status = post.optInt("http_status", 200)
         if (status !in 200..299) return false
         if (!post.optBoolean("ok")) return false
-        if (land == null || !land.has("published_for_sale")) return true
-        val landStatus = land.optInt("http_status", 200)
-        if (landStatus != 0 && landStatus !in 200..299) return true
-        return land.optBoolean("published_for_sale")
+        if (freshLandSays(land, published = true)) return true
+        if (freshLandSays(land, published = false)) return false
+        return true
     }
 
     /** اگر پاسخ سرور موفق باشد ولی وضعیت ملک عوض نشده، پیام موفقیت نشان داده نمی‌شود. */
