@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_search_sheet"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:paddingBottom="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:text="تعیین قیمت"
+            android:textColor="@color/vinor_text"
+            android:textSize="15sp" />
+
+        <ImageButton
+            android:id="@+id/priceSheetClose"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="بستن"
+            android:src="@drawable/ic_close"
+            android:tint="@color/vinor_text" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/priceSheetInput"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:background="@drawable/bg_search_field"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center_vertical"
+        android:hint="قیمت به تومان"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:paddingHorizontal="12dp"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/priceSheetSave"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_hub_start"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:text="ثبت قیمت"
+        android:textColor="#052E16"
+        android:textSize="15sp" />
+</LinearLayout>

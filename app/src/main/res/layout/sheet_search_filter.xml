@@ -53,13 +53,13 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginHorizontal="16dp"
-        android:background="@drawable/bg_search_apply"
+        android:background="@drawable/bg_hub_start"
         android:clickable="true"
         android:focusable="true"
         android:fontFamily="@font/vazirmatn_bold"
         android:gravity="center"
         android:text="اعمال"
-        android:textColor="@color/vinor_on_primary"
+        android:textColor="#052E16"
         android:textSize="15sp" />
 
     <TextView

@@ -1,6 +1,7 @@
 package ir.vinor.app
 
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
 import android.net.Uri
@@ -39,7 +40,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** تب جستجو — خرید ملک، فیلتر محلی روی دادهٔ فعلی خانه. */
+/** تب جستجو — پیش‌فرض همه استان‌ها، آگهی‌های منتشرشده از جدید به قدیم. */
 class SearchFragment : Fragment() {
 
     private var _binding: FragmentSearchBinding? = null
@@ -57,10 +58,7 @@ class SearchFragment : Fragment() {
     private var sheetDialog: BottomSheetDialog? = null
 
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener {
-        val b = _binding ?: return@OnScrollChangedListener
-        if (!isAdded) return@OnScrollChangedListener
-        val threshold = 8 * resources.displayMetrics.density
-        b.searchHeaderBorder.isVisible = b.searchScroll.scrollY > threshold
+        if (_binding == null || !isAdded) return@OnScrollChangedListener
         bindVisibleImages()
     }
 
@@ -75,7 +73,7 @@ class SearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_primary_red))
+        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
         binding.searchRefresh.setProgressBackgroundColorSchemeColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
         binding.searchClear.setOnClickListener {
@@ -133,8 +131,8 @@ class SearchFragment : Fragment() {
         }
         val ctx = context ?: return
         scope.launch {
-            val obj = try {
-                withContext(Dispatchers.IO) { PartnerApi.get("/express/partner/home/data", ctx) }
+            val loaded = try {
+                withContext(Dispatchers.IO) { fetchAds(ctx) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -142,7 +140,7 @@ class SearchFragment : Fragment() {
             }
             if (_binding == null) return@launch
             binding.searchRefresh.isRefreshing = false
-            if (obj == null || isFailedHome(obj)) {
+            if (loaded == null || loaded.failed) {
                 val previous = if (kept.isNotEmpty()) {
                     SearchUiState(SearchPhase.CONTENT, kept, query.hasClearableFilters())
                 } else {
@@ -153,12 +151,52 @@ class SearchFragment : Fragment() {
                 if (ui.items.isNotEmpty()) showOfflineBar()
                 return@launch
             }
-            approved = obj.optBoolean("is_approved")
-            rawAds = readAds(obj.optJSONArray("divar_pro_ads") ?: JSONArray())
+            approved = loaded.approved
+            rawAds = loaded.ads
             hasSnapshot = true
             ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
             render()
         }
+    }
+
+    private fun fetchAds(ctx: Context): SearchLoad {
+        val searchHtml = runCatching {
+            PartnerApi.getHtml("/express/partner/search?sort=newest", ctx)
+        }.getOrDefault("")
+        val searchRows = SearchPageHtml.parse(searchHtml)
+        val home = runCatching { PartnerApi.get("/express/partner/home/data", ctx) }.getOrNull()
+        val homeAds = if (home == null) {
+            emptyList()
+        } else {
+            SearchAds.fromObjects(home.optJSONArray("divar_pro_ads") ?: JSONArray()) +
+                SearchAds.fromObjects(home.optJSONArray("suggested_files") ?: JSONArray())
+        }
+        val homeHtmlAds = if (searchRows.isEmpty() && homeAds.isEmpty()) {
+            val html = runCatching { PartnerApi.getHtml("/express/partner/home", ctx) }.getOrDefault("")
+            SearchAds.fromObjects(HomeAdsHtml.parse(html))
+        } else {
+            emptyList()
+        }
+        val primary = SearchAds.catalog(searchRows, homeAds, homeHtmlAds)
+        val ads = if (primary.isNotEmpty()) primary else publicPublished(ctx)
+        val failed = ads.isEmpty() && (home == null || isFailedHome(home))
+        return SearchLoad(ads, home?.optBoolean("is_approved") == true, failed)
+    }
+
+    /** مهمان ردیف SSR ندارد؛ sitemap نشانی ملک‌های منتشرشدهٔ عمومی است. */
+    private fun publicPublished(ctx: Context): List<SearchAd> {
+        val xml = runCatching { PartnerApi.getHtml(PublicSearchCatalog.SITEMAP_PATH, ctx) }.getOrDefault("")
+        val refs = PublicSearchCatalog.landRefs(xml).take(PublicSearchCatalog.MAX)
+        val out = ArrayList<SearchAd>(refs.size)
+        for (ref in refs) {
+            val obj = runCatching {
+                PartnerApi.get("/express/partner/api/lands/${Uri.encode(ref.code)}/data", ctx)
+            }.getOrNull() ?: continue
+            if (obj.has("http_status") && obj.optInt("http_status") !in 200..299) continue
+            val ad = PublicSearchCatalog.fromDetail(obj, ref.lastmod, out.size) ?: continue
+            out += ad
+        }
+        return SearchAds.dedupe(out)
     }
 
     private fun publish() {
@@ -257,9 +295,13 @@ class SearchFragment : Fragment() {
             "فیلتر متراژ، انتخاب‌شده: ${area.replace("\u2013", " تا ")}"
         }
         val city = query.city.trim()
-        b.searchCity.text = if (city.isEmpty()) "شهر ▾" else "$city ▾"
+        b.searchCity.text = if (city.isEmpty()) "${SearchQuery.ALL_PROVINCES} ▾" else "$city ▾"
         b.searchCity.isSelected = city.isNotEmpty()
-        b.searchCity.contentDescription = if (city.isEmpty()) "انتخاب شهر" else "شهر، انتخاب‌شده: $city"
+        b.searchCity.contentDescription = if (city.isEmpty()) {
+            SearchQuery.ALL_PROVINCES
+        } else {
+            "شهر، انتخاب‌شده: $city"
+        }
     }
 
     private fun bindRows(items: List<SearchAd>) {
@@ -268,9 +310,12 @@ class SearchFragment : Fragment() {
         items.forEachIndexed { index, ad ->
             val row = ItemAdsAllRowBinding.inflate(layoutInflater, b.searchList, false)
             row.adsAllTitle.text = ad.title
-            val price = ad.priceRaw.ifBlank { "توافقی" }
+            val price = SearchAds.cardPrice(ad.priceRaw)
             row.adsAllPrice.text = price
-            val loc = locationLine(ad)
+            val area = SearchAds.cardArea(ad.areaRaw)
+            row.adsAllArea.isVisible = area.isNotBlank()
+            row.adsAllArea.text = area
+            val loc = SearchAds.cardPlace(ad)
             row.adsAllLoc.text = loc
             row.adsAllLoc.isVisible = loc.isNotBlank()
             if (approved && ad.commissionAmount > 0) {
@@ -282,13 +327,14 @@ class SearchFragment : Fragment() {
             row.adsAllShots.isVisible = ad.imageCount > 1
             if (ad.imageCount > 1) {
                 row.adsAllShots.text = PartnerFormat.digits(ad.imageCount)
-                val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)
+                val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)?.mutate()
+                camera?.setTint(ContextCompat.getColor(requireContext(), R.color.vinor_text))
                 row.adsAllShots.setCompoundDrawablesRelativeWithIntrinsicBounds(camera, null, null, null)
             }
             row.adsAllDivider.isVisible = index != items.lastIndex
             PartnerImages.roundClip(row.adsAllThumbWrap, 12f)
             row.adsAllThumb.tag = ad.imageUrl
-            row.root.contentDescription = listOf(ad.title, price, loc).filter { it.isNotBlank() }.joinToString("، ")
+            row.root.contentDescription = listOf(ad.title, price, area, loc).filter { it.isNotBlank() }.joinToString("، ")
             row.root.setOnClickListener { openAd(ad) }
             b.searchList.addView(row.root)
         }
@@ -478,15 +524,16 @@ class SearchFragment : Fragment() {
     private fun showCitySheet() {
         val session = openSheet("شهر") ?: return
         var selected = query.city.trim()
-        val rows = knownCities().map { city ->
-            city to optionRow(city, city == selected) {}
+        val choices = listOf("" to SearchQuery.ALL_PROVINCES) + knownCities().map { it to it }
+        val rows = choices.map { (value, label) ->
+            Triple(value, label, optionRow(label, value == selected) {})
         }
         fun paint() {
-            rows.forEach { (city, view) -> styleOption(view, city == selected) }
+            rows.forEach { (value, _, view) -> styleOption(view, value == selected) }
         }
-        rows.forEach { (city, view) ->
+        rows.forEach { (value, _, view) ->
             view.setOnClickListener {
-                selected = if (selected == city) "" else city
+                selected = if (value.isEmpty()) "" else if (selected == value) "" else value
                 paint()
             }
             session.sheet.sheetBody.addView(view)
@@ -576,7 +623,7 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         val bar = Snackbar.make(b.root, "اتصال برقرار نشد", Snackbar.LENGTH_LONG)
         bar.setAction("تلاش دوباره") { load() }
-        bar.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+        bar.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
         bar.view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
         bar.view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
             text.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
@@ -603,70 +650,13 @@ class SearchFragment : Fragment() {
         return set.toList()
     }
 
-    private fun readAds(array: JSONArray): List<SearchAd> {
-        val out = ArrayList<SearchAd>(array.length())
-        for (i in 0 until array.length()) {
-            val ad = array.optJSONObject(i) ?: continue
-            out += jsonAd(ad, out.size)
-        }
-        return out
-    }
-
-    private fun jsonAd(ad: JSONObject, index: Int): SearchAd {
-        val area = jsonText(ad, "area").ifBlank { jsonText(ad, "size") }.ifBlank { jsonText(ad, "area_m2") }
-        val areaText = area.ifBlank { areaFromFacts(ad) }
-        val price = jsonText(ad, "price").ifBlank {
-            val toman = ad.optLong("price_toman")
-            if (toman > 0) toman.toString() else {
-                val total = ad.optLong("price_total")
-                if (total > 0) total.toString() else ""
-            }
-        }
-        val district = jsonText(ad, "district").ifBlank { jsonText(ad, "neighborhood") }
-        val location = jsonText(ad, "location")
-        return SearchAd(
-            title = jsonText(ad, "title"),
-            priceRaw = price,
-            location = location,
-            city = jsonText(ad, "city"),
-            district = district.ifBlank { SearchAds.districtFromLocation(location) },
-            areaRaw = areaText,
-            token = jsonText(ad, "token"),
-            source = jsonText(ad, "source"),
-            url = jsonText(ad, "url"),
-            imageUrl = jsonText(ad, "image_url"),
-            imageCount = ad.optInt("image_count"),
-            commissionAmount = ad.optInt("commission_amount"),
-            index = index,
-        )
-    }
-
-    private fun areaFromFacts(ad: JSONObject): String {
-        val facts = ad.optJSONArray("facts") ?: return ""
-        for (i in 0 until facts.length()) {
-            val bit = facts.optString(i)
-            if ("متر" in bit) return bit
-        }
-        return ""
-    }
-
-    private fun jsonText(ad: JSONObject, key: String): String {
-        val value = ad.optString(key).trim()
-        return if (value.isEmpty() || value == "null") "" else value
-    }
-
-    private fun locationLine(ad: SearchAd): String {
-        val loc = ad.location
-        if (loc.isBlank()) return ""
-        return if (loc.contains("در ") || loc.startsWith("در")) loc else "در $loc"
-    }
-
     private fun openAd(ad: SearchAd) {
-        when {
-            ad.source == "vinor" && ad.token.isNotBlank() -> (activity as? MainActivity)?.openLand(ad.token)
-            ad.source == "divar" && ad.token.isNotBlank() -> (activity as? MainActivity)?.openLand("divar:${ad.token}")
-            ad.url.isNotBlank() -> openVinorOrExternal(ad.url)
+        val code = SearchAds.openCode(ad)
+        if (code.isNotBlank()) {
+            (activity as? MainActivity)?.openLand(code)
+            return
         }
+        if (ad.url.isNotBlank()) openVinorOrExternal(ad.url)
     }
 
     private fun openVinorOrExternal(raw: String) {
@@ -774,6 +764,8 @@ class SearchFragment : Fragment() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private data class RangePreset(val label: String, val min: Long?, val max: Long?)
+
+    private data class SearchLoad(val ads: List<SearchAd>, val approved: Boolean, val failed: Boolean)
 
     private data class SheetSession(val dialog: BottomSheetDialog, val sheet: SheetSearchFilterBinding)
 

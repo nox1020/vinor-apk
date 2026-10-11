@@ -22,29 +22,23 @@
 
             <ImageButton
                 android:id="@+id/profileEditBack"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_header_orb"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="بازگشت"
-                android:padding="11dp"
+                android:padding="12dp"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="#ECECEC" />
+                app:tint="@color/vinor_text" />
 
             <TextView
                 android:layout_width="0dp"
-                android:layout_height="42dp"
-                android:layout_marginHorizontal="8dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                android:background="@drawable/bg_header_title_pill"
-                android:gravity="center"
                 android:text="ویرایش پروفایل"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textColor="@color/vinor_text"
+                android:textSize="17sp"
                 android:textStyle="bold" />
-
-            <View
-                android:layout_width="42dp"
-                android:layout_height="42dp" />
         </LinearLayout>
 
         <ProgressBar
@@ -85,7 +79,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:textColor="#6B7280"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="28sp"
                     android:textStyle="bold" />
 
@@ -126,8 +120,8 @@
                 android:gravity="center"
                 android:maxWidth="280dp"
                 android:text="برای تغییر عکس پروفایل، روی تصویر ضربه بزنید"
-                android:textColor="#6B7280"
-                android:textSize="11sp" />
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <!-- معرفی -->
@@ -163,7 +157,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="تنظیمات پروفایل"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <TextView
@@ -171,7 +165,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="لطفاً اطلاعات خود را دقیق و خوانا وارد کنید."
-                        android:textColor="#9CA3AF"
+                        android:textColor="@color/vinor_text_muted"
                         android:textSize="12sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -193,7 +187,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="نام و نام خانوادگی"
-                    android:textColor="#9CA3AF"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
                 <EditText
                     android:id="@+id/profileEditName"
@@ -205,7 +199,7 @@
                     android:inputType="textPersonName"
                     android:maxLength="60"
                     android:padding="12dp"
-                    android:textColor="#F9FAFB"
+                    android:textColor="@color/vinor_text"
                     android:textColorHint="#6B7280"
                     android:textSize="14sp" />
 
@@ -214,7 +208,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="شهر"
-                    android:textColor="#9CA3AF"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/profileEditCity"
@@ -230,7 +224,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="درباره من (حداکثر ۲۰۰ کاراکتر)"
-                    android:textColor="#9CA3AF"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
                 <EditText
                     android:id="@+id/profileEditBio"
@@ -244,7 +238,7 @@
                     android:maxLength="200"
                     android:minLines="3"
                     android:padding="12dp"
-                    android:textColor="#F9FAFB"
+                    android:textColor="@color/vinor_text"
                     android:textColorHint="#6B7280"
                     android:textSize="14sp" />
                 <TextView
@@ -254,7 +248,7 @@
                     android:layout_gravity="end"
                     android:layout_marginTop="4dp"
                     android:text="0/200"
-                    android:textColor="#9CA3AF"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="11sp" />
 
                 <LinearLayout
@@ -290,7 +284,7 @@
                         android:gravity="center"
                         android:paddingVertical="14dp"
                         android:text="ذخیره تغییرات"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>

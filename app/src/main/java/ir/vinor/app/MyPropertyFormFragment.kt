@@ -53,6 +53,8 @@ class MyPropertyFormFragment : Fragment() {
     private var mapOpen = false
     private var mapConfirmed = false
     private var publicListing = false
+    private var editCode = ""
+    private var editSnapshot = ""
     private val paymentMethods = mutableListOf("انتخاب کنید")
     private val installmentRows = mutableListOf<View>()
 
@@ -88,10 +90,18 @@ class MyPropertyFormFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         publicListing = arguments?.getBoolean(ARG_PUBLIC) == true
+        editSnapshot = arguments?.getString(ARG_SNAPSHOT).orEmpty()
+        editCode = arguments?.getString(ARG_CODE).orEmpty().trim()
+        if (editCode.isBlank() && editSnapshot.isNotBlank()) {
+            editCode = runCatching { MyPropertyManage.codeOf(JSONObject(editSnapshot)) }.getOrDefault("").trim()
+        }
         if (publicListing) {
             binding.mpFormHeader.pageTitle.text = "ثبت آگهی"
             binding.mpFormSubtitle.text = "اطلاعات ملک را وارد و منتشر کنید"
             binding.mpFormSubmit.text = "ثبت و انتشار آگهی"
+        } else if (editCode.isNotBlank()) {
+            binding.mpFormHeader.pageTitle.text = "ویرایش"
+            binding.mpFormSubmit.text = "ذخیره"
         } else {
             binding.mpFormHeader.pageTitle.text = "ثبت ملک من"
         }
@@ -165,7 +175,7 @@ class MyPropertyFormFragment : Fragment() {
         binding.mpFormProgress.isVisible = true
         scope.launch {
             try {
-                val path = if (publicListing) "$FORM_PATH?mode=listing" else FORM_PATH
+                val path = formPath()
                 val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null) return@launch
                 binding.mpFormProgress.isVisible = false
@@ -242,7 +252,69 @@ class MyPropertyFormFragment : Fragment() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         rebuildSpecs()
+        if (editCode.isNotBlank()) {
+            binding.mpFormHeader.pageTitle.text = "ویرایش"
+            binding.mpFormSubmit.text = "ذخیره"
+            applySnapshot()
+        }
     }
+
+    private fun formPath(): String {
+        val query = mutableListOf<String>()
+        if (publicListing) query.add("mode=listing")
+        if (editCode.isNotBlank()) query.add("code=${Uri.encode(editCode)}")
+        return if (query.isEmpty()) FORM_PATH else "$FORM_PATH?" + query.joinToString("&")
+    }
+
+    private fun applySnapshot() {
+        val obj = runCatching { JSONObject(editSnapshot) }.getOrNull() ?: return
+        val b = _binding ?: return
+        fun fill(current: CharSequence?, value: String, set: (String) -> Unit) {
+            if (!current.isNullOrBlank() || value.isBlank()) return
+            set(value)
+        }
+        fill(b.mpFormTitle.text, textOf(obj, "title")) { b.mpFormTitle.setText(it) }
+        fill(b.mpFormLocation.text, textOf(obj, "location")) { b.mpFormLocation.setText(it) }
+        fill(b.mpFormDesc.text, textOf(obj, "description")) { b.mpFormDesc.setText(it) }
+        selectNamed(b.mpFormCity, cities, textOf(obj, "city"))
+        selectNamed(b.mpFormCategory, categories, textOf(obj, "category"))
+        val size = digitsOf(textOf(obj, "size"))
+        fill(b.mpFormSize.text, size) { b.mpFormSize.setText(it) }
+        val price = digitsOf(textOf(obj, "price_total")).ifBlank { digitsOf(textOf(obj, "price_toman")) }
+        fill(b.mpFormPrice.text, price) { b.mpFormPrice.setText(it) }
+        val pay = MyPropertyManage.paymentOf(obj)
+        if (pay.isNotBlank()) selectNamed(b.mpFormPayment, paymentMethods, pay)
+        val commission = MyPropertyManage.commissionOf(obj)
+        if (commission.isNotBlank() && b.mpFormCommission.text.isNullOrBlank()) {
+            b.mpFormCommission.setText(commission)
+        }
+    }
+
+    private fun selectNamed(spinner: Spinner, items: MutableList<String>, value: String) {
+        val name = value.trim()
+        if (name.isBlank()) return
+        var index = items.indexOfFirst { it == name }
+        if (index < 0) {
+            items.add(name)
+            spinner.adapter = spinnerAdapter(items)
+            index = items.lastIndex
+        }
+        if (spinner.selectedItemPosition != index) spinner.setSelection(index)
+    }
+
+    private fun textOf(obj: JSONObject, key: String): String {
+        if (!obj.has(key) || obj.isNull(key)) return ""
+        val raw = obj.opt(key) ?: return ""
+        return when (raw) {
+            is Number -> {
+                val asLong = raw.toLong()
+                if (asLong.toDouble() == raw.toDouble()) asLong.toString() else raw.toString()
+            }
+            else -> obj.optString(key).trim()
+        }
+    }
+
+    private fun digitsOf(raw: String): String = PartnerApi.asciiDigits(raw)
 
     private fun spinnerAdapter(items: List<String>): ArrayAdapter<String> {
         return ArrayAdapter(requireContext(), R.layout.item_spinner_dark, items).apply {
@@ -543,6 +615,14 @@ class MyPropertyFormFragment : Fragment() {
         val location = binding.mpFormLocation.text?.toString()?.trim().orEmpty()
         val size = longDigits(binding.mpFormSize.text?.toString().orEmpty())
         val price = longDigits(binding.mpFormPrice.text?.toString().orEmpty())
+        val snap = runCatching { JSONObject(editSnapshot) }.getOrNull()
+        val payment = MyPropertyManage.editPayment(
+            snap,
+            if (publicListing) selectedPayment() else "",
+            publicListing,
+        )
+        val typedCommission = if (publicListing) commissionPct()?.toString().orEmpty() else ""
+        val commission = MyPropertyManage.editCommission(snap, typedCommission, publicListing)
         when {
             title.isBlank() || city.isBlank() || location.isBlank() || size <= 0L || price <= 0L -> {
                 showError("لطفاً فیلدهای اجباری را پر کنید.")
@@ -552,22 +632,20 @@ class MyPropertyFormFragment : Fragment() {
                 showError("عنوان باید حداقل ۱۰ کاراکتر باشد.")
                 return
             }
-            publicListing && selectedPayment().isBlank() -> {
+            publicListing && payment.isBlank() -> {
                 showError("نحوه پرداخت را انتخاب کنید.")
                 return
             }
-            publicListing && selectedPayment() == "اقساطی" && collectInstallments() == null -> {
+            publicListing && payment == "اقساطی" && collectInstallments() == null -> {
                 showError("برای پرداخت اقساطی حداقل یک قسط معتبر وارد کنید.")
                 return
             }
-            publicListing && commissionPct() == null -> {
+            publicListing && commission.isBlank() -> {
                 showError("درصد پورسانت الزامی است.")
                 return
             }
         }
         val ppm = if (size > 0L) price / size else 0L
-        val payment = if (publicListing) selectedPayment() else "توافقی"
-        val commission = if (publicListing) commissionPct()?.toString() ?: "0" else "0"
         val body = JSONObject()
             .put("title", title)
             .put("city", city)
@@ -590,7 +668,8 @@ class MyPropertyFormFragment : Fragment() {
         }
         val images = JSONArray()
         photos.forEach { images.put(it.path) }
-        body.put("images", images)
+        if (editCode.isBlank() || photos.isNotEmpty()) body.put("images", images)
+        if (editCode.isNotBlank()) body.put("code", editCode)
         video?.let { body.put("video", it.path) }
         doc1?.let { body.put("document_1", it.path) }
         doc2?.let { body.put("document_2", it.path) }
@@ -619,7 +698,8 @@ class MyPropertyFormFragment : Fragment() {
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {
-                    toast(obj.optString("message").ifBlank { "ملک شما ثبت شد." })
+                    val saved = if (editCode.isNotBlank()) "تغییرات ذخیره شد." else "ملک شما ثبت شد."
+                    toast(obj.optString("message").ifBlank { saved })
                     (activity as? MainActivity)?.openMyProperty()
                 } else {
                     showError(obj.optString("error").ifBlank {
@@ -742,6 +822,8 @@ class MyPropertyFormFragment : Fragment() {
 
     companion object {
         const val ARG_PUBLIC = "publicListing"
+        const val ARG_CODE = "editCode"
+        const val ARG_SNAPSHOT = "snapshot"
         private const val MAX_PHOTOS = 12
         private const val FORM_PATH = "/express/partner/api/my-property/form"
         private const val SUBMIT_PATH = "/express/partner/api/my-property/submit"

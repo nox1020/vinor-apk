@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -147,6 +148,34 @@ object PartnerApi {
         }
     }
 
+    /**
+     * OkHttp redirects an expired partner session to the HTML login page. Treat that
+     * final response as 401 before callers try to parse the HTML as a successful JSON response.
+     */
+    fun responsePayload(
+        text: String,
+        status: Int,
+        requestPath: String,
+        finalPath: String,
+    ): JSONObject {
+        val requestedLogin = requestPath.startsWith("/express/partner/login")
+        val redirectedToLogin = !requestedLogin && finalPath.startsWith("/express/partner/login")
+        if (status == 401 || redirectedToLogin) {
+            return JSONObject()
+                .put("ok", false)
+                .put("success", false)
+                .put("error", "unauthorized")
+                .put("http_status", 401)
+        }
+        val obj = try {
+            JSONObject(text.ifBlank { "{}" })
+        } catch (_: Exception) {
+            JSONObject().put("ok", false).put("error", "پاسخ نامعتبر")
+        }
+        if (!obj.has("http_status")) obj.put("http_status", status)
+        return obj
+    }
+
     fun absoluteUrl(path: String): String =
         if (path.startsWith("http")) path else "$BASE$path"
 
@@ -161,6 +190,11 @@ object PartnerApi {
     fun isFresh(path: String, context: Context?): Boolean {
         if (context == null) return false
         return VinorApiCacheStore.isFresh(context.applicationContext, absoluteUrl(path))
+    }
+
+    fun forget(path: String, context: Context?) {
+        if (context == null) return
+        VinorApiCacheStore.forget(context.applicationContext, absoluteUrl(path))
     }
 
     fun remember(path: String, obj: JSONObject, context: Context?) {
@@ -210,7 +244,6 @@ object PartnerApi {
             val req = requestBuilder(path, context).get().build()
             val obj = execute(req)
             val code = obj.optInt("http_status")
-            // ۴۰۱/۴۰۳ و انقضای خاموش قبل از هر peekJson
             if (obj.optBoolean("session_expired") || code == 401) {
                 return authRequiredResult(obj, 401)
             }
@@ -223,12 +256,156 @@ object PartnerApi {
             if (code in 200..299) {
                 remember(path, obj, context)
                 obj
+            } else if (!ChatSessionGate.cacheMayHideAuthFailure(path, code)) {
+                obj
             } else {
                 peekJson(path, context) ?: obj
             }
         } catch (e: Exception) {
             peekJson(path, context) ?: throw e
         }
+    }
+
+    data class PageBody(val code: Int, val url: String, val body: String)
+
+    /** HTML بدون ذخیره. برای صفحه‌هایی که شماره و نام مشتری دارند. */
+    fun getPage(path: String, context: Context? = null): PageBody {
+        val url = if (path.startsWith("http")) path else "$BASE$path"
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return PageBody(0, url, "")
+        }
+        return try {
+            val b = Request.Builder().url(url).addHeader("Accept", "text/html")
+            val cookie = cookieHeader()
+            if (cookie.isNotBlank()) b.addHeader("Cookie", cookie)
+            if (context != null) {
+                b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+                VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
+            }
+            client.newCall(b.get().build()).execute().use { resp ->
+                saveCookies(resp)
+                PageBody(resp.code, resp.request.url.toString(), resp.body?.string().orEmpty())
+            }
+        } catch (_: Exception) {
+            PageBody(0, url, "")
+        }
+    }
+
+    /**
+     * POST صفحه‌ای که CSRF و Referer خودش را می‌خواهد. در صف آفلاین نمی‌رود.
+     */
+    fun postPage(
+        path: String,
+        body: JSONObject,
+        csrf: String,
+        refererPath: String,
+        context: Context? = null,
+    ): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executePage(path, body, token, refererPath, context)
+            if (PartnerCustomers.isCsrfExpired(resp)) {
+                val next = resp.optString("csrf_token").trim()
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executePage(path, body, token, refererPath, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executePage(
+        path: String,
+        body: JSONObject,
+        csrf: String,
+        refererPath: String,
+        context: Context?,
+    ): JSONObject {
+        val builder = requestBuilder(path, context)
+            .post(body.toString().toRequestBody(jsonType))
+            .addHeader("Content-Type", "application/json; charset=utf-8")
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", PartnerCustomers.ORIGIN)
+            .addHeader("Referer", PartnerCustomers.ORIGIN + refererPath)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
+    }
+
+    /**
+     * POST فرم وب (بازدید ملک). در صف آفلاین نمی‌رود و موفقیت جعلی نمی‌سازد.
+     */
+    fun postForm(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context? = null,
+    ): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executeForm(path, fields, token, refererPath, context)
+            if (PartnerCustomers.isCsrfExpired(resp)) {
+                val next = resp.optString("csrf_token").trim()
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executeForm(path, fields, token, refererPath, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executeForm(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context?,
+    ): JSONObject {
+        val form = FormBody.Builder()
+        if (csrf.isNotBlank()) form.add("csrf_token", csrf)
+        for ((key, value) in fields) {
+            if (key == "csrf_token") continue
+            form.add(key, value)
+        }
+        val referer = if (refererPath.startsWith("http")) refererPath else PartnerCustomers.ORIGIN + refererPath
+        val builder = requestBuilder(path, context)
+            .post(form.build())
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", PartnerCustomers.ORIGIN)
+            .addHeader("Referer", referer)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
     }
 
     fun getHtml(path: String, context: Context? = null): String {
@@ -303,6 +480,50 @@ object PartnerApi {
         } catch (e: Exception) {
             if (ctx != null) enqueueOrOffline(ctx, url, body) else throw e
         }
+    }
+
+    /**
+     * POST مالی کیف پول. در صف آفلاین نمی‌رود و موفقیت جعلی نمی‌سازد.
+     * سرور این مسیرها را فقط با X-CSRFToken به‌اضافه Referer صفحهٔ کمیسیون می‌پذیرد.
+     */
+    fun postFinance(path: String, body: JSONObject, csrf: String, context: Context? = null): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executeFinance(path, body, token, context)
+            if (WalletWithdraw.isCsrfExpired(resp)) {
+                val next = WalletWithdraw.csrfOf(resp)
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executeFinance(path, body, token, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private fun executeFinance(path: String, body: JSONObject, csrf: String, context: Context?): JSONObject {
+        val builder = requestBuilder(path, context)
+            .post(body.toString().toRequestBody(jsonType))
+            .addHeader("Content-Type", "application/json; charset=utf-8")
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", WalletWithdraw.ORIGIN)
+            .addHeader("Referer", WalletWithdraw.ORIGIN + WalletWithdraw.REFERER_PATH)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        return execute(builder.build())
     }
 
     private fun enqueueOrOffline(ctx: Context, url: String, body: JSONObject): JSONObject {
@@ -381,8 +602,16 @@ object PartnerApi {
 
     fun clearCookies(done: () -> Unit) {
         setLoggedIn(false)
+        ProfileFragment.clearRemembered()
         synchronized(cookieLock) { cookieSnapshot = "" }
-        val apply = {
+        val wipeUserCache = {
+            appCtx?.let { ctx ->
+                VinorApiCacheStore.clearUser(ctx)
+                VinorAvatarCache.clear(ctx)
+                VinorCacheSession.fingerprint(ctx)
+            }
+        }
+        val apply: () -> Unit = {
             runCatching {
                 val mgr = CookieManager.getInstance()
                 mgr.removeAllCookies {
@@ -392,9 +621,13 @@ object PartnerApi {
                             cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
                         }
                     }
+                    wipeUserCache()
                     done()
                 }
-            }.onFailure { done() }
+            }.onFailure {
+                wipeUserCache()
+                done()
+            }
             Unit
         }
         if (VinorSafe.isMainThread()) apply() else VinorSafe.onMain(apply)
@@ -509,15 +742,15 @@ object PartnerApi {
             val hadSession = hasSession()
             saveCookies(resp)
             val text = resp.body?.string().orEmpty()
-            val raw = text.toByteArray(Charsets.UTF_8)
-            val obj = if (isCacheableJson(raw)) {
-                JSONObject(text.trim())
-            } else {
-                JSONObject().put("ok", false).put("error", "پاسخ نامعتبر").put("non_json", true)
-            }
-            if (!obj.has("http_status")) obj.put("http_status", resp.code)
+            val obj = responsePayload(
+                text = text,
+                status = resp.code,
+                requestPath = req.url.encodedPath,
+                finalPath = resp.request.url.encodedPath,
+            )
+            if (obj.optString("error") == "پاسخ نامعتبر") obj.put("non_json", true)
             val url = req.url.toString()
-            val code = resp.code
+            val code = obj.optInt("http_status")
             if (code == 403) evictPrivateCache()
             val hard401 = code == 401 && !isCredentialPath(url)
             val silent = hadSession && isSilentLogout(url, obj)
@@ -525,6 +758,7 @@ object PartnerApi {
                 if (hadSession || silent) obj.put("session_expired", true)
                 expireSession(notifyUi = obj.optBoolean("session_expired"))
             } else if (!obj.optBoolean("non_json")) {
+                if (code == 401 || obj.optString("error") == "unauthorized") setLoggedIn(false)
                 ingestAuth(obj)
             }
             return obj

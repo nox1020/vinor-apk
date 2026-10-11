@@ -2,6 +2,8 @@
 <resources>
     <color name="ic_launcher_background">#000000</color>
     <color name="vinor_bg">#000000</color>
+    <!-- هدر و فوتر تب‌ها؛ چند درجه روشن‌تر از زمینه تا نوارها از صفحه جدا شوند. -->
+    <color name="vinor_chrome">#141416</color>
     <color name="vinor_bg_light">#000000</color>
     <color name="vinor_bg_dark">#000000</color>
     <color name="vinor_pwa_bg">#000000</color>
@@ -9,6 +11,14 @@
     <color name="vinor_raised_2">#2F2F2F</color>
     <color name="vinor_primary_red">#E22828</color>
     <color name="vinor_accent_green">#10B981</color>
+    <!-- سبز نئون کاشی‌های داشبورد؛ از سبز برند روشن‌تر است تا با طرح کاشی یکی باشد. -->
+    <color name="vinor_tile_green">#00C878</color>
+    <!-- نوار «مشتری دارم»؛ همان سبز تیرهٔ متن دکمهٔ قبلی و سبز روشن طرح. -->
+    <color name="vinor_customer_bg">#052E16</color>
+    <color name="vinor_customer_word">#12E888</color>
+    <color name="vinor_customer_btn">#50F0A8</color>
+    <color name="vinor_tile_stroke">#4D00C878</color>
+    <color name="vinor_tile_glow">#6600C878</color>
     <color name="vinor_text">#ECECEC</color>
     <color name="vinor_text_dark">#ECECEC</color>
     <color name="vinor_text_muted">#8E8E93</color>
@@ -25,5 +35,7 @@
     <color name="vinor_on_primary">#FFFFFF</color>
     <color name="vinor_primary_pressed">#C91F1F</color>
     <color name="vinor_error">#FB7185</color>
+    <!-- برچسب «ویژه» روی عکس کارت پیشنهادی؛ طلایی در پالت قبلی نبود. -->
+    <color name="vinor_badge_gold">#F5B942</color>
     <color name="vinor_border_focus">#29FFFFFF</color>
 </resources>

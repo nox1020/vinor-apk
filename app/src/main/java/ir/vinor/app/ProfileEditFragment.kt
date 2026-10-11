@@ -204,7 +204,7 @@ class ProfileEditFragment : Fragment() {
         bindInitials(meName)
         currentAvatarUrl = avatarUrl
         if (!avatarUrl.isNullOrEmpty()) {
-            loadAvatar(if (avatarUrl.startsWith("http")) avatarUrl else "$BASE$avatarUrl")
+            loadAvatar(avatarUrl)
         } else {
             binding.profileEditAvatar.visibility = View.GONE
             binding.profileEditInitials.visibility = View.VISIBLE
@@ -213,10 +213,24 @@ class ProfileEditFragment : Fragment() {
 
     private fun loadAvatar(fullUrl: String) {
         val ctx = context ?: return
+        val resolved = VinorAvatarCache.resolve(fullUrl)
+        VinorAvatarCache.peek(resolved)?.let { cached ->
+            binding.profileEditAvatar.setImageBitmap(cached)
+            binding.profileEditAvatar.visibility = View.VISIBLE
+            binding.profileEditInitials.visibility = View.GONE
+            return
+        }
+        val cookie = cookieHeader()
         scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { PartnerApi.bytes(fullUrl, ctx) } ?: return@launch
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@launch
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, resolved)
+                        ?: VinorAvatarCache.fetch(resolved, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, resolved, fresh)
+                        }
+                } ?: return@launch
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(resolved, bmp)
                 if (_binding == null) return@launch
                 binding.profileEditAvatar.setImageBitmap(bmp)
                 binding.profileEditAvatar.visibility = View.VISIBLE
@@ -313,12 +327,18 @@ class ProfileEditFragment : Fragment() {
                     }.getOrNull()
                     currentAvatarUrl = newUrl
                     val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (!newUrl.isNullOrEmpty()) {
+                        val resolved = VinorAvatarCache.resolve(newUrl)
+                        VinorAvatarCache.store(requireContext(), resolved, bytes)
+                        if (bmp != null) VinorAvatarCache.rememberBitmap(resolved, bmp)
+                        context?.let { ProfileFragment.noteLocalEdit(it, avatarUrl = newUrl) }
+                    }
                     if (bmp != null) {
                         binding.profileEditAvatar.setImageBitmap(bmp)
                         binding.profileEditAvatar.visibility = View.VISIBLE
                         binding.profileEditInitials.visibility = View.GONE
                     } else if (!newUrl.isNullOrEmpty()) {
-                        loadAvatar("$BASE$newUrl")
+                        loadAvatar(newUrl)
                     }
                     context?.let { Toast.makeText(it, "عکس پروفایل به‌روزرسانی شد.", Toast.LENGTH_SHORT).show() }
                 }
@@ -360,7 +380,10 @@ class ProfileEditFragment : Fragment() {
                             JSONObject(resp.body?.string() ?: "{}").optBoolean("success", false)
                         }.getOrElse { false }
                         if (ok) {
-                            context?.let { Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show() }
+                            context?.let {
+                                ProfileFragment.noteLocalEdit(it, name = name)
+                                Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show()
+                            }
                             findNavController().navigateUp()
                         } else {
                             context?.let { Toast.makeText(it, "خطا در ذخیره", Toast.LENGTH_SHORT).show() }

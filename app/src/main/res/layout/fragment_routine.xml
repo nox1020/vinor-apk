@@ -41,7 +41,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="پیشرفت امروز"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -53,7 +53,7 @@
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="4dp"
                         android:text="۰ / ۳"
-                        android:textColor="#D1D5DB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="11sp" />
                 </LinearLayout>
 
@@ -65,7 +65,7 @@
                     android:layout_marginTop="8dp"
                     android:max="3"
                     android:progress="0"
-                    android:progressTint="#16a34a"
+                    android:progressTint="@color/vinor_accent_green"
                     android:progressBackgroundTint="#374151" />
 
                 <!-- چیپ‌های مراحل (مثل وب) -->
@@ -100,9 +100,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="بازاریابی"
-                            android:textColor="#E5E7EB"
-                            android:textSize="12sp" />
+                        android:text="بازاریابی"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -130,9 +130,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="بازدید"
-                            android:textColor="#E5E7EB"
-                            android:textSize="12sp" />
+                        android:text="بازدید"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -159,9 +159,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="معامله"
-                            android:textColor="#E5E7EB"
-                            android:textSize="12sp" />
+                        android:text="معامله"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -210,7 +210,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="ماه قبل"
                         android:src="@drawable/ic_chevron_right"
-                        app:tint="#9CA3AF" />
+                        app:tint="@color/vinor_text_muted" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -223,14 +223,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="تقویم انجام روتین"
-                            android:textColor="#F9FAFB"
+                            android:textColor="@color/vinor_text"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                         <TextView
                             android:id="@+id/routineMonthLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#9CA3AF"
+                            android:textColor="@color/vinor_text_muted"
                             android:textSize="12sp"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
@@ -242,7 +242,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="ماه بعد"
                         android:src="@drawable/ic_chevron_left"
-                        app:tint="#9CA3AF" />
+                        app:tint="@color/vinor_text_muted" />
                 </LinearLayout>
 
                 <!-- روزهای هفته -->
@@ -251,13 +251,13 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginBottom="4dp">
-                    <TextView android:text="ش" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="ی" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="د" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="س" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="چ" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="پ" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
-                    <TextView android:text="ج" android:textColor="#9CA3AF" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="ش" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="ی" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="د" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="س" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="چ" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="پ" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
+                    <TextView android:text="ج" android:textColor="@color/vinor_text_muted" android:textSize="11sp" android:gravity="center" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" />
                 </LinearLayout>
 
                 <GridLayout
@@ -272,7 +272,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:textColor="#9CA3AF"
+                    android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
             </LinearLayout>
         </FrameLayout>
@@ -309,14 +309,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="آموزش ۳ مرحله‌ای"
-                        android:textColor="#F9FAFB"
+                        android:textColor="@color/vinor_text"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="مشاهده راهنمای کوتاه مراحل"
-                        android:textColor="#9CA3AF"
+                        android:textColor="@color/vinor_text_muted"
                         android:textSize="12sp"
                         android:layout_marginTop="2dp" />
                 </LinearLayout>

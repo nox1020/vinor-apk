@@ -23,6 +23,8 @@ object DeepLinkRouter {
         PARTNER_ROUTINE,
         PARTNER_LANDS,
         PARTNER_NOTIFICATIONS,
+        PARTNER_CUSTOMERS,
+        PARTNER_REQUESTS,
         PARTNER_LOGIN,
         PARTNER_WEB,
         PUBLIC_HOME,
@@ -168,11 +170,19 @@ object DeepLinkRouter {
                 )
             path == "/express/partner/customers" || path.startsWith("/express/partner/customers/") ->
                 Route(
-                    type = DestinationType.PARTNER_WEB,
+                    type = DestinationType.PARTNER_CUSTOMERS,
                     targetUrl = "https://$HOST$path${querySuffix(uri)}",
                     requiresAuth = true,
                     originalUri = raw,
                     logLabel = "customers",
+                )
+            path == "/express/partner/requests" || path.startsWith("/express/partner/requests/") ->
+                Route(
+                    type = DestinationType.PARTNER_REQUESTS,
+                    targetUrl = "https://$HOST$path${querySuffix(uri)}",
+                    requiresAuth = true,
+                    originalUri = raw,
+                    logLabel = "requests",
                 )
             path == "/express/partner/home" -> partnerHomeRoute(raw, uri)
             path.startsWith("/express/partner") ->

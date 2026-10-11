@@ -80,17 +80,21 @@ class DeepLinkRouterTest {
     }
 
     @Test
-    fun requests_isPartnerWeb_requiresAuth() {
+    fun requests_andRequestDetails_areNativePartnerFlow_andRequireAuth() {
         val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/requests")
-        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_REQUESTS, r.type)
         assertTrue(r.requiresAuth)
         assertTrue(r.targetUrl.contains("/requests"))
+        val detail = DeepLinkRouter.resolve("https://vinor.ir/express/partner/requests/15?tab=visits")
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_REQUESTS, detail.type)
+        assertTrue(detail.requiresAuth)
+        assertEquals("requests", detail.logLabel)
     }
 
     @Test
     fun customers_isPartnerWeb_requiresAuth() {
         val r = DeepLinkRouter.resolve("https://vinor.ir/express/partner/customers")
-        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, r.type)
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS, r.type)
         assertTrue(r.requiresAuth)
         assertEquals("customers", r.logLabel)
         assertTrue(r.targetUrl.contains("/express/partner/customers"))
@@ -99,11 +103,11 @@ class DeepLinkRouterTest {
     @Test
     fun customersQueryAndNested_stayInApp() {
         val query = DeepLinkRouter.resolve("https://vinor.ir/express/partner/customers?tab=active")
-        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, query.type)
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS, query.type)
         assertTrue(query.requiresAuth)
         assertTrue(query.targetUrl.contains("/express/partner/customers?tab=active"))
         val nested = DeepLinkRouter.resolve("https://www.vinor.ir/express/partner/customers/12/")
-        assertEquals(DeepLinkRouter.DestinationType.PARTNER_WEB, nested.type)
+        assertEquals(DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS, nested.type)
         assertTrue(nested.requiresAuth)
         assertTrue(nested.targetUrl.contains("/express/partner/customers/12"))
     }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M8,3.4 H15.2 A2.4,2.4 0,0 1,17.6 5.8 V18.2 A2.4,2.4 0,0 1,15.2 20.6 H8.8 A2.4,2.4 0,0 1,6.4 18.2 V5.8 A2.4,2.4 0,0 1,8.8 3.4 Z"
+        android:strokeWidth="1.7"
+        android:strokeColor="@color/vinor_tile_green"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="@color/vinor_tile_green"
+        android:pathData="M9.1,8.2 H14.9 V9.7 H9.1 Z" />
+    <path
+        android:fillColor="@color/vinor_tile_green"
+        android:pathData="M9.1,11.5 H14.9 V13 H9.1 Z" />
+    <path
+        android:fillColor="@color/vinor_tile_green"
+        android:pathData="M9.1,14.8 H13.1 V16.3 H9.1 Z" />
+</vector>
