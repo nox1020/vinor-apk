@@ -115,11 +115,14 @@ class CommissionsFragment : Fragment() {
     private fun statusText(status: String): String =
         WalletWithdraw.commissionStatusText(status).ifBlank { "در انتظار" }
 
-    private fun statusColor(status: String): Int = when (WalletWithdraw.commissionKind(status)) {
-        "paid", "success" -> 0xFF16a34a.toInt()
-        "approved" -> 0xFF2563EB.toInt()
-        "rejected" -> 0xFFDC2626.toInt()
-        else -> 0xFFD97706.toInt()
+    private fun statusColor(status: String): Int {
+        val color = when (WalletWithdraw.commissionKind(status)) {
+            "paid", "success" -> R.color.vinor_accent_green
+            "approved" -> R.color.vinor_text
+            "rejected" -> R.color.vinor_error
+            else -> R.color.vinor_text_muted
+        }
+        return ContextCompat.getColor(requireContext(), color)
     }
 
     private fun loadData() {

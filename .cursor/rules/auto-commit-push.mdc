@@ -15,6 +15,7 @@ alwaysApply: true
 4. Force-push به `main`/`master` نکن.
 5. سکرت‌ها را commit نکن: `.env`، کلید، keystore، `credentials.json`، `google-services.json`، `key.properties`.
 6. اگر هوک `stop` هم push کرد، همان commit را دوباره نساز.
+7. مرج Pull Request طبق `.cursor/rules/auto-pr-merge.mdc` است. به `main` مستقیم پوش نکن.
 
 اگر push به‌خاطر auth شکست، در پاسخ نهایی بگو و همان‌جا متوقف شو.
 

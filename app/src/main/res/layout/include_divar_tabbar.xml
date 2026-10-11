@@ -48,7 +48,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_home"
-                    app:tint="@color/vinor_accent_green" />
+                    app:tint="@color/vinor_nav_selected" />
             </FrameLayout>
 
             <TextView
@@ -62,7 +62,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="خانه"
-                android:textColor="@color/vinor_accent_green"
+                android:textColor="@color/vinor_nav_selected"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -93,7 +93,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_search"
-                    app:tint="@color/vinor_text_muted" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
@@ -107,7 +107,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="جستجو"
-                android:textColor="@color/vinor_text_muted"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -137,7 +137,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_add"
-                    app:tint="@color/vinor_text_muted" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
@@ -151,7 +151,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="ثبت آگهی"
-                android:textColor="@color/vinor_text_muted"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -181,7 +181,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_chat"
-                    app:tint="@color/vinor_text_muted" />
+                    app:tint="@color/vinor_nav_unselected" />
 
                 <TextView
                     android:id="@+id/tabChatBadge"
@@ -210,7 +210,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="AI چت"
-                android:textColor="@color/vinor_text_muted"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -240,7 +240,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_me"
-                    app:tint="@color/vinor_text_muted" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
@@ -254,7 +254,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="وینور من"
-                android:textColor="@color/vinor_text_muted"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
