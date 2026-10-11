@@ -903,21 +903,23 @@ class DashboardFragment : Fragment() {
         val write = chatWriteGen
         historyInFlight = true
         scope.launch {
+            var peeked: JSONObject? = null
             try {
-                val peeked = withContext(Dispatchers.IO) {
+                val offline = VinorNetworkStatus.useCacheFirst(ctx)
+                val wasFresh = withContext(Dispatchers.IO) {
+                    PartnerApi.isFresh(ChatLive.HISTORY, ctx)
+                }
+                peeked = withContext(Dispatchers.IO) {
                     PartnerApi.peekJson(ChatLive.HISTORY, ctx)
                 }
                 if (!chatStill(account, gen)) return@launch
-                if (peeked != null && wantChatLayer &&
+                if (offline && peeked != null && wantChatLayer &&
                     (_binding?.dashboardChatList?.childCount ?: 0) == 0
                 ) {
                     bindChatIfNeeded(peeked)
                 }
                 val urgent = force || wantChatLayer
-                if (!urgent && peeked != null && withContext(Dispatchers.IO) {
-                        PartnerApi.isFresh(ChatLive.HISTORY, ctx)
-                    }
-                ) {
+                if (!urgent && peeked != null && wasFresh) {
                     rememberHistory(peeked)
                     return@launch
                 }
@@ -948,17 +950,27 @@ class DashboardFragment : Fragment() {
                 ) {
                     PartnerApi.remember(ChatLive.HISTORY, hist, ctx)
                 }
-                if (wantChatLayer) bindChatIfNeeded(hist) else if (
+                val networkFailed = !wasFresh && (
+                    hist.optBoolean("from_cache") ||
+                        hist.optBoolean("offline") ||
+                        (hist.has("http_status") && hist.optInt("http_status") !in 200..299)
+                    )
+                if (wantChatLayer) {
+                    val usable = chatCacheable(hist) || hist.optBoolean("from_cache")
+                    if (usable) bindChatIfNeeded(hist)
+                    if (networkFailed) showOfflineSnackbar()
+                } else if (
                     ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
                 ) {
                     rememberHistory(hist)
                 }
             } catch (_: Exception) {
-                if (chatStill(account, gen) && wantChatLayer &&
-                    binding.dashboardChatList.childCount == 0
-                ) {
-                    bindChat(JSONObject())
+                if (!chatStill(account, gen) || !wantChatLayer) return@launch
+                val fallback = peeked
+                if (fallback != null && (_binding?.dashboardChatList?.childCount ?: 0) == 0) {
+                    bindChatIfNeeded(fallback)
                 }
+                showOfflineSnackbar()
             } finally {
                 historyInFlight = false
                 val again = historyQueued

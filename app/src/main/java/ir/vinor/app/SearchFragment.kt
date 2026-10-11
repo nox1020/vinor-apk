@@ -56,6 +56,8 @@ class SearchFragment : Fragment() {
     private var searchDebounce: Runnable? = null
     private var shimmer: ValueAnimator? = null
     private var sheetDialog: BottomSheetDialog? = null
+    private var loadGen = 0
+    private var skipNextResume = true
 
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener {
         if (_binding == null || !isAdded) return@OnScrollChangedListener
@@ -67,6 +69,7 @@ class SearchFragment : Fragment() {
             job = Job()
             scope = CoroutineScope(Dispatchers.Main + job)
         }
+        skipNextResume = true
         _binding = FragmentSearchBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -105,7 +108,17 @@ class SearchFragment : Fragment() {
         binding.searchChipArea.setOnClickListener { showAreaSheet() }
         binding.searchCity.setOnClickListener { showCitySheet() }
         binding.searchScroll.viewTreeObserver.addOnScrollChangedListener(scrollListener)
-        load()
+        if (rememberedAds != null) paintRemembered()
+        load(forceSkeleton = rememberedAds == null)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null) load(forceSkeleton = !hasSnapshot)
     }
 
     override fun onDestroyView() {
@@ -119,17 +132,17 @@ class SearchFragment : Fragment() {
         _binding = null
     }
 
-    private fun load(fromPull: Boolean = false) {
+    private fun load(fromPull: Boolean = false, forceSkeleton: Boolean = false) {
         val kept = ui.items.takeIf {
             it.isNotEmpty() && (ui.phase == SearchPhase.CONTENT || ui.phase == SearchPhase.ERROR)
         }.orEmpty()
-        if (kept.isEmpty()) {
+        if (kept.isEmpty() && (forceSkeleton || !hasSnapshot) && !fromPull) {
             ui = SearchStateReducer.loading()
             render()
-        } else if (fromPull) {
-            // لیست فعلی زیر اسپینر می‌ماند.
         }
         val ctx = context ?: return
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
             val loaded = try {
                 withContext(Dispatchers.IO) { fetchAds(ctx) }
@@ -138,9 +151,13 @@ class SearchFragment : Fragment() {
             } catch (_: Exception) {
                 null
             }
-            if (_binding == null) return@launch
+            if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
             binding.searchRefresh.isRefreshing = false
             if (loaded == null || loaded.failed) {
+                if (loaded?.sessionExpired == true && kept.isEmpty() && rememberedAds.isNullOrEmpty()) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 val previous = if (kept.isNotEmpty()) {
                     SearchUiState(SearchPhase.CONTENT, kept, query.hasClearableFilters())
                 } else {
@@ -154,9 +171,20 @@ class SearchFragment : Fragment() {
             approved = loaded.approved
             rawAds = loaded.ads
             hasSnapshot = true
+            rememberedAds = loaded.ads
+            rememberedApproved = loaded.approved
             ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
             render()
         }
+    }
+
+    private fun paintRemembered() {
+        val snap = rememberedAds ?: return
+        rawAds = snap
+        approved = rememberedApproved
+        hasSnapshot = true
+        ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
+        render()
     }
 
     private fun fetchAds(ctx: Context): SearchLoad {
@@ -180,7 +208,8 @@ class SearchFragment : Fragment() {
         val primary = SearchAds.catalog(searchRows, homeAds, homeHtmlAds)
         val ads = if (primary.isNotEmpty()) primary else publicPublished(ctx)
         val failed = ads.isEmpty() && (home == null || isFailedHome(home))
-        return SearchLoad(ads, home?.optBoolean("is_approved") == true, failed)
+        val sessionExpired = home?.optBoolean("session_expired") == true || home?.optInt("http_status") == 401
+        return SearchLoad(ads, home?.optBoolean("is_approved") == true, failed, sessionExpired)
     }
 
     /** مهمان ردیف SSR ندارد؛ sitemap نشانی ملک‌های منتشرشدهٔ عمومی است. */
@@ -765,11 +794,26 @@ class SearchFragment : Fragment() {
 
     private data class RangePreset(val label: String, val min: Long?, val max: Long?)
 
-    private data class SearchLoad(val ads: List<SearchAd>, val approved: Boolean, val failed: Boolean)
+    private data class SearchLoad(
+        val ads: List<SearchAd>,
+        val approved: Boolean,
+        val failed: Boolean,
+        val sessionExpired: Boolean = false,
+    )
 
     private data class SheetSession(val dialog: BottomSheetDialog, val sheet: SheetSearchFilterBinding)
 
     companion object {
+        private var rememberedAds: List<SearchAd>? = null
+        private var rememberedApproved = false
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            rememberedAds = null
+            rememberedApproved = false
+            sessionStamp++
+        }
+
         private val pricePresets = listOf(
             RangePreset("تا ۱ میلیارد", null, 1_000_000_000),
             RangePreset("۱–۳ میلیارد", 1_000_000_000, 3_000_000_000),
