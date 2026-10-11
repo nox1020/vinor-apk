@@ -168,8 +168,12 @@ class NativePartnerFragment : Fragment() {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
                 if (_binding == null || !followCurrent(epoch)) return@launch
                 val code = fresh.optInt("http_status")
+                if (PartnerApi.isSessionExpired(fresh) || code == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 val followUnauthorized = page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh)
-                if (code == 401 || fresh.optString("error") == "unauthorized" || followUnauthorized) {
+                if (fresh.optString("error") == "unauthorized" || followUnauthorized) {
                     bindEmpty("برای ادامه وارد شوید.")
                     (activity as? MainActivity)?.openLogin()
                     return@launch
@@ -232,6 +236,10 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/favorites/cards", body, ctx)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
                 bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
             } catch (_: Exception) {
                 if (_binding != null) bindEmpty("اتصال برقرار نشد")
@@ -740,6 +748,10 @@ class NativePartnerFragment : Fragment() {
                 if (_binding == null) return@launch
                 val freshCsrf = resp.optString("csrf_token").trim()
                 if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (FollowRequests.isUnauthorized(resp)) {
                     followCsrf = ""
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
@@ -827,6 +839,10 @@ class NativePartnerFragment : Fragment() {
                     PartnerApi.postJson("/express/partner/api/apply/submit", body, requireContext())
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
                 if (resp.optBoolean("ok") || resp.optString("status") == "pending" || resp.optString("status") == "approved") {
                     bindApply(resp)
                     if (resp.optString("status") == "approved") {

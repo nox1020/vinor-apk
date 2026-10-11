@@ -61,6 +61,8 @@ object VinorApiCacheStore {
     fun put(context: Context, url: String, body: ByteArray, contentType: String) {
         if (!VinorCachePolicy.isSafeGetApi(url)) return
         if (body.isEmpty() || body.size > VinorCachePolicy.MAX_API_BODY_BYTES) return
+        if (contentType.lowercase(java.util.Locale.US).contains("html")) return
+        if (!PartnerApi.isCacheableJson(body)) return
         val n = VinorCachePolicy.normalizeUrl(url)
         val ct = contentType.ifBlank { "application/json" }
         val copy = body.copyOf()

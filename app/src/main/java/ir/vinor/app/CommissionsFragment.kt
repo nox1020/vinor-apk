@@ -139,6 +139,10 @@ class CommissionsFragment : Fragment() {
                     bindCommissionPayload(data)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(obj)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (!WalletWithdraw.hasCommissionPayload(obj)) {
                     showError()
                     return@launch

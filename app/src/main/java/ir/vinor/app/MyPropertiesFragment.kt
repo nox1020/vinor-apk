@@ -88,10 +88,11 @@ class MyPropertiesFragment : Fragment() {
 
     private fun load(forceNet: Boolean) {
         val ctx = context ?: return
+        if (forceNet) binding.mpRefresh.isRefreshing = true
         if (!PartnerApi.hasSession()) {
             binding.mpRefresh.isRefreshing = false
             Toast.makeText(ctx, "برای دیدن ملک من وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
         scope.launch {
@@ -107,9 +108,8 @@ class MyPropertiesFragment : Fragment() {
             try {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.get(PATH, ctx) }
                 if (_binding == null) return@launch
-                if (fresh.optInt("http_status") == 401) {
-                    Toast.makeText(ctx, "برای دیدن ملک من وارد شوید.", Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openDrawer()
+                if (PartnerApi.isSessionExpired(fresh) || fresh.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = fresh.optBoolean("session_expired"))
                     return@launch
                 }
                 bind(fresh)

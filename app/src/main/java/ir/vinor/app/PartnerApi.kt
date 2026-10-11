@@ -17,6 +17,7 @@ import okhttp3.Response
 import okio.BufferedSink
 import okio.source
 import org.json.JSONObject
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -35,9 +36,16 @@ object PartnerApi {
         .writeTimeout(90, TimeUnit.SECONDS)
         .build()
     private val cookieLock = Any()
+    private val expiryLock = Any()
     @Volatile private var appCtx: Context? = null
     @Volatile private var loggedIn: Boolean = false
     @Volatile private var cookieSnapshot: String = ""
+    @Volatile private var expiryQueued = false
+    @Volatile private var sessionExpiredListener: SessionExpiredListener? = null
+
+    fun interface SessionExpiredListener {
+        fun onSessionExpired()
+    }
 
     fun attach(context: Context) {
         val app = context.applicationContext
@@ -77,8 +85,15 @@ object PartnerApi {
         return cookie.contains("vinor_session")
     }
 
-    /** ورود قطعی (user_phone)، نه کوکی موقت OTP. */
+    /** ورود قطعی (user_phone)، نه کوکی موقت OTP. مهمان هم vinor_session می‌گیرد. */
     fun hasSession(): Boolean = loggedIn && hasVinorCookie()
+
+    fun setSessionExpiredListener(listener: SessionExpiredListener?) {
+        sessionExpiredListener = listener
+    }
+
+    /** نشست قبلی باطل شده (۴۰۱ یا پاسخ مهمان در حالی که کلاینت لاگین می‌دانست). */
+    fun isSessionExpired(obj: JSONObject): Boolean = obj.optBoolean("session_expired")
 
     fun markLoggedIn() {
         setLoggedIn(true)
@@ -184,49 +199,61 @@ object PartnerApi {
 
     fun remember(path: String, obj: JSONObject, context: Context?) {
         if (context == null || obj.optBoolean("from_cache")) return
+        if (obj.optBoolean("non_json") || obj.optBoolean("session_expired")) return
         val code = obj.optInt("http_status", 200)
+        if (code == 401 || code == 403) return
         if (code != 0 && code !in 200..299) return
+        val bytes = obj.toString().toByteArray(Charsets.UTF_8)
+        if (!isCacheableJson(bytes)) return
         VinorApiCacheStore.put(
             context.applicationContext,
             absoluteUrl(path),
-            obj.toString().toByteArray(Charsets.UTF_8),
+            bytes,
             "application/json",
         )
     }
 
-    /** اول کش را روی Main می‌دهد؛ اگر تازه باشد شبکه را نمی‌زند. */
+    /**
+     * آنلاین: اول نتیجهٔ شبکه (و وضعیت ورود) مشخص می‌شود، بعد bind.
+     * کش خصوصی قبل از آن رسم نمی‌شود. آفلاین یا خطای شبکه/۵xx همان کش را نشان می‌دهد.
+     */
     suspend fun loadDisplay(
         path: String,
         context: Context,
         bind: (JSONObject) -> Unit,
     ): JSONObject {
-        val stale = withContext(Dispatchers.IO) { peekJson(path, context) }
-        if (stale != null) bind(stale)
-        if (stale != null && withContext(Dispatchers.IO) { isFresh(path, context) }) {
-            return stale
+        if (VinorNetworkStatus.useCacheFirst(context)) {
+            val stale = withContext(Dispatchers.IO) { peekJson(path, context) }
+            if (stale != null) bind(stale)
+            return stale ?: offlineMiss()
         }
         val fresh = withContext(Dispatchers.IO) { get(path, context) }
-        if (!fresh.optBoolean("from_cache") || stale == null) bind(fresh)
+        if (isSessionExpired(fresh) || fresh.optInt("http_status") == 401 || fresh.optInt("http_status") == 403) {
+            return fresh
+        }
+        bind(fresh)
         return fresh
     }
 
     fun get(path: String, context: Context? = null): JSONObject {
         val ctx = context ?: appCtx
         if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
-            return peekJson(path, ctx) ?: JSONObject()
-                .put("ok", false)
-                .put("offline", true)
-                .put("from_cache", false)
-                .put("error", "آفلاین است و نسخه‌ای ذخیره نشده")
+            return peekJson(path, ctx) ?: offlineMiss()
         }
         return try {
             val req = requestBuilder(path, context).get().build()
             val obj = execute(req)
             val code = obj.optInt("http_status")
-            if (code == 401 || code == 403) {
-                // دادهٔ خصوصی قبلی نباید پاسخ انقضای نشست یا منع دسترسی را بپوشاند.
-                obj
-            } else if (code in 200..299) {
+            if (obj.optBoolean("session_expired") || code == 401) {
+                return authRequiredResult(obj, 401)
+            }
+            if (code == 403) {
+                return authRequiredResult(obj, 403)
+            }
+            if (obj.optBoolean("non_json")) {
+                return obj
+            }
+            if (code in 200..299) {
                 remember(path, obj, context)
                 obj
             } else if (!ChatSessionGate.cacheMayHideAuthFailure(path, code)) {
@@ -577,20 +604,31 @@ object PartnerApi {
         setLoggedIn(false)
         ProfileFragment.clearRemembered()
         synchronized(cookieLock) { cookieSnapshot = "" }
-        val apply = {
-            val mgr = CookieManager.getInstance()
-            mgr.removeAllCookies {
-                mgr.flush()
-                synchronized(cookieLock) {
-                    cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
+        val wipeUserCache = {
+            appCtx?.let { ctx ->
+                VinorApiCacheStore.clearUser(ctx)
+                VinorAvatarCache.clear(ctx)
+                VinorCacheSession.fingerprint(ctx)
+            }
+        }
+        val apply: () -> Unit = {
+            runCatching {
+                val mgr = CookieManager.getInstance()
+                mgr.removeAllCookies {
+                    runCatching {
+                        mgr.flush()
+                        synchronized(cookieLock) {
+                            cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
+                        }
+                    }
+                    wipeUserCache()
+                    done()
                 }
-                appCtx?.let { ctx ->
-                    VinorApiCacheStore.clearUser(ctx)
-                    VinorAvatarCache.clear(ctx)
-                    VinorCacheSession.fingerprint(ctx)
-                }
+            }.onFailure {
+                wipeUserCache()
                 done()
             }
+            Unit
         }
         if (VinorSafe.isMainThread()) apply() else VinorSafe.onMain(apply)
     }
@@ -609,8 +647,99 @@ object PartnerApi {
         return b
     }
 
+    private fun offlineMiss(): JSONObject = JSONObject()
+        .put("ok", false)
+        .put("offline", true)
+        .put("from_cache", false)
+        .put("error", "آفلاین است و نسخه‌ای ذخیره نشده")
+
+    private fun authRequiredResult(server: JSONObject, code: Int): JSONObject {
+        val err = server.optString("error")
+        val error = when {
+            code == 403 -> err.ifBlank { "forbidden" }
+            err == "unauthorized" || err == "auth_required" -> err
+            else -> "auth_required"
+        }
+        return JSONObject()
+            .put("ok", false)
+            .put("success", false)
+            .put("error", error)
+            .put("http_status", code)
+            .put("from_cache", false)
+            .put("auth_required", code == 401 || server.optBoolean("session_expired"))
+            .put("session_expired", server.optBoolean("session_expired"))
+    }
+
+    /** HTML، بدنهٔ خالی، و پورتال اسیر JSON نیستند و نباید کش شوند. */
+    internal fun isCacheableJson(body: ByteArray): Boolean {
+        if (body.isEmpty()) return false
+        val text = runCatching { body.toString(Charsets.UTF_8).trim() }.getOrNull().orEmpty()
+        if (text.isEmpty() || text[0] != '{') return false
+        if (text.startsWith("<!") || text.startsWith("<html", ignoreCase = true)) return false
+        return runCatching { JSONObject(text) }.isSuccess
+    }
+
+    private fun requestPath(url: String): String {
+        val path = VinorCachePolicy.pathOf(url).lowercase(Locale.US)
+        return if (path.length > 1 && path.endsWith("/")) path.dropLast(1) else path
+    }
+
+    private fun isCredentialPath(url: String): Boolean {
+        val path = requestPath(url)
+        return path.endsWith("/login-request") ||
+            path.endsWith("/api/verify") ||
+            path.endsWith("/otp/resend") ||
+            path.endsWith("/api/logout")
+    }
+
+    /**
+     * فقط وقتی کلاینت خودش را لاگین می‌داند.
+     * پروفایل ۲۰۰ با me_phone خالی، یا home/data با is_logged_in:false.
+     */
+    private fun isSilentLogout(url: String, obj: JSONObject): Boolean {
+        if (obj.optBoolean("non_json")) return false
+        if (obj.optInt("http_status") !in 200..299) return false
+        val path = requestPath(url)
+        if (path == "/express/partner/profile/data") {
+            return obj.optString("me_phone").isBlank()
+        }
+        if (path == "/express/partner/home/data") {
+            return obj.has("is_logged_in") && !obj.optBoolean("is_logged_in")
+        }
+        return false
+    }
+
+    private fun evictPrivateCache() {
+        val ctx = appCtx ?: return
+        runCatching { VinorApiCacheStore.clearUser(ctx) }
+    }
+
+    private fun expireSession(notifyUi: Boolean) {
+        setLoggedIn(false)
+        evictPrivateCache()
+        runCatching { clearCookies { } }
+        if (!notifyUi) return
+        val post = synchronized(expiryLock) {
+            if (expiryQueued) {
+                false
+            } else {
+                expiryQueued = true
+                true
+            }
+        }
+        if (!post) return
+        VinorSafe.onMain {
+            try {
+                sessionExpiredListener?.onSessionExpired()
+            } finally {
+                synchronized(expiryLock) { expiryQueued = false }
+            }
+        }
+    }
+
     private fun execute(req: Request, http: OkHttpClient = client): JSONObject {
         http.newCall(req).execute().use { resp ->
+            val hadSession = hasSession()
             saveCookies(resp)
             val text = resp.body?.string().orEmpty()
             val obj = responsePayload(
@@ -619,10 +748,19 @@ object PartnerApi {
                 requestPath = req.url.encodedPath,
                 finalPath = resp.request.url.encodedPath,
             )
-            if (obj.optInt("http_status") == 401 || obj.optString("error") == "unauthorized") {
-                setLoggedIn(false)
+            if (obj.optString("error") == "پاسخ نامعتبر") obj.put("non_json", true)
+            val url = req.url.toString()
+            val code = obj.optInt("http_status")
+            if (code == 403) evictPrivateCache()
+            val hard401 = code == 401 && !isCredentialPath(url)
+            val silent = hadSession && isSilentLogout(url, obj)
+            if (hard401 || silent) {
+                if (hadSession || silent) obj.put("session_expired", true)
+                expireSession(notifyUi = obj.optBoolean("session_expired"))
+            } else if (!obj.optBoolean("non_json")) {
+                if (code == 401 || obj.optString("error") == "unauthorized") setLoggedIn(false)
+                ingestAuth(obj)
             }
-            ingestAuth(obj)
             return obj
         }
     }

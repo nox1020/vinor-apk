@@ -53,6 +53,10 @@ class DashboardFragment : Fragment() {
 
     companion object {
         private var rememberedHome: JSONObject? = null
+
+        fun clearRememberedHome() {
+            rememberedHome = null
+        }
     }
 
     private var _binding: FragmentDashboardBinding? = null
@@ -190,7 +194,9 @@ class DashboardFragment : Fragment() {
         }
         syncSendEnabled()
         syncComposerVisible()
-        paintRememberedHome()
+        val ctx = context
+        val offline = ctx != null && VinorNetworkStatus.useCacheFirst(ctx)
+        if (offline || !PartnerApi.hasSession()) paintRememberedHome()
         loadAll()
     }
 
@@ -484,7 +490,12 @@ class DashboardFragment : Fragment() {
                 if (_binding == null) return@launch
                 attachUploading = false
                 val http = resp.optInt("http_status")
-                if (http == 401 || http == 403 || resp.optBoolean("need_login")) {
+                if (http == 401 || resp.optBoolean("session_expired")) {
+                    clearPendingAttachment()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
+                if (http == 403 || resp.optBoolean("need_login")) {
                     clearPendingAttachment()
                     Toast.makeText(ctx, resp.optString("error").ifBlank { "برای ارسال فایل وارد شوید." }, Toast.LENGTH_SHORT).show()
                     releaseChatAccount()
@@ -617,10 +628,23 @@ class DashboardFragment : Fragment() {
                 if (_binding == null) return@launch
                 val fresh = resp.optString("csrf_token").trim()
                 if (fresh.isNotBlank()) customerCsrf = fresh
+                val http = resp.optInt("http_status")
+                if (http == 401 || resp.optBoolean("session_expired")) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (PartnerCustomers.isUnauthorized(resp)) {
                     customerCsrf = ""
                     Toast.makeText(ctx, "برای ثبت مشتری وارد شوید.", Toast.LENGTH_SHORT).show()
                     (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
+                if (http == 403) {
+                    Toast.makeText(
+                        ctx,
+                        resp.optString("error").ifBlank { "برای ثبت درخواست وارد شوید." },
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     return@launch
                 }
                 if (PartnerCustomers.isOk(resp)) {
@@ -732,7 +756,7 @@ class DashboardFragment : Fragment() {
                 shownCache = binding.dashboardEmpty.isVisible
                 if (!wantChatLayer) binding.dashboardProgress.isVisible = false
             }
-            var home = JSONObject()
+            var home: JSONObject
             var loadError: String? = null
             try {
                 home = withContext(Dispatchers.IO) {
@@ -740,10 +764,27 @@ class DashboardFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 loadError = e.message ?: "خطا در بارگذاری"
-                if (shownCache) {
-                    home = PartnerApi.peekJson("/express/partner/home/data", ctx) ?: JSONObject()
+                home = withContext(Dispatchers.IO) {
+                    PartnerApi.peekJson("/express/partner/home/data", ctx) ?: JSONObject()
                 }
             }
+            if (_binding == null) {
+                if (!wantChatLayer) finishRefreshUi()
+                return@launch
+            }
+            if (PartnerApi.isSessionExpired(home) || home.optInt("http_status") == 401) {
+                clearRememberedHome()
+                cachedHistory = null
+                threadId = null
+                (activity as? MainActivity)?.openLogin(sessionExpired = home.optBoolean("session_expired"))
+                if (!wantChatLayer) finishRefreshUi()
+                return@launch
+            }
+            if (home.optInt("http_status") == 403) {
+                if (!wantChatLayer) finishRefreshUi()
+                return@launch
+            }
+            shownCache = binding.dashboardEmpty.isVisible
             if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
                 try {
                     val html = withContext(Dispatchers.IO) {
@@ -848,9 +889,13 @@ class DashboardFragment : Fragment() {
                 }
                 if (!chatStill(account, gen)) return@launch
                 val status = hist.optInt("http_status")
-                if (status == 401 || status == 403) {
+                if (status == 401 || status == 403 || hist.optBoolean("session_expired")) {
                     releaseChatAccount()
-                    if (wantChatLayer) (activity as? MainActivity)?.requireChatLogin()
+                    if (wantChatLayer) {
+                        (activity as? MainActivity)?.requireChatLogin(
+                            sessionExpired = status == 401 || hist.optBoolean("session_expired"),
+                        )
+                    }
                     return@launch
                 }
                 if (path != ChatLive.HISTORY && chatCacheable(hist) &&
@@ -1665,15 +1710,10 @@ class DashboardFragment : Fragment() {
         val path = "/api/express/$code"
         val ctx = context ?: return
         try {
-            val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
-            val fromCache = cached?.optJSONObject("land")
-            if (fromCache != null) {
-                if (!fromCache.has("code")) fromCache.put("code", code)
-                landsByCode[code] = fromCache
-                VinorLandCardCache.put(code, fromCache)
-                if (withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) return
-            }
             val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
+            if (PartnerApi.isSessionExpired(obj) || obj.optInt("http_status") == 401 || obj.optInt("http_status") == 403) {
+                return
+            }
             val land = obj.optJSONObject("land") ?: return
             if (!land.has("code")) land.put("code", code)
             landsByCode[code] = land
@@ -1850,9 +1890,20 @@ class DashboardFragment : Fragment() {
                 }
                 if (_binding == null || currentAccountKey() != account) return@launch
                 val http = resp.optInt("http_status")
-                if (http == 401 || http == 403) {
+                if (http == 401 || http == 403 || resp.optBoolean("session_expired")) {
+                    if ((http == 401 || resp.optBoolean("session_expired")) && toSend != null) {
+                        pendingAttachment = toSend
+                        showAttachPreview(
+                            toSend.optString("kind"),
+                            toSend.optString("name"),
+                            toSend.optLong("size"),
+                            uploading = false,
+                        )
+                    }
                     releaseChatAccount()
-                    (activity as? MainActivity)?.requireChatLogin()
+                    (activity as? MainActivity)?.requireChatLogin(
+                        sessionExpired = http == 401 || resp.optBoolean("session_expired"),
+                    )
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {

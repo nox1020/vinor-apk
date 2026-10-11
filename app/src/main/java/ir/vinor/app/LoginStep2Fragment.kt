@@ -161,9 +161,9 @@ class LoginStep2Fragment : Fragment() {
                 val success = obj.optBoolean("success", false) == true
 
                 withContext(Dispatchers.Main) {
-                    binding.loginStep2Progress.visibility = View.GONE
-                    binding.loginStep2Submit.isEnabled = true
-                    if (_binding == null) return@withContext
+                    val b = _binding ?: return@withContext
+                    b.loginStep2Progress.visibility = View.GONE
+                    b.loginStep2Submit.isEnabled = true
                     if (success) {
                         unregisterSmsReceiver()
                         PartnerApi.markLoggedIn()
@@ -178,15 +178,17 @@ class LoginStep2Fragment : Fragment() {
                         val host = activity
                         if (host is MainActivity) {
                             host.requestNotificationPermission()
-                            host.openPartnerHome()
                             val openedLink = host.consumePendingDeepLink()
                             if (ConsultantResume.consume(host)) {
+                                AuthReturnStore.clear(host)
                                 host.clearChatResume()
                                 host.openConsultantOnboarding()
-                            } else if (!openedLink) {
-                                host.openChatIfResumed()
-                            } else {
+                            } else if (openedLink) {
+                                AuthReturnStore.clear(host)
                                 host.clearChatResume()
+                            } else {
+                                if (!host.consumeAuthReturn()) host.openPartnerHome()
+                                host.openChatIfResumed()
                             }
                             return@withContext
                         }
@@ -200,21 +202,20 @@ class LoginStep2Fragment : Fragment() {
                         }
                     } else {
                         otpFilled = false
-                        binding.loginStep2Error.text =
+                        b.loginStep2Error.text =
                             obj.optString("error", getString(R.string.login_otp_wrong))
-                        binding.loginStep2Error.visibility = View.VISIBLE
+                        b.loginStep2Error.visibility = View.VISIBLE
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "verify error", e)
                 withContext(Dispatchers.Main) {
-                    binding.loginStep2Progress.visibility = View.GONE
-                    binding.loginStep2Submit.isEnabled = true
+                    val b = _binding ?: return@withContext
+                    b.loginStep2Progress.visibility = View.GONE
+                    b.loginStep2Submit.isEnabled = true
                     otpFilled = false
-                    if (_binding != null) {
-                        binding.loginStep2Error.text = getString(R.string.login_network_error)
-                        binding.loginStep2Error.visibility = View.VISIBLE
-                    }
+                    b.loginStep2Error.text = getString(R.string.login_network_error)
+                    b.loginStep2Error.visibility = View.VISIBLE
                 }
             }
         }

@@ -132,6 +132,10 @@ class LandDetailFragment : Fragment() {
                     bindLand(code, data)
                 }
                 if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(obj)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
                 if (!obj.optBoolean("ok") && obj.optString("title").isBlank()) {
                     binding.landDetailError.isVisible = true
                     binding.landDetailError.text = obj.optString("error", "آگهی پیدا نشد.")
