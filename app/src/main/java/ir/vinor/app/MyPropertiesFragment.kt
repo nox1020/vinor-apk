@@ -1,12 +1,12 @@
 package ir.vinor.app
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -27,7 +27,6 @@ class MyPropertiesFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var skipNextResumeLoad = true
-    private var openedForm = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -41,17 +40,15 @@ class MyPropertiesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.mpHeader.pageTitle.text = "ملک من"
+        binding.mpHeader.pageTitle.text = "آگهی‌های من"
         binding.mpHeader.pageBack.setOnClickListener {
-            if (!findNavController().navigateUp()) {
-                (activity as? MainActivity)?.openPartnerHome()
-            }
+            (activity as? MainActivity)?.returnToVinorMan() ?: findNavController().navigateUp()
         }
         val add = ImageButton(requireContext()).apply {
             setImageResource(R.drawable.ic_add)
-            background = null
+            setBackgroundResource(R.drawable.bg_header_orb)
             imageTintList = android.content.res.ColorStateList.valueOf(
-                androidx.core.content.ContextCompat.getColor(context, R.color.vinor_text),
+                ContextCompat.getColor(context, R.color.vinor_text),
             )
             contentDescription = "ثبت ملک"
             setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -63,8 +60,10 @@ class MyPropertiesFragment : Fragment() {
             add,
             ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
         )
-        binding.mpRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
-        binding.mpRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
+        binding.mpRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_primary_red))
+        binding.mpRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(requireContext(), R.color.vinor_raised),
+        )
         binding.mpRefresh.setOnRefreshListener { load(true) }
         binding.mpEmptyCta.setOnClickListener {
             (activity as? MainActivity)?.openOwnerHomeForm()
@@ -98,7 +97,7 @@ class MyPropertiesFragment : Fragment() {
         scope.launch {
             if (!forceNet) {
                 val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(PATH, ctx) }
-                if (_binding != null && cached != null) bind(cached, fromNetwork = false)
+                if (_binding != null && cached != null) bind(cached)
                 else _binding?.mpRefresh?.isRefreshing = true
                 if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }) {
                     _binding?.mpRefresh?.isRefreshing = false
@@ -113,10 +112,14 @@ class MyPropertiesFragment : Fragment() {
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                bind(fresh, fromNetwork = true)
-            } catch (e: Exception) {
+                bind(fresh)
+            } catch (_: Exception) {
                 if (_binding != null && !binding.mpContent.isVisible) {
-                    Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                    com.google.android.material.snackbar.Snackbar.make(
+                        binding.root,
+                        "اتصال برقرار نشد",
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG,
+                    ).show()
                 }
             } finally {
                 _binding?.mpRefresh?.isRefreshing = false
@@ -124,7 +127,7 @@ class MyPropertiesFragment : Fragment() {
         }
     }
 
-    private fun bind(obj: JSONObject, fromNetwork: Boolean = true) {
+    private fun bind(obj: JSONObject) {
         val items = obj.optJSONArray("items") ?: obj.optJSONArray("listings") ?: JSONArray()
         val has = items.length() > 0 || (
             obj.optBoolean("has_property", false) &&
@@ -134,13 +137,6 @@ class MyPropertiesFragment : Fragment() {
         if (items.length() == 0 && !has) {
             binding.mpContent.isVisible = false
             binding.mpEmpty.isVisible = true
-            if (fromNetwork && !openedForm) {
-                openedForm = true
-                binding.root.post {
-                    if (_binding == null) return@post
-                    (activity as? MainActivity)?.openOwnerHomeForm()
-                }
-            }
             return
         }
         binding.mpEmpty.isVisible = false

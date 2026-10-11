@@ -356,7 +356,11 @@ class MyPropertyManageFragment : Fragment() {
                     )
                 }
                 val land = if (fresh.optBoolean("ok")) {
-                    withContext(Dispatchers.IO) { PartnerApi.get(MyPropertyManage.landDataPath(code), ctx) }
+                    withContext(Dispatchers.IO) {
+                        val path = MyPropertyManage.landDataPath(code)
+                        PartnerApi.forget(path, ctx)
+                        PartnerApi.get(path, ctx)
+                    }
                 } else {
                     null
                 }

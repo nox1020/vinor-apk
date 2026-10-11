@@ -176,11 +176,14 @@ object SearchAds {
         return number.toLongOrNull()?.takeIf { it in 1..1_000_000 }
     }
 
-    /** قیمت کارت. عدد خام تومان می‌شود؛ «توافقی» و متن آماده دست نمی‌خورند. */
+    /**
+     * قیمت کارت. فقط مبلغ صحیح خام قالب می‌شود: رقم فارسی/عربی/لاتین و جداکنندهٔ هزارگان.
+     * واحد، ممیز، یا هر حرف دیگری همان متن سرور می‌ماند.
+     */
     fun cardPrice(raw: String): String {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return "توافقی"
-        if ("توافقی" in trimmed || "تومان" in trimmed) return trimmed
+        if (!pureIntegerAmount(trimmed)) return trimmed
         val amount = parseToman(trimmed) ?: return trimmed
         return PartnerFormat.toman(amount) + " تومان"
     }
@@ -197,9 +200,10 @@ object SearchAds {
     /** محلهٔ کارت: شهر و منطقه، بدون تکرار. عبارت زمانی سرور همان‌طور می‌ماند. */
     fun cardPlace(ad: SearchAd): String {
         val loc = ad.location.trim()
-        if (loc.isNotEmpty() && (loc.contains("پیش") || loc.contains("ساعت") || loc.contains("هفته"))) {
+        if (loc.isNotEmpty() && (standaloneWord(loc, "پیش") || loc.contains("ساعت") || loc.contains("هفته"))) {
             return loc
         }
+        if (keepLocationText(ad, loc)) return loc
         val town = ad.city.trim()
         val hood = ad.district.trim().ifBlank { districtFromLocation(loc) }.ifBlank {
             loc.removePrefix("در ").trim()
@@ -218,13 +222,102 @@ object SearchAds {
         }
     }
 
+    /**
+     * محله بعد از «در» به‌صورت واژهٔ جدا: ابتدای متن یا پس از فاصله/نشانه، و بعدش فاصله.
+     * «بندر عباس» برش نمی‌خورد؛ بدون تطبیق درست خالی می‌ماند تا متن محل دست نخورد.
+     */
     fun districtFromLocation(location: String): String {
         val loc = location.trim()
         if (loc.isEmpty()) return ""
-        val key = "در "
-        val at = loc.lastIndexOf(key)
-        if (at < 0) return ""
-        return loc.substring(at + key.length).trim()
+        val rest = textAfterStandaloneDar(loc)
+        return rest?.trim().orEmpty()
+    }
+
+    /** رقم و جداکنندهٔ هزارگان (٬ ، , و فاصله). ممیز و حرف قبول نیست. */
+    private fun pureIntegerAmount(text: String): Boolean {
+        var digits = 0
+        for (ch in text) {
+            when {
+                ch in '0'..'9' || ch in '۰'..'۹' || ch in '٠'..'٩' -> digits++
+                ch == ',' || ch == '،' || ch == '٬' || ch.isWhitespace() -> Unit
+                else -> return false
+            }
+        }
+        return digits > 0
+    }
+
+    /** «پیش» و مانند آن فقط واژهٔ جدا هستند، نه ابتدای «پیشوا». */
+    private fun standaloneWord(text: String, word: String): Boolean {
+        var from = 0
+        while (from <= text.length - word.length) {
+            val at = text.indexOf(word, from)
+            if (at < 0) return false
+            val beforeOk = at == 0 || isWordBoundary(text[at - 1])
+            val after = at + word.length
+            val afterOk = after >= text.length || isWordBoundary(text[after])
+            if (beforeOk && afterOk) return true
+            from = at + 1
+        }
+        return false
+    }
+
+    /**
+     * اگر «در» فقط داخل واژه آمده (مثل «بندر عباس») محله‌ای در کار نیست
+     * و کارت همان متن محل را نشان می‌دهد.
+     */
+    private fun keepLocationText(ad: SearchAd, loc: String): Boolean {
+        if (loc.isEmpty() || ad.district.isNotBlank()) return false
+        if (textAfterStandaloneDar(loc) != null) return false
+        return darFollowedBySpace(loc)
+    }
+
+    /** انتهای محله بعد از آخرین «در» جدا. بدون تطبیق درست null. */
+    private fun textAfterStandaloneDar(loc: String): String? {
+        val word = "در"
+        var startOfRest = -1
+        var from = 0
+        while (from <= loc.length - word.length) {
+            val at = loc.indexOf(word, from)
+            if (at < 0) break
+            val beforeOk = at == 0 || isWordBoundary(loc[at - 1])
+            val after = at + word.length
+            if (beforeOk && after < loc.length && loc[after].isWhitespace()) {
+                var rest = after + 1
+                while (rest < loc.length && loc[rest].isWhitespace()) rest++
+                if (rest < loc.length) startOfRest = rest
+            }
+            from = at + 1
+        }
+        if (startOfRest < 0) return null
+        return loc.substring(startOfRest)
+    }
+
+    private fun darFollowedBySpace(loc: String): Boolean {
+        val word = "در"
+        var from = 0
+        while (from <= loc.length - word.length) {
+            val at = loc.indexOf(word, from)
+            if (at < 0) return false
+            val after = at + word.length
+            if (after < loc.length && loc[after].isWhitespace()) return true
+            from = at + 1
+        }
+        return false
+    }
+
+    private fun isWordBoundary(ch: Char): Boolean {
+        if (ch.isWhitespace()) return true
+        return when (ch.category) {
+            CharCategory.DASH_PUNCTUATION,
+            CharCategory.START_PUNCTUATION,
+            CharCategory.END_PUNCTUATION,
+            CharCategory.CONNECTOR_PUNCTUATION,
+            CharCategory.OTHER_PUNCTUATION,
+            CharCategory.INITIAL_QUOTE_PUNCTUATION,
+            CharCategory.FINAL_QUOTE_PUNCTUATION,
+            -> true
+            else -> false
+        }
     }
 
     fun norm(raw: String): String {

@@ -74,6 +74,20 @@ class MyPropertyManageTest {
         assertFalse(MyPropertyManage.unpublishStopped(ok, stillLive))
         assertFalse(MyPropertyManage.unpublishStopped(ok, null))
         assertTrue(MyPropertyManage.unpublishStopped(ok, stopped))
+        val cachedLive = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("from_cache", true)
+            .put("published_for_sale", true)
+        val proved = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("code", "4")
+            .put("items", JSONArray().put(JSONObject().put("code", "4").put("published_for_sale", false)))
+        assertFalse(MyPropertyManage.unpublishStopped(ok, cachedLive))
+        assertTrue(MyPropertyManage.unpublishStopped(proved, null))
+        assertTrue(MyPropertyManage.unpublishStopped(proved, cachedLive))
+        assertFalse(MyPropertyManage.unpublishStopped(proved, stillLive))
     }
 
     @Test
