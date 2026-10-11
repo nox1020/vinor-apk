@@ -20,6 +20,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -128,6 +129,10 @@ class DashboardFragment : Fragment() {
         binding.dashboardAttachFile.setOnClickListener { onAttachKind("file") }
         binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
+        binding.dashboardHero.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (_binding == null) return@addOnLayoutChangeListener
+            placeHeroLabel()
+        }
         binding.dashboardBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
         binding.dashboardHomeAvatar.setOnClickListener { (activity as? MainActivity)?.openProfile() }
         PartnerImages.roundClip(binding.dashboardHomeAvatar, 20f)
@@ -1418,7 +1423,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardHeroStart.isVisible = !customer
         if (!customer) binding.dashboardHeroStart.text = "ادامه"
         binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
-        binding.dashboardHeroTitle.gravity = if (customer) Gravity.CENTER else Gravity.START
+        alignHeroLabel(customer)
         if (customer) {
             binding.dashboardHeroTitle.maxLines = 1
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
@@ -1498,6 +1503,55 @@ class DashboardFragment : Fragment() {
                     (activity as? MainActivity)?.openConsultantOnboarding()
                 href.isNotBlank() -> openVinorOrExternal(href)
                 else -> runPromptOr(prompt, fallbackAction)
+            }
+        }
+    }
+
+    private var heroLabelCentered = true
+
+    /** «مشتری دارم» روی کل دکمه وسط می‌ماند؛ آیکون کناری مرکز متن را جابه‌جا نمی‌کند. */
+    private fun alignHeroLabel(customer: Boolean) {
+        heroLabelCentered = customer
+        val title = binding.dashboardHeroTitle
+        val body = binding.dashboardHeroBody
+        val lp = body.layoutParams as FrameLayout.LayoutParams
+        lp.width = FrameLayout.LayoutParams.MATCH_PARENT
+        lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
+        lp.gravity = if (customer) Gravity.CENTER else Gravity.CENTER_VERTICAL
+        body.layoutParams = lp
+        body.gravity = if (customer) Gravity.CENTER else Gravity.CENTER_VERTICAL or Gravity.START
+        if (customer) {
+            title.gravity = Gravity.CENTER
+            title.textAlignment = View.TEXT_ALIGNMENT_CENTER
+            title.includeFontPadding = false
+        } else {
+            title.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            title.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            title.includeFontPadding = true
+            val gap = (12 * resources.displayMetrics.density).toInt()
+            val reserve = (binding.dashboardHeroChip.width.takeIf { it > 0 }
+                ?: (96 * resources.displayMetrics.density).toInt()) + gap
+            body.setPaddingRelative(reserve, 0, 0, 0)
+        }
+        placeHeroLabel()
+    }
+
+    /** حاشیهٔ متقارن دور متن تا وسط هندسی دکمه همان وسط کلمه بماند. */
+    private fun placeHeroLabel() {
+        val body = _binding?.dashboardHeroBody ?: return
+        val chip = binding.dashboardHeroChip
+        val density = resources.displayMetrics.density
+        if (heroLabelCentered) {
+            val gap = (8 * density).toInt()
+            val chipWidth = chip.width.takeIf { it > 0 } ?: (50 * density).toInt()
+            val side = chipWidth + gap
+            if (body.paddingStart != side || body.paddingEnd != side) {
+                body.setPaddingRelative(side, 0, side, 0)
+            }
+        } else if (chip.width > 0) {
+            val reserve = chip.width + (12 * density).toInt()
+            if (body.paddingStart != reserve || body.paddingEnd != 0) {
+                body.setPaddingRelative(reserve, 0, 0, 0)
             }
         }
     }

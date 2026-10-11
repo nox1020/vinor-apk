@@ -597,7 +597,7 @@
                         </HorizontalScrollView>
                     </LinearLayout>
 
-                    <LinearLayout
+                    <FrameLayout
                         android:id="@+id/dashboardHero"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -607,49 +607,16 @@
                         android:clickable="true"
                         android:contentDescription="مشتری دارم"
                         android:focusable="true"
-                        android:gravity="center_vertical"
                         android:layoutDirection="rtl"
                         android:minHeight="76dp"
-                        android:orientation="horizontal"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="10dp">
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:id="@+id/dashboardHeroBody"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layoutDirection="ltr"
-                            android:background="@drawable/bg_customer_start"
-                            android:gravity="center_vertical"
-                            android:minHeight="48dp"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="14dp"
-                            android:paddingVertical="8dp">
-
-                            <ImageView
-                                android:id="@+id/dashboardHeroIcon"
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:contentDescription=""
-                                android:importantForAccessibility="no"
-                                android:src="@drawable/ic_customer_plus" />
-
-                            <TextView
-                                android:id="@+id/dashboardHeroStart"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:fontFamily="@font/vazirmatn_bold"
-                                android:text="ادامه"
-                                android:textColor="@color/vinor_customer_bg"
-                                android:textSize="15sp"
-                                android:visibility="gone" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
+                            android:layout_gravity="center"
                             android:gravity="center"
                             android:orientation="vertical">
 
@@ -669,10 +636,13 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:ellipsize="end"
+                                android:fallbackLineSpacing="false"
                                 android:fontFamily="@font/vazirmatn_bold"
                                 android:gravity="center"
+                                android:includeFontPadding="false"
                                 android:maxLines="1"
                                 android:text="مشتری دارم"
+                                android:textAlignment="center"
                                 android:textColor="@color/vinor_on_primary"
                                 android:textSize="26sp" />
 
@@ -700,7 +670,41 @@
                                 android:textStyle="bold"
                                 android:visibility="gone" />
                         </LinearLayout>
-                    </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/dashboardHeroChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_vertical|start"
+                            android:layoutDirection="ltr"
+                            android:background="@drawable/bg_customer_start"
+                            android:gravity="center"
+                            android:minHeight="48dp"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="8dp">
+
+                            <ImageView
+                                android:id="@+id/dashboardHeroIcon"
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:contentDescription=""
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_customer_plus" />
+
+                            <TextView
+                                android:id="@+id/dashboardHeroStart"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:fontFamily="@font/vazirmatn_bold"
+                                android:includeFontPadding="false"
+                                android:text="ادامه"
+                                android:textColor="@color/vinor_customer_bg"
+                                android:textSize="15sp"
+                                android:visibility="gone" />
+                        </LinearLayout>
+                    </FrameLayout>
 
                     <LinearLayout
                         android:id="@+id/dashboardTiles"
