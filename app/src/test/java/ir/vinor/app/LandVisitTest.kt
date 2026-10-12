@@ -107,12 +107,49 @@ class LandVisitTest {
     }
 
     @Test
-    fun successKeepsAnAlreadySentMessage() {
+    fun statusOpensTheFormWithoutTheRemovedHtmlButton() {
+        val status = JSONObject()
+            .put("success", true)
+            .put("http_status", 200)
+            .put("tx_mode", "visit")
+            .put("visit_date_min", "2026-10-12")
+            .put("visit_allowed_hours", org.json.JSONArray().put(18))
+            .put("visit_allowed_weekdays", org.json.JSONArray().put(6))
+        val ready = LandVisit.decide("12", status) as LandVisit.Outcome.Ready
+        assertEquals("/express/partner/visit-requests/12", ready.schedule.requestUrl)
+        assertEquals(listOf(18), ready.schedule.hours)
+        assertEquals(setOf(6), ready.schedule.weekdays)
+        assertTrue(LandVisit.canSchedule("visit_no_show", true))
+        assertFalse(LandVisit.canSchedule("visit_no_show", false))
+        val hidden = LandVisit.decide(
+            "12",
+            JSONObject().put("success", true).put("http_status", 200).put("tx_mode", "hidden"),
+        ) as LandVisit.Outcome.Blocked
+        assertTrue(hidden.message.contains("تأیید"))
+        assertTrue(LandVisit.decide("12", JSONObject().put("offline", true).put("http_status", 0)) is LandVisit.Outcome.Offline)
+        assertTrue(
+            LandVisit.decide("12", JSONObject().put("http_status", 401).put("error", "unauthorized"))
+                is LandVisit.Outcome.Login,
+        )
+    }
+
+    @Test
+    fun successKeepsTheServerMessageAndAShiftedDay() {
         assertEquals(LandVisit.SENT, LandVisit.successMessage(JSONObject().put("success", true)))
         assertEquals(
             "این بازدید قبلاً ثبت شده",
             LandVisit.successMessage(JSONObject().put("message", "این بازدید قبلاً ثبت شده")),
         )
+        val already = "این بازدید از قبل ثبت شده. برای هماهنگی با 09121471301 تماس بگیر"
+        assertEquals(already, LandVisit.successMessage(JSONObject().put("message", already), "2026-10-12"))
+        val shifted = LandVisit.successMessage(
+            JSONObject()
+                .put("message", "بازدید ثبت شد")
+                .put("visit_date", "2026-10-13")
+                .put("visit_date_jalali", "۲۱ مهر"),
+            "2026-10-12",
+        )
+        assertTrue(shifted.contains("۲۱ مهر"))
         assertFalse(LandVisit.isOk(JSONObject().put("success", false).put("message", "تاریخ نامعتبر است")))
         assertFalse(LandVisit.isOk(JSONObject().put("message", "تمام")))
         assertTrue(LandVisit.isOk(JSONObject().put("success", true)))
