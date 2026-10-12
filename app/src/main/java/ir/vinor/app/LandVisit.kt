@@ -74,7 +74,7 @@ object LandVisit {
     /**
      * وضعیت معامله همان منبع تقویم است. صفحهٔ HTML جزئیات دیگر آدرس ثبت را ندارد.
      */
-    fun decide(landCode: String, status: JSONObject?): Outcome {
+    fun decide(landCode: String, status: JSONObject?, page: Schedule? = null): Outcome {
         val obj = status ?: JSONObject()
         if (obj.optBoolean("offline") || obj.optInt("http_status") == 0) return Outcome.Offline
         if (needsLogin(obj)) return Outcome.Login
@@ -86,12 +86,21 @@ object LandVisit {
                 Outcome.Unavailable
             }
         }
-        val schedule = fromStatus(landCode, obj)
+        val schedule = withPageCalendar(fromStatus(landCode, obj), obj, page)
         if (!canSchedule(schedule.mode, schedule.canRevisit)) {
             return Outcome.Blocked(blockedMessage(schedule))
         }
         if (schedule.requestUrl.isBlank()) return Outcome.Unavailable
         return Outcome.Ready(schedule)
+    }
+
+    /** فیلد نبودن با لیست خالی فرق دارد؛ خالی یعنی محدودیتی در آن محور نیست. */
+    fun needsPageCalendar(status: JSONObject?): Boolean {
+        val obj = status ?: return true
+        if (!obj.optBoolean("success")) return false
+        return !obj.has("visit_date_min") ||
+            !obj.has("visit_allowed_weekdays") ||
+            !obj.has("visit_allowed_hours")
     }
 
     fun fromStatus(landCode: String, status: JSONObject): Schedule {
@@ -104,9 +113,29 @@ object LandVisit {
             canRevisit = if (status.has("can_revisit")) status.optBoolean("can_revisit") else false,
             visitDate = status.optString("visit_date").trim(),
             visitDateJalali = status.optString("visit_date_jalali").trim(),
-            minDate = status.optString("visit_date_min").trim(),
-            weekdays = intSet(status.optJSONArray("visit_allowed_weekdays")),
-            hours = intList(status.optJSONArray("visit_allowed_hours")),
+            minDate = if (status.has("visit_date_min")) status.optString("visit_date_min").trim() else "",
+            weekdays = if (status.has("visit_allowed_weekdays")) {
+                intSet(status.optJSONArray("visit_allowed_weekdays"))
+            } else {
+                emptySet()
+            },
+            hours = if (status.has("visit_allowed_hours")) {
+                intList(status.optJSONArray("visit_allowed_hours"))
+            } else {
+                emptyList()
+            },
+        )
+    }
+
+    /** فیلد غایب از tx-status از landDetailConfig صفحه می‌آید تا همهٔ روزها باز نمانند. */
+    fun withPageCalendar(schedule: Schedule, status: JSONObject, page: Schedule?): Schedule {
+        if (page == null) return schedule
+        return schedule.copy(
+            requestUrl = schedule.requestUrl.ifBlank { page.requestUrl },
+            csrf = schedule.csrf.ifBlank { page.csrf },
+            minDate = if (status.has("visit_date_min")) schedule.minDate else page.minDate,
+            weekdays = if (status.has("visit_allowed_weekdays")) schedule.weekdays else page.weekdays,
+            hours = if (status.has("visit_allowed_hours")) schedule.hours else page.hours,
         )
     }
 
