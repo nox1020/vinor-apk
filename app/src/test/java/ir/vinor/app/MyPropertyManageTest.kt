@@ -65,6 +65,19 @@ class MyPropertyManageTest {
     }
 
     @Test
+    fun unpublishFailure_explainsStaleServerWhenAlreadyPublished() {
+        val stale = JSONObject()
+            .put("ok", false)
+            .put("http_status", 400)
+            .put("error_code", "already_published")
+            .put("error", "این ملک قبلاً برای فروش منتشر شده است.")
+        assertEquals(
+            "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود",
+            MyPropertyManage.unpublishFailure(stale, "توقف انتشار ناموفق بود."),
+        )
+    }
+
+    @Test
     fun unpublishStopped_requiresServerToClearTheFlag() {
         val ok = JSONObject().put("ok", true).put("http_status", 200)
         val missingRoute = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
