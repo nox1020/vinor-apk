@@ -16,6 +16,7 @@ object MyPropertyManage {
     const val DELETE_PATH = "/express/partner/api/my-property/delete"
     /** همان مسیر انتشار؛ توقف با published_for_sale=false. مسیر جداگانه روی سرور نیست. */
     const val UNPUBLISH_PATH = "$PUBLISH_PATH?published_for_sale=0"
+    const val STALE_UNPUBLISH = "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود"
 
     enum class Action {
         VIEW,
@@ -303,13 +304,22 @@ object MyPropertyManage {
         return true
     }
 
-    /** اگر پاسخ سرور موفق باشد ولی وضعیت ملک عوض نشده، پیام موفقیت نشان داده نمی‌شود. */
+    /**
+     * توقف انجام نشده.
+     * پاسخ موفق انتشار، خطای «قبلاً منتشر شده»، یا ۴۰۴ یعنی سرور کهنه درخواست را
+     * به‌جای توقف، انتشار دیده است. خطای مشخص مثل نحوهٔ پرداخت همان متن سرور می‌ماند.
+     */
     fun unpublishFailure(post: JSONObject, fallback: String): String {
-        if (post.optString("error_code") == "already_published") {
-            return "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود"
-        }
-        if (post.optBoolean("ok")) return fallback
-        return failureMessage(post, fallback)
+        if (staleUnpublishServer(post) || post.optBoolean("ok")) return STALE_UNPUBLISH
+        val detail = failureMessage(post, fallback)
+        if (detail.isBlank() || detail == fallback) return STALE_UNPUBLISH
+        return detail
+    }
+
+    private fun staleUnpublishServer(post: JSONObject): Boolean {
+        if (post.optString("error_code") == "already_published") return true
+        val err = post.optString("error").trim()
+        return err.contains("قبلاً برای فروش منتشر شده")
     }
 
     /** پاسخ «قبلاً منتشر شده» یعنی آگهی روی سرور روشن است و صفحه باید همان را نشان دهد. */
