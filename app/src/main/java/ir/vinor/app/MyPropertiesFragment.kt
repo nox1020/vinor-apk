@@ -95,7 +95,7 @@ class MyPropertiesFragment : Fragment() {
         val ctx = context ?: return
         if (!PartnerApi.hasSession()) {
             binding.mpRefresh.isRefreshing = false
-            clearRemembered()
+            ListingMemory.clearSession()
             (activity as? MainActivity)?.openLogin()
             return
         }
@@ -113,14 +113,14 @@ class MyPropertiesFragment : Fragment() {
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (VinorPageLoad.needsLogin(fresh)) {
-                    clearRemembered()
+                    ListingMemory.clearSession()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
                 if (acceptable(fresh)) {
                     bind(fresh)
                     rendered = true
-                    if (VinorPageLoad.canRemember(fresh)) remembered = VinorPageLoad.rememberedCopy(fresh)
+                    remember(fresh)
                 }
                 if (rendered && VinorPageLoad.networkFailed(wasFresh, fresh)) {
                     VinorPageLoad.showOffline(binding.root) { load(showSpinner = true) }
@@ -214,5 +214,12 @@ class MyPropertiesFragment : Fragment() {
             remembered = null
             sessionStamp++
         }
+
+        internal fun remember(obj: JSONObject) {
+            if (!VinorPageLoad.canRemember(obj)) return
+            remembered = VinorPageLoad.rememberedCopy(obj)
+        }
+
+        internal fun peekRemembered(): JSONObject? = remembered
     }
 }

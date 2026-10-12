@@ -159,7 +159,7 @@ class LandDetailFragment : Fragment() {
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (VinorPageLoad.needsLogin(obj)) {
-                    clearRemembered()
+                    ListingMemory.clearSession()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
@@ -167,7 +167,7 @@ class LandDetailFragment : Fragment() {
                     bindLand(code, obj)
                     rendered = true
                     binding.landDetailError.isVisible = false
-                    if (VinorPageLoad.canRemember(obj)) remembered[code] = VinorPageLoad.rememberedCopy(obj)
+                    remember(code, obj)
                 }
                 when {
                     rendered && VinorPageLoad.networkFailed(wasFresh, obj) ->
@@ -755,8 +755,7 @@ class LandDetailFragment : Fragment() {
                 val land = if (fresh.optBoolean("ok")) {
                     withContext(Dispatchers.IO) {
                         val path = apiPath(code)
-                        PartnerApi.forget(path, ctx)
-                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                        ListingMemory.invalidateLand(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
                 } else {
@@ -866,6 +865,19 @@ class LandDetailFragment : Fragment() {
 
         fun clearRemembered() {
             remembered.clear()
+            sessionStamp++
+        }
+
+        internal fun remember(code: String, obj: JSONObject) {
+            val clean = code.trim()
+            if (clean.isEmpty() || !VinorPageLoad.canRemember(obj)) return
+            remembered[clean] = VinorPageLoad.rememberedCopy(obj)
+        }
+
+        internal fun peekRemembered(code: String): JSONObject? = remembered[code.trim()]
+
+        internal fun dropRemembered(code: String) {
+            remembered.remove(code.trim())
             sessionStamp++
         }
     }
