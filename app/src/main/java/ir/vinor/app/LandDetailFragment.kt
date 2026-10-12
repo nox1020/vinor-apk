@@ -205,7 +205,7 @@ class LandDetailFragment : Fragment() {
         bindBody(obj.optString("description").ifBlank { obj.optString("body") })
         bindRows(rows)
         bindSticky(code, obj, audience, isDivar, published)
-        bindPublish(code, obj, hasSession, isMine, published)
+        bindPublish(code, obj, hasSession)
     }
 
     private fun bindSticky(
@@ -658,84 +658,22 @@ class LandDetailFragment : Fragment() {
         code: String,
         obj: JSONObject,
         hasSession: Boolean,
-        isMine: Boolean,
-        publishedFlag: Boolean,
     ) {
         val canPublish = obj.optBoolean("can_publish")
-        val published = publishedFlag && isMine
-        binding.landDetailPublish.isVisible = LandDetailRole.showPublish(hasSession, canPublish, isMine, publishedFlag)
+        binding.landDetailPublish.isVisible = LandDetailRole.showPublish(hasSession, canPublish)
         binding.landDetailPayRow.isVisible = canPublish
         binding.landDetailCommissionRow.isVisible = canPublish
         binding.landDetailSendAll.isVisible = canPublish
-        if (published) {
-            binding.landDetailPayRow.isVisible = false
-            binding.landDetailCommissionRow.isVisible = false
-            binding.landDetailSendAll.isVisible = false
-            binding.landDetailPublishTitle.text = "توقف انتشار فروش"
-            binding.landDetailPublishHint.text = "با توقف، این ملک از آگهی‌های فروش برداشته می‌شود."
-            binding.landDetailPublishCta.isVisible = true
-            binding.landDetailPublishCta.text = "توقف انتشار فروش"
-            paintPublishCta(stop = true)
-            binding.landDetailPublishCta.setOnClickListener { stopPublish(code) }
-            return
-        }
-        if (!canPublish) {
-            binding.landDetailPublish.isVisible = false
-            return
-        }
+        if (!canPublish) return
         binding.landDetailPublishTitle.text = "انتشار برای فروش"
         binding.landDetailPublishHint.text = "بعد از انتشار، این ملک در آگهی‌های وینور دیده می‌شود."
         binding.landDetailPublishCta.isVisible = true
-        paintPublishCta(stop = false)
+        paintPublishCta()
         paintPayChips()
         binding.landDetailPayCash.setOnClickListener { selectedPayment = "نقدی"; paintPayChips() }
         binding.landDetailPayDeal.setOnClickListener { selectedPayment = "توافقی"; paintPayChips() }
         binding.landDetailPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paintPayChips() }
         binding.landDetailPublishCta.setOnClickListener { publish(code) }
-    }
-
-    private fun stopPublish(code: String) {
-        val ctx = context ?: return
-        if (publishing) return
-        publishing = true
-        binding.landDetailPublishCta.alpha = 0.6f
-        scope.launch {
-            try {
-                val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson(
-                        MyPropertyManage.UNPUBLISH_PATH,
-                        MyPropertyManage.unpublishBody(code, listing),
-                        ctx,
-                    )
-                }
-                val land = if (fresh.optBoolean("ok")) {
-                    withContext(Dispatchers.IO) {
-                        val path = apiPath(code)
-                        PartnerApi.forget(path, ctx)
-                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
-                        PartnerApi.get(path, ctx)
-                    }
-                } else {
-                    null
-                }
-                if (_binding == null) return@launch
-                if (MyPropertyManage.unpublishStopped(fresh, land)) {
-                    Toast.makeText(ctx, fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." }, Toast.LENGTH_SHORT).show()
-                    load(code)
-                } else {
-                    Toast.makeText(
-                        ctx,
-                        MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(ctx, e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
-            } finally {
-                publishing = false
-                _binding?.landDetailPublishCta?.alpha = 1f
-            }
-        }
     }
 
     private fun paintPayChips() {
@@ -843,15 +781,10 @@ class LandDetailFragment : Fragment() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun paintPublishCta(stop: Boolean) {
+    private fun paintPublishCta() {
         val cta = binding.landDetailPublishCta
-        if (stop) {
-            cta.setBackgroundResource(R.drawable.bg_ld_surface)
-            cta.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
-        } else {
-            cta.setBackgroundResource(R.drawable.bg_hub_start)
-            cta.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg))
-        }
+        cta.setBackgroundResource(R.drawable.bg_hub_start)
+        cta.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg))
     }
 
     private inner class GalleryAdapter(

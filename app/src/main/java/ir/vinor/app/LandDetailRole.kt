@@ -37,10 +37,8 @@ object LandDetailRole {
 
     fun showCommission(hasSession: Boolean, amount: Int): Boolean = hasSession && amount > 0
 
-    fun showPublish(hasSession: Boolean, canPublish: Boolean, isMine: Boolean, published: Boolean): Boolean {
-        if (!hasSession) return false
-        return canPublish || (published && isMine)
-    }
+    /** جزئیات فقط فرم انتشار را نشان می‌دهد. توقف انتشار در مدیریت ملک است. */
+    fun showPublish(hasSession: Boolean, canPublish: Boolean): Boolean = hasSession && canPublish
 
     fun badge(
         hasSession: Boolean,

@@ -17,7 +17,7 @@ class LandDetailRoleTest {
         assertEquals(LandDetailRole.StickyKind.LOGIN, sticky.kind)
         assertEquals("ورود برای گفتگو", sticky.label)
         assertFalse(LandDetailRole.showCommission(false, 2_000_000))
-        assertFalse(LandDetailRole.showPublish(false, true, true, true))
+        assertFalse(LandDetailRole.showPublish(false, true))
         assertFalse(LandDetailRole.showMeta(false, "تهران، تهرانپارس", "تهران · 2"))
         assertTrue(LandDetailRole.showMeta(false, "", "تهران · تهرانپارس"))
         assertEquals("", LandDetailRole.badge(false, false, false, "", true))
@@ -34,7 +34,7 @@ class LandDetailRoleTest {
         assertEquals("دیدن در دیوار", divar.label)
         assertTrue(LandDetailRole.showCommission(true, 1))
         assertFalse(LandDetailRole.showCommission(true, 0))
-        assertFalse(LandDetailRole.showPublish(true, false, false, true))
+        assertFalse(LandDetailRole.showPublish(true, false))
         assertEquals("دیوار", LandDetailRole.badge(true, false, true, "", false))
     }
 
@@ -49,8 +49,8 @@ class LandDetailRoleTest {
         assertEquals("", LandDetailRole.stickyHint(LandDetailRole.Audience.PARTNER, true))
         assertEquals("منتشرشده", LandDetailRole.badge(true, true, false, "", true))
         assertEquals("ویژه", LandDetailRole.badge(true, true, false, "ویژه", true))
-        assertTrue(LandDetailRole.showPublish(true, true, true, false))
-        assertTrue(LandDetailRole.showPublish(true, false, true, true))
+        assertTrue(LandDetailRole.showPublish(true, true))
+        assertFalse(LandDetailRole.showPublish(true, false))
         assertEquals("تهران، تهرانپارس", LandDetailRole.place("تهران", "تهرانپارس"))
         assertEquals("تهران", LandDetailRole.place("تهران", "تهران"))
     }
