@@ -191,7 +191,7 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (VinorPageLoad.needsLogin(fresh)) {
-                    clearRemembered()
+                    ListingMemory.clearSession()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
@@ -340,8 +340,7 @@ class MyPropertyManageFragment : Fragment() {
                 val land = if (fresh.optBoolean("ok")) {
                     withContext(Dispatchers.IO) {
                         val path = MyPropertyManage.landDataPath(code)
-                        PartnerApi.forget(path, ctx)
-                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                        ListingMemory.invalidateLand(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
                 } else {
@@ -349,6 +348,7 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
+                    ListingMemory.clearSession()
                     toast("برای این کار وارد شوید.")
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
@@ -391,8 +391,7 @@ class MyPropertyManageFragment : Fragment() {
                 val land = if (fresh.optBoolean("ok")) {
                     withContext(Dispatchers.IO) {
                         val path = MyPropertyManage.landDataPath(code)
-                        PartnerApi.forget(path, ctx)
-                        PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                        ListingMemory.invalidateLand(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
                 } else {
@@ -400,6 +399,7 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
+                    ListingMemory.clearSession()
                     toast("برای این کار وارد شوید.")
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
@@ -452,16 +452,16 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401 || fresh.optString("error") == "unauthorized") {
+                    ListingMemory.clearSession()
                     toast("برای این کار وارد شوید.")
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                PartnerApi.forget(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                ListingMemory.invalidateLand(code, ctx)
                 val list = withContext(Dispatchers.IO) {
                     PartnerApi.get(MyPropertyManage.PORTFOLIO_PATH, ctx)
                 }
                 if (MyPropertyManage.removedFromPortfolio(list, code)) {
-                    PartnerApi.forget(MyPropertyManage.landDataPath(code), ctx)
                     val note = fresh.optString("message").trim()
                     val announced = note.isNotBlank() &&
                         fresh.optString("error").isBlank() &&
@@ -491,6 +491,7 @@ class MyPropertyManageFragment : Fragment() {
                 val fresh = withContext(Dispatchers.IO) { PartnerApi.postJson(path, body, ctx) }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
+                    ListingMemory.clearSession()
                     toast("برای این کار وارد شوید.")
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
