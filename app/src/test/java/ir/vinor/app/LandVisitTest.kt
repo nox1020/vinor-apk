@@ -134,6 +134,62 @@ class LandVisitTest {
     }
 
     @Test
+    fun statusCalendarDisablesDaysAndHoursOutsideTheAllowedSet() {
+        val status = JSONObject()
+            .put("success", true)
+            .put("http_status", 200)
+            .put("tx_mode", "visit")
+            .put("visit_date_min", "2026-10-10")
+            .put("visit_allowed_weekdays", org.json.JSONArray().put(6))
+            .put("visit_allowed_hours", org.json.JSONArray().put(18))
+        assertFalse(LandVisit.needsPageCalendar(status))
+        val ready = LandVisit.decide("12", status) as LandVisit.Outcome.Ready
+        val (min, max) = LandVisit.bounds(ready.schedule.minDate, "2026-10-10")
+        assertTrue(LandVisit.allows("2026-10-10", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 15))
+        assertFalse(LandVisit.allows("2026-10-11", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 15))
+        assertFalse(LandVisit.allows("2026-10-10", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 18))
+        val cells = LandVisit.monthCells(
+            1405, 7, "", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 15,
+        )
+        assertFalse(cells.filterNotNull().single { it.iso == "2026-10-11" }.enabled)
+        assertTrue(cells.filterNotNull().single { it.iso == "2026-10-10" }.enabled)
+    }
+
+    @Test
+    fun missingCalendarFieldsUseThePageConfigInsteadOfEveryDay() {
+        val status = JSONObject()
+            .put("success", true)
+            .put("http_status", 200)
+            .put("tx_mode", "visit")
+        assertTrue(LandVisit.needsPageCalendar(status))
+        val page = LandVisit.parsePage(
+            """
+            <script id="landDetailConfig" type="application/json">
+            {"visitDateMin":"2026-10-10","visitAllowedWeekdays":[6],"visitAllowedHours":[18],"txMode":"visit"}
+            </script>
+            """.trimIndent(),
+        )
+        val ready = LandVisit.decide("12", status, page) as LandVisit.Outcome.Ready
+        val (min, max) = LandVisit.bounds(ready.schedule.minDate, "2026-10-10")
+        assertEquals(setOf(6), ready.schedule.weekdays)
+        assertEquals(listOf(18), ready.schedule.hours)
+        assertEquals("2026-10-10", ready.schedule.minDate)
+        assertFalse(LandVisit.allows("2026-10-11", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 10))
+        assertTrue(LandVisit.allows("2026-10-10", min, max, ready.schedule.weekdays, ready.schedule.hours, "2026-10-10", 10))
+        val richer = JSONObject()
+            .put("success", true)
+            .put("http_status", 200)
+            .put("tx_mode", "visit")
+            .put("visit_date_min", "2026-10-12")
+            .put("visit_allowed_weekdays", org.json.JSONArray().put(0))
+            .put("visit_allowed_hours", org.json.JSONArray().put(9))
+        val fromStatus = LandVisit.decide("12", richer, page) as LandVisit.Outcome.Ready
+        assertEquals(setOf(0), fromStatus.schedule.weekdays)
+        assertEquals(listOf(9), fromStatus.schedule.hours)
+        assertEquals("2026-10-12", fromStatus.schedule.minDate)
+    }
+
+    @Test
     fun successKeepsTheServerMessageAndAShiftedDay() {
         assertEquals(LandVisit.SENT, LandVisit.successMessage(JSONObject().put("success", true)))
         assertEquals(
