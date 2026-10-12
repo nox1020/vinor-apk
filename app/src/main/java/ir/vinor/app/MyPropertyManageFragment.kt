@@ -432,7 +432,7 @@ class MyPropertyManageFragment : Fragment() {
                     bindRows()
                     toast(fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." })
                 } else {
-                    toast(MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."))
+                    toast(MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."), long = true)
                 }
             } catch (e: Exception) {
                 toast(e.message ?: "توقف انتشار ناموفق بود.")
@@ -527,9 +527,9 @@ class MyPropertyManageFragment : Fragment() {
         }
     }
 
-    private fun toast(msg: String) {
+    private fun toast(msg: String, long: Boolean = false) {
         val ctx = context ?: return
-        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, msg, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
     }
 
     companion object {
