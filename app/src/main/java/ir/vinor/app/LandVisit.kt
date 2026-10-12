@@ -15,6 +15,7 @@ object LandVisit {
     const val SENT = "درخواست بازدید ارسال شد"
     const val UNAVAILABLE = "امکان ثبت درخواست بازدید برای این ملک وجود ندارد."
     const val NEED_DATE = "لطفاً تاریخ بازدید را انتخاب کنید."
+    const val CALENDAR_MISSING = "تقویم بازدید از سرور نیامد. دوباره تلاش کنید."
 
     data class Schedule(
         val requestUrl: String = "",
@@ -72,9 +73,9 @@ object LandVisit {
     }
 
     /**
-     * وضعیت معامله همان منبع تقویم است. صفحهٔ HTML جزئیات دیگر آدرس ثبت را ندارد.
+     * وضعیت معامله همان منبع تقویم است. صفحهٔ HTML جزئیات تقویم ندارد.
      */
-    fun decide(landCode: String, status: JSONObject?, page: Schedule? = null): Outcome {
+    fun decide(landCode: String, status: JSONObject?): Outcome {
         val obj = status ?: JSONObject()
         if (obj.optBoolean("offline") || obj.optInt("http_status") == 0) return Outcome.Offline
         if (needsLogin(obj)) return Outcome.Login
@@ -86,21 +87,21 @@ object LandVisit {
                 Outcome.Unavailable
             }
         }
-        val schedule = withPageCalendar(fromStatus(landCode, obj), obj, page)
+        val schedule = fromStatus(landCode, obj)
         if (!canSchedule(schedule.mode, schedule.canRevisit)) {
             return Outcome.Blocked(blockedMessage(schedule))
         }
+        if (!calendarReady(obj)) return Outcome.Blocked(CALENDAR_MISSING)
         if (schedule.requestUrl.isBlank()) return Outcome.Unavailable
         return Outcome.Ready(schedule)
     }
 
-    /** فیلد نبودن با لیست خالی فرق دارد؛ خالی یعنی محدودیتی در آن محور نیست. */
-    fun needsPageCalendar(status: JSONObject?): Boolean {
-        val obj = status ?: return true
-        if (!obj.optBoolean("success")) return false
-        return !obj.has("visit_date_min") ||
-            !obj.has("visit_allowed_weekdays") ||
-            !obj.has("visit_allowed_hours")
+    /** هر سه فیلد باید در JSON باشند. نبودن کلید به‌معنی «همهٔ روزها آزاد» نیست. */
+    fun calendarReady(status: JSONObject): Boolean {
+        if (!status.has("visit_date_min") || status.optString("visit_date_min").isBlank()) return false
+        if (!status.has("visit_allowed_weekdays")) return false
+        if (!status.has("visit_allowed_hours")) return false
+        return true
     }
 
     fun fromStatus(landCode: String, status: JSONObject): Schedule {
@@ -124,18 +125,6 @@ object LandVisit {
             } else {
                 emptyList()
             },
-        )
-    }
-
-    /** فیلد غایب از tx-status از landDetailConfig صفحه می‌آید تا همهٔ روزها باز نمانند. */
-    fun withPageCalendar(schedule: Schedule, status: JSONObject, page: Schedule?): Schedule {
-        if (page == null) return schedule
-        return schedule.copy(
-            requestUrl = schedule.requestUrl.ifBlank { page.requestUrl },
-            csrf = schedule.csrf.ifBlank { page.csrf },
-            minDate = if (status.has("visit_date_min")) schedule.minDate else page.minDate,
-            weekdays = if (status.has("visit_allowed_weekdays")) schedule.weekdays else page.weekdays,
-            hours = if (status.has("visit_allowed_hours")) schedule.hours else page.hours,
         )
     }
 

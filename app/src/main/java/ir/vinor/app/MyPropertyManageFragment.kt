@@ -126,7 +126,7 @@ class MyPropertyManageFragment : Fragment() {
                 row.itemProfileLinkTitle.setTextColor(error)
                 row.itemProfileLinkIcon.imageTintList = android.content.res.ColorStateList.valueOf(error)
             }
-            val spinning = publishBusy && action == MyPropertyManage.Action.PUBLISH
+            val spinning = MyPropertyManage.showPublishProgress(publishBusy) && action == MyPropertyManage.Action.PUBLISH
             row.itemProfileLinkProgress.isVisible = spinning
             row.itemProfileLinkChevron.isVisible = !spinning
             row.root.isEnabled = !busy
@@ -137,7 +137,7 @@ class MyPropertyManageFragment : Fragment() {
     }
 
     private fun onAction(action: MyPropertyManage.Action) {
-        if (busy) return
+        if (!MyPropertyManage.claimAction(busy)) return
         when (action) {
             MyPropertyManage.Action.VIEW -> openDetail()
             MyPropertyManage.Action.EDIT -> openEdit()
@@ -465,15 +465,25 @@ class MyPropertyManageFragment : Fragment() {
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                if (MyPropertyManage.deleteUnavailable(fresh)) {
+                if (MyPropertyManage.deleteRouteMissing(fresh)) {
                     deleteHidden = true
                     arguments?.putBoolean(ARG_DELETE_GONE, true)
                     bindRows()
                     toast("حذف آگهی در دسترس نیست.")
                     return@launch
                 }
+                if (MyPropertyManage.deleteNotFound(fresh)) {
+                    ListingMemory.invalidateLand(code, ctx)
+                    MyPropertiesFragment.clearRemembered()
+                    toast(fresh.optString("error").ifBlank { "این ملک پیدا نشد." })
+                    if (!findNavController().navigateUp()) {
+                        (activity as? MainActivity)?.openMyProperty()
+                    }
+                    return@launch
+                }
                 if (MyPropertyManage.deleteSucceeded(fresh)) {
                     ListingMemory.invalidateLand(code, ctx)
+                    MyPropertiesFragment.clearRemembered()
                     toast(fresh.optString("message").ifBlank { "ملک حذف شد." })
                     if (!findNavController().navigateUp()) {
                         (activity as? MainActivity)?.openMyProperty()
