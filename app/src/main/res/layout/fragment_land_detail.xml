@@ -247,7 +247,8 @@
                 android:fontFamily="@font/vazirmatn"
                 android:lineSpacingExtra="4dp"
                 android:textColor="@color/vinor_text"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/landDetailMore"

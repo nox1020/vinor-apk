@@ -50,6 +50,9 @@ class LandDetailFragment : Fragment() {
     private var galleryCount = 0
     private var visitSheet: BottomSheetDialog? = null
     private var visitBusy = false
+    private var loadGen = 0
+    private var rendered = false
+    private var skipNextResume = true
     private val pageCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageSelected(position: Int) {
             paintCounter(position)
@@ -65,6 +68,7 @@ class LandDetailFragment : Fragment() {
             job = Job()
             scope = CoroutineScope(Dispatchers.Main + job)
         }
+        skipNextResume = true
         _binding = FragmentLandDetailBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -90,7 +94,21 @@ class LandDetailFragment : Fragment() {
                 syncFav(code)
             }
         }
+        remembered[code]?.let {
+            bindLand(code, it)
+            rendered = true
+        }
         load(code)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        val code = listingCode
+        if (_binding != null && code.isNotBlank()) load(code)
     }
 
     private fun syncFav(code: String) {
@@ -124,32 +142,74 @@ class LandDetailFragment : Fragment() {
 
     private fun load(code: String) {
         val ctx = context ?: return
-        binding.landDetailProgress.isVisible = true
+        val path = apiPath(code)
+        if (!rendered) binding.landDetailProgress.isVisible = true
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                val obj = PartnerApi.loadDisplay(apiPath(code), ctx) { data ->
-                    if (_binding == null) return@loadDisplay
+                val obj = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                    if (!acceptable(data)) return@loadDisplay
                     bindLand(code, data)
+                    rendered = true
+                    binding.landDetailProgress.isVisible = false
+                    binding.landDetailError.isVisible = false
                 }
-                if (_binding == null) return@launch
-                if (PartnerApi.isSessionExpired(obj)) {
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                if (!obj.optBoolean("ok") && obj.optString("title").isBlank()) {
-                    binding.landDetailError.isVisible = true
-                    binding.landDetailError.text = obj.optString("error", "آگهی پیدا نشد.")
+                if (acceptable(obj)) {
+                    bindLand(code, obj)
+                    rendered = true
+                    binding.landDetailError.isVisible = false
+                    if (VinorPageLoad.canRemember(obj)) remembered[code] = VinorPageLoad.rememberedCopy(obj)
+                }
+                when {
+                    rendered && VinorPageLoad.networkFailed(wasFresh, obj) ->
+                        VinorPageLoad.showOffline(binding.root) { load(code) }
+                    !rendered && missing(obj) -> showMissing()
+                    !rendered -> showOffline()
                 }
             } catch (e: Exception) {
-                if (_binding != null) {
-                    binding.landDetailError.isVisible = true
-                    binding.landDetailError.text = e.message ?: "خطا در بارگذاری"
-                    Toast.makeText(requireContext(), e.message, Toast.LENGTH_SHORT).show()
-                }
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (rendered) VinorPageLoad.showOffline(binding.root) { load(code) } else showOffline()
             } finally {
-                if (_binding != null) binding.landDetailProgress.isVisible = false
+                if (_binding != null && gen == loadGen) binding.landDetailProgress.isVisible = false
             }
         }
+    }
+
+    private fun acceptable(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.optBoolean("ok") && obj.optString("title").isBlank()) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
+    }
+
+    private fun missing(obj: JSONObject): Boolean {
+        if (obj.optBoolean("from_cache") || obj.optBoolean("offline")) return false
+        val code = obj.optInt("http_status")
+        if (code == 0 || code >= 500) return false
+        return !obj.optBoolean("ok") && obj.optString("title").isBlank()
+    }
+
+    private fun showMissing() {
+        val b = _binding ?: return
+        b.landDetailError.isVisible = true
+        b.landDetailError.text = "آگهی پیدا نشد."
+    }
+
+    private fun showOffline() {
+        val b = _binding ?: return
+        b.landDetailError.isVisible = true
+        b.landDetailError.text = VinorPageLoad.OFFLINE
     }
 
     private fun bindLand(code: String, obj: JSONObject) {
@@ -809,5 +869,15 @@ class LandDetailFragment : Fragment() {
         }
 
         override fun getItemCount(): Int = urls.size
+    }
+
+    companion object {
+        private val remembered = HashMap<String, JSONObject>()
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered.clear()
+            sessionStamp++
+        }
     }
 }

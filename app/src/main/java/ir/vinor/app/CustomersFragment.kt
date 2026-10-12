@@ -48,6 +48,10 @@ class CustomersFragment : Fragment() {
     )
     private var csrf: String = ""
     private var busy: Boolean = false
+    private var loadGen = 0
+    private var rendered = false
+    private var boundUrl = ""
+    private var skipNextResume = true
     private var detail: PartnerCustomers.Row? = null
     private var pendingDelete: Boolean = false
     private val inputs = ArrayList<Pair<PartnerCustomers.Field, EditText>>()
@@ -57,6 +61,7 @@ class CustomersFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
+        skipNextResume = true
         _binding = FragmentCustomersBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -99,6 +104,17 @@ class CustomersFragment : Fragment() {
         load()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding == null || !PartnerApi.hasSession()) return
+        if (binding.customersSheet.isVisible) return
+        load()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
@@ -117,36 +133,68 @@ class CustomersFragment : Fragment() {
 
     private fun load() {
         val ctx = context ?: return
-        binding.customersProgress.isVisible = true
-        binding.customersEmpty.isVisible = false
-        viewLifecycleOwner.lifecycleScope.launch {
-            val doc = withContext(Dispatchers.IO) { PartnerApi.getPage(pageUrl, ctx) }
-            val profile = withContext(Dispatchers.IO) {
-                PartnerApi.get("/express/partner/profile/data", ctx)
-            }
-            if (_binding == null) return@launch
-            binding.customersProgress.isVisible = false
-            val fromPage = PartnerCustomers.csrfFromHtml(doc.body)
-            csrf = fromPage.ifBlank { profile.optString("csrf_token").trim() }
-            if (doc.code == 0) {
-                showMessage(profile.optString("message").ifBlank { "برای دیدن مشتریان اینترنت لازم است." })
-                return@launch
-            }
-            if (PartnerCustomers.isLoginDocument(doc.url, doc.body)) {
-                (activity as? MainActivity)?.openLogin()
-                return@launch
-            }
-            if (doc.code !in 200..299) {
-                val payload = try {
-                    JSONObject(doc.body).put("http_status", doc.code)
-                } catch (_: Exception) {
-                    JSONObject().put("http_status", doc.code)
-                }
-                showMessage(PartnerCustomers.userMessage(payload, "بارگذاری مشتریان ناموفق بود."))
-                return@launch
-            }
-            page = PartnerCustomers.parse(doc.body)
+        val url = pageUrl
+        val gen = ++loadGen
+        val stamp = sessionStamp
+        val snap = remembered[url]
+        if (snap != null) {
+            page = snap.page
+            csrf = snap.csrf
+            rendered = true
+            boundUrl = url
             bindPage()
+            binding.customersProgress.isVisible = false
+        } else if (!rendered || boundUrl != url) {
+            binding.customersList.removeAllViews()
+            binding.customersProgress.isVisible = true
+            binding.customersEmpty.isVisible = false
+            rendered = false
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val doc = withContext(Dispatchers.IO) { PartnerApi.getPage(url, ctx) }
+                val profile = withContext(Dispatchers.IO) {
+                    runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }.getOrElse { JSONObject() }
+                }
+                if (_binding == null || gen != loadGen || stamp != sessionStamp || pageUrl != url) return@launch
+                binding.customersProgress.isVisible = false
+                if (doc.code == 0) {
+                    if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load() }
+                    else showMessage(VinorPageLoad.OFFLINE)
+                    return@launch
+                }
+                if (PartnerCustomers.isLoginDocument(doc.url, doc.body) || VinorPageLoad.needsLogin(profile)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(profile))
+                    return@launch
+                }
+                if (doc.code !in 200..299) {
+                    if (rendered && boundUrl == url) {
+                        VinorPageLoad.showOffline(binding.root) { load() }
+                    } else {
+                        val payload = try {
+                            JSONObject(doc.body).put("http_status", doc.code)
+                        } catch (_: Exception) {
+                            JSONObject().put("http_status", doc.code)
+                        }
+                        showMessage(PartnerCustomers.userMessage(payload, VinorPageLoad.OFFLINE))
+                    }
+                    return@launch
+                }
+                val fromPage = PartnerCustomers.csrfFromHtml(doc.body)
+                csrf = fromPage.ifBlank { profile.optString("csrf_token").trim() }
+                page = PartnerCustomers.parse(doc.body)
+                remembered[url] = CustomersMemory(page, csrf)
+                rendered = true
+                boundUrl = url
+                bindPage()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                binding.customersProgress.isVisible = false
+                if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load() }
+                else showMessage(VinorPageLoad.OFFLINE)
+            }
         }
     }
 
@@ -381,6 +429,18 @@ class CustomersFragment : Fragment() {
             trimmed.startsWith("http") -> trimmed
             trimmed.startsWith("/") -> PartnerApi.BASE + trimmed
             else -> PartnerApi.BASE + PartnerCrm.PATH + "/" + trimmed
+        }
+    }
+
+    private data class CustomersMemory(val page: PartnerCustomers.Page, val csrf: String)
+
+    companion object {
+        private val remembered = HashMap<String, CustomersMemory>()
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered.clear()
+            sessionStamp++
         }
     }
 }

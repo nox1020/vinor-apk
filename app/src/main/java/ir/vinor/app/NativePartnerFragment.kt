@@ -54,6 +54,9 @@ class NativePartnerFragment : Fragment() {
     private var followBusy = false
     private var followCsrf = ""
     private var followSheet: BottomSheetDialog? = null
+    private var loadGen = 0
+    private var pageRendered = false
+    private var skipNextResume = true
 
     val page: String
         get() = arguments?.getString(ARG_PAGE).orEmpty().ifBlank { PAGE_TRAINING }
@@ -63,6 +66,7 @@ class NativePartnerFragment : Fragment() {
             job = Job()
             scope = CoroutineScope(Dispatchers.Main + job)
         }
+        skipNextResume = true
         _binding = FragmentNativePartnerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -87,7 +91,7 @@ class NativePartnerFragment : Fragment() {
         )
         binding.nativeRefresh.setOnRefreshListener {
             if (page == PAGE_REQUESTS) followEpoch++
-            load(forceNet = true)
+            load(pull = true)
         }
         binding.nativeApplySubmit.setOnClickListener { submitApply() }
         binding.nativeFavoritesCta.setOnClickListener {
@@ -107,7 +111,20 @@ class NativePartnerFragment : Fragment() {
             searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
             if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
         }
+        rememberedByPage[page]?.let {
+            bindPayload(it)
+            pageRendered = true
+        }
         load()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null && page != PAGE_APPLY) load()
     }
 
     override fun onDestroyView() {
@@ -132,77 +149,102 @@ class NativePartnerFragment : Fragment() {
         binding.nativeHeader.pageTitle.text = text
     }
 
-    private fun load(forceNet: Boolean = false) {
+    private fun load(pull: Boolean = false) {
         when (page) {
             PAGE_SETTINGS -> {
                 binding.nativeRefresh.isRefreshing = false
                 bindSettings()
+                pageRendered = true
             }
-            PAGE_FAVORITES -> loadFavorites()
-            else -> loadJson(forceNet)
+            PAGE_FAVORITES -> loadFavorites(pull)
+            else -> loadJson(pull)
         }
     }
 
-    private fun loadJson(forceNet: Boolean) {
+    private fun loadJson(pull: Boolean) {
         val epoch = followEpoch
+        val gen = ++loadGen
+        val stamp = sessionStamp
         val ctx = context ?: run {
             finishFollowReload(epoch)
             return
         }
-        val path = dataPath(page) ?: return bindEmpty("صفحه پیدا نشد.")
+        val path = dataPath(page) ?: run {
+            if (!pageRendered) bindEmpty("صفحه پیدا نشد.")
+            finishFollowReload(epoch)
+            return
+        }
+        if (pageRendered) {
+            if (pull) binding.nativeRefresh.isRefreshing = true
+        } else {
+            binding.nativeProgress.isVisible = true
+        }
         scope.launch {
-            if (!forceNet) {
-                val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
-                if (!followCurrent(epoch)) return@launch
-                if (_binding != null && cached != null) bindPayload(cached)
-                else if (_binding != null) binding.nativeProgress.isVisible = true
-                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) {
-                    if (_binding != null && followCurrent(epoch)) {
-                        binding.nativeProgress.isVisible = false
-                        binding.nativeRefresh.isRefreshing = false
-                    }
-                    return@launch
-                }
-            }
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                val fresh = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
-                if (_binding == null || !followCurrent(epoch)) return@launch
-                val code = fresh.optInt("http_status")
-                if (PartnerApi.isSessionExpired(fresh) || code == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                val fresh = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp || !followCurrent(epoch)) {
+                        return@loadDisplay
+                    }
+                    if (!canPaint(data)) return@loadDisplay
+                    bindPayload(data)
+                    pageRendered = true
+                    binding.nativeProgress.isVisible = false
+                }
+                if (_binding == null || gen != loadGen || stamp != sessionStamp || !followCurrent(epoch)) return@launch
+                val unauthorized = fresh.optString("error") == "unauthorized" ||
+                    (page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh))
+                if (VinorPageLoad.needsLogin(fresh) || unauthorized) {
+                    clearRemembered()
+                    if (!pageRendered) bindEmpty("برای ادامه وارد شوید.")
+                    (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(fresh))
                     return@launch
                 }
-                val followUnauthorized = page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh)
-                if (fresh.optString("error") == "unauthorized" || followUnauthorized) {
-                    bindEmpty("برای ادامه وارد شوید.")
-                    (activity as? MainActivity)?.openLogin()
+                if (fresh.optInt("http_status") == 403) {
+                    if (!pageRendered) bindEmpty(fresh.optString("error").ifBlank { "دسترسی ندارید." })
+                    else VinorPageLoad.showOffline(binding.root) { load(pull = true) }
                     return@launch
                 }
-                if (code == 403) {
-                    bindEmpty(fresh.optString("error").ifBlank { "دسترسی ندارید." })
+                if (page == PAGE_REQUESTS && !FollowRequests.isOk(fresh) && !fresh.optBoolean("from_cache")) {
+                    if (!pageRendered) bindEmpty(FollowRequests.userMessage(fresh, "بارگذاری پیگیری ناموفق بود."))
+                    else VinorPageLoad.showOffline(binding.root) { load(pull = true) }
                     return@launch
                 }
-                if (page == PAGE_REQUESTS && !FollowRequests.isOk(fresh)) {
-                    bindEmpty(FollowRequests.userMessage(fresh, "بارگذاری پیگیری ناموفق بود."))
-                    return@launch
+                if (canPaint(fresh)) {
+                    bindPayload(fresh)
+                    pageRendered = true
+                    if (VinorPageLoad.canRemember(fresh)) {
+                        rememberedByPage[page] = VinorPageLoad.rememberedCopy(fresh)
+                    }
                 }
-                bindPayload(fresh)
-            } catch (_: Exception) {
-                if (_binding == null || !followCurrent(epoch)) return@launch
-                val showing = binding.nativeList.childCount > 0 || binding.nativeInviteBox.isVisible
-                if (showing) {
-                    Toast.makeText(requireContext(), "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
-                } else {
-                    bindEmpty("اتصال برقرار نشد")
+                if (pageRendered && VinorPageLoad.networkFailed(wasFresh, fresh)) {
+                    VinorPageLoad.showOffline(binding.root) { load(pull = true) }
+                } else if (!pageRendered) {
+                    bindEmpty(VinorPageLoad.OFFLINE)
                 }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp || !followCurrent(epoch)) return@launch
+                if (pageRendered) VinorPageLoad.showOffline(binding.root) { load(pull = true) }
+                else bindEmpty(VinorPageLoad.OFFLINE)
             } finally {
-                if (_binding != null && followCurrent(epoch)) {
+                if (_binding != null && followCurrent(epoch) && gen == loadGen) {
                     binding.nativeProgress.isVisible = false
                     binding.nativeRefresh.isRefreshing = false
                 }
                 finishFollowReload(epoch)
             }
         }
+    }
+
+    private fun canPaint(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj)) return false
+        if (obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (obj.optString("error") == "unauthorized") return false
+        if (page == PAGE_REQUESTS && !FollowRequests.isOk(obj)) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
     }
 
     private fun followCurrent(epoch: Int): Boolean = page != PAGE_REQUESTS || epoch == followEpoch
@@ -213,21 +255,35 @@ class NativePartnerFragment : Fragment() {
         if (_binding != null) setFollowBusy(false) else followBusy = false
     }
 
-    private fun loadFavorites() {
+    private fun loadFavorites(pull: Boolean) {
         val ctx = context ?: return
         if (!PartnerApi.hasSession()) {
+            clearRemembered()
             bindEmpty("برای دیدن نشان‌ها وارد شوید.")
             binding.nativeRefresh.isRefreshing = false
+            (activity as? MainActivity)?.openLogin()
             return
         }
         val codes = VinorFavoritesStore.codes(ctx)
         if (codes.isEmpty()) {
+            rememberedByPage.remove(PAGE_FAVORITES)
             bindEmpty(FAVORITES_EMPTY)
+            pageRendered = true
             binding.nativeRefresh.isRefreshing = false
             return
         }
+        rememberedByPage[PAGE_FAVORITES]?.let { memory ->
+            bindLandItems(memory.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
+            pageRendered = true
+        }
+        if (pageRendered) {
+            if (pull) binding.nativeRefresh.isRefreshing = true
+        } else {
+            binding.nativeProgress.isVisible = true
+        }
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
-            binding.nativeProgress.isVisible = binding.nativeList.childCount == 0
             try {
                 val body = JSONObject().put("codes", JSONArray().also { arr ->
                     codes.forEach { arr.put(it) }
@@ -235,16 +291,30 @@ class NativePartnerFragment : Fragment() {
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/api/favorites/cards", body, ctx)
                 }
-                if (_binding == null) return@launch
-                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(resp)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
-            } catch (_: Exception) {
-                if (_binding != null) bindEmpty("اتصال برقرار نشد")
+                val live = VinorPageLoad.canRemember(resp)
+                val hasCards = resp.optInt("http_status") in 200..299 || resp.has("items")
+                if (live) rememberedByPage[PAGE_FAVORITES] = VinorPageLoad.rememberedCopy(resp)
+                if (hasCards && (live || resp.has("items"))) {
+                    bindLandItems(resp.optJSONArray("items") ?: JSONArray(), emptyMsg = FAVORITES_EMPTY)
+                    pageRendered = true
+                } else if (pageRendered) {
+                    VinorPageLoad.showOffline(binding.root) { loadFavorites(pull = true) }
+                } else {
+                    bindEmpty(VinorPageLoad.OFFLINE)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (pageRendered) VinorPageLoad.showOffline(binding.root) { loadFavorites(pull = true) }
+                else bindEmpty(VinorPageLoad.OFFLINE)
             } finally {
-                if (_binding != null) {
+                if (_binding != null && gen == loadGen) {
                     binding.nativeProgress.isVisible = false
                     binding.nativeRefresh.isRefreshing = false
                 }
@@ -770,11 +840,11 @@ class NativePartnerFragment : Fragment() {
                         pendingFollowBody = JSONObject(body.toString())
                         activeTab = ""
                     }
-                    binding.nativeList.removeAllViews()
+                    rememberedByPage.remove(PAGE_REQUESTS)
                     binding.nativeRefresh.isRefreshing = true
                     followReload = true
                     followEpoch++
-                    load(forceNet = true)
+                    load(pull = true)
                 } else {
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
                 }
@@ -946,6 +1016,14 @@ class NativePartnerFragment : Fragment() {
             PAGE_TERMS -> "قوانین استفاده"
             PAGE_PRIVACY -> "حریم خصوصی"
             else -> "وینور"
+        }
+
+        private val rememberedByPage = HashMap<String, JSONObject>()
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            rememberedByPage.clear()
+            sessionStamp++
         }
 
         fun dataPath(page: String): String? = when (page) {

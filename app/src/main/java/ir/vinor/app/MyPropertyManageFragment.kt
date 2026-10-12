@@ -37,6 +37,7 @@ class MyPropertyManageFragment : Fragment() {
     private var sheetDialog: BottomSheetDialog? = null
     private var busy = false
     private var selectedPayment = "نقدی"
+    private var loadGen = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -177,18 +178,45 @@ class MyPropertyManageFragment : Fragment() {
         val code = MyPropertyManage.codeOf(snapshot)
         val ctx = context ?: return
         if (code.isBlank()) return
+        val path = "/express/partner/api/lands/${Uri.encode(code)}/data"
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/api/lands/${Uri.encode(code)}/data", ctx)
+                val fresh = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                    if (!VinorPageLoad.canRemember(data) || !detailOk(data)) return@loadDisplay
+                    applyDetail(data)
                 }
-                if (_binding == null) return@launch
-                snapshot = MyPropertyManage.mergeDetail(snapshot, fresh)
-                bindPreview()
-                bindRows()
-            } catch (_: Exception) {
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(fresh)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (VinorPageLoad.canRemember(fresh) && detailOk(fresh)) {
+                    applyDetail(fresh)
+                } else if (VinorPageLoad.networkFailed(wasFresh, fresh)) {
+                    VinorPageLoad.showOffline(binding.root) { loadDetail() }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                VinorPageLoad.showOffline(binding.root) { loadDetail() }
             }
         }
+    }
+
+    private fun detailOk(obj: JSONObject): Boolean {
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        return obj.optBoolean("ok") || obj.optString("title").isNotBlank()
+    }
+
+    private fun applyDetail(fresh: JSONObject) {
+        snapshot = MyPropertyManage.mergeDetail(snapshot, fresh)
+        bindPreview()
+        bindRows()
     }
 
     private fun showPriceSheet() {
@@ -487,5 +515,10 @@ class MyPropertyManageFragment : Fragment() {
 
     companion object {
         const val ARG_SNAPSHOT = "snapshot"
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            sessionStamp++
+        }
     }
 }
