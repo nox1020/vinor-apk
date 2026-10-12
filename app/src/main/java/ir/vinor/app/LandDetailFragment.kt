@@ -331,22 +331,8 @@ class LandDetailFragment : Fragment() {
                 val status = withContext(Dispatchers.IO) {
                     PartnerApi.get(LandVisit.statusPath(Uri.encode(code)), ctx)
                 }
-                val page = if (LandVisit.needsPageCalendar(status)) {
-                    withContext(Dispatchers.IO) {
-                        val html = PartnerApi.getPage(LandVisit.pagePath(Uri.encode(code)), ctx)
-                        if (PartnerCustomers.isLoginDocument(html.url, html.body)) return@withContext null
-                        if (html.code == 0 || html.body.isBlank()) return@withContext LandVisit.Schedule()
-                        LandVisit.parsePage(html.body)
-                    }
-                } else {
-                    null
-                }
                 if (_binding == null) return@launch
-                if (page == null && LandVisit.needsPageCalendar(status) && !status.optBoolean("offline")) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
-                    return@launch
-                }
-                when (val outcome = LandVisit.decide(code, status, page)) {
+                when (val outcome = LandVisit.decide(code, status)) {
                     is LandVisit.Outcome.Ready -> showVisitSheet(outcome.schedule)
                     LandVisit.Outcome.Login -> {
                         (activity as? MainActivity)?.openLogin(sessionExpired = true)

@@ -56,7 +56,7 @@ import java.io.File
 class DashboardFragment : Fragment() {
 
     companion object {
-        private const val HOME_DATA = "/express/partner/home/data"
+        const val HOME_DATA = "/express/partner/home/data"
         private const val HOME_HTML = "/express/partner/home"
         private var rememberedHome: JSONObject? = null
         private var sessionStamp = 0
@@ -64,6 +64,12 @@ class DashboardFragment : Fragment() {
         fun clearRememberedHome() {
             rememberedHome = null
             sessionStamp++
+        }
+
+        internal fun peekRememberedHome(): JSONObject? = rememberedHome
+
+        internal fun rememberHome(obj: JSONObject) {
+            rememberedHome = JSONObject(obj.toString())
         }
     }
 

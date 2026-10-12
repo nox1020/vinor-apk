@@ -127,8 +127,17 @@ object MyPropertyManage {
         return text(post, "code").isNotBlank()
     }
 
-    /** ۴۰۴ یعنی این مسیر حذف برای این ملک نیست؛ دکمه پنهان می‌شود. */
-    fun deleteUnavailable(post: JSONObject): Boolean = post.optInt("http_status") == 404
+    /** ۴۰۴ بدون error_code یعنی مسیر حذف روی این سرور نیست و دکمه پنهان می‌شود. */
+    fun deleteRouteMissing(post: JSONObject): Boolean =
+        post.optInt("http_status") == 404 && post.optString("error_code").isBlank()
+
+    /** ملک نیست یا مال این کاربر نیست. فهرست باید تازه شود. */
+    fun deleteNotFound(post: JSONObject): Boolean = post.optString("error_code") == "not_found"
+
+    /** ضربهٔ دوم تا پایان درخواست پذیرفته نمی‌شود. */
+    fun claimAction(busy: Boolean): Boolean = !busy
+
+    fun showPublishProgress(publishBusy: Boolean): Boolean = publishBusy
 
     /**
      * موفقیت فقط وقتی است که فهرست ملک من این کد را دیگر نداشته باشد.
