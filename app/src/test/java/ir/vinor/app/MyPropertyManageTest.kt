@@ -209,42 +209,18 @@ class MyPropertyManageTest {
     }
 
     @Test
-    fun deleteUsesThePropertyPageInsteadOfTheMissingApi() {
-        val html = """
-            <form action="/express/partner/my-property" method="post">
-              <input type="hidden" name="csrf_token" value="tok">
-              <input type="hidden" name="title" value="ذخیره">
-              <button type="submit">ذخیره</button>
-            </form>
-            <form action="/express/partner/my-property" method="post">
-              <input type="hidden" name="csrf_token" value="tok">
-              <input type="hidden" name="code" value="12">
-              <button type="submit" name="action" value="delete">حذف ملک</button>
-            </form>
-            <form action="/express/partner/my-property">
-              <input type="hidden" name="code" value="99">
-              <button type="submit" name="action" value="delete">حذف</button>
-            </form>
-        """.trimIndent()
-        val call = MyPropertyManage.deleteCall(html, "12")
-        assertEquals("/express/partner/my-property", call.path)
-        assertEquals("tok", call.csrf)
-        assertEquals("12", call.body.getString("code"))
-        assertEquals("delete", call.body.getString("action"))
-        assertFalse(call.body.has("title"))
-        val other = MyPropertyManage.deleteCall(html, "99")
-        assertEquals("99", other.body.getString("code"))
-    }
-
-    @Test
-    fun deleteWithoutAFormStillPostsActionAndCode() {
-        val html = """<meta name="csrf-token" content="abc">"""
-        val call = MyPropertyManage.deleteCall(html, "4")
-        assertEquals(MyPropertyManage.PAGE_PATH, call.path)
-        assertEquals("abc", call.csrf)
-        assertEquals("delete", call.body.getString("action"))
-        assertEquals("4", call.body.getString("code"))
-        assertFalse(call.path.contains("/api/my-property/delete"))
+    fun deleteUsesJsonApi() {
+        val body = MyPropertyManage.deleteBody("12")
+        assertEquals(MyPropertyManage.DELETE_PATH, "/express/partner/api/my-property/delete")
+        assertEquals("12", body.getString("code"))
+        assertFalse(body.has("action"))
+        assertFalse(body.has("csrf_token"))
+        val ok = JSONObject().put("ok", true).put("http_status", 200).put("code", "12").put("message", "ملک حذف شد.")
+        val missing = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
+        assertTrue(MyPropertyManage.deleteSucceeded(ok))
+        assertFalse(MyPropertyManage.deleteSucceeded(missing))
+        assertTrue(MyPropertyManage.deleteUnavailable(missing))
+        assertFalse(MyPropertyManage.deleteUnavailable(ok))
     }
 
     @Test
@@ -265,10 +241,82 @@ class MyPropertyManageTest {
         assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف آگهی انجام نشد."))
         val html = JSONObject().put("http_status", 200).put("ok", false).put("error", "پاسخ نامعتبر")
         assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(html, "حذف آگهی انجام نشد."))
-        val fields = MyPropertyManage.formFields(MyPropertyManage.deleteCall("", "4"))
-        assertEquals("delete", fields["action"])
-        assertEquals("4", fields["code"])
-        assertFalse(fields.containsKey("csrf_token"))
+    }
+
+    @Test
+    fun unpublishedSnapshotSurvivesViewRecreation() {
+        val card = JSONObject()
+            .put("code", "4")
+            .put("title", "زمین ویلایی")
+            .put("published_for_sale", true)
+            .put("badge_label", "منتشرشده")
+        val post = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("code", "4")
+            .put("items", JSONArray().put(JSONObject().put("code", "4").put("published_for_sale", false)))
+        val land = JSONObject()
+            .put("ok", false)
+            .put("http_status", 200)
+            .put("published_for_sale", false)
+            .put("can_publish", true)
+        val next = MyPropertyManage.finishUnpublish(card, post, land)
+        assertTrue(next != null)
+        val restored = MyPropertyManage.readSnapshot(MyPropertyManage.commitSnapshot(next!!))
+        assertFalse(MyPropertyManage.isPublished(restored))
+        assertEquals("خصوصی", MyPropertyManage.statusOf(restored))
+        assertEquals("زمین ویلایی", restored.getString("title"))
+        assertTrue(restored.getBoolean("can_publish"))
+    }
+
+    @Test
+    fun privateLandDetailUpdatesStatusWhenOkIsFalse() {
+        val card = JSONObject()
+            .put("code", "4")
+            .put("title", "زمین ویلایی")
+            .put("city", "تهران")
+            .put("published_for_sale", true)
+            .put("badge_label", "منتشرشده")
+        val detail = JSONObject()
+            .put("ok", false)
+            .put("http_status", 200)
+            .put("published_for_sale", false)
+            .put("can_publish", true)
+            .put("title", "")
+        assertTrue(MyPropertyManage.detailAccepted(detail))
+        val merged = MyPropertyManage.applyListingDetail(card, detail)
+        assertFalse(merged.getBoolean("published_for_sale"))
+        assertTrue(merged.getBoolean("can_publish"))
+        assertEquals("خصوصی", MyPropertyManage.statusOf(merged))
+        assertEquals("زمین ویلایی", merged.getString("title"))
+        assertEquals("تهران", merged.getString("city"))
+    }
+
+    @Test
+    fun alreadyPublishedMarksSnapshotLive() {
+        val card = JSONObject().put("code", "4").put("published_for_sale", false).put("badge_label", "خصوصی")
+        val post = JSONObject()
+            .put("ok", false)
+            .put("http_status", 400)
+            .put("error_code", "already_published")
+            .put("error", "این ملک قبلاً برای فروش منتشر شده است.")
+        assertTrue(MyPropertyManage.absorbAlreadyPublished(card, post))
+        assertTrue(MyPropertyManage.isPublished(card))
+        assertEquals("منتشرشده", MyPropertyManage.statusOf(card))
+        val other = JSONObject().put("ok", false).put("error_code", "payment_required")
+        assertFalse(MyPropertyManage.absorbAlreadyPublished(JSONObject(card.toString()), other))
+    }
+
+    @Test
+    fun savedEditKeepsPublishFlagAndUpdatesFields() {
+        val card = JSONObject().put("code", "4").put("title", "عنوان قدیمی").put("published_for_sale", true)
+        val body = JSONObject().put("code", "4").put("title", "عنوان تازه ده حرفی").put("price_total", "2500").put("city", "دماوند")
+        val next = MyPropertyManage.applySavedEdit(card, body)
+        val restored = MyPropertyManage.readSnapshot(MyPropertyManage.commitSnapshot(next))
+        assertEquals("عنوان تازه ده حرفی", restored.getString("title"))
+        assertEquals("دماوند", restored.getString("city"))
+        assertEquals(2500L, restored.getLong("price_total"))
+        assertTrue(restored.getBoolean("published_for_sale"))
     }
 
     @Test

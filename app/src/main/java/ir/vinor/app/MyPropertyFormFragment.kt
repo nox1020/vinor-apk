@@ -815,6 +815,7 @@ class MyPropertyFormFragment : Fragment() {
                     return@launch
                 }
                 if (obj.optBoolean("ok", false)) {
+                    if (editCode.isNotBlank()) rememberManageSnapshot(body)
                     val saved = if (editCode.isNotBlank()) "تغییرات ذخیره شد." else "ملک شما ثبت شد."
                     toast(obj.optString("message").ifBlank { saved })
                     (activity as? MainActivity)?.openMyProperty()
@@ -830,6 +831,17 @@ class MyPropertyFormFragment : Fragment() {
                 if (_binding != null) syncBusy()
             }
         }
+    }
+
+    private fun rememberManageSnapshot(body: JSONObject) {
+        val prev = runCatching { findNavController().previousBackStackEntry }.getOrNull() ?: return
+        if (prev.destination.id != R.id.myPropertyManageFragment) return
+        val args = prev.arguments ?: return
+        val next = MyPropertyManage.applySavedEdit(
+            MyPropertyManage.readSnapshot(args.getString(MyPropertyManageFragment.ARG_SNAPSHOT)),
+            body,
+        )
+        args.putString(MyPropertyManageFragment.ARG_SNAPSHOT, MyPropertyManage.commitSnapshot(next))
     }
 
     private fun syncBusy() {
