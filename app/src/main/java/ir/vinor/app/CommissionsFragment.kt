@@ -41,6 +41,9 @@ class CommissionsFragment : Fragment() {
     private var step: Step = Step.REQUEST
     private var addFromPick: Boolean = false
     private var pendingDeleteId: String? = null
+    private var loadGen = 0
+    private var rendered = false
+    private var skipNextResume = true
 
     private enum class Step { REQUEST, PICK, ADD }
 
@@ -49,6 +52,7 @@ class CommissionsFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        skipNextResume = true
         _binding = FragmentCommissionsBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -84,7 +88,23 @@ class CommissionsFragment : Fragment() {
                 }
             },
         )
+        remembered?.let {
+            if (WalletWithdraw.hasCommissionPayload(it)) {
+                bindCommissionPayload(it)
+                rendered = true
+            }
+        }
         loadData()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null && binding.withdrawSheet.isVisible) return
+        if (_binding != null) loadData()
     }
 
     override fun onDestroyView() {
@@ -127,38 +147,54 @@ class CommissionsFragment : Fragment() {
 
     private fun loadData() {
         val ctx = context ?: return
-        binding.commissionsProgress.visibility = View.VISIBLE
-        binding.commissionsList.visibility = View.VISIBLE
-        binding.commissionsEmpty.visibility = View.GONE
-
+        if (!rendered) {
+            binding.commissionsProgress.visibility = View.VISIBLE
+            binding.commissionsList.visibility = View.GONE
+            binding.commissionsEmpty.visibility = View.GONE
+        }
+        val gen = ++loadGen
+        val stamp = sessionStamp
         viewLifecycleOwner.lifecycleScope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(COMMISSIONS_DATA, ctx) }
             try {
                 val obj = PartnerApi.loadDisplay(COMMISSIONS_DATA, ctx) { data ->
-                    if (_binding == null) return@loadDisplay
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
                     if (!WalletWithdraw.hasCommissionPayload(data)) return@loadDisplay
+                    if (VinorPageLoad.needsLogin(data)) return@loadDisplay
                     bindCommissionPayload(data)
+                    rendered = true
                 }
-                if (_binding == null) return@launch
-                if (PartnerApi.isSessionExpired(obj)) {
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
                 if (!WalletWithdraw.hasCommissionPayload(obj)) {
-                    showError()
+                    if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) showOffline()
+                    else if (!rendered) showOffline()
                     return@launch
                 }
+                bindCommissionPayload(obj)
+                rendered = true
+                if (VinorPageLoad.canRemember(obj)) remembered = VinorPageLoad.rememberedCopy(obj)
+                if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) showOffline()
                 if (WalletWithdraw.readBalance(obj) == null) {
                     val home = withContext(Dispatchers.IO) {
                         PartnerApi.peekJson(WalletWithdraw.HOME_DATA, ctx)
                             ?: PartnerApi.get(WalletWithdraw.HOME_DATA, ctx)
                     }
-                    if (_binding == null) return@launch
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                     WalletWithdraw.readBalance(home)?.let { setWithdrawable(it) }
                 }
                 WalletWithdraw.parsePending(obj)?.let { showPending(it) }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadData error", e)
-                if (_binding != null) showError()
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                showOffline()
+            } finally {
+                if (_binding != null && gen == loadGen) binding.commissionsProgress.visibility = View.GONE
             }
         }
     }
@@ -197,11 +233,14 @@ class CommissionsFragment : Fragment() {
         binding.commissionsWithdrawStatus.visibility = View.VISIBLE
     }
 
-    private fun showError() {
+    private fun showOffline() {
         if (_binding == null) return
         binding.commissionsProgress.visibility = View.GONE
-        context?.let { Toast.makeText(it, "خطا در بارگذاری پورسانت‌ها", Toast.LENGTH_SHORT).show() }
-        binding.commissionsEmptyText.text = "خطا در بارگذاری پورسانت‌ها."
+        if (rendered) {
+            VinorPageLoad.showOffline(binding.root) { loadData() }
+            return
+        }
+        binding.commissionsEmptyText.text = VinorPageLoad.OFFLINE
         binding.commissionsEmpty.visibility = View.VISIBLE
         binding.commissionsList.visibility = View.GONE
     }
@@ -520,5 +559,12 @@ class CommissionsFragment : Fragment() {
     companion object {
         private const val TAG = "CommissionsFragment"
         private const val COMMISSIONS_DATA = "/express/partner/commissions/data"
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 }

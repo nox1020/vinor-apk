@@ -94,9 +94,7 @@ class MainActivity : AppCompatActivity() {
         handleDeepLink(intent)
         PartnerApi.setSessionExpiredListener {
             if (isFinishing || isDestroyed) return@setSessionExpiredListener
-            DashboardFragment.clearRememberedHome()
-            SearchFragment.clearRemembered()
-            MyPropertyFormFragment.clearRemembered()
+            clearPageMemory()
             openLogin(sessionExpired = true)
         }
         runCatching { VinorCacheSession.fingerprint(this) }
@@ -792,10 +790,26 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
+    private fun clearPageMemory() {
         DashboardFragment.clearRememberedHome()
         SearchFragment.clearRemembered()
         MyPropertyFormFragment.clearRemembered()
+        ProfileFragment.clearRemembered()
+        NativePartnerFragment.clearRemembered()
+        MyPropertiesFragment.clearRemembered()
+        LandDetailFragment.clearRemembered()
+        MyPropertyManageFragment.clearRemembered()
+        NotificationsFragment.clearRemembered()
+        NotesFragment.clearRemembered()
+        ProfileEditFragment.clearRemembered()
+        CommissionsFragment.clearRemembered()
+        CustomersFragment.clearRemembered()
+        RoutineFragment.clearRemembered()
+        ConsultantOnboardingFragment.clearRemembered()
+    }
+
+    fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
+        clearPageMemory()
         VinorSessionLogout.perform(this, lifecycleScope) {
             try {
                 dropChatForSignedOutAccount()

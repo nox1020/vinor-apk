@@ -38,6 +38,8 @@ class ConsultantOnboardingFragment : Fragment() {
     private var tipIndex = 0
     private var ignoreToggle = false
     private var latestStatus = ""
+    private var loadGen = 0
+    private var routed = false
 
     private data class LocalFile(val uri: Uri, val name: String, val mime: String, val size: Long)
 
@@ -98,7 +100,11 @@ class ConsultantOnboardingFragment : Fragment() {
             (activity as? MainActivity)?.openLogin()
             return
         }
-        startApply()
+        remembered?.let {
+            route(it)
+            routed = true
+        }
+        if (routed) refreshFromServer() else startApply()
     }
 
     override fun onDestroyView() {
@@ -109,18 +115,22 @@ class ConsultantOnboardingFragment : Fragment() {
 
     private fun startApply() {
         val ctx = context ?: return
-        showProgress(true)
+        if (!routed) showProgress(true)
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
             try {
                 val resp = withContext(Dispatchers.IO) { ConsultantApi.apply(ctx) }
-                if (_binding == null) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (handleAuth(resp)) return@launch
                 if (!resp.optBoolean("ok", resp.optInt("http_status") in 200..299)) {
                     showError(ConsultantOnboarding.userMessage(resp))
                 }
+                rememberStatus(resp)
                 route(resp)
             } catch (e: Exception) {
-                if (_binding != null) showError(e.message ?: "خطای شبکه")
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null && gen == loadGen && stamp == sessionStamp) showError(VinorPageLoad.OFFLINE)
             } finally {
                 if (_binding != null) showProgress(false)
             }
@@ -129,10 +139,12 @@ class ConsultantOnboardingFragment : Fragment() {
 
     private fun refreshFromServer() {
         val ctx = context ?: return
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
             try {
                 val resp = withContext(Dispatchers.IO) { ConsultantApi.status(ctx) }
-                if (_binding == null) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (handleAuth(resp)) return@launch
                 val missing = resp.optInt("http_status") == 404
                 if (missing) {
@@ -141,16 +153,26 @@ class ConsultantOnboardingFragment : Fragment() {
                 }
                 if (resp.optBoolean("ok") || resp.optString("status").isNotBlank()) {
                     clearError()
+                    rememberStatus(resp)
                     route(resp)
+                } else if (routed) {
+                    VinorPageLoad.showOffline(binding.root) { refreshFromServer() }
                 } else {
                     showError(ConsultantOnboarding.userMessage(resp))
                 }
             } catch (e: Exception) {
-                if (_binding != null) showError(e.message ?: "خطای شبکه")
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null && gen == loadGen && stamp == sessionStamp) showError(VinorPageLoad.OFFLINE)
             } finally {
-                if (_binding != null) binding.consultantRefresh.isRefreshing = false
+                if (_binding != null && gen == loadGen) binding.consultantRefresh.isRefreshing = false
             }
         }
+    }
+
+    private fun rememberStatus(obj: JSONObject) {
+        if (!VinorPageLoad.canRemember(obj)) return
+        if (obj.optString("status").isBlank() && obj.optString("next_step").isBlank()) return
+        remembered = VinorPageLoad.rememberedCopy(obj)
     }
 
     private fun route(obj: JSONObject) {
@@ -171,6 +193,7 @@ class ConsultantOnboardingFragment : Fragment() {
         binding.consultantStatus.isVisible = screen == ConsultantOnboarding.Screen.STATUS
         binding.consultantTips.isVisible = screen == ConsultantOnboarding.Screen.TIPS
         binding.consultantDashboard.isVisible = screen == ConsultantOnboarding.Screen.DASHBOARD
+        routed = true
         when (screen) {
             ConsultantOnboarding.Screen.PROFILE -> ensureCities()
             ConsultantOnboarding.Screen.STATUS -> bindStatus(obj)
@@ -249,7 +272,7 @@ class ConsultantOnboardingFragment : Fragment() {
                             showError(ConsultantOnboarding.userMessage(resp))
                         }
                     } catch (e: Exception) {
-                        if (_binding != null) showError(e.message ?: "خطای شبکه")
+                        if (_binding != null) showError(VinorPageLoad.OFFLINE)
                     } finally {
                         if (_binding != null) binding.consultantProfileSubmit.isEnabled = true
                     }
@@ -294,7 +317,7 @@ class ConsultantOnboardingFragment : Fragment() {
                 if (handleAuth(resp)) return@launch
                 if (resp.optBoolean("ok")) route(resp) else showError(ConsultantOnboarding.userMessage(resp))
             } catch (e: Exception) {
-                if (_binding != null) showError(e.message ?: "خطای شبکه")
+                if (_binding != null) showError(VinorPageLoad.OFFLINE)
             } finally {
                 if (_binding != null) binding.consultantDocumentsSubmit.isEnabled = true
             }
@@ -366,7 +389,7 @@ class ConsultantOnboardingFragment : Fragment() {
                     ignoreToggle = true
                     binding.consultantOnline.isChecked = !online
                     ignoreToggle = false
-                    showError(e.message ?: "خطای شبکه")
+                    showError(VinorPageLoad.OFFLINE)
                 }
             }
         }
@@ -374,6 +397,7 @@ class ConsultantOnboardingFragment : Fragment() {
 
     private fun handleAuth(obj: JSONObject): Boolean {
         if (!ConsultantOnboarding.isUnauthorized(obj)) return false
+        clearRemembered()
         ConsultantResume.arm(requireContext())
         showError(ConsultantOnboarding.userMessage(obj))
         (activity as? MainActivity)?.openLogin()
@@ -402,9 +426,13 @@ class ConsultantOnboardingFragment : Fragment() {
     }
 
     private fun showError(text: String) {
+        if (routed && text == VinorPageLoad.OFFLINE) {
+            VinorPageLoad.showOffline(binding.root) { refreshFromServer() }
+            return
+        }
         binding.consultantError.isVisible = text.isNotBlank()
         binding.consultantError.text = text
-        if (text.isNotBlank() && isAdded) {
+        if (text.isNotBlank() && isAdded && !routed) {
             Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
         }
     }
@@ -412,5 +440,15 @@ class ConsultantOnboardingFragment : Fragment() {
     private fun clearError() {
         binding.consultantError.isVisible = false
         binding.consultantError.text = ""
+    }
+
+    companion object {
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 }

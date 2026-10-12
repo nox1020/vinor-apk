@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -27,6 +26,8 @@ class MyPropertiesFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var skipNextResumeLoad = true
+    private var loadGen = 0
+    private var rendered = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -64,11 +65,15 @@ class MyPropertiesFragment : Fragment() {
         binding.mpRefresh.setProgressBackgroundColorSchemeColor(
             ContextCompat.getColor(requireContext(), R.color.vinor_raised),
         )
-        binding.mpRefresh.setOnRefreshListener { load(true) }
+        binding.mpRefresh.setOnRefreshListener { load(showSpinner = true) }
         binding.mpEmptyCta.setOnClickListener {
             (activity as? MainActivity)?.openOwnerHomeForm()
         }
-        load(false)
+        remembered?.let {
+            bind(it)
+            rendered = true
+        }
+        load(showSpinner = !rendered)
     }
 
     override fun onDestroyView() {
@@ -83,48 +88,60 @@ class MyPropertiesFragment : Fragment() {
             skipNextResumeLoad = false
             return
         }
-        if (_binding != null && PartnerApi.hasSession()) load(true)
+        if (_binding != null && PartnerApi.hasSession()) load(showSpinner = !rendered)
     }
 
-    private fun load(forceNet: Boolean) {
+    private fun load(showSpinner: Boolean) {
         val ctx = context ?: return
-        if (forceNet) binding.mpRefresh.isRefreshing = true
         if (!PartnerApi.hasSession()) {
             binding.mpRefresh.isRefreshing = false
-            Toast.makeText(ctx, "برای دیدن ملک من وارد شوید.", Toast.LENGTH_SHORT).show()
+            clearRemembered()
             (activity as? MainActivity)?.openLogin()
             return
         }
+        if (!rendered || showSpinner) binding.mpRefresh.isRefreshing = true
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
-            if (!forceNet) {
-                val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(PATH, ctx) }
-                if (_binding != null && cached != null) bind(cached)
-                else _binding?.mpRefresh?.isRefreshing = true
-                if (cached != null && withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }) {
-                    _binding?.mpRefresh?.isRefreshing = false
-                    return@launch
-                }
-            }
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }
             try {
-                val fresh = withContext(Dispatchers.IO) { PartnerApi.get(PATH, ctx) }
-                if (_binding == null) return@launch
-                if (PartnerApi.isSessionExpired(fresh) || fresh.optInt("http_status") == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = fresh.optBoolean("session_expired"))
+                val fresh = PartnerApi.loadDisplay(PATH, ctx) { data ->
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                    if (!acceptable(data)) return@loadDisplay
+                    bind(data)
+                    rendered = true
+                }
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(fresh)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                bind(fresh)
-            } catch (_: Exception) {
-                if (_binding != null && !binding.mpContent.isVisible) {
-                    com.google.android.material.snackbar.Snackbar.make(
-                        binding.root,
-                        "اتصال برقرار نشد",
-                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG,
-                    ).show()
+                if (acceptable(fresh)) {
+                    bind(fresh)
+                    rendered = true
+                    if (VinorPageLoad.canRemember(fresh)) remembered = VinorPageLoad.rememberedCopy(fresh)
                 }
+                if (rendered && VinorPageLoad.networkFailed(wasFresh, fresh)) {
+                    VinorPageLoad.showOffline(binding.root) { load(showSpinner = true) }
+                } else if (!rendered) {
+                    VinorPageLoad.showOffline(binding.root) { load(showSpinner = true) }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                VinorPageLoad.showOffline(binding.root) { load(showSpinner = true) }
             } finally {
-                _binding?.mpRefresh?.isRefreshing = false
+                if (_binding != null && gen == loadGen) binding.mpRefresh.isRefreshing = false
             }
         }
+    }
+
+    private fun acceptable(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
     }
 
     private fun bind(obj: JSONObject) {
@@ -190,5 +207,12 @@ class MyPropertiesFragment : Fragment() {
 
     companion object {
         private const val PATH = "/express/partner/api/my-property/data"
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 }
