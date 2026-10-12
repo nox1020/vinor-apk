@@ -27,8 +27,11 @@ class ListingMemoryTest {
         assertFalse(ListingMemory.detailOnOpen("12", online = true, disk = null, cleared = emptyList())!!.optBoolean("published_for_sale"))
         assertTrue(ListingMemory.detailOnOpen("12", online = false, disk = null, cleared = emptyList())!!.optBoolean("can_publish"))
 
+        DashboardFragment.rememberHome(JSONObject().put("lands", JSONArray().put(JSONObject().put("code", "12").put("published_for_sale", false))))
         val cleared = ListingMemory.invalidateLand("12", null, MyPropertyManage.landDataPath("12"))
         assertReopenCleared("12", detail, list, cleared)
+        assertNull(ListingMemory.homeOnOpen(online = false, disk = JSONObject().put("stale", true), cleared = cleared))
+        assertTrue(cleared.contains(DashboardFragment.HOME_DATA))
         assertFalse(LandDetailFragment.peekRemembered("99")!!.optBoolean("published_for_sale"))
     }
 
@@ -64,11 +67,13 @@ class ListingMemoryTest {
         LandDetailFragment.remember("99", land(published = true, canPublish = false).put("code", "99"))
         MyPropertiesFragment.remember(portfolio(published = true))
 
+        DashboardFragment.rememberHome(JSONObject().put("ok", true))
         ListingMemory.clearSession()
 
         assertNull(LandDetailFragment.peekRemembered("12"))
         assertNull(LandDetailFragment.peekRemembered("99"))
         assertNull(MyPropertiesFragment.peekRemembered())
+        assertNull(DashboardFragment.peekRememberedHome())
         assertNull(ListingMemory.detailOnOpen("12", online = true, disk = land(false, true), cleared = emptyList()))
         assertNull(ListingMemory.portfolioOnOpen(online = true, disk = portfolio(true), cleared = emptyList()))
     }

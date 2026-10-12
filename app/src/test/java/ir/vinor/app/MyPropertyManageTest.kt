@@ -219,8 +219,19 @@ class MyPropertyManageTest {
         val missing = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
         assertTrue(MyPropertyManage.deleteSucceeded(ok))
         assertFalse(MyPropertyManage.deleteSucceeded(missing))
-        assertTrue(MyPropertyManage.deleteUnavailable(missing))
-        assertFalse(MyPropertyManage.deleteUnavailable(ok))
+        assertTrue(MyPropertyManage.deleteRouteMissing(missing))
+        assertFalse(MyPropertyManage.deleteRouteMissing(ok))
+        val gone = JSONObject()
+            .put("ok", false)
+            .put("http_status", 404)
+            .put("error_code", "not_found")
+            .put("error", "این ملک پیدا نشد.")
+        assertFalse(MyPropertyManage.deleteRouteMissing(gone))
+        assertTrue(MyPropertyManage.deleteNotFound(gone))
+        assertFalse(MyPropertyManage.claimAction(true))
+        assertTrue(MyPropertyManage.claimAction(false))
+        assertTrue(MyPropertyManage.showPublishProgress(true))
+        assertFalse(MyPropertyManage.showPublishProgress(false))
     }
 
     @Test

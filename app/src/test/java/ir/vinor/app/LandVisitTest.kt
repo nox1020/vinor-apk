@@ -126,6 +126,18 @@ class LandVisitTest {
             JSONObject().put("success", true).put("http_status", 200).put("tx_mode", "hidden"),
         ) as LandVisit.Outcome.Blocked
         assertTrue(hidden.message.contains("تأیید"))
+        val missingCalendar = LandVisit.decide(
+            "12",
+            JSONObject().put("success", true).put("http_status", 200).put("tx_mode", "visit"),
+        ) as LandVisit.Outcome.Blocked
+        assertEquals(LandVisit.CALENDAR_MISSING, missingCalendar.message)
+        val saturday = "2026-10-10"
+        val sunday = "2026-10-11"
+        val (min, max) = LandVisit.bounds("2026-10-10", saturday)
+        val weekdays = setOf(0)
+        val hours = listOf(18)
+        assertFalse(LandVisit.allows(saturday, min, max, weekdays, hours, saturday, 15))
+        assertTrue(LandVisit.allows(sunday, min, max, weekdays, hours, saturday, 15))
         assertTrue(LandVisit.decide("12", JSONObject().put("offline", true).put("http_status", 0)) is LandVisit.Outcome.Offline)
         assertTrue(
             LandVisit.decide("12", JSONObject().put("http_status", 401).put("error", "unauthorized"))

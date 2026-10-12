@@ -15,6 +15,7 @@ object LandVisit {
     const val SENT = "درخواست بازدید ارسال شد"
     const val UNAVAILABLE = "امکان ثبت درخواست بازدید برای این ملک وجود ندارد."
     const val NEED_DATE = "لطفاً تاریخ بازدید را انتخاب کنید."
+    const val CALENDAR_MISSING = "تقویم بازدید از سرور نیامد. دوباره تلاش کنید."
 
     data class Schedule(
         val requestUrl: String = "",
@@ -90,8 +91,17 @@ object LandVisit {
         if (!canSchedule(schedule.mode, schedule.canRevisit)) {
             return Outcome.Blocked(blockedMessage(schedule))
         }
+        if (!calendarReady(obj)) return Outcome.Blocked(CALENDAR_MISSING)
         if (schedule.requestUrl.isBlank()) return Outcome.Unavailable
         return Outcome.Ready(schedule)
+    }
+
+    /** هر سه فیلد باید در JSON باشند. نبودن کلید به‌معنی «همهٔ روزها آزاد» نیست. */
+    fun calendarReady(status: JSONObject): Boolean {
+        if (!status.has("visit_date_min") || status.optString("visit_date_min").isBlank()) return false
+        if (!status.has("visit_allowed_weekdays")) return false
+        if (!status.has("visit_allowed_hours")) return false
+        return true
     }
 
     fun fromStatus(landCode: String, status: JSONObject): Schedule {
