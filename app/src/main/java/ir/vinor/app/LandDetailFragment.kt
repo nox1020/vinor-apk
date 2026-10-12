@@ -328,40 +328,29 @@ class LandDetailFragment : Fragment() {
         binding.landDetailVisit.isEnabled = false
         scope.launch {
             try {
-                val schedule = withContext(Dispatchers.IO) {
-                    val encoded = Uri.encode(code)
-                    val page = PartnerApi.getPage(LandVisit.pagePath(encoded), ctx)
-                    if (PartnerCustomers.isLoginDocument(page.url, page.body)) return@withContext null
-                    val parsed = LandVisit.parsePage(page.body)
-                    val statusPath = parsed.statusUrl.ifBlank { LandVisit.statusPath(encoded) }
-                    val status = try {
-                        PartnerApi.get(statusPath, ctx)
-                    } catch (_: Exception) {
-                        JSONObject()
-                    }
-                    if (FollowRequests.isUnauthorized(status) && parsed.requestUrl.isBlank()) {
-                        return@withContext null
-                    }
-                    if (FollowRequests.isUnauthorized(status)) parsed else LandVisit.mergeStatus(parsed, status)
+                val status = withContext(Dispatchers.IO) {
+                    PartnerApi.get(LandVisit.statusPath(Uri.encode(code)), ctx)
                 }
                 if (_binding == null) return@launch
-                if (schedule == null) {
-                    (activity as? MainActivity)?.openLogin()
-                    return@launch
+                when (val outcome = LandVisit.decide(code, status)) {
+                    is LandVisit.Outcome.Ready -> showVisitSheet(outcome.schedule)
+                    LandVisit.Outcome.Login -> {
+                        (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    }
+                    LandVisit.Outcome.Offline -> {
+                        Toast.makeText(ctx, VinorPageLoad.OFFLINE, Toast.LENGTH_LONG).show()
+                    }
+                    is LandVisit.Outcome.Blocked -> {
+                        Toast.makeText(ctx, outcome.message, Toast.LENGTH_LONG).show()
+                    }
+                    LandVisit.Outcome.Unavailable -> {
+                        Toast.makeText(ctx, LandVisit.UNAVAILABLE, Toast.LENGTH_LONG).show()
+                    }
                 }
-                if (!LandVisit.canSchedule(schedule.mode, schedule.canRevisit)) {
-                    Toast.makeText(ctx, LandVisit.blockedMessage(schedule), Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                if (schedule.requestUrl.isBlank()) {
-                    Toast.makeText(ctx, LandVisit.UNAVAILABLE, Toast.LENGTH_SHORT).show()
-                    return@launch
-                }
-                showVisitSheet(schedule)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (_binding != null) {
-                    Toast.makeText(ctx, e.message ?: "خطا در ثبت بازدید", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, VinorPageLoad.OFFLINE, Toast.LENGTH_LONG).show()
                 }
             } finally {
                 visitBusy = false
@@ -563,7 +552,7 @@ class LandDetailFragment : Fragment() {
                     return@launch
                 }
                 PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
-                Toast.makeText(ctx, LandVisit.successMessage(resp), Toast.LENGTH_SHORT).show()
+                Toast.makeText(ctx, LandVisit.successMessage(resp, dateIso), Toast.LENGTH_LONG).show()
                 visitSheet?.dismiss()
                 val redirect = resp.optString("redirect_url").trim()
                 if (LandVisit.shouldFollowRedirect(redirect)) {
@@ -573,7 +562,7 @@ class LandDetailFragment : Fragment() {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (_binding != null && visitSheet?.isShowing == true) {
                     sheet.landVisitError.isVisible = true
-                    sheet.landVisitError.text = e.message ?: "خطا در ثبت بازدید"
+                    sheet.landVisitError.text = VinorPageLoad.OFFLINE
                 }
             } finally {
                 visitBusy = false

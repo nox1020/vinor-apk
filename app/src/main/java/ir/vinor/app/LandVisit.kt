@@ -32,6 +32,14 @@ object LandVisit {
 
     data class Customer(val first: String, val last: String, val phone: String)
 
+    sealed class Outcome {
+        data class Ready(val schedule: Schedule) : Outcome()
+        data object Login : Outcome()
+        data object Offline : Outcome()
+        data class Blocked(val message: String) : Outcome()
+        data object Unavailable : Outcome()
+    }
+
     data class DayCell(
         val iso: String,
         val label: String,
@@ -54,6 +62,58 @@ object LandVisit {
     fun pagePath(code: String): String = "/express/partner/lands/${code.trim()}"
 
     fun statusPath(code: String): String = "/express/partner/lands/${code.trim()}/tx-status"
+
+    /** مسیر ثبت، مستقل از HTML قدیمی جزئیات که دیگر دکمهٔ بازدید ندارد. */
+    fun requestPath(code: String): String {
+        val clean = code.trim()
+        if (clean.isEmpty()) return ""
+        val encoded = java.net.URLEncoder.encode(clean, Charsets.UTF_8.name()).replace("+", "%20")
+        return "/express/partner/visit-requests/$encoded"
+    }
+
+    /**
+     * وضعیت معامله همان منبع تقویم است. صفحهٔ HTML جزئیات دیگر آدرس ثبت را ندارد.
+     */
+    fun decide(landCode: String, status: JSONObject?): Outcome {
+        val obj = status ?: JSONObject()
+        if (obj.optBoolean("offline") || obj.optInt("http_status") == 0) return Outcome.Offline
+        if (needsLogin(obj)) return Outcome.Login
+        if (!obj.optBoolean("success")) {
+            val message = obj.optString("message").trim()
+            return if (message.isNotEmpty() && message != "Not Found") {
+                Outcome.Blocked(message)
+            } else {
+                Outcome.Unavailable
+            }
+        }
+        val schedule = fromStatus(landCode, obj)
+        if (!canSchedule(schedule.mode, schedule.canRevisit)) {
+            return Outcome.Blocked(blockedMessage(schedule))
+        }
+        if (schedule.requestUrl.isBlank()) return Outcome.Unavailable
+        return Outcome.Ready(schedule)
+    }
+
+    fun fromStatus(landCode: String, status: JSONObject): Schedule {
+        val url = status.optString("visit_request_url").trim().ifBlank { requestPath(landCode) }
+        return Schedule(
+            requestUrl = url,
+            statusUrl = statusPath(landCode),
+            csrf = status.optString("csrf_token").trim(),
+            mode = status.optString("tx_mode").trim(),
+            canRevisit = if (status.has("can_revisit")) status.optBoolean("can_revisit") else false,
+            visitDate = status.optString("visit_date").trim(),
+            visitDateJalali = status.optString("visit_date_jalali").trim(),
+            minDate = status.optString("visit_date_min").trim(),
+            weekdays = intSet(status.optJSONArray("visit_allowed_weekdays")),
+            hours = intList(status.optJSONArray("visit_allowed_hours")),
+        )
+    }
+
+    private fun needsLogin(obj: JSONObject): Boolean {
+        if (obj.optBoolean("session_expired") || obj.optInt("http_status") == 401) return true
+        return FollowRequests.isUnauthorized(obj)
+    }
 
     fun parsePage(html: String): Schedule {
         val config = configObject(html)
@@ -96,9 +156,9 @@ object LandVisit {
 
     fun canSchedule(mode: String, canRevisit: Boolean): Boolean {
         val key = mode.trim()
-        if (key.isEmpty()) return true
-        if (key == "visit" || key == "revisit") return true
-        return canRevisit && key == "deal"
+        if (key.isEmpty() || key == "visit" || key == "revisit") return true
+        if (!canRevisit) return false
+        return key == "deal" || key == "visit_no_show"
     }
 
     fun blockedMessage(schedule: Schedule): String {
@@ -111,6 +171,9 @@ object LandVisit {
             "visit_done" -> "بازدید این ملک ثبت شده است.$extra"
             "deal_pending" -> "درخواست معامله ثبت شد و منتظر تأیید ادمین است."
             "deal", "release" -> "ابتدا رفع معامله را انجام دهید. برای ثبت بازدید مجدد، از گزینه «رفع معامله» استفاده کنید."
+            "visit_no_show" -> "تا زمان تأیید، امکان ثبت بازدید جدید وجود ندارد."
+            "hidden" -> "برای ثبت درخواست بازدید باید حساب همکاری شما تأیید شده باشد."
+            "blocked" -> "این فایل در حال حاضر توسط همکار دیگری در حال معامله است."
             else -> UNAVAILABLE
         }
     }
@@ -161,9 +224,14 @@ object LandVisit {
         "customer_phone" to customer.phone,
     )
 
-    fun successMessage(payload: JSONObject): String {
+    fun successMessage(payload: JSONObject, selectedIso: String = ""): String {
+        val booked = payload.optString("visit_date").trim()
+        if (selectedIso.isNotBlank() && booked.isNotBlank() && booked != selectedIso) {
+            val label = payload.optString("visit_date_jalali").trim().ifBlank { display(booked) }
+            return "نوبت همان روز پر بود. بازدید برای $label ثبت شد."
+        }
         val message = payload.optString("message").trim()
-        if (message.contains("قبلاً")) return message
+        if (message.isNotEmpty()) return message
         return SENT
     }
 
