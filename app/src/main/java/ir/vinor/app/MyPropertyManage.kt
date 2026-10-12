@@ -293,6 +293,9 @@ object MyPropertyManage {
 
     /** اگر پاسخ سرور موفق باشد ولی وضعیت ملک عوض نشده، پیام موفقیت نشان داده نمی‌شود. */
     fun unpublishFailure(post: JSONObject, fallback: String): String {
+        if (post.optString("error_code") == "already_published") {
+            return "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود"
+        }
         if (post.optBoolean("ok")) return fallback
         return failureMessage(post, fallback)
     }
