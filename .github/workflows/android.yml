@@ -1,5 +1,7 @@
 name: Android CI & Direct APK
 
+# تغییر version.txt یا همین فایل، ساخت امضاشده را در Pull Request هم اجرا می‌کند.
+
 on:
   workflow_dispatch:
   push:
