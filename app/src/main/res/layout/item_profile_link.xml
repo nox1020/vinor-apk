@@ -70,6 +70,15 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <ProgressBar
+            android:id="@+id/itemProfileLinkProgress"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="8dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/vinor_text_muted"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/itemProfileLinkChevron"
             android:layout_width="16dp"

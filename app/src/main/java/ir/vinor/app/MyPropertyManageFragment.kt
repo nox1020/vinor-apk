@@ -36,6 +36,8 @@ class MyPropertyManageFragment : Fragment() {
     private var snapshot = JSONObject()
     private var sheetDialog: BottomSheetDialog? = null
     private var busy = false
+    private var publishBusy = false
+    private var deleteHidden = false
     private var selectedPayment = "نقدی"
     private var loadGen = 0
 
@@ -50,8 +52,8 @@ class MyPropertyManageFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        snapshot = runCatching { JSONObject(arguments?.getString(ARG_SNAPSHOT).orEmpty()) }.getOrNull()
-            ?: JSONObject()
+        snapshot = MyPropertyManage.readSnapshot(arguments?.getString(ARG_SNAPSHOT))
+        deleteHidden = arguments?.getBoolean(ARG_DELETE_GONE) == true
         binding.mpManageHeader.pageTitle.text = MyPropertyManage.PAGE_TITLE
         binding.mpManageHeader.pageBack.setOnClickListener {
             if (!findNavController().navigateUp()) {
@@ -100,6 +102,7 @@ class MyPropertyManageFragment : Fragment() {
         val price = MyPropertyManage.priceOf(snapshot)
         val published = MyPropertyManage.isPublished(snapshot)
         MyPropertyManage.actions().forEach { action ->
+            if (deleteHidden && action == MyPropertyManage.Action.DELETE) return@forEach
             val row = ItemProfileLinkBinding.inflate(layoutInflater, host, false)
             val label = MyPropertyManage.label(action, published && action == MyPropertyManage.Action.PUBLISH)
             row.itemProfileLinkTitle.text = label
@@ -123,6 +126,10 @@ class MyPropertyManageFragment : Fragment() {
                 row.itemProfileLinkTitle.setTextColor(error)
                 row.itemProfileLinkIcon.imageTintList = android.content.res.ColorStateList.valueOf(error)
             }
+            val spinning = publishBusy && action == MyPropertyManage.Action.PUBLISH
+            row.itemProfileLinkProgress.isVisible = spinning
+            row.itemProfileLinkChevron.isVisible = !spinning
+            row.root.isEnabled = !busy
             row.root.setOnClickListener { onAction(action) }
             row.root.contentDescription = label
             host.addView(row.root)
@@ -186,7 +193,7 @@ class MyPropertyManageFragment : Fragment() {
             try {
                 val fresh = PartnerApi.loadDisplay(path, ctx) { data ->
                     if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
-                    if (!VinorPageLoad.canRemember(data) || !detailOk(data)) return@loadDisplay
+                    if (!VinorPageLoad.canRemember(data) || !MyPropertyManage.detailAccepted(data)) return@loadDisplay
                     applyDetail(data)
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
@@ -195,7 +202,7 @@ class MyPropertyManageFragment : Fragment() {
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                if (VinorPageLoad.canRemember(fresh) && detailOk(fresh)) {
+                if (VinorPageLoad.canRemember(fresh) && MyPropertyManage.detailAccepted(fresh)) {
                     applyDetail(fresh)
                 } else if (VinorPageLoad.networkFailed(wasFresh, fresh)) {
                     VinorPageLoad.showOffline(binding.root) { loadDetail() }
@@ -208,15 +215,15 @@ class MyPropertyManageFragment : Fragment() {
         }
     }
 
-    private fun detailOk(obj: JSONObject): Boolean {
-        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
-        return obj.optBoolean("ok") || obj.optString("title").isNotBlank()
-    }
-
     private fun applyDetail(fresh: JSONObject) {
-        snapshot = MyPropertyManage.mergeDetail(snapshot, fresh)
+        snapshot = MyPropertyManage.applyListingDetail(snapshot, fresh)
+        persistSnapshot()
         bindPreview()
         bindRows()
+    }
+
+    private fun persistSnapshot() {
+        arguments?.putString(ARG_SNAPSHOT, MyPropertyManage.commitSnapshot(snapshot))
     }
 
     private fun showPriceSheet() {
@@ -316,6 +323,7 @@ class MyPropertyManageFragment : Fragment() {
         val body = MyPropertyManage.priceBody(snapshot, price)
         post(MyPropertyManage.SUBMIT_PATH, body, "ثبت قیمت ناموفق بود.") { fresh ->
             snapshot.put("price_total", price)
+            persistSnapshot()
             bindPreview()
             bindRows()
             toast(fresh.optString("message").ifBlank { "قیمت ثبت شد." })
@@ -332,6 +340,8 @@ class MyPropertyManageFragment : Fragment() {
         val ctx = context ?: return
         if (busy) return
         busy = true
+        publishBusy = true
+        bindRows()
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
@@ -356,9 +366,15 @@ class MyPropertyManageFragment : Fragment() {
                 if (MyPropertyManage.publishAccepted(fresh, land)) {
                     if (land != null) snapshot = MyPropertyManage.mergeDetail(snapshot, land)
                     MyPropertyManage.markPublished(snapshot, true)
+                    persistSnapshot()
                     bindPreview()
                     bindRows()
                     toast(fresh.optString("message").ifBlank { "ملک برای فروش منتشر شد." })
+                } else if (MyPropertyManage.absorbAlreadyPublished(snapshot, fresh)) {
+                    persistSnapshot()
+                    bindPreview()
+                    bindRows()
+                    toast(fresh.optString("error").ifBlank { "این ملک قبلاً برای فروش منتشر شده است." })
                 } else {
                     toast(MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."))
                 }
@@ -366,6 +382,8 @@ class MyPropertyManageFragment : Fragment() {
                 toast(e.message ?: "انتشار ناموفق بود.")
             } finally {
                 busy = false
+                publishBusy = false
+                if (_binding != null) bindRows()
             }
         }
     }
@@ -379,6 +397,8 @@ class MyPropertyManageFragment : Fragment() {
         }
         if (busy) return
         busy = true
+        publishBusy = true
+        bindRows()
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
@@ -404,9 +424,10 @@ class MyPropertyManageFragment : Fragment() {
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                if (MyPropertyManage.unpublishStopped(fresh, land)) {
-                    snapshot = if (land != null) MyPropertyManage.mergeDetail(snapshot, land) else snapshot
-                    MyPropertyManage.markPublished(snapshot, false)
+                val next = MyPropertyManage.finishUnpublish(snapshot, fresh, land)
+                if (next != null) {
+                    snapshot = next
+                    persistSnapshot()
                     bindPreview()
                     bindRows()
                     toast(fresh.optString("message").ifBlank { "انتشار فروش متوقف شد." })
@@ -417,6 +438,8 @@ class MyPropertyManageFragment : Fragment() {
                 toast(e.message ?: "توقف انتشار ناموفق بود.")
             } finally {
                 busy = false
+                publishBusy = false
+                if (_binding != null) bindRows()
             }
         }
     }
@@ -432,23 +455,8 @@ class MyPropertyManageFragment : Fragment() {
         busy = true
         scope.launch {
             try {
-                val page = withContext(Dispatchers.IO) {
-                    PartnerApi.getPage(MyPropertyManage.PAGE_PATH, ctx)
-                }
-                if (PartnerCustomers.isLoginDocument(page.url, page.body)) {
-                    toast("برای این کار وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
-                    return@launch
-                }
-                val call = MyPropertyManage.deleteCall(page.body, code)
                 val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postForm(
-                        call.path,
-                        MyPropertyManage.formFields(call),
-                        call.csrf,
-                        MyPropertyManage.PAGE_PATH,
-                        ctx,
-                    )
+                    PartnerApi.postJson(MyPropertyManage.DELETE_PATH, MyPropertyManage.deleteBody(code), ctx)
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401 || fresh.optString("error") == "unauthorized") {
@@ -457,16 +465,16 @@ class MyPropertyManageFragment : Fragment() {
                     (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                ListingMemory.invalidateLand(code, ctx)
-                val list = withContext(Dispatchers.IO) {
-                    PartnerApi.get(MyPropertyManage.PORTFOLIO_PATH, ctx)
+                if (MyPropertyManage.deleteUnavailable(fresh)) {
+                    deleteHidden = true
+                    arguments?.putBoolean(ARG_DELETE_GONE, true)
+                    bindRows()
+                    toast("حذف آگهی در دسترس نیست.")
+                    return@launch
                 }
-                if (MyPropertyManage.removedFromPortfolio(list, code)) {
-                    val note = fresh.optString("message").trim()
-                    val announced = note.isNotBlank() &&
-                        fresh.optString("error").isBlank() &&
-                        (fresh.optBoolean("ok") || fresh.optBoolean("success"))
-                    toast(if (announced) note else "ملک حذف شد.")
+                if (MyPropertyManage.deleteSucceeded(fresh)) {
+                    ListingMemory.invalidateLand(code, ctx)
+                    toast(fresh.optString("message").ifBlank { "ملک حذف شد." })
                     if (!findNavController().navigateUp()) {
                         (activity as? MainActivity)?.openMyProperty()
                     }
@@ -516,6 +524,7 @@ class MyPropertyManageFragment : Fragment() {
 
     companion object {
         const val ARG_SNAPSHOT = "snapshot"
+        const val ARG_DELETE_GONE = "delete_gone"
         private var sessionStamp = 0
 
         fun clearRemembered() {
