@@ -1,5 +1,8 @@
 package ir.vinor.app
 
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
+import java.util.concurrent.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -8,6 +11,42 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MyPropertyManageTest {
+
+    @Test
+    fun successfulPublishSurvivesFollowUpNetworkFailure() = runBlocking {
+        val post = JSONObject().put("ok", true).put("http_status", 200)
+        val detail = MyPropertyManage.refreshAfterPublish(post) { throw IOException("connection lost") }
+        assertTrue(MyPropertyManage.publishAccepted(post, detail))
+    }
+
+    @Test
+    fun confirmedStopSurvivesFollowUpNetworkFailure() = runBlocking {
+        val post = JSONObject().put("ok", true).put("http_status", 200).put("code", "4")
+            .put("items", JSONArray().put(JSONObject().put("code", "4").put("published_for_sale", false)))
+        val detail = MyPropertyManage.refreshAfterPublish(post) { throw IOException("connection lost") }
+        val card = JSONObject().put("code", "4").put("published_for_sale", true)
+        val next = MyPropertyManage.finishUnpublish(card, post, detail)
+        assertTrue(next != null)
+        assertFalse(MyPropertyManage.isPublished(next!!))
+        // A generic success without confirmation must still not fake a stopped listing.
+        assertFalse(MyPropertyManage.unpublishStopped(JSONObject().put("ok", true), detail))
+    }
+
+    @Test
+    fun rejectedPublishDoesNotRefresh() = runBlocking {
+        val post = JSONObject().put("ok", false).put("http_status", 400)
+        val detail = MyPropertyManage.refreshAfterPublish(post) { error("Must not refresh rejected write") }
+        assertTrue(detail == null)
+        assertFalse(MyPropertyManage.publishAccepted(post, detail))
+    }
+
+    @Test(expected = CancellationException::class)
+    fun followUpCancellationIsNotTreatedAsNetworkFailure(): Unit = runBlocking {
+        MyPropertyManage.refreshAfterPublish(JSONObject().put("ok", true)) {
+            throw CancellationException("view destroyed")
+        }
+        Unit
+    }
 
     @Test
     fun actions_matchDivarOrder() {

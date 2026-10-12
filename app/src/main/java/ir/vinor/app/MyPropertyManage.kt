@@ -238,6 +238,18 @@ object MyPropertyManage {
         return "/express/partner/api/lands/$encoded/data"
     }
 
+    /** A failed follow-up read must not discard an acknowledged write. */
+    suspend fun refreshAfterPublish(post: JSONObject, refresh: suspend () -> JSONObject): JSONObject? {
+        if (!post.optBoolean("ok") || post.optInt("http_status", 200) !in 200..299) return null
+        return try {
+            refresh()
+        } catch (e: java.util.concurrent.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** موفقیت فقط وقتی پاسخ انتشار قبول شود و جزئیات تازهٔ ملک دیگر منتشرشده نباشد. */
     fun unpublishStopped(post: JSONObject, land: JSONObject?): Boolean {
         val status = post.optInt("http_status", 200)

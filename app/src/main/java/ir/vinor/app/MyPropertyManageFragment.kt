@@ -341,20 +341,20 @@ class MyPropertyManageFragment : Fragment() {
         if (busy) return
         busy = true
         publishBusy = true
+        // Ignore detail requests started before this mutation.
+        ++loadGen
         bindRows()
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
                     PartnerApi.postJson(MyPropertyManage.PUBLISH_PATH, body, ctx)
                 }
-                val land = if (fresh.optBoolean("ok")) {
+                val land = MyPropertyManage.refreshAfterPublish(fresh) {
                     withContext(Dispatchers.IO) {
                         val path = MyPropertyManage.landDataPath(code)
                         ListingMemory.invalidateLand(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
-                } else {
-                    null
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
@@ -379,6 +379,7 @@ class MyPropertyManageFragment : Fragment() {
                     toast(MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 toast(e.message ?: "انتشار ناموفق بود.")
             } finally {
                 busy = false
@@ -398,6 +399,8 @@ class MyPropertyManageFragment : Fragment() {
         if (busy) return
         busy = true
         publishBusy = true
+        // Ignore detail requests started before this mutation.
+        ++loadGen
         bindRows()
         scope.launch {
             try {
@@ -408,14 +411,12 @@ class MyPropertyManageFragment : Fragment() {
                         ctx,
                     )
                 }
-                val land = if (fresh.optBoolean("ok")) {
+                val land = MyPropertyManage.refreshAfterPublish(fresh) {
                     withContext(Dispatchers.IO) {
                         val path = MyPropertyManage.landDataPath(code)
                         ListingMemory.invalidateLand(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
-                } else {
-                    null
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
@@ -435,6 +436,7 @@ class MyPropertyManageFragment : Fragment() {
                     toast(MyPropertyManage.unpublishFailure(fresh, "توقف انتشار ناموفق بود."))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 toast(e.message ?: "توقف انتشار ناموفق بود.")
             } finally {
                 busy = false
