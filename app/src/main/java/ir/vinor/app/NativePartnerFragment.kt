@@ -348,7 +348,6 @@ class NativePartnerFragment : Fragment() {
         hideSpecials()
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
-        addActionRow("ویرایش پروفایل") { (activity as? MainActivity)?.openProfileEdit() }
         addActionRow("خروج", danger = true) {
             VinorLogoutSheet.show(this) { finish ->
                 (activity as? MainActivity)?.logoutFromDrawer(finish) ?: finish()
