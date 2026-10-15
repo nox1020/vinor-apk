@@ -8,8 +8,8 @@ import org.json.JSONObject
  */
 object PublicSearchCatalog {
     const val SITEMAP_PATH = "/sitemap.xml"
-    /** سقف ایمنی؛ با جستجوی وب هم‌تراز تا همهٔ آگهی‌های عمومی بیایند. */
-    const val MAX = 5000
+    /** سقف ایمنی مسیر sitemap؛ با جستجوی وب هم‌تراز تا همهٔ آگهی‌های عمومی بیایند. */
+    const val MAX = 5_000
 
     private val urlRe = Regex(
         """<url>\s*<loc>\s*([^<]+?)\s*</loc>(?:\s*<lastmod>\s*([^<]+?)\s*</lastmod>)?""",
