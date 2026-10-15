@@ -3,7 +3,7 @@ package ir.vinor.app
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** ردیف افقی فایل پیشنهادی خانه. `suggested_files` اگر پر باشد، وگرنه همان آگهی‌های `divar_pro_ads`. */
+/** فهرست عمودی فایل پیشنهادی خانه. `suggested_files` اگر پر باشد، وگرنه همان آگهی‌های `divar_pro_ads`. */
 object HomeSuggest {
     const val LIMIT = 12
 
@@ -69,7 +69,7 @@ object HomeSuggest {
         val city = cityOf(ad.optString("location"))
         val hood = neighborhood(ad.optString("title"), city)
         return when {
-            city.isNotEmpty() && hood.isNotEmpty() && hood != city -> "$city - $hood"
+            city.isNotEmpty() && hood.isNotEmpty() && hood != city -> "$city، $hood"
             city.isNotEmpty() -> city
             else -> hood
         }
@@ -105,14 +105,31 @@ object HomeSuggest {
         return "${PartnerFormat.toman(pct.toLong())}٪ پورسانت"
     }
 
+    /** سن آگهی روی گوشهٔ عکس — مثل «۴ روز پیش». */
+    fun listedAge(ad: JSONObject): String {
+        val value = ad.optString("listed_label").trim()
+        if (value.isEmpty() || value == "null") return ""
+        return if (ageLabelRe.containsMatchIn(value)) value else ""
+    }
+
     /**
      * برچسب روی عکس کوچک. فیلد واقعی یا «جدید» برای آگهی چندساعت اخیر.
      * «پیشنهادی» تکرار عنوان ردیف است و روی بندانگشتی جا نمی‌شود.
+     * برچسب زمانی (`listed_label`) جدا با [listedAge] روی عکس می‌آید.
      */
     fun badge(ad: JSONObject): String {
-        listOf("badge", "tag", "ribbon", "listed_label").forEach { key ->
+        listOf("badge", "tag", "ribbon").forEach { key ->
             val value = ad.optString(key).trim()
             if (value.isNotEmpty() && value != "null" && value != "پیشنهادی") return value
+        }
+        val listed = ad.optString("listed_label").trim()
+        if (
+            listed.isNotEmpty() &&
+            listed != "null" &&
+            listed != "پیشنهادی" &&
+            !ageLabelRe.containsMatchIn(listed)
+        ) {
+            return listed
         }
         val location = ad.optString("location")
         if (recentRe.containsMatchIn(location)) return "جدید"
@@ -312,6 +329,7 @@ object HomeSuggest {
         """(?:امروز|دیروز|پریروز|[0-9۰-۹٠-٩]+\s*(?:ساعت|دقیقه|روز|هفته|ماه)\s*پیش)\s*""",
     )
     private val recentRe = Regex("""ساعت\s*پیش|دقیقه\s*پیش|لحظاتی|امروز|پریروز""")
+    private val ageLabelRe = Regex("""پیش|امروز|دیروز|پریروز|ساعت|دقیقه|لحظه|هفته|ماه|سال""")
     private val placeSkip = setOf(
         "زمین", "ویلا", "ویلایی", "ویلاهای", "باغ", "باغچه", "آب", "برق", "سند", "قسط", "قسطی",
         "اقساط", "اقساطی", "آسفالت", "نزدیک", "ساخت", "قابل", "بافت", "داخل", "فروش", "کد",
