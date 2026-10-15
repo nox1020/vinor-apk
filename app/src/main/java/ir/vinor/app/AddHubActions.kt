@@ -9,6 +9,8 @@ object AddHubActions {
     const val PAGE_TITLE = "چه کاری می‌خواهید انجام دهید؟"
     const val FOOTER_LABEL = "افزودن"
     const val PAGE_PATH = "/express/partner/add"
+    /** همان مودال «مشتری دارم» روی خانه — مسیر CRM جدا نیست. */
+    const val CUSTOMER_MODAL = "action:open_customer_modal"
 
     data class Row(
         val id: String,
@@ -30,7 +32,7 @@ object AddHubActions {
             id = "customer",
             title = "افزودن مشتری",
             subtitle = "مشخصات و نیاز ملکی مشتری را ثبت کنید.",
-            path = "/express/partner/customers",
+            path = CUSTOMER_MODAL,
             iconRes = R.drawable.ic_user_plus_stroke,
         ),
         Row(
@@ -48,6 +50,8 @@ object AddHubActions {
             iconRes = R.drawable.ic_scale,
         ),
     )
+
+    fun isCustomerModal(path: String?): Boolean = path == CUSTOMER_MODAL
 
     fun missingPaths(): List<String> = rows().filter { it.path.isNullOrBlank() }.map { it.title }
 }

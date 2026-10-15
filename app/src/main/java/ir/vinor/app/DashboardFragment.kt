@@ -236,6 +236,9 @@ class DashboardFragment : Fragment() {
         rememberedHome?.let { bindHomeAvatar(it) }
         if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
             openVinorChat()
+        } else if ((activity as? MainActivity)?.consumePendingCustomerModal() == true) {
+            showHomeEntry()
+            openCustomerModal()
         } else if (isChatOpen()) {
             resumeChatLive()
         }
@@ -628,7 +631,7 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun openCustomer() {
+    fun openCustomerModal() {
         if (!PartnerApi.hasSession()) {
             (activity as? MainActivity)?.openLogin()
             return
@@ -638,6 +641,8 @@ class DashboardFragment : Fragment() {
         binding.dashboardCustomer.isVisible = true
         binding.dashboardCustomerFirst.requestFocus()
     }
+
+    private fun openCustomer() = openCustomerModal()
 
     private fun submitCustomer() {
         if (customerBusy) return
@@ -1414,6 +1419,7 @@ class DashboardFragment : Fragment() {
         for (i in 0 until prompts.length()) {
             val p = prompts.optJSONObject(i) ?: continue
             if (p.optString("ui_action") == "open_divar_ads_all") continue
+            if (p.optString("ui_action") == "open_customer_modal") continue
             if (p.optString("label") == "پیگیری") continue
             if (p.optString("variant") == "hero") {
                 if (hero == null) hero = p
@@ -1470,14 +1476,7 @@ class DashboardFragment : Fragment() {
             obj.optBoolean("is_logged_in") ||
             obj.optString("me_phone").isNotBlank()
         if (approved) {
-            out.put(
-                JSONObject()
-                    .put("label", "مشتری دارم")
-                    .put("subtitle", "برای مشتری فایل مناسب پیدا کن")
-                    .put("variant", "hero")
-                    .put("icon", "user_plus")
-                    .put("ui_action", "open_customer_modal"),
-            )
+            // «مشتری دارم» از فوتر افزودن باز می‌شود؛ دکمهٔ خانه حذف شد.
             return out
         }
         if (pending) {
@@ -1515,54 +1514,38 @@ class DashboardFragment : Fragment() {
     }
 
     private fun bindHeroPrompt(prompt: JSONObject?, reqCount: Int = 0) {
-        val label = prompt?.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
-        val action = prompt?.optString("ui_action").orEmpty()
-        val followUps = if (action == "open_customer_modal") reqCount else 0
-        val sub = if (followUps > 0) {
-            "${PartnerFormat.toman(followUps)} مشتری نیاز به پیگیری"
-        } else {
-            prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        if (prompt == null || prompt.optString("ui_action") == "open_customer_modal") {
+            binding.dashboardHero.isVisible = false
+            return
         }
-        val customer = action == "open_customer_modal"
+        binding.dashboardHero.isVisible = true
+        val label = prompt.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
+        val action = prompt.optString("ui_action").orEmpty()
+        val sub = prompt.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
         binding.dashboardHeroKicker.isVisible = false
-        binding.dashboardHeroSub.isVisible = !customer && sub.isNotBlank()
+        binding.dashboardHeroSub.isVisible = sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = false
-        binding.dashboardHeroStart.isVisible = !customer
-        if (!customer) binding.dashboardHeroStart.text = "ادامه"
-        binding.dashboardHero.contentDescription = if (customer) "مشتری دارم" else label
-        alignHeroLabel(customer)
-        if (customer) {
-            binding.dashboardHeroTitle.maxLines = 1
-            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                binding.dashboardHeroTitle,
-                18,
-                26,
-                1,
-                TypedValue.COMPLEX_UNIT_SP,
-            )
-            binding.dashboardHeroTitle.text = customerTitle()
-            binding.dashboardHeroIcon.setImageResource(R.drawable.ic_customer_plus)
-            ImageViewCompat.setImageTintList(binding.dashboardHeroIcon, null)
-        } else {
-            TextViewCompat.setAutoSizeTextTypeWithDefaults(
-                binding.dashboardHeroTitle,
-                TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE,
-            )
-            binding.dashboardHeroTitle.text = label
-            binding.dashboardHeroTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
-            binding.dashboardHeroTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            binding.dashboardHeroTitle.maxLines = 2
-            binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
-            ImageViewCompat.setImageTintList(
-                binding.dashboardHeroIcon,
-                ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg)),
-            )
-        }
-        val href = prompt?.optString("href").orEmpty()
+        binding.dashboardHeroStart.isVisible = true
+        binding.dashboardHeroStart.text = "ادامه"
+        binding.dashboardHero.contentDescription = label
+        alignHeroLabel(customer = false)
+        TextViewCompat.setAutoSizeTextTypeWithDefaults(
+            binding.dashboardHeroTitle,
+            TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE,
+        )
+        binding.dashboardHeroTitle.text = label
+        binding.dashboardHeroTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+        binding.dashboardHeroTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        binding.dashboardHeroTitle.maxLines = 2
+        binding.dashboardHeroIcon.setImageResource(heroIcon(prompt.optString("icon")))
+        ImageViewCompat.setImageTintList(
+            binding.dashboardHeroIcon,
+            ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg)),
+        )
+        val href = prompt.optString("href").orEmpty()
         binding.dashboardHero.setOnClickListener {
             when {
-                action == "open_customer_modal" -> openCustomer()
                 action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
                 href.contains("/apply") || href.contains("/thanks") ->
                     (activity as? MainActivity)?.openConsultantOnboarding()

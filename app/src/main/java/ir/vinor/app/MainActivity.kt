@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var pendingOpenVinorChat = false
+    private var pendingOpenCustomerModal = false
     private var resumeChatAfterAuth = false
     private var pendingShowHome = false
     private var drawerIsSpecial = false
@@ -206,6 +207,7 @@ class MainActivity : AppCompatActivity() {
 
     fun openPartnerHome() {
         pendingOpenVinorChat = false
+        pendingOpenCustomerModal = false
         pendingShowHome = true
         val nav = navController
         val dash = findDashboard()
@@ -220,6 +222,58 @@ class MainActivity : AppCompatActivity() {
             runCatching { nav.navigate(R.id.dashboardFragment) }
         }
         revealPendingHome()
+    }
+
+    /** همان شیت «مشتری دارم» روی خانه — از صفحهٔ افزودن. */
+    fun openCustomerModal() {
+        if (!PartnerApi.hasSession()) {
+            openLogin()
+            return
+        }
+        pendingOpenVinorChat = false
+        pendingShowHome = false
+        val nav = navController
+        val dash = findDashboard()
+        if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
+            dash.showHomeEntry()
+            dash.openCustomerModal()
+            syncDivarTab()
+            return
+        }
+        pendingOpenCustomerModal = true
+        if (nav.currentDestination?.id != R.id.dashboardFragment) {
+            if (!nav.popBackStack(R.id.dashboardFragment, false)) {
+                nav.navigate(R.id.dashboardFragment)
+            }
+        }
+        fun tryOpen(left: Int) {
+            if (!pendingOpenCustomerModal) {
+                syncDivarTab()
+                return
+            }
+            if (!PartnerApi.hasSession()) {
+                pendingOpenCustomerModal = false
+                openLogin()
+                return
+            }
+            val live = findDashboard()
+            if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+                live.showHomeEntry()
+                live.openCustomerModal()
+                pendingOpenCustomerModal = false
+                syncDivarTab()
+                return
+            }
+            if (left > 0) binding.root.post { tryOpen(left - 1) }
+            else pendingOpenCustomerModal = false
+        }
+        binding.root.post { tryOpen(12) }
+    }
+
+    fun consumePendingCustomerModal(): Boolean {
+        val pending = pendingOpenCustomerModal
+        pendingOpenCustomerModal = false
+        return pending
     }
 
     /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب خانه روی چت می‌ماند. */

@@ -52,7 +52,9 @@ class AddHubFragment : Fragment() {
             } else {
                 item.root.contentDescription = "${row.title}. ${row.subtitle}"
                 item.root.setOnClickListener {
-                    (activity as? MainActivity)?.openPath(path)
+                    val host = activity as? MainActivity ?: return@setOnClickListener
+                    if (AddHubActions.isCustomerModal(path)) host.openCustomerModal()
+                    else host.openPath(path)
                 }
             }
         }
