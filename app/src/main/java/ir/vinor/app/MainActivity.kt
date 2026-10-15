@@ -151,6 +151,7 @@ class MainActivity : AppCompatActivity() {
                 profile = R.id.profileFragment,
                 myProperties = R.id.myPropertiesFragment,
                 propertyForm = R.id.myPropertyFormFragment,
+                addHub = R.id.addHubFragment,
             ),
         )
         val adsOn = tab == FooterTabs.Tab.ADS
@@ -378,6 +379,10 @@ class MainActivity : AppCompatActivity() {
                 openMyProperty()
                 true
             }
+            "add_hub" -> {
+                openAddHub()
+                true
+            }
             "property_form" -> {
                 openMyPropertyForm(dest.param == "1")
                 true
@@ -538,6 +543,7 @@ class MainActivity : AppCompatActivity() {
             R.id.commissionsFragment -> AuthReturnStore.Dest("commissions", "")
             R.id.routineFragment -> AuthReturnStore.Dest("routine", "")
             R.id.myPropertiesFragment -> AuthReturnStore.Dest("my_properties", "")
+            R.id.addHubFragment -> AuthReturnStore.Dest("add_hub", "")
             R.id.myPropertyFormFragment -> AuthReturnStore.Dest(
                 "property_form",
                 if (args?.getBoolean(MyPropertyFormFragment.ARG_PUBLIC) == true) "1" else "0",
@@ -586,7 +592,12 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        openOwnerHomeForm()
+        openAddHub()
+    }
+
+    fun openAddHub() {
+        if (navController.currentDestination?.id == R.id.addHubFragment) return
+        navigateTab(R.id.addHubFragment)
     }
 
     private fun applyTabbarVisibility() {
@@ -742,6 +753,7 @@ class MainActivity : AppCompatActivity() {
             }
             low == "/express/partner/requests" || low.startsWith("/express/partner/requests/") ->
                 openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/add") -> openAddHub()
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
