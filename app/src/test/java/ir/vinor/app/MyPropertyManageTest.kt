@@ -98,7 +98,15 @@ class MyPropertyManageTest {
     @Test
     fun unpublishFailure_hidesSuccessTextWhenListingStaysLive() {
         val republished = JSONObject().put("ok", true).put("message", "ملک برای فروش منتشر شد.")
-        assertEquals("توقف انتشار ناموفق بود.", MyPropertyManage.unpublishFailure(republished, "توقف انتشار ناموفق بود."))
+        assertEquals(
+            MyPropertyManage.STALE_UNPUBLISH,
+            MyPropertyManage.unpublishFailure(republished, "توقف انتشار ناموفق بود."),
+        )
+        val missing = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
+        assertEquals(
+            MyPropertyManage.STALE_UNPUBLISH,
+            MyPropertyManage.unpublishFailure(missing, "توقف انتشار ناموفق بود."),
+        )
         val rejected = JSONObject().put("ok", false).put("http_status", 400).put("error", "نحوه پرداخت را انتخاب کنید")
         assertEquals("نحوه پرداخت را انتخاب کنید", MyPropertyManage.unpublishFailure(rejected, "توقف انتشار ناموفق بود."))
     }
@@ -111,8 +119,16 @@ class MyPropertyManageTest {
             .put("error_code", "already_published")
             .put("error", "این ملک قبلاً برای فروش منتشر شده است.")
         assertEquals(
-            "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود",
+            MyPropertyManage.STALE_UNPUBLISH,
             MyPropertyManage.unpublishFailure(stale, "توقف انتشار ناموفق بود."),
+        )
+        val withoutCode = JSONObject()
+            .put("ok", false)
+            .put("http_status", 400)
+            .put("error", "این ملک قبلاً برای فروش منتشر شده است.")
+        assertEquals(
+            MyPropertyManage.STALE_UNPUBLISH,
+            MyPropertyManage.unpublishFailure(withoutCode, "توقف انتشار ناموفق بود."),
         )
     }
 
