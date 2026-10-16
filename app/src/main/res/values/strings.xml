@@ -15,6 +15,7 @@
     <string name="offline_checking">در حال بررسی…</string>
     <string name="offline_icon_cd">بدون اتصال</string>
 
+    <string name="login_reauth_hint">برای امنیت بیشتر، دوباره وارد شوید</string>
     <string name="login_otp_sent_to">کد ۵ رقمی ارسال‌شده به %1$s را وارد کنید</string>
     <string name="login_otp_incomplete">لطفاً کد ۵ رقمی را کامل وارد کنید.</string>
     <string name="login_otp_wrong">کد تأیید نادرست است.</string>

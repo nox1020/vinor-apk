@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/vinor_bg"
@@ -25,18 +26,17 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:layout_marginHorizontal="16dp"
-                android:background="@drawable/bg_routine_card"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="28dp"
+                android:padding="16dp"
                 android:visibility="gone">
 
                 <ImageView
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:contentDescription=""
+                    android:importantForAccessibility="no"
                     android:src="@drawable/ic_home"
-                    android:tint="#10B981" />
+                    app:tint="@color/vinor_text_muted" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -44,31 +44,31 @@
                     android:layout_marginTop="12dp"
                     android:fontFamily="@font/vazirmatn"
                     android:gravity="center"
-                    android:text="ملک شما هنوز ثبت نشده"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:text="هنوز آگهی‌ای ثبت نکرده‌اید"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="15sp" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
+                    android:fontFamily="@font/vazirmatn"
                     android:gravity="center"
                     android:text="ملک را ثبت کنید؛ بعد از ثبت می‌توانید برای فروش منتشر کنید."
                     android:textColor="@color/vinor_text_muted"
-                    android:textSize="12sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/mpEmptyCta"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_mp_submit"
+                    android:background="@drawable/bg_search_apply"
+                    android:fontFamily="@font/vazirmatn_bold"
                     android:gravity="center"
-                    android:text="ثبت ملک من"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:text="ثبت آگهی"
+                    android:textColor="@color/vinor_on_primary"
+                    android:textSize="15sp" />
             </LinearLayout>
 
             <ScrollView

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/vinor_bg"
+    android:layoutDirection="rtl"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/mpManageHeader"
+        layout="@layout/include_page_header" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
+
+            <LinearLayout
+                android:id="@+id/mpManagePreview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_routine_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/mpManageTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/vazirmatn"
+                        android:maxLines="2"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/mpManagePrice"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/mpManageStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="96dp"
+                    android:layout_height="96dp">
+
+                    <ImageView
+                        android:id="@+id/mpManageImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_land_thumb"
+                        android:contentDescription=""
+                        android:scaleType="centerCrop" />
+
+                    <TextView
+                        android:id="@+id/mpManageImagePlaceholder"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_land_thumb"
+                        android:gravity="center"
+                        android:text="- V -"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/mpManageActions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -40,8 +40,12 @@ class RoutineFragment : Fragment() {
     private var _binding: FragmentRoutineBinding? = null
     private val binding get() = _binding!!
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
+    private var stepsGen = 0
+    private var monthGen = 0
+    private var stepsRendered = false
+    private var monthRendered = false
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -75,6 +79,13 @@ class RoutineFragment : Fragment() {
         private const val ROUTINE_DATA = "/express/partner/routine/data"
         private const val ROUTINE_STEPS_DETAIL = "/express/partner/routine/steps/detail"
         private val PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
+        private val remembered = HashMap<String, JSONObject>()
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered.clear()
+            sessionStamp++
+        }
     }
 
     override fun onCreateView(
@@ -82,6 +93,10 @@ class RoutineFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
         _binding = FragmentRoutineBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -97,6 +112,14 @@ class RoutineFragment : Fragment() {
         todayStr = todayDateString()
         setupStepsReadOnly()
         setupCalendarNav()
+        remembered[todayPath()]?.let {
+            applyToday(it)
+            stepsRendered = true
+        }
+        remembered[monthPath()]?.let {
+            applyMonth(it)
+            monthRendered = true
+        }
         loadTodayDetail()
         loadMonthData()
         binding.cardTraining.setOnClickListener { openTraining() }
@@ -170,8 +193,8 @@ class RoutineFragment : Fragment() {
         stopAutoRefresh()
         val r = Runnable {
             if (_binding == null) return@Runnable
-            loadTodayDetail()
-            loadMonthData()
+            loadTodayDetail(quiet = true)
+            loadMonthData(quiet = true)
             refreshRunnable?.let { binding.root.postDelayed(it, refreshIntervalMs) }
         }
         refreshRunnable = r
@@ -184,63 +207,140 @@ class RoutineFragment : Fragment() {
         _binding?.root?.removeCallbacks(r)
     }
 
-    private fun loadTodayDetail() {
+    private fun todayPath(): String =
+        "$ROUTINE_STEPS_DETAIL?date=${URLEncoder.encode(todayStr, "UTF-8")}"
+
+    private fun monthPath(): String {
+        val month = String.format(
+            Locale.US,
+            "%04d-%02d",
+            currentMonth.get(Calendar.YEAR),
+            currentMonth.get(Calendar.MONTH) + 1,
+        )
+        return "$ROUTINE_DATA?month=${URLEncoder.encode(month, "UTF-8")}"
+    }
+
+    private fun loadTodayDetail(quiet: Boolean = false) {
         val ctx = context ?: return
-        val path = "$ROUTINE_STEPS_DETAIL?date=${URLEncoder.encode(todayStr, "UTF-8")}"
+        val path = todayPath()
+        val gen = ++stepsGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                PartnerApi.loadDisplay(path, ctx) { obj ->
-                    if (_binding == null) return@loadDisplay
-                    val arr = obj.optJSONArray("detail")
-                    stepsDetail = mutableListOf<String>().apply {
-                        if (arr != null) for (i in 0 until arr.length()) add(arr.optString(i, ""))
-                    }
-                    binding.step1.isChecked = stepsDetail.contains("1")
-                    binding.step2.isChecked = stepsDetail.contains("2")
-                    binding.step3.isChecked = stepsDetail.contains("3")
-                    updateStepChipsAndProgress()
+                val obj = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != stepsGen || stamp != sessionStamp) return@loadDisplay
+                    if (!stepsOk(data)) return@loadDisplay
+                    applyToday(data)
+                    stepsRendered = true
+                }
+                if (_binding == null || gen != stepsGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (stepsOk(obj)) {
+                    applyToday(obj)
+                    stepsRendered = true
+                    if (VinorPageLoad.canRemember(obj)) remembered[path] = VinorPageLoad.rememberedCopy(obj)
+                }
+                if (!quiet && VinorPageLoad.networkFailed(wasFresh, obj)) {
+                    VinorPageLoad.showOffline(binding.root) { loadTodayDetail() }
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadTodayDetail error", e)
+                if (_binding == null || gen != stepsGen || stamp != sessionStamp) return@launch
+                if (!quiet) VinorPageLoad.showOffline(binding.root) { loadTodayDetail() }
             }
         }
     }
 
-    private fun loadMonthData() {
+    private fun stepsOk(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.has("detail")) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
+    }
+
+    private fun applyToday(obj: JSONObject) {
+        val arr = obj.optJSONArray("detail")
+        stepsDetail = mutableListOf<String>().apply {
+            if (arr != null) for (i in 0 until arr.length()) add(arr.optString(i, ""))
+        }
+        binding.step1.isChecked = stepsDetail.contains("1")
+        binding.step2.isChecked = stepsDetail.contains("2")
+        binding.step3.isChecked = stepsDetail.contains("3")
+        updateStepChipsAndProgress()
+    }
+
+    private fun loadMonthData(quiet: Boolean = false) {
         val ctx = context ?: return
-        val month = String.format(Locale.US, "%04d-%02d", currentMonth.get(Calendar.YEAR), currentMonth.get(Calendar.MONTH) + 1)
-        val path = "$ROUTINE_DATA?month=${URLEncoder.encode(month, "UTF-8")}"
+        val path = monthPath()
+        if (_binding != null) updateMonthLabel()
+        remembered[path]?.let {
+            applyMonth(it)
+            monthRendered = true
+        }
+        val gen = ++monthGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                PartnerApi.loadDisplay(path, ctx) { obj ->
-                    if (_binding == null) return@loadDisplay
-                    val daysArr = obj.optJSONArray("days")
-                    completedDays = mutableListOf<String>().apply {
-                        if (daysArr != null) for (i in 0 until daysArr.length()) add(daysArr.optString(i, ""))
-                    }
-                    val stepsObj = obj.optJSONObject("steps")
-                    monthSteps = mutableMapOf<String, Int>().apply {
-                        if (stepsObj != null) {
-                            stepsObj.keys().forEach { key ->
-                                put(key, stepsObj.optInt(key, 0).coerceIn(0, 3))
-                            }
-                        }
-                    }
-                    setStatus("روزهای انجام‌شده از سرور بارگذاری شد.")
-                    updateMonthLabel()
-                    fillCalendar()
+                val obj = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != monthGen || stamp != sessionStamp) return@loadDisplay
+                    if (!monthOk(data)) return@loadDisplay
+                    applyMonth(data)
+                    monthRendered = true
                 }
+                if (_binding == null || gen != monthGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (monthOk(obj)) {
+                    applyMonth(obj)
+                    monthRendered = true
+                    if (VinorPageLoad.canRemember(obj)) remembered[path] = VinorPageLoad.rememberedCopy(obj)
+                }
+                val failed = VinorPageLoad.networkFailed(wasFresh, obj) || (!monthRendered && !monthOk(obj))
+                if (!quiet && failed) VinorPageLoad.showOffline(binding.root) { loadMonthData() }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadMonthData error", e)
-                if (_binding == null) return@launch
-                if (completedDays.isEmpty()) {
-                    monthSteps = emptyMap()
-                    setStatus("")
-                    updateMonthLabel()
-                    fillCalendar()
+                if (_binding == null || gen != monthGen || stamp != sessionStamp) return@launch
+                if (!quiet) VinorPageLoad.showOffline(binding.root) { loadMonthData() }
+            }
+        }
+    }
+
+    private fun monthOk(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.has("days") && !obj.has("steps")) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
+    }
+
+    private fun applyMonth(obj: JSONObject) {
+        val daysArr = obj.optJSONArray("days")
+        completedDays = mutableListOf<String>().apply {
+            if (daysArr != null) for (i in 0 until daysArr.length()) add(daysArr.optString(i, ""))
+        }
+        val stepsObj = obj.optJSONObject("steps")
+        monthSteps = mutableMapOf<String, Int>().apply {
+            if (stepsObj != null) {
+                stepsObj.keys().forEach { key ->
+                    put(key, stepsObj.optInt(key, 0).coerceIn(0, 3))
                 }
             }
         }
+        setStatus("روزهای انجام‌شده از سرور بارگذاری شد.")
+        updateMonthLabel()
+        fillCalendar()
     }
 
     private fun updateMonthLabel() {

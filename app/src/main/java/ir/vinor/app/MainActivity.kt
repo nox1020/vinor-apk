@@ -2,19 +2,18 @@ package ir.vinor.app
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.PorterDuff
-import android.graphics.Typeface
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -34,6 +33,9 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var pendingOpenVinorChat = false
+    private var pendingOpenCustomerModal = false
+    private var resumeChatAfterAuth = false
+    private var pendingShowHome = false
     private var drawerIsSpecial = false
     private var tabbarForcedHidden = false
     private var tabbarImeHidden = false
@@ -91,6 +93,11 @@ class MainActivity : AppCompatActivity() {
         })
 
         handleDeepLink(intent)
+        PartnerApi.setSessionExpiredListener {
+            if (isFinishing || isDestroyed) return@setSessionExpiredListener
+            clearPageMemory()
+            openLogin(sessionExpired = true)
+        }
         runCatching { VinorCacheSession.fingerprint(this) }
         runCatching { VinorApiCacheStore.warmup(this) }
         runCatching { VinorAppUpdateChecker.check(this, webView = null) }
@@ -116,6 +123,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        PartnerApi.setSessionExpiredListener(null)
         unregisterConnectivityCallback()
         notifyHelper?.destroy()
         super.onDestroy()
@@ -134,17 +142,24 @@ class MainActivity : AppCompatActivity() {
     fun syncDivarTab() {
         if (!::binding.isInitialized) return
         applyTabbarVisibility()
-        val dest = runCatching { navController.currentDestination?.id }.getOrNull()
-        val chatOn = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
-        val searchOn = dest == R.id.searchFragment
-        val postOn = dest == R.id.myPropertyFormFragment || dest == R.id.myPropertiesFragment
-        val meOn = dest == R.id.profileFragment ||
-            dest == R.id.commissionsFragment ||
-            dest == R.id.routineFragment ||
-            dest == R.id.notesFragment ||
-            dest == R.id.notificationsFragment ||
-            dest == R.id.nativePartnerFragment
-        val adsOn = dest == R.id.dashboardFragment && !chatOn
+        val stack = runCatching { navController.currentBackStack.value.map { it.destination.id } }.getOrDefault(emptyList())
+        val tab = FooterTabs.selected(
+            stack,
+            findDashboard()?.isChatOpen() == true,
+            FooterTabs.Ids(
+                dashboard = R.id.dashboardFragment,
+                search = R.id.searchFragment,
+                profile = R.id.profileFragment,
+                myProperties = R.id.myPropertiesFragment,
+                propertyForm = R.id.myPropertyFormFragment,
+                addHub = R.id.addHubFragment,
+            ),
+        )
+        val adsOn = tab == FooterTabs.Tab.ADS
+        val searchOn = tab == FooterTabs.Tab.SEARCH
+        val postOn = tab == FooterTabs.Tab.POST
+        val chatOn = tab == FooterTabs.Tab.CHAT
+        val meOn = tab == FooterTabs.Tab.ME
         paintTab(
             binding.divarTabbar.tabAdsIcon,
             binding.divarTabbar.tabAdsLabel,
@@ -185,33 +200,113 @@ class MainActivity : AppCompatActivity() {
     fun isDrawerOpen(): Boolean = false
 
     fun openDrawer() {
-        openLogin()
+        openLogin(sessionExpired = false)
     }
 
     fun closeDrawer() {}
 
     fun openPartnerHome() {
         pendingOpenVinorChat = false
+        pendingOpenCustomerModal = false
+        pendingShowHome = true
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
             dash.showHomeEntry()
             dash.scrollHomeToTop()
+            pendingShowHome = false
             syncDivarTab()
             return
         }
         if (!nav.popBackStack(R.id.dashboardFragment, false)) {
-            nav.navigate(R.id.dashboardFragment)
+            runCatching { nav.navigate(R.id.dashboardFragment) }
         }
-        findDashboard()?.showHomeEntry()
-        syncDivarTab()
+        revealPendingHome()
     }
 
-    fun openVinorChat() {
+    /** همان شیت «مشتری دارم» روی خانه — از صفحهٔ افزودن. */
+    fun openCustomerModal() {
+        if (!PartnerApi.hasSession()) {
+            openLogin()
+            return
+        }
+        pendingOpenVinorChat = false
+        pendingShowHome = false
         val nav = navController
         val dash = findDashboard()
         if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
-            dash.openVinorChat()
+            dash.showHomeEntry()
+            dash.openCustomerModal()
+            syncDivarTab()
+            return
+        }
+        pendingOpenCustomerModal = true
+        if (nav.currentDestination?.id != R.id.dashboardFragment) {
+            if (!nav.popBackStack(R.id.dashboardFragment, false)) {
+                nav.navigate(R.id.dashboardFragment)
+            }
+        }
+        fun tryOpen(left: Int) {
+            if (!pendingOpenCustomerModal) {
+                syncDivarTab()
+                return
+            }
+            if (!PartnerApi.hasSession()) {
+                pendingOpenCustomerModal = false
+                openLogin()
+                return
+            }
+            val live = findDashboard()
+            if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+                live.showHomeEntry()
+                live.openCustomerModal()
+                pendingOpenCustomerModal = false
+                syncDivarTab()
+                return
+            }
+            if (left > 0) binding.root.post { tryOpen(left - 1) }
+            else pendingOpenCustomerModal = false
+        }
+        binding.root.post { tryOpen(12) }
+    }
+
+    fun consumePendingCustomerModal(): Boolean {
+        val pending = pendingOpenCustomerModal
+        pendingOpenCustomerModal = false
+        return pending
+    }
+
+    /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب خانه روی چت می‌ماند. */
+    private fun revealPendingHome(left: Int = 12) {
+        if (!pendingShowHome) {
+            syncDivarTab()
+            return
+        }
+        val live = findDashboard()
+        if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+            live.showHomeEntry()
+            live.scrollHomeToTop()
+            pendingShowHome = false
+            syncDivarTab()
+            return
+        }
+        if (left > 0) binding.root.post { revealPendingHome(left - 1) }
+        else {
+            pendingShowHome = false
+            syncDivarTab()
+        }
+    }
+
+    fun openVinorChat() {
+        if (!PartnerApi.hasSession()) {
+            requireChatLogin()
+            return
+        }
+        pendingShowHome = false
+        val nav = navController
+        val dash = findDashboard()
+        if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
+            if (!dash.isCurrentAccountChatOpen()) dash.openVinorChat()
             syncDivarTab()
             return
         }
@@ -226,8 +321,12 @@ class MainActivity : AppCompatActivity() {
                 syncDivarTab()
                 return
             }
+            if (!PartnerApi.hasSession()) {
+                requireChatLogin()
+                return
+            }
             val live = findDashboard()
-            if (live != null) {
+            if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
                 live.openVinorChat()
                 pendingOpenVinorChat = false
                 syncDivarTab()
@@ -244,14 +343,141 @@ class MainActivity : AppCompatActivity() {
         return pending
     }
 
-    fun openLogin() {
-        if (navController.currentDestination?.id != R.id.loginStep1Fragment) {
-            navController.navigate(R.id.loginStep1Fragment)
+    /** مهمان تب چت را زده؛ بعد از OTP همان چتِ حساب جدید باز می‌شود. */
+    fun requireChatLogin(sessionExpired: Boolean = false) {
+        resumeChatAfterAuth = true
+        pendingOpenVinorChat = false
+        openLogin(sessionExpired)
+    }
+
+    fun clearChatResume() {
+        resumeChatAfterAuth = false
+    }
+
+    fun openChatIfResumed() {
+        if (!resumeChatAfterAuth || !PartnerApi.hasSession()) return
+        resumeChatAfterAuth = false
+        openVinorChat()
+    }
+
+    fun dropChatForSignedOutAccount() {
+        resumeChatAfterAuth = false
+        pendingOpenVinorChat = false
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        host?.childFragmentManager?.fragments?.forEach { (it as? DashboardFragment)?.releaseChatAccount() }
+    }
+
+    fun openLogin(sessionExpired: Boolean = false) {
+        if (sessionExpired) captureAuthReturn()
+        val args = Bundle().apply {
+            if (sessionExpired) {
+                putString(LoginStep1Fragment.ARG_REASON, AuthReturnStore.REASON_SESSION_EXPIRED)
+            }
         }
+        val current = navController.currentDestination?.id
+        if (current == R.id.loginStep1Fragment) {
+            if (sessionExpired) findLoginStep1()?.showSessionExpiredHint()
+            return
+        }
+        navController.navigate(R.id.loginStep1Fragment, args)
+    }
+
+    /** بعد از ورود موفق؛ false یعنی مقصدی نبود. */
+    fun consumeAuthReturn(): Boolean {
+        val dest = AuthReturnStore.consume(this) ?: return false
+        if (!AuthReturnStore.isInternal(dest)) return false
+        return when (dest.kind) {
+            "home" -> {
+                openPartnerHome()
+                true
+            }
+            "chat" -> {
+                openVinorChat()
+                true
+            }
+            "search" -> {
+                openSearch()
+                true
+            }
+            "profile" -> {
+                openProfile()
+                true
+            }
+            "profile_edit" -> {
+                openProfileEdit()
+                true
+            }
+            "notifications" -> {
+                openNotifications()
+                true
+            }
+            "notes" -> {
+                if (navController.currentDestination?.id != R.id.notesFragment) {
+                    navController.navigate(R.id.notesFragment)
+                }
+                true
+            }
+            "commissions" -> {
+                if (navController.currentDestination?.id != R.id.commissionsFragment) {
+                    navController.navigate(R.id.commissionsFragment)
+                }
+                true
+            }
+            "routine" -> {
+                if (navController.currentDestination?.id != R.id.routineFragment) {
+                    navController.navigate(R.id.routineFragment)
+                }
+                true
+            }
+            "my_properties" -> {
+                openMyProperty()
+                true
+            }
+            "add_hub" -> {
+                openAddHub()
+                true
+            }
+            "property_form" -> {
+                openMyPropertyForm(dest.param == "1")
+                true
+            }
+            "land" -> {
+                if (!AuthReturnStore.isSafeLandCode(dest.param)) false
+                else {
+                    openLand(dest.param)
+                    true
+                }
+            }
+            "native" -> {
+                if (!AuthReturnStore.isSafeNativePage(dest.param)) false
+                else {
+                    openNativePage(dest.param)
+                    true
+                }
+            }
+            "consultant" -> {
+                openConsultantOnboarding()
+                true
+            }
+            "partner" -> {
+                val path = AuthReturnStore.internalPartnerPath(dest.param) ?: return false
+                openPath(path)
+                true
+            }
+            else -> false
+        }
+    }
+
+    fun openMyPropertyForm(publicListing: Boolean) {
+        openListingCompose(publicListing)
     }
 
     fun openProfile() {
         if (navController.currentDestination?.id == R.id.profileFragment) return
+        if (popToInStack(R.id.profileFragment)) {
+            syncDivarTab()
+            return
+        }
         navigateTab(R.id.profileFragment)
     }
 
@@ -278,7 +504,17 @@ class MainActivity : AppCompatActivity() {
 
     fun openSearch() {
         if (navController.currentDestination?.id == R.id.searchFragment) return
+        if (popToInStack(R.id.searchFragment)) {
+            syncDivarTab()
+            return
+        }
         navigateTab(R.id.searchFragment)
+    }
+
+    /** اگر ریشهٔ همین تب زیر صفحهٔ فعلی است، همان را نشان بده و فرگمنت را از نو نساز. */
+    private fun popToInStack(destId: Int): Boolean {
+        if (runCatching { navController.getBackStackEntry(destId) }.isFailure) return false
+        return navController.popBackStack(destId, false)
     }
 
     private fun openNativePage(page: String, asTab: Boolean) {
@@ -301,6 +537,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openCustomers(uri: Uri) {
+        if (!PartnerApi.hasSession()) {
+            DeepLinkPendingStore.save(this, uri.toString())
+            openLogin()
+            return
+        }
+        val url = uri.toString()
+        val current = navController.currentBackStackEntry?.arguments?.getString("url")
+        if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
+        val args = Bundle().apply { putString("url", url) }
+        navController.navigate(R.id.customersFragment, args)
+    }
+
     fun openLand(code: String) {
         val trimmed = code.trim()
         if (trimmed.isBlank()) return
@@ -321,6 +570,59 @@ class MainActivity : AppCompatActivity() {
         return host?.childFragmentManager?.primaryNavigationFragment as? DashboardFragment
     }
 
+    private fun findLoginStep1(): LoginStep1Fragment? {
+        val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+        return host?.childFragmentManager?.primaryNavigationFragment as? LoginStep1Fragment
+    }
+
+    private fun captureAuthReturn() {
+        val destId = runCatching { navController.currentDestination?.id }.getOrNull() ?: return
+        if (destId == R.id.loginStep1Fragment ||
+            destId == R.id.loginStep2Fragment ||
+            destId == R.id.loginWebFragment
+        ) {
+            return
+        }
+        val args = navController.currentBackStackEntry?.arguments
+        val dest = when (destId) {
+            R.id.dashboardFragment -> AuthReturnStore.Dest(
+                if (findDashboard()?.isChatOpen() == true) "chat" else "home",
+                "",
+            )
+            R.id.searchFragment -> AuthReturnStore.Dest("search", "")
+            R.id.profileFragment -> AuthReturnStore.Dest("profile", "")
+            R.id.profileEditFragment -> AuthReturnStore.Dest("profile_edit", "")
+            R.id.notificationsFragment -> AuthReturnStore.Dest("notifications", "")
+            R.id.notesFragment -> AuthReturnStore.Dest("notes", "")
+            R.id.commissionsFragment -> AuthReturnStore.Dest("commissions", "")
+            R.id.routineFragment -> AuthReturnStore.Dest("routine", "")
+            R.id.myPropertiesFragment -> AuthReturnStore.Dest("my_properties", "")
+            R.id.addHubFragment -> AuthReturnStore.Dest("add_hub", "")
+            R.id.myPropertyFormFragment -> AuthReturnStore.Dest(
+                "property_form",
+                if (args?.getBoolean(MyPropertyFormFragment.ARG_PUBLIC) == true) "1" else "0",
+            )
+            R.id.landDetailFragment -> {
+                val code = args?.getString("code").orEmpty()
+                if (!AuthReturnStore.isSafeLandCode(code)) return
+                AuthReturnStore.Dest("land", code)
+            }
+            R.id.nativePartnerFragment -> {
+                val page = args?.getString(NativePartnerFragment.ARG_PAGE).orEmpty()
+                if (!AuthReturnStore.isSafeNativePage(page)) return
+                AuthReturnStore.Dest("native", page)
+            }
+            R.id.consultantOnboardingFragment -> AuthReturnStore.Dest("consultant", "")
+            R.id.partnerPageFragment -> {
+                val raw = args?.getString(PartnerPageFragment.ARG_URL).orEmpty()
+                val path = AuthReturnStore.internalPartnerPath(raw) ?: return
+                AuthReturnStore.Dest("partner", path)
+            }
+            else -> return
+        }
+        if (AuthReturnStore.isInternal(dest)) AuthReturnStore.save(this, dest)
+    }
+
     private fun wireDivarTabbar() {
         binding.divarTabbar.tabAds.setOnClickListener { openPartnerHome() }
         binding.divarTabbar.tabSearch.setOnClickListener { openSearch() }
@@ -328,7 +630,11 @@ class MainActivity : AppCompatActivity() {
         binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
         binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
         binding.root.post {
-            navController.addOnDestinationChangedListener { _, _, _ ->
+            navController.addOnDestinationChangedListener { _, destination, _ ->
+                val onLogin = destination.id == R.id.loginStep1Fragment ||
+                    destination.id == R.id.loginStep2Fragment ||
+                    destination.id == R.id.loginWebFragment
+                if (!onLogin && !PartnerApi.hasSession()) resumeChatAfterAuth = false
                 binding.root.post { syncDivarTab() }
             }
             syncDivarTab()
@@ -340,7 +646,12 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        openOwnerHomeForm()
+        openAddHub()
+    }
+
+    fun openAddHub() {
+        if (navController.currentDestination?.id == R.id.addHubFragment) return
+        navigateTab(R.id.addHubFragment)
     }
 
     private fun applyTabbarVisibility() {
@@ -352,6 +663,7 @@ class MainActivity : AppCompatActivity() {
             dest == R.id.profileEditFragment ||
             dest == R.id.landDetailFragment ||
             dest == R.id.myPropertyFormFragment ||
+            dest == R.id.myPropertyManageFragment ||
             dest == R.id.partnerPageFragment
         val chatOpen = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         if (!chatOpen) tabbarImeHidden = false
@@ -381,10 +693,16 @@ class MainActivity : AppCompatActivity() {
         fill: Int,
     ) {
         icon.setImageResource(if (on) fill else outline)
-        val c = Color.parseColor(if (on) "#4ADE80" else "#A3A3A3")
+        val c = ContextCompat.getColor(
+            this,
+            if (on) R.color.vinor_nav_selected else R.color.vinor_nav_unselected,
+        )
         icon.setColorFilter(c, PorterDuff.Mode.SRC_IN)
         label.setTextColor(c)
-        label.setTypeface(null, if (on) Typeface.BOLD else Typeface.NORMAL)
+        label.typeface = ResourcesCompat.getFont(
+            this,
+            if (on) R.font.vazirmatn_bold else R.font.vazirmatn_regular,
+        )
     }
 
     private fun findWebPage(): BaseWebViewFragment? {
@@ -394,7 +712,32 @@ class MainActivity : AppCompatActivity() {
 
     fun openMyProperty() {
         if (navController.currentDestination?.id == R.id.myPropertiesFragment) return
+        if (navController.currentDestination?.id == R.id.profileFragment) {
+            navController.navigate(R.id.myPropertiesFragment)
+            return
+        }
         navigateTab(R.id.myPropertiesFragment)
+    }
+
+    /** بازگشت هدر تنظیمات، نشان‌شده‌ها و آگهی‌های من به تب وینور من. */
+    fun returnToVinorMan() {
+        if (!navController.popBackStack(R.id.profileFragment, false)) {
+            openProfile()
+        }
+    }
+
+    fun openMyPropertyManage(snapshot: org.json.JSONObject) {
+        val args = Bundle().apply { putString(MyPropertyManageFragment.ARG_SNAPSHOT, snapshot.toString()) }
+        navController.navigate(R.id.myPropertyManageFragment, args)
+    }
+
+    fun openPropertyEdit(snapshot: org.json.JSONObject) {
+        val args = Bundle().apply {
+            putBoolean(MyPropertyFormFragment.ARG_PUBLIC, false)
+            putString(MyPropertyFormFragment.ARG_CODE, MyPropertyManage.codeOf(snapshot))
+            putString(MyPropertyFormFragment.ARG_SNAPSHOT, snapshot.toString())
+        }
+        navController.navigate(R.id.myPropertyFormFragment, args)
     }
 
     fun openOwnerHomeForm() {
@@ -408,9 +751,18 @@ class MainActivity : AppCompatActivity() {
     private fun openListingCompose(publicListing: Boolean) {
         val args = Bundle().apply {
             putBoolean(MyPropertyFormFragment.ARG_PUBLIC, publicListing)
+            putString(MyPropertyFormFragment.ARG_CODE, "")
+            putString(MyPropertyFormFragment.ARG_SNAPSHOT, "")
         }
         if (navController.currentDestination?.id == R.id.myPropertyFormFragment) return
-        navigateTab(R.id.myPropertyFormFragment, args)
+        // فرم تازه نباید آرگومان ویرایش قبلی (مثلاً کد ۱) را از بک‌استک برگرداند.
+        val opts = NavOptions.Builder()
+            .setLaunchSingleTop(false)
+            .setRestoreState(false)
+            .setPopUpTo(R.id.dashboardFragment, false, false)
+            .build()
+        runCatching { navController.navigate(R.id.myPropertyFormFragment, args, opts) }
+            .onFailure { navController.navigate(R.id.myPropertyFormFragment, args) }
     }
 
     private fun navigateTab(dest: Int, args: Bundle? = null) {
@@ -434,6 +786,7 @@ class MainActivity : AppCompatActivity() {
                 when {
                     !land.isNullOrBlank() -> openLand(land)
                     !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    uri.getQueryParameter("ai") == "1" -> openVinorChat()
                     else -> openPartnerHome()
                 }
             }
@@ -452,8 +805,18 @@ class MainActivity : AppCompatActivity() {
             low.endsWith("/invite") -> openNativePage(NativePartnerFragment.PAGE_INVITE)
             low.endsWith("/settings") -> openNativePage(NativePartnerFragment.PAGE_SETTINGS)
             low.endsWith("/favorites") -> openNativePage(NativePartnerFragment.PAGE_FAVORITES)
-            low.endsWith("/search") -> openSearch()
-            low.endsWith("/requests") -> openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/search") -> {
+                val land = uri.getQueryParameter("land")
+                val divar = uri.getQueryParameter("divar")
+                when {
+                    !land.isNullOrBlank() -> openLand(land)
+                    !divar.isNullOrBlank() -> openLand("divar:$divar")
+                    else -> openSearch()
+                }
+            }
+            low == "/express/partner/requests" || low.startsWith("/express/partner/requests/") ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/add") -> openAddHub()
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {
@@ -463,7 +826,8 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.myPropertiesFragment)
                 }
             }
-            low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
+            low.endsWith("/consultant") || low.contains("/consultant/") ||
+                low.endsWith("/apply") || low.contains("/apply/") || low.endsWith("/thanks") ->
                 openConsultantOnboarding()
             low.contains("/legal/terms") || low.endsWith("/cooperation-terms") ->
                 openNativePage(NativePartnerFragment.PAGE_TERMS)
@@ -472,7 +836,7 @@ class MainActivity : AppCompatActivity() {
             low.contains("/notifications") -> openNotifications()
             low.contains("/commissions") -> {
                 if (navController.currentDestination?.id != R.id.commissionsFragment) {
-                    navController.navigate(R.id.commissionsFragment)
+                    navigateTab(R.id.commissionsFragment)
                 }
             }
             low.contains("/profile/edit") -> openProfileEdit()
@@ -481,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.routineFragment)
                 }
             }
-            low.endsWith("/customers") || low.contains("/customers/") -> openInAppPartnerPage(uri)
+            low.endsWith("/customers") || low.contains("/customers/") -> openCustomers(uri)
             else -> openInAppPartnerPage(uri)
         }
     }
@@ -493,23 +857,39 @@ class MainActivity : AppCompatActivity() {
 
     fun consumePendingDeepLink(): Boolean {
         val pending = DeepLinkPendingStore.consume(this) ?: return false
+        if (VinorManMenu.isSafeInternalPath(pending)) {
+            openPath(pending)
+            return true
+        }
         handleDeepLink(Intent(Intent.ACTION_VIEW, Uri.parse(pending)))
         return true
     }
 
-    fun logoutFromDrawer() {
-        lifecycleScope.launch {
-            VinorFcmRegistrar.unregisterCurrentToken(this@MainActivity)
+    private fun clearPageMemory() {
+        DashboardFragment.clearRememberedHome()
+        SearchFragment.clearRemembered()
+        MyPropertyFormFragment.clearRemembered()
+        ProfileFragment.clearRemembered()
+        NativePartnerFragment.clearRemembered()
+        ListingMemory.clearSession()
+        NotificationsFragment.clearRemembered()
+        NotesFragment.clearRemembered()
+        ProfileEditFragment.clearRemembered()
+        CommissionsFragment.clearRemembered()
+        CustomersFragment.clearRemembered()
+        RoutineFragment.clearRemembered()
+        ConsultantOnboardingFragment.clearRemembered()
+    }
+
+    fun logoutFromDrawer(onFinished: (() -> Unit)? = null) {
+        clearPageMemory()
+        VinorSessionLogout.perform(this, lifecycleScope) {
             try {
-                withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/api/logout", JSONObject(), this@MainActivity)
-                }
-            } catch (_: Exception) {
-            }
-            PartnerApi.clearCookies {
-                Toast.makeText(this@MainActivity, "از حساب خارج شدید.", Toast.LENGTH_SHORT).show()
+                dropChatForSignedOutAccount()
                 refreshPartnerFlags()
                 openPartnerHome()
+            } finally {
+                onFinished?.invoke()
             }
         }
     }
@@ -567,6 +947,9 @@ class MainActivity : AppCompatActivity() {
             DeepLinkRouter.DestinationType.PARTNER_COMMISSIONS -> navController.navigate(R.id.commissionsFragment)
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
+            DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS -> openPath(route.targetUrl)
+            DeepLinkRouter.DestinationType.PARTNER_REQUESTS ->
+                openNativePage(NativePartnerFragment.PAGE_REQUESTS)
             DeepLinkRouter.DestinationType.PARTNER_LOGIN -> openLogin()
             DeepLinkRouter.DestinationType.PARTNER_WEB -> openPath(route.targetUrl)
             DeepLinkRouter.DestinationType.APK_DOWNLOAD -> {

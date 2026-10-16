@@ -1,5 +1,7 @@
 name: Android CI & Direct APK
 
+# تغییر version.txt یا همین فایل، ساخت امضاشده را در Pull Request هم اجرا می‌کند.
+
 on:
   workflow_dispatch:
   push:
@@ -15,11 +17,13 @@ on:
   pull_request:
     branches: [ main ]
     paths:
+      - 'version.txt'
       - 'app/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'
       - 'gradle/**'
+      - '.github/workflows/android.yml'
 
 concurrency:
   group: android-${{ github.ref }}

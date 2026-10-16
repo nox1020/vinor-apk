@@ -38,8 +38,11 @@ class NotesFragment : Fragment() {
     private var _binding: FragmentNotesBinding? = null
     private val binding get() = _binding!!
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
+    private var loadGen = 0
+    private var rendered = false
+    private var skipNextResume = true
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -51,6 +54,14 @@ class NotesFragment : Fragment() {
         private const val API_LIST = "/express/partner/api/notes"
         private const val API_ADD = "/express/partner/api/notes"
         private const val API_DELETE = "/express/partner/api/notes/%d/delete"
+        private const val EMPTY = "یادداشتی ثبت نشده است."
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 
     override fun onCreateView(
@@ -58,6 +69,11 @@ class NotesFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
+        skipNextResume = true
         _binding = FragmentNotesBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -66,7 +82,19 @@ class NotesFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.notesBack.setOnClickListener { findNavController().navigateUp() }
         binding.notesAdd.setOnClickListener { addNote() }
+        remembered?.let {
+            if (paint(it)) rendered = true
+        }
         loadNotes()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null) loadNotes()
     }
 
     override fun onDestroyView() {
@@ -99,41 +127,66 @@ class NotesFragment : Fragment() {
     private fun loadNotes() {
         val ctx = context ?: return
         if (_binding == null) return
-        binding.notesProgress.visibility = View.VISIBLE
-        binding.notesEmpty.visibility = View.GONE
-
+        if (!rendered) {
+            binding.notesProgress.visibility = View.VISIBLE
+            binding.notesEmpty.visibility = View.GONE
+        }
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(API_LIST, ctx) }
             try {
                 val obj = PartnerApi.loadDisplay(API_LIST, ctx) { data ->
-                    if (_binding == null) return@loadDisplay
-                    if (!data.optBoolean("success", false) && data.optJSONArray("items") == null) return@loadDisplay
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                    if (!paint(data)) return@loadDisplay
+                    rendered = true
                     binding.notesProgress.visibility = View.GONE
-                    val arr = data.optJSONArray("items") ?: org.json.JSONArray()
-                    val items = mutableListOf<JSONObject>()
-                    for (i in 0 until arr.length()) {
-                        arr.optJSONObject(i)?.let { items.add(it) }
-                    }
-                    bind(items)
                 }
-                if (_binding == null) return@launch
-                if (!obj.optBoolean("success", false) && obj.optJSONArray("items") == null) {
-                    showError()
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
                 }
+                if (paint(obj)) {
+                    rendered = true
+                    if (VinorPageLoad.canRemember(obj)) remembered = VinorPageLoad.rememberedCopy(obj)
+                }
+                if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) showOffline()
+                else if (!rendered) showOffline()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadNotes error", e)
-                if (_binding != null) showError()
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                showOffline()
+            } finally {
+                if (_binding != null && gen == loadGen) binding.notesProgress.visibility = View.GONE
             }
         }
     }
 
-    private fun showError() {
+    private fun paint(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.optBoolean("success", false) && obj.optJSONArray("items") == null) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        if (code !in 200..299) return false
+        val arr = obj.optJSONArray("items") ?: org.json.JSONArray()
+        val items = mutableListOf<JSONObject>()
+        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { items.add(it) }
+        bind(items)
+        return true
+    }
+
+    private fun showOffline() {
         if (_binding == null) return
         binding.notesProgress.visibility = View.GONE
-        binding.notesList.removeAllViews()
-        binding.notesEmpty.visibility = View.VISIBLE
-        context?.let {
-            Toast.makeText(it, "خطا در بارگذاری یادداشت‌ها", Toast.LENGTH_SHORT).show()
+        if (rendered) {
+            VinorPageLoad.showOffline(binding.root) { loadNotes() }
+            return
         }
+        binding.notesEmpty.text = VinorPageLoad.OFFLINE
+        binding.notesEmpty.visibility = View.VISIBLE
     }
 
     private fun bind(items: List<JSONObject>) {
@@ -141,6 +194,7 @@ class NotesFragment : Fragment() {
         binding.notesList.removeAllViews()
 
         if (items.isEmpty()) {
+            binding.notesEmpty.text = EMPTY
             binding.notesEmpty.visibility = View.VISIBLE
             return
         }

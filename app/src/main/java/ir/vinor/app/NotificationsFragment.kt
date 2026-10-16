@@ -40,8 +40,11 @@ class NotificationsFragment : Fragment() {
     private var _binding: FragmentNotificationsBinding? = null
     private val binding get() = _binding!!
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
+    private var loadGen = 0
+    private var rendered = false
+    private var skipNextResume = true
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -53,6 +56,14 @@ class NotificationsFragment : Fragment() {
         private const val API_LIST = "/express/partner/api/notifications"
         private const val API_MARK_ALL = "/express/partner/api/notifications/read-all"
         private const val API_MARK_ONE = "/express/partner/api/notifications/%s/read"
+        private const val EMPTY = "اعلانی برای نمایش وجود ندارد."
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 
     override fun onCreateView(
@@ -60,6 +71,11 @@ class NotificationsFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
+        skipNextResume = true
         _binding = FragmentNotificationsBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -72,7 +88,19 @@ class NotificationsFragment : Fragment() {
         binding.notificationsMarkAll.setOnClickListener {
             markAllRead()
         }
+        remembered?.let {
+            if (paint(it)) rendered = true
+        }
         loadNotifications()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null) loadNotifications()
     }
 
     override fun onDestroyView() {
@@ -105,43 +133,66 @@ class NotificationsFragment : Fragment() {
     private fun loadNotifications() {
         val ctx = context ?: return
         if (_binding == null) return
-        binding.notificationsProgress.visibility = View.VISIBLE
-        binding.notificationsEmpty.visibility = View.GONE
-
+        if (!rendered) {
+            binding.notificationsProgress.visibility = View.VISIBLE
+            binding.notificationsEmpty.visibility = View.GONE
+        }
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(API_LIST, ctx) }
             try {
                 val obj = PartnerApi.loadDisplay(API_LIST, ctx) { data ->
-                    if (_binding == null) return@loadDisplay
-                    if (!data.optBoolean("success", false) && data.optJSONArray("notifications") == null) {
-                        return@loadDisplay
-                    }
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                    if (!paint(data)) return@loadDisplay
+                    rendered = true
                     binding.notificationsProgress.visibility = View.GONE
-                    val arr = data.optJSONArray("notifications") ?: org.json.JSONArray()
-                    val items = mutableListOf<JSONObject>()
-                    for (i in 0 until arr.length()) {
-                        arr.optJSONObject(i)?.let { items.add(it) }
-                    }
-                    bind(items)
                 }
-                if (_binding == null) return@launch
-                if (!obj.optBoolean("success", false) && obj.optJSONArray("notifications") == null) {
-                    showError()
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
                 }
+                if (paint(obj)) {
+                    rendered = true
+                    if (VinorPageLoad.canRemember(obj)) remembered = VinorPageLoad.rememberedCopy(obj)
+                }
+                if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) showOffline()
+                else if (!rendered) showOffline()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadNotifications error", e)
-                if (_binding != null) showError()
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                showOffline()
+            } finally {
+                if (_binding != null && gen == loadGen) binding.notificationsProgress.visibility = View.GONE
             }
         }
     }
 
-    private fun showError() {
+    private fun paint(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.optBoolean("success", false) && obj.optJSONArray("notifications") == null) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        if (code !in 200..299) return false
+        val arr = obj.optJSONArray("notifications") ?: org.json.JSONArray()
+        val items = mutableListOf<JSONObject>()
+        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { items.add(it) }
+        bind(items)
+        return true
+    }
+
+    private fun showOffline() {
         if (_binding == null) return
         binding.notificationsProgress.visibility = View.GONE
-        binding.notificationsList.removeAllViews()
-        binding.notificationsEmpty.visibility = View.VISIBLE
-        context?.let {
-            Toast.makeText(it, "خطا در بارگذاری اعلان‌ها", Toast.LENGTH_SHORT).show()
+        if (rendered) {
+            VinorPageLoad.showOffline(binding.root) { loadNotifications() }
+            return
         }
+        binding.notificationsEmpty.text = VinorPageLoad.OFFLINE
+        binding.notificationsEmpty.visibility = View.VISIBLE
     }
 
     private fun bind(items: List<JSONObject>) {
@@ -149,6 +200,7 @@ class NotificationsFragment : Fragment() {
         binding.notificationsList.removeAllViews()
 
         if (items.isEmpty()) {
+            binding.notificationsEmpty.text = EMPTY
             binding.notificationsEmpty.visibility = View.VISIBLE
             return
         }

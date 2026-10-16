@@ -7,21 +7,21 @@ alwaysApply: true
 
 Work on a `cursor/*` branch, open a PR, and never commit or push directly to main.
 
-ادغام با `main` فقط کار عامل CI/CD است و فقط squash. خودت merge نکن و به شاخهٔ دیگری هم push نکن.
+مرج Pull Request طبق `.cursor/rules/auto-pr-merge.mdc` است. به `main` مستقیم پوش نکن. Force-push و بازنویسی تاریخچه ممنوع است.
 
 ## شاخه و Push
 
 1. از `main` یک شاخهٔ `cursor/<topic>` بساز. روی `main` یا `master` نه commit کن و نه push.
-2. فقط همان شاخهٔ `cursor/*` را پوش کن، آن هم بعد از `git fetch origin` و با `git push -u origin HEAD:refs/heads/<branch>`. این دستور را برای `main` اجرا نکن.
+2. وقتی کار روی فایل‌ها تمام شد، `git add` / `git commit` کن و فقط همان شاخهٔ `cursor/*` را پوش کن، آن هم بعد از `git fetch origin` و با `git push -u origin HEAD:refs/heads/<branch>`. این دستور را برای `main` اجرا نکن.
 3. به شاخه‌های دیگر (شاخهٔ دلخواه، شاخهٔ همکار، یا `master`) push نکن. `--force` نزن.
 4. اگر push رد شد، خطا را همان‌جا گزارش کن و دوباره همان شاخه را push کن. خروج صفر وقتی commitها روی origin نیستند کافی نیست.
-5. یک PR به `main` باز کن. merge، update، و squash فقط با عامل CI/CD و یکی‌یکی انجام می‌شود.
+5. یک PR به `main` باز کن. مرج بعد از چک‌های الزامی طبق `auto-pr-merge.mdc` است؛ محافظت شاخه را دور نزن.
 6. تأیید نپرس — خودت انجام بده.
 7. پیام commit کوتاه و متمرکز بر «چرا» باشد.
 8. سکرت‌ها را commit نکن: `.env`، کلید، keystore، `credentials.json`، `google-services.json`، `key.properties`.
-9. اگر هوک `stop` هم push کرد، همان commit را دوباره نساز. هوک به `main` push نمی‌کند؛ اگر روی `main` باشد با خطا می‌ایستد.
+9. اگر هوک `stop` هم push کرد، همان commit را دوباره نساز. هوک به `main` push نمی‌کند؛ اگر روی `main`، `master`، یا HEAD جدا باشد با خطا می‌ایستد و به ریموت دست نمی‌زند.
 
-این قانون bump نسخه ندارد. `version.txt` را در PR فیچر عوض نکن؛ نسخه از CI می‌آید (قاعدهٔ نسخه).
+نسخه طبق `.cursor/rules/bump-app-version.mdc` بالا می‌رود. این قانون شمارهٔ نسخه را عوض نمی‌کند.
 
 اگر push به‌خاطر auth شکست، در پاسخ نهایی بگو و همان‌جا متوقف شو.
 

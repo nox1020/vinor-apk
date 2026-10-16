@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M15.2,20.2v-1.4a3.2,3.2 0,0 0,-3.2 -3.2H7.4a3.2,3.2 0,0 0,-3.2 3.2v1.4"
+        android:strokeWidth="1.8"
+        android:strokeColor="@color/vinor_customer_bg"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9.7,8.2m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0"
+        android:strokeWidth="1.8"
+        android:strokeColor="@color/vinor_customer_bg" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18.2,8.6v5.2M20.8,11.2h-5.2"
+        android:strokeWidth="1.8"
+        android:strokeColor="@color/vinor_customer_bg"
+        android:strokeLineCap="round" />
+</vector>

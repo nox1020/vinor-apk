@@ -123,6 +123,10 @@ object VinorFcmRegistrar {
         if (tokenTrim.isEmpty()) return
         val appCtx = context.applicationContext
         VinorSafe.onMain {
+            if (!PartnerApi.hasSession()) {
+                Log.d(TAG, "skip FCM register — not logged in")
+                return@onMain
+            }
             val cookie = VinorSafe.cookieOrEmpty(BASE)
             if (cookie.isBlank()) {
                 Log.d(TAG, "skip FCM register — not logged in")

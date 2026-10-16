@@ -12,6 +12,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,8 +46,13 @@ class ProfileEditFragment : Fragment() {
     private var _binding: FragmentProfileEditBinding? = null
     private val binding get() = _binding!!
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private var job = Job()
+    private var scope = CoroutineScope(Dispatchers.Main + job)
+    private var loadGen = 0
+    private var rendered = false
+    private var skipNextResume = true
+    private var formDirty = false
+    private var bindingForm = false
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -71,6 +77,13 @@ class ProfileEditFragment : Fragment() {
         private const val PROFILE_AVATAR = "/express/partner/api/profile/avatar"
         private const val AVATAR_MAX_SIDE = 1200
         private const val AVATAR_JPEG_QUALITY = 82
+        private var remembered: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRemembered() {
+            remembered = null
+            sessionStamp++
+        }
     }
 
     override fun onCreateView(
@@ -78,6 +91,11 @@ class ProfileEditFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        if (job.isCancelled) {
+            job = Job()
+            scope = CoroutineScope(Dispatchers.Main + job)
+        }
+        skipNextResume = true
         _binding = FragmentProfileEditBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -100,18 +118,37 @@ class ProfileEditFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 binding.profileEditBioCount.text = "${s?.length ?: 0}/200"
+                if (!bindingForm && rendered) formDirty = true
             }
         })
         binding.profileEditName.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                if (!bindingForm && rendered) formDirty = true
                 if (binding.profileEditAvatar.visibility != View.VISIBLE) {
                     bindInitials(s?.toString()?.trim().orEmpty())
                 }
             }
         })
+        binding.profileEditCity.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (!bindingForm && rendered) formDirty = true
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        remembered?.let { applyEdit(it) }
         loadData()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        if (_binding != null && !formDirty) loadData()
     }
 
     override fun onDestroyView() {
@@ -147,29 +184,64 @@ class ProfileEditFragment : Fragment() {
 
     private fun loadData() {
         val ctx = context ?: return
-        if (_binding == null) return
-        binding.profileEditProgress.visibility = View.VISIBLE
+        if (_binding == null || (formDirty && rendered)) return
+        if (!rendered) binding.profileEditProgress.visibility = View.VISIBLE
+        val gen = ++loadGen
+        val stamp = sessionStamp
         scope.launch {
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(PROFILE_EDIT_DATA, ctx) }
             try {
                 val obj = PartnerApi.loadDisplay(PROFILE_EDIT_DATA, ctx) { data ->
-                    if (_binding == null) return@loadDisplay
-                    if (!data.optBoolean("success", false) && data.optString("me_phone").isBlank()) return@loadDisplay
-                    bindEditPayload(data)
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp || formDirty) return@loadDisplay
+                    if (!editable(data)) return@loadDisplay
+                    applyEdit(data)
                 }
-                if (_binding == null) return@launch
-                if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) {
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (VinorPageLoad.needsLogin(obj)) {
+                    clearRemembered()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (editable(obj)) {
+                    if (!formDirty) applyEdit(obj)
+                    rendered = true
+                    if (VinorPageLoad.canRemember(obj)) remembered = VinorPageLoad.rememberedCopy(obj)
+                }
+                if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) {
+                    VinorPageLoad.showOffline(binding.root) { loadData() }
+                } else if (!rendered) {
                     binding.profileEditProgress.visibility = View.GONE
-                    Toast.makeText(ctx, "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
-                    findNavController().navigateUp()
+                    VinorPageLoad.showOffline(binding.root) { loadData() }
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "loadData error", e)
-                if (_binding != null) {
-                    binding.profileEditProgress.visibility = View.GONE
-                    Toast.makeText(ctx, "خطا در بارگذاری", Toast.LENGTH_SHORT).show()
-                    findNavController().navigateUp()
-                }
+                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                binding.profileEditProgress.visibility = View.GONE
+                if (rendered) VinorPageLoad.showOffline(binding.root) { loadData() }
+                else VinorPageLoad.showOffline(binding.root) { loadData() }
             }
+        }
+    }
+
+    private fun editable(obj: JSONObject): Boolean {
+        if (VinorPageLoad.needsLogin(obj) || obj.optInt("http_status") == 403) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json")) return false
+        if (!obj.optBoolean("success", false) && obj.optString("me_phone").isBlank()) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299
+    }
+
+    private fun applyEdit(obj: JSONObject) {
+        bindingForm = true
+        bindEditPayload(obj)
+        rendered = true
+        val city = _binding?.profileEditCity ?: run {
+            bindingForm = false
+            return
+        }
+        city.post {
+            if (_binding?.profileEditCity === city) bindingForm = false
         }
     }
 
@@ -200,7 +272,7 @@ class ProfileEditFragment : Fragment() {
         bindInitials(meName)
         currentAvatarUrl = avatarUrl
         if (!avatarUrl.isNullOrEmpty()) {
-            loadAvatar(if (avatarUrl.startsWith("http")) avatarUrl else "$BASE$avatarUrl")
+            loadAvatar(avatarUrl)
         } else {
             binding.profileEditAvatar.visibility = View.GONE
             binding.profileEditInitials.visibility = View.VISIBLE
@@ -209,10 +281,24 @@ class ProfileEditFragment : Fragment() {
 
     private fun loadAvatar(fullUrl: String) {
         val ctx = context ?: return
+        val resolved = VinorAvatarCache.resolve(fullUrl)
+        VinorAvatarCache.peek(resolved)?.let { cached ->
+            binding.profileEditAvatar.setImageBitmap(cached)
+            binding.profileEditAvatar.visibility = View.VISIBLE
+            binding.profileEditInitials.visibility = View.GONE
+            return
+        }
+        val cookie = cookieHeader()
         scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { PartnerApi.bytes(fullUrl, ctx) } ?: return@launch
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@launch
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, resolved)
+                        ?: VinorAvatarCache.fetch(resolved, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, resolved, fresh)
+                        }
+                } ?: return@launch
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(resolved, bmp)
                 if (_binding == null) return@launch
                 binding.profileEditAvatar.setImageBitmap(bmp)
                 binding.profileEditAvatar.visibility = View.VISIBLE
@@ -309,12 +395,18 @@ class ProfileEditFragment : Fragment() {
                     }.getOrNull()
                     currentAvatarUrl = newUrl
                     val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (!newUrl.isNullOrEmpty()) {
+                        val resolved = VinorAvatarCache.resolve(newUrl)
+                        VinorAvatarCache.store(requireContext(), resolved, bytes)
+                        if (bmp != null) VinorAvatarCache.rememberBitmap(resolved, bmp)
+                        context?.let { ProfileFragment.noteLocalEdit(it, avatarUrl = newUrl) }
+                    }
                     if (bmp != null) {
                         binding.profileEditAvatar.setImageBitmap(bmp)
                         binding.profileEditAvatar.visibility = View.VISIBLE
                         binding.profileEditInitials.visibility = View.GONE
                     } else if (!newUrl.isNullOrEmpty()) {
-                        loadAvatar("$BASE$newUrl")
+                        loadAvatar(newUrl)
                     }
                     context?.let { Toast.makeText(it, "عکس پروفایل به‌روزرسانی شد.", Toast.LENGTH_SHORT).show() }
                 }
@@ -356,7 +448,10 @@ class ProfileEditFragment : Fragment() {
                             JSONObject(resp.body?.string() ?: "{}").optBoolean("success", false)
                         }.getOrElse { false }
                         if (ok) {
-                            context?.let { Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show() }
+                            context?.let {
+                                ProfileFragment.noteLocalEdit(it, name = name)
+                                Toast.makeText(it, "مشخصات با موفقیت به‌روزرسانی شد.", Toast.LENGTH_SHORT).show()
+                            }
                             findNavController().navigateUp()
                         } else {
                             context?.let { Toast.makeText(it, "خطا در ذخیره", Toast.LENGTH_SHORT).show() }

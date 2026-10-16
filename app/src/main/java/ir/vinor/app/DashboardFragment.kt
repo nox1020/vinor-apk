@@ -3,50 +3,74 @@ package ir.vinor.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.Editable
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
+import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
+import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
+import com.google.android.material.snackbar.Snackbar
 import ir.vinor.app.databinding.FragmentDashboardBinding
 import ir.vinor.app.databinding.ItemChatBubbleBinding
-import ir.vinor.app.databinding.ItemHomeAdBinding
+import ir.vinor.app.databinding.ItemHomeSuggestBinding
 import ir.vinor.app.databinding.ItemLandCardBinding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** خانه نیتیو — همان چیدمان وب: آگهی، میانبرها، کارت همکاری. چت فقط از تب فوتر. */
+/** خانه نیتیو — میانبرها، کارت مشتری و فایل‌های پیشنهادی در یک صفحه. چت فقط از تب فوتر. */
 class DashboardFragment : Fragment() {
 
     companion object {
+        const val HOME_DATA = "/express/partner/home/data"
+        private const val HOME_HTML = "/express/partner/home"
         private var rememberedHome: JSONObject? = null
+        private var sessionStamp = 0
+
+        fun clearRememberedHome() {
+            rememberedHome = null
+            sessionStamp++
+        }
+
+        internal fun peekRememberedHome(): JSONObject? = rememberedHome
+
+        internal fun rememberHome(obj: JSONObject) {
+            rememberedHome = JSONObject(obj.toString())
+        }
     }
 
     private var _binding: FragmentDashboardBinding? = null
@@ -55,17 +79,35 @@ class DashboardFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var threadId: String? = null
     private val landsByCode = linkedMapOf<String, JSONObject>()
-    private var lastAdsKey = ""
     private var isApproved = false
     private var pendingAttachment: JSONObject? = null
     private var attachUploading = false
     private var cameraOutput: Uri? = null
     private var cachedHistory: JSONObject? = null
+    private var chatAccount: String? = null
     private var chatLayerOpen = false
     private var wantChatLayer = false
     private var chatBindGen = 0
+    private var customerCsrf: String = ""
+    private var customerBusy = false
     private var boundMessageCount = 0
-    private val adsScrollListener = ViewTreeObserver.OnScrollChangedListener { bindVisibleCarouselImages() }
+    private var boundFingerprint = ""
+    private var lastSyncAt = ""
+    private var chatPollJob: Job? = null
+    private var historyInFlight = false
+    private var historyQueued = false
+    private var syncInFlight = false
+    private var chatSending = false
+    private var chatWriteGen = 0
+    private var emptyPollStreak = 0
+    private var pollPaused = false
+    private var suggestKey = ""
+    private var loadGen = 0
+    private var homeRendered = false
+    private var skipNextResume = true
+    private var homeAvatarWanted: String? = null
+    private var homeAvatarLoading: String? = null
+    private var homeAvatarLookup = false
     private val pickGallery = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { startUpload(it, "image") }
     }
@@ -88,6 +130,7 @@ class DashboardFragment : Fragment() {
             job = Job()
             scope = CoroutineScope(Dispatchers.Main + job)
         }
+        skipNextResume = true
         _binding = FragmentDashboardBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -108,7 +151,13 @@ class DashboardFragment : Fragment() {
         binding.dashboardAttachFile.setOnClickListener { onAttachKind("file") }
         binding.dashboardAttachRemove.setOnClickListener { clearPendingAttachment() }
         binding.dashboardHero.setOnClickListener { onHero() }
+        binding.dashboardHero.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (_binding == null) return@addOnLayoutChangeListener
+            placeHeroLabel()
+        }
         binding.dashboardBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+        binding.dashboardHomeAvatar.setOnClickListener { (activity as? MainActivity)?.openProfile() }
+        PartnerImages.roundClip(binding.dashboardHomeAvatar, 20f)
         binding.dashboardWallet.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/commissions")
         }
@@ -118,16 +167,33 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
         }
-        binding.dashboardShortcutFiles.setOnClickListener {
-            (activity as? MainActivity)?.openPath("/express/partner/my-property")
+        binding.dashboardSuggestSeeAll.setOnClickListener {
+            (activity as? MainActivity)?.openSearch()
         }
-        binding.dashboardSeeAll.setOnClickListener { (activity as? MainActivity)?.openSearch() }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }
         binding.dashboardCustomerBackdrop.setOnClickListener { closeCustomer() }
+        binding.dashboardCustomerSheetHost.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerClose.setOnClickListener { closeCustomer() }
         binding.dashboardCustomerSubmit.setOnClickListener { submitCustomer() }
+        binding.dashboardCustomerNotes.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submitCustomer()
+                true
+            } else {
+                false
+            }
+        }
+        val clearCustomerError = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { showCustomerError(null) }
+        }
+        binding.dashboardCustomerFirst.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerLast.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerPhone.addTextChangedListener(clearCustomerError)
+        binding.dashboardCustomerNotes.addTextChangedListener(clearCustomerError)
         val headerPad = (56 * resources.displayMetrics.density).toInt()
         binding.dashboardRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
@@ -144,35 +210,50 @@ class DashboardFragment : Fragment() {
                 true
             } else false
         }
-        val adsOrigin = FloatArray(2)
-        binding.dashboardAdsScroll.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    adsOrigin[0] = event.x
-                    adsOrigin[1] = event.y
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = kotlin.math.abs(event.x - adsOrigin[0])
-                    val dy = kotlin.math.abs(event.y - adsOrigin[1])
-                    v.parent.requestDisallowInterceptTouchEvent(dx > dy + 8f)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                    v.parent.requestDisallowInterceptTouchEvent(false)
-            }
-            false
-        }
-        binding.dashboardAdsScroll.viewTreeObserver.addOnScrollChangedListener(adsScrollListener)
         syncSendEnabled()
         syncComposerVisible()
+        val snap = rememberedHome
+        if (snap != null) {
+            paintRememberedHome()
+            homeRendered = true
+        } else {
+            showHomeLoading()
+        }
+        loadAll(forceSkeleton = !homeRendered)
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        val snap = rememberedHome ?: return
+        if (_binding == null) return
         paintRememberedHome()
-        loadAll()
+        bindHomeAvatar(snap)
+        homeRendered = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        rememberedHome?.let { bindHomeAvatar(it) }
         if ((activity as? MainActivity)?.consumePendingVinorChat() == true) {
             openVinorChat()
+        } else if ((activity as? MainActivity)?.consumePendingCustomerModal() == true) {
+            showHomeEntry()
+            openCustomerModal()
+        } else if (isChatOpen()) {
+            resumeChatLive()
+        }
+        if (skipNextResume) {
+            skipNextResume = false
+            return
+        }
+        val sheetOpen = _binding?.dashboardCustomer?.isVisible == true
+        if (_binding != null && !isChatOpen() && !sheetOpen) {
+            loadAll(forceSkeleton = !homeRendered)
         }
     }
 
     override fun onDestroyView() {
-        runCatching { binding.dashboardAdsScroll.viewTreeObserver.removeOnScrollChangedListener(adsScrollListener) }
+        stopChatPoll()
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -181,7 +262,7 @@ class DashboardFragment : Fragment() {
     fun reload() {
         if (_binding == null) return
         showHomeEntry()
-        loadAll()
+        loadAll(forceSkeleton = !homeRendered)
     }
 
     private fun onPullRefresh() {
@@ -191,7 +272,7 @@ class DashboardFragment : Fragment() {
             return
         }
         if (chatLayerOpen || wantChatLayer) {
-            fetchHistory(bindIfWanted = true)
+            fetchHistory(bindIfWanted = true, force = true)
             return
         }
         loadAll(fromPull = true)
@@ -205,10 +286,17 @@ class DashboardFragment : Fragment() {
 
     fun isChatOpen(): Boolean = chatLayerOpen && wantChatLayer
 
-    /** تب آگهی‌ها: لایهٔ چت را ببند، آگهی‌ها را نشان بده. */
+    /** چتِ باز فقط وقتی مال همین نشست است که دوباره از شبکه پر نشود. */
+    fun isCurrentAccountChatOpen(): Boolean {
+        val account = currentAccountKey()
+        return isChatOpen() && account != null && chatAccount == account
+    }
+
+    /** تب خانه: لایهٔ چت را ببند و خانه را نشان بده. */
     fun showHomeEntry() {
         wantChatLayer = false
         chatBindGen += 1
+        stopChatPoll()
         showHomeEmpty()
         (activity as? MainActivity)?.syncDivarTab()
     }
@@ -247,7 +335,6 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         b.dashboardHomeHeader.isVisible = false
         b.dashboardEmpty.isVisible = false
-        b.dashboardAdsScroll.isVisible = false
         b.dashboardHeader.isVisible = true
     }
 
@@ -256,9 +343,17 @@ class DashboardFragment : Fragment() {
         b.dashboardScroll.post { b.dashboardScroll.scrollTo(0, 0) }
     }
 
-    /** کلیک تب چت / «وینور»: اول پیام‌ها، فایل‌ها بعداً. */
+    /** کلیک تب چت / «وینور»: فقط نشست همین حساب. */
     fun openVinorChat() {
         if (_binding == null) return
+        val account = currentAccountKey()
+        if (account == null) {
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
         wantChatLayer = true
         chatLayerOpen = true
         hideHomeDashboardWidgets()
@@ -267,18 +362,53 @@ class DashboardFragment : Fragment() {
         if (binding.dashboardChatList.childCount > 0) {
             binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             finishRefreshUi()
-            fetchHistory(bindIfWanted = true)
+            armChatLive()
             return
         }
         val hist = cachedHistory
         if (hist != null) {
             bindChat(hist)
-            fetchHistory(bindIfWanted = true)
+            armChatLive()
             return
         }
-        chatBindGen += 1
         binding.dashboardProgress.isVisible = true
-        fetchHistory(bindIfWanted = true)
+        armChatLive()
+    }
+
+    /** لایه باز است: کش را همان لحظه نشان بده، شبکه را عقب نینداز، و poll را روشن کن. */
+    private fun armChatLive() {
+        pollPaused = false
+        emptyPollStreak = 0
+        startChatPoll()
+        fetchHistory(bindIfWanted = true, force = true)
+    }
+
+    /** برگشت به چتِ باز: همگام‌سازی فوری، بدون انتظار برای دور بعدی. */
+    private fun resumeChatLive() {
+        pollPaused = false
+        emptyPollStreak = 0
+        startChatPoll()
+        if (threadId.isNullOrBlank() || boundFingerprint.isEmpty()) {
+            fetchHistory(bindIfWanted = true, force = true)
+        } else {
+            pollSync()
+        }
+    }
+
+    private fun startChatPoll() {
+        if (chatPollJob?.isActive == true) return
+        chatPollJob = scope.launch {
+            while (isActive) {
+                delay(ChatLive.POLL_MS)
+                pollSync()
+            }
+        }
+    }
+
+    private fun stopChatPoll() {
+        chatPollJob?.cancel()
+        chatPollJob = null
+        pollPaused = true
     }
 
     fun setHeaderVisible(visible: Boolean) {
@@ -301,7 +431,13 @@ class DashboardFragment : Fragment() {
     private fun closeCustomer(): Boolean {
         val b = _binding ?: return false
         if (!b.dashboardCustomer.isVisible) return false
+        b.dashboardCustomerFirst.clearFocus()
+        b.dashboardCustomerLast.clearFocus()
+        b.dashboardCustomerPhone.clearFocus()
+        b.dashboardCustomerNotes.clearFocus()
+        hideKeyboard()
         b.dashboardCustomer.isVisible = false
+        showCustomerError(null)
         return true
     }
 
@@ -334,9 +470,10 @@ class DashboardFragment : Fragment() {
 
     private fun onAttachKind(kind: String) {
         closeAttach()
-        if (!PartnerApi.hasSession()) {
+        if (currentAccountKey() == null) {
             Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
             return
         }
         when (kind) {
@@ -366,9 +503,10 @@ class DashboardFragment : Fragment() {
 
     private fun startUpload(uri: Uri, kind: String) {
         if (_binding == null) return
-        if (!PartnerApi.hasSession()) {
+        if (currentAccountKey() == null) {
             Toast.makeText(requireContext(), "برای ارسال فایل وارد شوید.", Toast.LENGTH_SHORT).show()
-            (activity as? MainActivity)?.openDrawer()
+            releaseChatAccount()
+            (activity as? MainActivity)?.requireChatLogin()
             return
         }
         val ctx = requireContext()
@@ -394,10 +532,16 @@ class DashboardFragment : Fragment() {
                 if (_binding == null) return@launch
                 attachUploading = false
                 val http = resp.optInt("http_status")
-                if (http == 401 || http == 403 || resp.optBoolean("need_login")) {
+                if (http == 401 || resp.optBoolean("session_expired")) {
+                    clearPendingAttachment()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    return@launch
+                }
+                if (http == 403 || resp.optBoolean("need_login")) {
                     clearPendingAttachment()
                     Toast.makeText(ctx, resp.optString("error").ifBlank { "برای ارسال فایل وارد شوید." }, Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openDrawer()
+                    releaseChatAccount()
+                    (activity as? MainActivity)?.requireChatLogin()
                     return@launch
                 }
                 if (resp.optBoolean("ok") && resp.optString("url").isNotBlank()) {
@@ -487,66 +631,127 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun openCustomer() {
+    fun openCustomerModal() {
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
         closeAttach()
+        showCustomerError(null)
         binding.dashboardCustomer.isVisible = true
+        binding.dashboardCustomerFirst.requestFocus()
     }
 
+    private fun openCustomer() = openCustomerModal()
+
     private fun submitCustomer() {
+        if (customerBusy) return
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openDrawer()
+            (activity as? MainActivity)?.openLogin()
             return
         }
-        val body = JSONObject()
-            .put("customer_first_name", binding.dashboardCustomerFirst.text?.toString()?.trim().orEmpty())
-            .put("customer_last_name", binding.dashboardCustomerLast.text?.toString()?.trim().orEmpty())
-            .put("customer_phone", binding.dashboardCustomerPhone.text?.toString()?.trim().orEmpty())
-            .put("notes", binding.dashboardCustomerNotes.text?.toString()?.trim().orEmpty())
-        binding.dashboardCustomerSubmit.isEnabled = false
+        val first = binding.dashboardCustomerFirst.text?.toString().orEmpty()
+        val last = binding.dashboardCustomerLast.text?.toString().orEmpty()
+        val phone = binding.dashboardCustomerPhone.text?.toString().orEmpty()
+        val notes = binding.dashboardCustomerNotes.text?.toString().orEmpty()
+        val problem = CustomerRegister.error(first, last, phone, notes)
+        if (problem != null) {
+            showCustomerError(problem)
+            return
+        }
+        showCustomerError(null)
+        val body = CustomerRegister.body(first, last, phone, notes)
+        setCustomerBusy(true)
+        val ctx = requireContext()
         scope.launch {
             try {
+                val token = withContext(Dispatchers.IO) { ensureCustomerCsrf(ctx) }
                 val resp = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson("/express/partner/home/register-customer", body, requireContext())
+                    PartnerApi.postPage(CustomerRegister.PATH, body, token, CustomerRegister.REFERER, ctx)
                 }
                 if (_binding == null) return@launch
+                val fresh = resp.optString("csrf_token").trim()
+                if (fresh.isNotBlank()) customerCsrf = fresh
                 val http = resp.optInt("http_status")
-                if (http == 401 || http == 403) {
+                if (http == 401 || resp.optBoolean("session_expired")) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (PartnerCustomers.isUnauthorized(resp)) {
+                    customerCsrf = ""
+                    Toast.makeText(ctx, "برای ثبت مشتری وارد شوید.", Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
+                if (http == 403) {
                     Toast.makeText(
-                        requireContext(),
+                        ctx,
                         resp.optString("error").ifBlank { "برای ثبت درخواست وارد شوید." },
                         Toast.LENGTH_SHORT,
                     ).show()
-                    if (http == 401) (activity as? MainActivity)?.openDrawer()
                     return@launch
                 }
-                if (resp.optBoolean("ok")) {
+                if (PartnerCustomers.isOk(resp)) {
+                    clearCustomerForm()
                     closeCustomer()
-                    binding.dashboardCustomerFirst.setText("")
-                    binding.dashboardCustomerLast.setText("")
-                    binding.dashboardCustomerPhone.setText("")
-                    binding.dashboardCustomerNotes.setText("")
                     Toast.makeText(
-                        requireContext(),
-                        resp.optString("message").ifBlank { "درخواست بازدید ثبت شد." },
+                        ctx,
+                        PartnerCustomers.userMessage(resp, "مشتری ثبت شد."),
                         Toast.LENGTH_SHORT,
                     ).show()
                 } else {
-                    Toast.makeText(
-                        requireContext(),
-                        resp.optString("error").ifBlank { "ثبت ناموفق بود." },
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    showCustomerError(PartnerCustomers.userMessage(resp, "ثبت ناموفق بود."))
                 }
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null) showCustomerError(e.message ?: "خطای شبکه")
             } finally {
-                if (_binding != null) binding.dashboardCustomerSubmit.isEnabled = true
+                if (_binding != null) setCustomerBusy(false)
             }
         }
+    }
+
+    private fun ensureCustomerCsrf(ctx: android.content.Context): String {
+        if (customerCsrf.isNotBlank()) return customerCsrf
+        val profile = try {
+            PartnerApi.get("/express/partner/profile/data", ctx)
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        var token = profile.optString("csrf_token").trim()
+        if (token.isBlank()) {
+            val html = try {
+                PartnerApi.getHtml("/express/partner/home", ctx)
+            } catch (_: Exception) {
+                ""
+            }
+            token = PartnerCustomers.csrfFromHtml(html)
+        }
+        customerCsrf = token
+        return token
+    }
+
+    private fun showCustomerError(text: String?) {
+        val b = _binding ?: return
+        val message = text?.trim().orEmpty()
+        b.dashboardCustomerError.text = message
+        b.dashboardCustomerError.isVisible = message.isNotEmpty()
+    }
+
+    private fun setCustomerBusy(busy: Boolean) {
+        customerBusy = busy
+        val b = _binding ?: return
+        b.dashboardCustomerProgress.isVisible = busy
+        b.dashboardCustomerSubmit.isEnabled = !busy
+        b.dashboardCustomerSubmit.alpha = if (busy) 0.55f else 1f
+    }
+
+    private fun clearCustomerForm() {
+        val b = _binding ?: return
+        b.dashboardCustomerFirst.setText("")
+        b.dashboardCustomerLast.setText("")
+        b.dashboardCustomerPhone.setText("")
+        b.dashboardCustomerNotes.setText("")
+        showCustomerError(null)
     }
 
     private fun syncSendEnabled() {
@@ -562,90 +767,117 @@ class DashboardFragment : Fragment() {
         )
     }
 
-    private fun loadAll(fromPull: Boolean = false) {
+    private fun loadAll(fromPull: Boolean = false, forceSkeleton: Boolean = false) {
         val ctx = context ?: return
-        if (PartnerApi.hasSession()) {
+        if (_binding == null) return
+        if (currentAccountKey() != null) {
             fetchHistory(bindIfWanted = wantChatLayer)
         } else {
-            cachedHistory = null
-            threadId = null
-            if (wantChatLayer) bindChat(JSONObject())
+            releaseChatAccount()
         }
+        val gen = ++loadGen
+        val stamp = sessionStamp
+        if ((forceSkeleton || !homeRendered) && !fromPull) showHomeLoading()
         scope.launch {
-            var shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
-            if (!fromPull) {
-                val cached = withContext(Dispatchers.IO) {
-                    PartnerApi.peekJson("/express/partner/home/data", ctx)
-                }
-                if (_binding == null) return@launch
-                if (cached != null) {
-                    bindHome(cached)
-                    if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
-                    binding.dashboardProgress.isVisible = false
-                    shownCache = true
-                    if (withContext(Dispatchers.IO) {
-                            PartnerApi.isFresh("/express/partner/home/data", ctx)
-                        }
-                    ) {
-                        if (!wantChatLayer) finishRefreshUi()
-                        return@launch
-                    }
-                } else if (!wantChatLayer && !shownCache) {
-                    binding.dashboardProgress.isVisible = true
-                }
-            } else {
-                shownCache = binding.dashboardAds.childCount > 0 || binding.dashboardEmpty.isVisible
-                if (!wantChatLayer) binding.dashboardProgress.isVisible = false
-            }
-            var home = JSONObject()
-            var loadError: String? = null
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(HOME_DATA, ctx) }
             try {
-                home = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/home/data", ctx)
+                val fetched = PartnerApi.loadDisplay(HOME_DATA, ctx) { }
+                if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
+                if (PartnerApi.isSessionExpired(fetched) || fetched.optInt("http_status") == 401) {
+                    clearRememberedHome()
+                    cachedHistory = null
+                    threadId = null
+                    homeRendered = false
+                    (activity as? MainActivity)?.openLogin(
+                        sessionExpired = fetched.optBoolean("session_expired"),
+                    )
+                    return@launch
+                }
+                if (fetched.optInt("http_status") == 403) {
+                    if (!homeRendered && !wantChatLayer && !chatLayerOpen) showHomeEmpty()
+                    if (!homeRendered) showOfflineSnackbar()
+                    return@launch
+                }
+                val networkFailed = !wasFresh && (
+                    fetched.optBoolean("from_cache") ||
+                        fetched.optBoolean("offline") ||
+                        (fetched.has("http_status") && fetched.optInt("http_status") !in 200..299)
+                    )
+                val home = withAds(fetched, ctx)
+                if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
+                if (homePayloadOk(home)) {
+                    bindHome(home)
+                    homeRendered = true
+                    if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
+                    if (networkFailed) showOfflineSnackbar()
+                } else if (!wantChatLayer && !chatLayerOpen && !homeRendered) {
+                    showHomeEmpty()
+                    showOfflineSnackbar()
+                } else {
+                    showOfflineSnackbar()
                 }
             } catch (e: Exception) {
-                loadError = e.message ?: "خطا در بارگذاری"
-                if (shownCache) {
-                    home = PartnerApi.peekJson("/express/partner/home/data", ctx) ?: JSONObject()
-                }
+                if (e is CancellationException) throw e
+                if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
+                if (!homeRendered && !wantChatLayer && !chatLayerOpen) showHomeEmpty()
+                showOfflineSnackbar()
+            } finally {
+                if (gen == loadGen && _binding != null && !wantChatLayer) finishRefreshUi()
             }
-            if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0) {
-                try {
-                    val html = withContext(Dispatchers.IO) {
-                        PartnerApi.getHtml("/express/partner/home", ctx)
-                    }
-                    val ads = HomeAdsHtml.parse(html)
-                    if (ads.length() > 0) {
-                        home.put("divar_pro_ads", ads)
-                        if (home.optInt("divar_pro_ads_count") <= 0) {
-                            home.put("divar_pro_ads_count", ads.length())
-                        }
-                        loadError = null
-                    }
-                    if (ads.length() > 0) {
-                        home.remove("from_cache")
-                        PartnerApi.remember("/express/partner/home/data", home, ctx)
-                    }
-                } catch (e: Exception) {
-                    if (loadError == null && !shownCache) loadError = e.message
-                }
-            }
-            if (_binding == null) {
-                if (!wantChatLayer) finishRefreshUi()
-                return@launch
-            }
-            if (!home.optBoolean("from_cache") || !shownCache) {
-                bindHome(home)
-            }
-            if (!wantChatLayer && !chatLayerOpen) showHomeEmpty()
-            if (loadError != null && (home.optJSONArray("divar_pro_ads")?.length() ?: 0) == 0 && !shownCache) {
-                Toast.makeText(requireContext(), loadError, Toast.LENGTH_SHORT).show()
-            }
-            if (!wantChatLayer) finishRefreshUi()
         }
     }
 
-    /** آخرین خانهٔ دیده‌شده — ورود بعدی به تب آگهی‌ها منتظر شبکه نمی‌ماند. */
+    /** آگهی‌ها قبل از اولین رسم می‌آیند تا کارت‌ها بعد از بقیهٔ خانه ظاهر نشوند. */
+    private suspend fun withAds(home: JSONObject, ctx: android.content.Context): JSONObject {
+        if (!homePayloadOk(home)) return home
+        if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) > 0) return home
+        if (HomeSuggest.files(home).length() > 0) return home
+        return try {
+            val html = withContext(Dispatchers.IO) { PartnerApi.getHtml(HOME_HTML, ctx) }
+            val ads = HomeAdsHtml.parse(html)
+            if (ads.length() > 0) {
+                home.put("divar_pro_ads", ads)
+                if (home.optInt("divar_pro_ads_count") <= 0) {
+                    home.put("divar_pro_ads_count", ads.length())
+                }
+                home.remove("from_cache")
+                PartnerApi.remember(HOME_DATA, home, ctx)
+            }
+            home
+        } catch (_: Exception) {
+            home
+        }
+    }
+
+    private fun homePayloadOk(obj: JSONObject): Boolean {
+        if (obj.optBoolean("offline") || obj.optBoolean("session_expired")) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        if (code !in 200..299) return false
+        return obj.optBoolean("success") || obj.has("is_logged_in") || obj.has("is_approved")
+    }
+
+    private fun showHomeLoading() {
+        val b = _binding ?: return
+        if (wantChatLayer || chatLayerOpen) return
+        b.dashboardProgress.isVisible = true
+        b.dashboardEmpty.isVisible = false
+        b.dashboardHomeHeader.isVisible = false
+    }
+
+    private fun showOfflineSnackbar() {
+        val b = _binding ?: return
+        val bar = Snackbar.make(b.root, "اتصال برقرار نشد", Snackbar.LENGTH_LONG)
+        bar.setAction("تلاش دوباره") { loadAll(forceSkeleton = !homeRendered) }
+        bar.setActionTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+        bar.view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
+        bar.view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
+            text.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_text))
+            text.typeface = ResourcesCompat.getFont(requireContext(), R.font.vazirmatn)
+        }
+        bar.show()
+    }
+
+    /** آخرین خانهٔ دیده‌شده — ورود بعدی به تب خانه منتظر شبکه نمی‌ماند. */
     private fun paintRememberedHome() {
         val snap = rememberedHome ?: return
         bindHome(snap)
@@ -658,56 +890,265 @@ class DashboardFragment : Fragment() {
         b.dashboardHeader.isVisible = false
         b.dashboardHomeHeader.isVisible = true
         b.dashboardEmpty.isVisible = true
-        b.dashboardAdsScroll.isVisible = b.dashboardAds.childCount > 0
-        b.dashboardFilesHead.isVisible = b.dashboardAds.childCount > 0
         hideKeyboard()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
     }
 
-    private fun fetchHistory(bindIfWanted: Boolean) {
+    private fun fetchHistory(bindIfWanted: Boolean, force: Boolean = false) {
         val ctx = context ?: return
+        val account = currentAccountKey()
+        if (account == null) {
+            releaseChatAccount()
+            if (bindIfWanted) (activity as? MainActivity)?.requireChatLogin()
+            finishRefreshUi()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
+        if (historyInFlight) {
+            if (force) historyQueued = true
+            return
+        }
+        val gen = chatBindGen
+        val write = chatWriteGen
+        historyInFlight = true
         scope.launch {
+            var peeked: JSONObject? = null
             try {
-                val peeked = withContext(Dispatchers.IO) {
-                    PartnerApi.peekJson("/express/partner/ai/history", ctx)
+                val offline = VinorNetworkStatus.useCacheFirst(ctx)
+                val wasFresh = withContext(Dispatchers.IO) {
+                    PartnerApi.isFresh(ChatLive.HISTORY, ctx)
                 }
-                if (_binding == null) return@launch
-                if (peeked != null) {
+                peeked = withContext(Dispatchers.IO) {
+                    PartnerApi.peekJson(ChatLive.HISTORY, ctx)
+                }
+                if (!chatStill(account, gen)) return@launch
+                if (offline && peeked != null && wantChatLayer &&
+                    (_binding?.dashboardChatList?.childCount ?: 0) == 0
+                ) {
+                    bindChatIfNeeded(peeked)
+                }
+                val urgent = force || wantChatLayer
+                if (!urgent && peeked != null && wasFresh) {
                     rememberHistory(peeked)
-                    if (bindIfWanted && wantChatLayer) bindChatIfNeeded(peeked)
-                }
-                val hist = withContext(Dispatchers.IO) {
-                    PartnerApi.get("/express/partner/ai/history", ctx)
-                }
-                if (_binding == null) return@launch
-                val status = hist.optInt("http_status")
-                if (status == 401 || status == 403) {
-                    cachedHistory = null
-                    threadId = null
-                    if (bindIfWanted && wantChatLayer) bindChat(JSONObject())
                     return@launch
                 }
-                rememberHistory(hist)
-                if (bindIfWanted && wantChatLayer) bindChatIfNeeded(hist)
-            } catch (_: Exception) {
-                if (_binding != null && bindIfWanted && wantChatLayer &&
-                    binding.dashboardChatList.childCount == 0
-                ) {
-                    bindChat(JSONObject())
+                val path = ChatLive.historyPath(threadId)
+                val hist = withContext(Dispatchers.IO) {
+                    PartnerApi.get(path, ctx)
                 }
+                if (write != chatWriteGen) {
+                    PartnerApi.forget(ChatLive.HISTORY, ctx)
+                    if (path != ChatLive.HISTORY) PartnerApi.forget(path, ctx)
+                    cachedHistory?.let { snap ->
+                        if (!snap.optBoolean("from_cache")) PartnerApi.remember(ChatLive.HISTORY, snap, ctx)
+                    }
+                }
+                if (!chatStill(account, gen)) return@launch
+                val status = hist.optInt("http_status")
+                if (status == 401 || status == 403 || hist.optBoolean("session_expired")) {
+                    releaseChatAccount()
+                    if (wantChatLayer) {
+                        (activity as? MainActivity)?.requireChatLogin(
+                            sessionExpired = status == 401 || hist.optBoolean("session_expired"),
+                        )
+                    }
+                    return@launch
+                }
+                if (path != ChatLive.HISTORY && chatCacheable(hist) &&
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
+                    PartnerApi.remember(ChatLive.HISTORY, hist, ctx)
+                }
+                val networkFailed = !wasFresh && (
+                    hist.optBoolean("from_cache") ||
+                        hist.optBoolean("offline") ||
+                        (hist.has("http_status") && hist.optInt("http_status") !in 200..299)
+                    )
+                if (wantChatLayer) {
+                    val usable = chatCacheable(hist) || hist.optBoolean("from_cache")
+                    if (usable) bindChatIfNeeded(hist)
+                    if (networkFailed) showOfflineSnackbar()
+                } else if (
+                    ChatLive.shouldReplaceTranscript(ChatLive.messagesOf(cachedHistory), ChatLive.messagesOf(hist))
+                ) {
+                    rememberHistory(hist)
+                }
+            } catch (_: Exception) {
+                if (!chatStill(account, gen) || !wantChatLayer) return@launch
+                val fallback = peeked
+                if (fallback != null && (_binding?.dashboardChatList?.childCount ?: 0) == 0) {
+                    bindChatIfNeeded(fallback)
+                }
+                showOfflineSnackbar()
             } finally {
-                if (wantChatLayer || _binding?.dashboardProgress?.isVisible == true) {
-                    finishRefreshUi()
+                historyInFlight = false
+                val again = historyQueued
+                historyQueued = false
+                if (wantChatLayer) finishRefreshUi()
+                if (again && _binding != null && currentAccountKey() == account) {
+                    fetchHistory(bindIfWanted = true, force = true)
                 }
             }
         }
     }
 
+    private fun pollSync() {
+        val ctx = context ?: return
+        val account = currentAccountKey() ?: return
+        val tid = threadId ?: return
+        if (!ChatLive.shouldPoll(
+                wantChatLayer && chatLayerOpen,
+                tid,
+                chatSending,
+                historyInFlight || syncInFlight,
+                pollPaused,
+            )
+        ) {
+            return
+        }
+        val gen = chatBindGen
+        val messages = ChatLive.messagesOf(cachedHistory)
+        val path = ChatLive.syncPath(
+            tid,
+            ChatLive.syncCount(messages),
+            lastSyncAt,
+            ChatLive.escalationIds(messages),
+        )
+        syncInFlight = true
+        scope.launch {
+            try {
+                val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
+                if (!chatStill(account, gen) || !wantChatLayer) return@launch
+                when (ChatLive.syncOutcome(obj)) {
+                    ChatLive.SyncOutcome.AUTH -> {
+                        releaseChatAccount()
+                        (activity as? MainActivity)?.requireChatLogin()
+                    }
+                    ChatLive.SyncOutcome.EMPTY -> {
+                        emptyPollStreak = ChatLive.nextEmptyStreak(emptyPollStreak, false)
+                        if (ChatLive.shouldPause(emptyPollStreak)) pollPaused = true
+                    }
+                    ChatLive.SyncOutcome.MESSAGES -> {
+                        emptyPollStreak = 0
+                        pollPaused = false
+                        absorbLiveMessages(ChatLive.messagesOf(obj))
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                syncInFlight = false
+            }
+        }
+    }
+
+    private fun absorbLiveMessages(incoming: JSONArray) {
+        if (!wantChatLayer || !chatLayerOpen || _binding == null) return
+        val base = cachedHistory ?: JSONObject()
+        val existing = ChatLive.messagesOf(base)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(incoming))
+        val next = ChatLive.reconcile(existing, incoming) ?: return
+        base.put("messages", next)
+        base.remove("from_cache")
+        threadId?.let { if (base.optString("thread_id").isBlank()) base.put("thread_id", it) }
+        cachedHistory = base
+        boundMessageCount = next.length()
+        boundFingerprint = ChatLive.fingerprint(next)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(next))
+        context?.let { PartnerApi.remember(ChatLive.HISTORY, base, it) }
+        if (ChatLive.sameVisible(existing, next)) return
+        if (next.length() > existing.length() && !transcriptEdited(existing, next)) {
+            for (i in existing.length() until next.length()) {
+                val msg = next.optJSONObject(i) ?: continue
+                val att = msg.optJSONObject("attachment")
+                    ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
+                addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
+            }
+            stickToLatestIfFollowing()
+        } else {
+            renderMessages(next, stick = followingLatest() || next.length() > existing.length())
+        }
+        val codes = landCodesIn(next).filter { !landsByCode.containsKey(it) }
+        if (codes.isEmpty()) return
+        val gen = chatBindGen
+        val fp = boundFingerprint
+        scope.launch {
+            coroutineScope { codes.map { code -> async { prefetchLand(code) } }.awaitAll() }
+            if (_binding == null || gen != chatBindGen || !wantChatLayer) return@launch
+            if (fp == boundFingerprint) renderMessages(next, stick = followingLatest())
+        }
+    }
+
+    private fun transcriptEdited(before: JSONArray, after: JSONArray): Boolean {
+        val n = minOf(before.length(), after.length())
+        for (i in 0 until n) {
+            val a = before.optJSONObject(i)
+            val b = after.optJSONObject(i)
+            if (ChatLive.fingerprint(JSONArray().put(a)) != ChatLive.fingerprint(JSONArray().put(b))) return true
+        }
+        return false
+    }
+
+    private fun chatCacheable(obj: JSONObject): Boolean {
+        if (obj.optBoolean("from_cache") || obj.optBoolean("offline")) return false
+        val status = obj.optInt("http_status", 200)
+        return status in 200..299
+    }
+
+    private fun currentAccountKey(): String? {
+        if (!PartnerApi.hasSession()) return null
+        val ctx = context ?: return ChatSessionGate.accountKey(true, VinorCacheSession.ANON)
+        val fp = runCatching { VinorCacheSession.fingerprint(ctx) }.getOrDefault(VinorCacheSession.ANON)
+        return ChatSessionGate.accountKey(true, fp)
+    }
+
+    private fun chatStill(account: String, gen: Int): Boolean {
+        if (_binding == null || gen != chatBindGen) return false
+        return currentAccountKey() == account
+    }
+
+    /** خروج یا عوض شدن حساب: ترد، حباب‌ها و پیوست همین صفحه پاک می‌شوند. */
+    fun releaseChatAccount() {
+        val wasOpen = chatLayerOpen || wantChatLayer
+        discardAccountChat()
+        wantChatLayer = false
+        if (wasOpen && _binding != null) showHomeEntry() else chatLayerOpen = false
+    }
+
+    private fun discardAccountChat() {
+        chatBindGen += 1
+        threadId = null
+        cachedHistory = null
+        boundMessageCount = 0
+        boundFingerprint = ""
+        lastSyncAt = ""
+        emptyPollStreak = 0
+        chatSending = false
+        historyQueued = false
+        chatAccount = null
+        landsByCode.clear()
+        pendingAttachment = null
+        attachUploading = false
+        val b = _binding ?: return
+        b.dashboardChatList.removeAllViews()
+        b.dashboardChatInput.setText("")
+        b.dashboardAttachPreview.isVisible = false
+        b.dashboardAttachPreview.alpha = 1f
+        if (b.dashboardAttachSheet.isVisible || b.dashboardAttachScrim.isVisible) closeAttach()
+        syncSendEnabled()
+    }
+
     private fun bindChatIfNeeded(obj: JSONObject) {
-        val incoming = obj.optJSONArray("messages")?.length() ?: 0
-        if (boundMessageCount > 0 &&
-            incoming == boundMessageCount &&
+        val messages = ChatLive.messagesOf(obj)
+        val current = ChatLive.messagesOf(cachedHistory)
+        threadFrom(obj)?.let { tid ->
+            if (threadId.isNullOrBlank() || ChatLive.shouldReplaceTranscript(current, messages)) threadId = tid
+        }
+        if (!ChatLive.shouldReplaceTranscript(current, messages)) return
+        rememberHistory(obj)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(messages))
+        if (ChatLive.fingerprint(messages) == boundFingerprint &&
             (_binding?.dashboardChatList?.childCount ?: 0) > 0
         ) {
             return
@@ -717,7 +1158,12 @@ class DashboardFragment : Fragment() {
 
     private fun rememberHistory(obj: JSONObject) {
         cachedHistory = obj
+        threadFrom(obj)?.let { threadId = it }
+    }
+
+    private fun threadFrom(obj: JSONObject): String? {
         var tid = obj.optString("thread_id").takeIf { it.isNotBlank() }
+            ?: obj.optJSONObject("data")?.optString("thread_id")?.takeIf { it.isNotBlank() }
         if (tid.isNullOrBlank()) {
             val threads = obj.optJSONArray("threads") ?: JSONArray()
             for (i in 0 until threads.length()) {
@@ -729,29 +1175,114 @@ class DashboardFragment : Fragment() {
                 if (th.optBoolean("is_active")) break
             }
         }
-        if (!tid.isNullOrBlank()) threadId = tid
+        return tid
+    }
+
+    private fun bindHomeAvatar(home: JSONObject) {
+        if (_binding == null) return
+        val loggedIn = home.optBoolean("is_logged_in") || home.optString("me_name").isNotBlank()
+        if (!loggedIn) {
+            homeAvatarLookup = false
+            showHomeAvatarFallback()
+            return
+        }
+        val ctx = context
+        val profile = if (ctx != null) PartnerApi.peekJson("/express/partner/profile/data", ctx) else null
+        val url = VinorAvatarCache.urlFrom(home, profile)
+        val memUrl = VinorAvatarCache.currentUrl()
+        val memNewer = memUrl.isNotEmpty() &&
+            (url.isEmpty() || VinorAvatarCache.version(memUrl) > VinorAvatarCache.version(url) ||
+                (VinorAvatarCache.version(memUrl) == VinorAvatarCache.version(url) &&
+                    VinorAvatarCache.base(memUrl) == VinorAvatarCache.base(url)))
+        if (memNewer) {
+            VinorAvatarCache.currentBitmap()?.let {
+                applyHomePhoto(it)
+                if (url.isEmpty() || VinorAvatarCache.samePhoto(memUrl, url)) return
+            }
+        }
+        if (url.isNotEmpty()) {
+            showHomeAvatar(url)
+            return
+        }
+        if (profile != null || homeAvatarLookup || ctx == null) {
+            if (profile != null) showHomeAvatarFallback()
+            return
+        }
+        homeAvatarLookup = true
+        scope.launch {
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }.getOrNull()
+            }
+            if (_binding == null) return@launch
+            val found = VinorAvatarCache.urlFrom(fresh)
+            if (found.isEmpty()) showHomeAvatarFallback() else showHomeAvatar(found)
+        }
+    }
+
+    private fun showHomeAvatar(url: String) {
+        val resolved = VinorAvatarCache.resolve(url)
+        if (resolved.isEmpty()) {
+            showHomeAvatarFallback()
+            return
+        }
+        homeAvatarWanted = resolved
+        VinorAvatarCache.peek(resolved)?.let {
+            applyHomePhoto(it)
+            return
+        }
+        if (homeAvatarLoading == resolved) return
+        homeAvatarLoading = resolved
+        val ctx = context ?: return
+        val cookie = android.webkit.CookieManager.getInstance().getCookie(PartnerApi.BASE).orEmpty()
+        scope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) {
+                    VinorAvatarCache.read(ctx, resolved)
+                        ?: VinorAvatarCache.fetch(resolved, cookie)?.also { fresh ->
+                            VinorAvatarCache.store(ctx, resolved, fresh)
+                        }
+                }
+                if (_binding == null || homeAvatarWanted != resolved) return@launch
+                if (bytes == null) {
+                    showHomeAvatarFallback()
+                    return@launch
+                }
+                val bmp = withContext(Dispatchers.IO) { VinorAvatarCache.decode(bytes) } ?: return@launch
+                VinorAvatarCache.rememberBitmap(resolved, bmp)
+                if (_binding == null || homeAvatarWanted != resolved) return@launch
+                applyHomePhoto(bmp)
+            } finally {
+                if (homeAvatarLoading == resolved) homeAvatarLoading = null
+            }
+        }
+    }
+
+    private fun applyHomePhoto(bmp: Bitmap) {
+        val view = binding.dashboardHomeAvatar
+        view.setPadding(0, 0, 0, 0)
+        ImageViewCompat.setImageTintList(view, null)
+        view.scaleType = ImageView.ScaleType.CENTER_CROP
+        view.setImageBitmap(bmp)
+    }
+
+    private fun showHomeAvatarFallback() {
+        homeAvatarWanted = null
+        val view = binding.dashboardHomeAvatar
+        val pad = (9 * resources.displayMetrics.density).toInt()
+        view.setPadding(pad, pad, pad, pad)
+        view.scaleType = ImageView.ScaleType.CENTER_CROP
+        ImageViewCompat.setImageTintList(
+            view,
+            ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_text)),
+        )
+        view.setImageResource(R.drawable.ic_profile)
     }
 
     private fun bindHome(obj: JSONObject) {
         isApproved = obj.optBoolean("is_approved")
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
-        val adsKey = adsFingerprint(ads)
-        val sameCards = adsKey.isNotEmpty() &&
-            adsKey == lastAdsKey &&
-            binding.dashboardAds.childCount == ads.length()
-        val showCarousel = ads.length() > 0
-        if (!sameCards) {
-            lastAdsKey = adsKey
-            binding.dashboardAds.removeAllViews()
-            for (i in 0 until ads.length()) {
-                val ad = ads.optJSONObject(i) ?: continue
-                binding.dashboardAds.addView(inflateAdCard(ad, binding.dashboardAds).root)
-            }
-        }
         rememberHome(obj)
         if (isChatOpen()) {
-            binding.dashboardAdsScroll.isVisible = false
-            binding.dashboardFilesHead.isVisible = false
             binding.dashboardEmpty.isVisible = false
             binding.dashboardHeader.isVisible = true
             binding.dashboardHomeHeader.isVisible = false
@@ -759,21 +1290,11 @@ class DashboardFragment : Fragment() {
             binding.dashboardHeader.isVisible = false
             binding.dashboardHomeHeader.isVisible = true
             binding.dashboardEmpty.isVisible = true
-            binding.dashboardAdsScroll.isVisible = showCarousel
-            binding.dashboardFilesHead.isVisible = showCarousel
-            if (showCarousel && !sameCards) {
-                binding.dashboardAds.post {
-                    val b = _binding ?: return@post
-                    alignAdsToStart(b)
-                    bindVisibleCarouselImages()
-                }
-            } else if (showCarousel) {
-                bindVisibleCarouselImages()
-            }
         }
 
         val name = obj.optString("me_name")
         binding.dashboardGreetName.text = if (name.isBlank()) "سلام، همکار عزیز" else "سلام، $name"
+        bindHomeAvatar(obj)
         binding.dashboardGreetSub.text = when {
             isApproved -> "آماده‌ای بفروشی؟"
             obj.optBoolean("has_pending_app") -> "درخواستت در حال بررسی است"
@@ -781,16 +1302,17 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardWallet.isVisible = isApproved
         binding.dashboardPerf.isVisible = isApproved
-        val reqCount = obj.optInt("home_requests_pipeline_count")
+        val reqCount = HomePulse.requests(obj).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
         if (isApproved) {
-            binding.dashboardWalletAmount.text = PartnerFormat.toman(obj.optLong("withdrawable_balance")) + " تومان"
+            binding.dashboardWalletAmount.text = PartnerFormat.toman(HomePulse.withdrawable(obj)) + " تومان"
             val hasGrowth = obj.has("home_month_growth_pct") && !obj.isNull("home_month_growth_pct")
             binding.dashboardWalletGrowth.isVisible = hasGrowth
             if (hasGrowth) binding.dashboardWalletGrowth.text = monthGrowthLabel(obj.optInt("home_month_growth_pct"))
-            binding.dashboardPerfDeals.text = PartnerFormat.toman(obj.optInt("home_deals_done"))
-            binding.dashboardPerfVisits.text = PartnerFormat.toman(obj.optInt("home_visits_done"))
-            binding.dashboardPerfCustomers.text = PartnerFormat.toman(obj.optInt("home_active_customers"))
+            binding.dashboardPerfDeals.text = PartnerFormat.toman(HomePulse.deals(obj))
+            binding.dashboardPerfVisits.text = PartnerFormat.toman(HomePulse.visits(obj))
+            binding.dashboardPerfCustomers.text = PartnerFormat.toman(HomePulse.customers(obj))
             binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
+            binding.dashboardShortcutFollow.contentDescription = "پیگیری مشتری‌ها"
             binding.dashboardFollowBadge.isVisible = reqCount > 0
             if (reqCount > 0) binding.dashboardFollowBadge.text = PartnerFormat.toman(reqCount)
             binding.dashboardShortcutFollow.setOnClickListener {
@@ -798,6 +1320,7 @@ class DashboardFragment : Fragment() {
             }
         } else {
             binding.dashboardShortcutFollowTitle.text = "سطوح همکاری"
+            binding.dashboardShortcutFollow.contentDescription = "سطوح همکاری"
             binding.dashboardFollowBadge.isVisible = false
             binding.dashboardShortcutFollow.setOnClickListener {
                 (activity as? MainActivity)?.openPath("/express/partner/levels")
@@ -806,16 +1329,86 @@ class DashboardFragment : Fragment() {
 
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         bindPrompts(obj, adsCount, reqCount)
+        bindSuggest(obj)
         binding.dashboardTiles.isVisible = false
-        val imageUrls = mutableListOf<String>()
-        for (i in 0 until ads.length()) {
-            val url = ads.optJSONObject(i)?.optString("image_url").orEmpty()
-            if (url.isNotBlank()) imageUrls.add(url)
+    }
+
+    private fun bindSuggest(obj: JSONObject) {
+        val files = HomeSuggest.files(obj)
+        val show = files.length() > 0
+        binding.dashboardSuggestBlock.isVisible = show
+        if (!show) {
+            suggestKey = ""
+            binding.dashboardSuggest.removeAllViews()
+            return
         }
-        val ctx = context
-        if (ctx != null && imageUrls.isNotEmpty()) {
-            PartnerImages.prefetch(scope, ctx, imageUrls)
+        val key = HomeSuggest.fingerprint(files)
+        if (key == suggestKey && binding.dashboardSuggest.childCount > 0) return
+        suggestKey = key
+        binding.dashboardSuggest.removeAllViews()
+        val limit = minOf(files.length(), HomeSuggest.LIMIT)
+        for (i in 0 until limit) {
+            val ad = files.optJSONObject(i) ?: continue
+            val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
+            card.suggestTitle.text = HomeSuggest.displayTitle(ad)
+            val spec = HomeSuggest.cardSpec(ad)
+            card.suggestSpec.isVisible = spec.isNotBlank()
+            card.suggestSpec.text = spec
+            val price = HomeSuggest.priceLine(ad)
+            card.suggestPrice.isVisible = price.isNotBlank()
+            card.suggestPrice.text = price
+            val location = HomeSuggest.locationLine(ad)
+            card.suggestLocBar.isVisible = location.isNotBlank()
+            card.suggestLocation.text = location
+            bindSuggestBadge(card, HomeSuggest.badge(ad))
+            val commission = HomeSuggest.commissionLabel(ad)
+            card.suggestCommissionRow.isVisible = commission.isNotBlank()
+            card.suggestCommission.text = commission
+            PartnerImages.roundClip(card.root, 16f)
+            PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
+            card.root.contentDescription = HomeSuggest.displayTitle(ad)
+            val url = ad.optString("url").trim().let { if (it.isBlank() || it == "null") "" else it }
+            card.root.isClickable = HomeSuggest.landCode(ad).isNotBlank() || url.isNotBlank()
+            card.root.setOnClickListener { openSuggest(ad) }
         }
+        binding.dashboardSuggestScroll.post {
+            val scroll = _binding?.dashboardSuggestScroll ?: return@post
+            val child = scroll.getChildAt(0) ?: return@post
+            val viewport = scroll.width - scroll.paddingLeft - scroll.paddingRight
+            val x = HomeSuggest.startScrollX(
+                child.width,
+                viewport,
+                scroll.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
+            )
+            scroll.scrollTo(x, 0)
+        }
+    }
+
+    private fun bindSuggestBadge(card: ItemHomeSuggestBinding, badge: String) {
+        card.suggestBadge.isVisible = badge.isNotBlank()
+        if (badge.isBlank()) return
+        card.suggestBadge.text = badge
+        val tone = HomeSuggest.badgeTone(badge)
+        val bg = when (tone) {
+            "new" -> R.color.vinor_error
+            "gold" -> R.color.vinor_badge_gold
+            else -> R.color.vinor_accent_green
+        }
+        val fg = if (tone == "gold") R.color.vinor_bg else R.color.vinor_on_primary
+        card.suggestBadge.setTextColor(ContextCompat.getColor(requireContext(), fg))
+        card.suggestBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(requireContext(), bg),
+        )
+    }
+
+    private fun openSuggest(ad: JSONObject) {
+        val code = HomeSuggest.landCode(ad)
+        if (code.isNotBlank()) {
+            (activity as? MainActivity)?.openLand(code)
+            return
+        }
+        val url = ad.optString("url").trim()
+        if (url.isNotBlank() && url != "null") openVinorOrExternal(url)
     }
 
     private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {
@@ -826,6 +1419,7 @@ class DashboardFragment : Fragment() {
         for (i in 0 until prompts.length()) {
             val p = prompts.optJSONObject(i) ?: continue
             if (p.optString("ui_action") == "open_divar_ads_all") continue
+            if (p.optString("ui_action") == "open_customer_modal") continue
             if (p.optString("label") == "پیگیری") continue
             if (p.optString("variant") == "hero") {
                 if (hero == null) hero = p
@@ -882,14 +1476,7 @@ class DashboardFragment : Fragment() {
             obj.optBoolean("is_logged_in") ||
             obj.optString("me_phone").isNotBlank()
         if (approved) {
-            out.put(
-                JSONObject()
-                    .put("label", "مشتری دارم")
-                    .put("subtitle", "برای مشتری فایل مناسب پیدا کن")
-                    .put("variant", "hero")
-                    .put("icon", "user_plus")
-                    .put("ui_action", "open_customer_modal"),
-            )
+            // «مشتری دارم» از فوتر افزودن باز می‌شود؛ دکمهٔ خانه حذف شد.
             return out
         }
         if (pending) {
@@ -927,24 +1514,38 @@ class DashboardFragment : Fragment() {
     }
 
     private fun bindHeroPrompt(prompt: JSONObject?, reqCount: Int = 0) {
-        val label = prompt?.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
-        val action = prompt?.optString("ui_action").orEmpty()
-        val followUps = if (action == "open_customer_modal") reqCount else 0
-        val sub = if (followUps > 0) {
-            "${PartnerFormat.toman(followUps)} مشتری نیاز به پیگیری"
-        } else {
-            prompt?.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        if (prompt == null || prompt.optString("ui_action") == "open_customer_modal") {
+            binding.dashboardHero.isVisible = false
+            return
         }
-        binding.dashboardHeroKicker.isVisible = action == "open_customer_modal"
-        binding.dashboardHeroStart.text = if (action == "open_customer_modal") "شروع کنید" else "ادامه"
-        binding.dashboardHeroTitle.text = label
+        binding.dashboardHero.isVisible = true
+        val label = prompt.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
+        val action = prompt.optString("ui_action").orEmpty()
+        val sub = prompt.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        binding.dashboardHeroKicker.isVisible = false
+        binding.dashboardHeroSub.isVisible = sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
         binding.dashboardHeroCount.isVisible = false
-        binding.dashboardHeroIcon.setImageResource(heroIcon(prompt?.optString("icon")))
-        val href = prompt?.optString("href").orEmpty()
+        binding.dashboardHeroStart.isVisible = true
+        binding.dashboardHeroStart.text = "ادامه"
+        binding.dashboardHero.contentDescription = label
+        alignHeroLabel(customer = false)
+        TextViewCompat.setAutoSizeTextTypeWithDefaults(
+            binding.dashboardHeroTitle,
+            TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE,
+        )
+        binding.dashboardHeroTitle.text = label
+        binding.dashboardHeroTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.vinor_on_primary))
+        binding.dashboardHeroTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        binding.dashboardHeroTitle.maxLines = 2
+        binding.dashboardHeroIcon.setImageResource(heroIcon(prompt.optString("icon")))
+        ImageViewCompat.setImageTintList(
+            binding.dashboardHeroIcon,
+            ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.vinor_customer_bg)),
+        )
+        val href = prompt.optString("href").orEmpty()
         binding.dashboardHero.setOnClickListener {
             when {
-                action == "open_customer_modal" -> openCustomer()
                 action == "open_divar_ads_all" -> (activity as? MainActivity)?.openSearch()
                 href.contains("/apply") || href.contains("/thanks") ->
                     (activity as? MainActivity)?.openConsultantOnboarding()
@@ -997,6 +1598,66 @@ class DashboardFragment : Fragment() {
         }
     }
 
+    private var heroLabelCentered = true
+
+    /** «مشتری دارم» روی کل دکمه وسط می‌ماند؛ آیکون کناری مرکز متن را جابه‌جا نمی‌کند. */
+    private fun alignHeroLabel(customer: Boolean) {
+        heroLabelCentered = customer
+        val title = binding.dashboardHeroTitle
+        val body = binding.dashboardHeroBody
+        val lp = body.layoutParams as FrameLayout.LayoutParams
+        lp.width = FrameLayout.LayoutParams.MATCH_PARENT
+        lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
+        lp.gravity = if (customer) Gravity.CENTER else Gravity.CENTER_VERTICAL
+        body.layoutParams = lp
+        body.gravity = if (customer) Gravity.CENTER else Gravity.CENTER_VERTICAL or Gravity.START
+        if (customer) {
+            title.gravity = Gravity.CENTER
+            title.textAlignment = View.TEXT_ALIGNMENT_CENTER
+            title.includeFontPadding = false
+        } else {
+            title.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            title.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            title.includeFontPadding = true
+            val gap = (12 * resources.displayMetrics.density).toInt()
+            val reserve = (binding.dashboardHeroChip.width.takeIf { it > 0 }
+                ?: (96 * resources.displayMetrics.density).toInt()) + gap
+            body.setPaddingRelative(reserve, 0, 0, 0)
+        }
+        placeHeroLabel()
+    }
+
+    /** حاشیهٔ متقارن دور متن تا وسط هندسی دکمه همان وسط کلمه بماند. */
+    private fun placeHeroLabel() {
+        val body = _binding?.dashboardHeroBody ?: return
+        val chip = binding.dashboardHeroChip
+        val density = resources.displayMetrics.density
+        if (heroLabelCentered) {
+            val gap = (8 * density).toInt()
+            val chipWidth = chip.width.takeIf { it > 0 } ?: (50 * density).toInt()
+            val side = chipWidth + gap
+            if (body.paddingStart != side || body.paddingEnd != side) {
+                body.setPaddingRelative(side, 0, side, 0)
+            }
+        } else if (chip.width > 0) {
+            val reserve = chip.width + (12 * density).toInt()
+            if (body.paddingStart != reserve || body.paddingEnd != 0) {
+                body.setPaddingRelative(reserve, 0, 0, 0)
+            }
+        }
+    }
+
+    /** «مشتری» سفید و «دارم» سبز؛ ترتیب منطقی در متن راست‌به‌چپ همان طرح است. */
+    private fun customerTitle(): SpannableString {
+        val text = SpannableString("مشتری دارم")
+        val split = text.indexOf(' ')
+        val white = ContextCompat.getColor(requireContext(), R.color.vinor_on_primary)
+        val green = ContextCompat.getColor(requireContext(), R.color.vinor_customer_word)
+        text.setSpan(ForegroundColorSpan(white), 0, split, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(ForegroundColorSpan(green), split + 1, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return text
+    }
+
     private fun heroIcon(name: String?): Int = when (name) {
         "clipboard" -> R.drawable.ic_clipboard
         "user_plus" -> R.drawable.ic_user_plus_stroke
@@ -1020,56 +1681,7 @@ class DashboardFragment : Fragment() {
             pct < 0 -> "−"
             else -> ""
         }
-        return "رشد این ماه\n$sign$body٪"
-    }
-
-    private fun inflateAdCard(ad: JSONObject, parent: ViewGroup): ItemHomeAdBinding {
-        val card = ItemHomeAdBinding.inflate(layoutInflater, parent, false)
-        val cardW = (resources.displayMetrics.widthPixels * 0.86f).toInt()
-        val lp = (card.root.layoutParams as? ViewGroup.MarginLayoutParams)
-            ?: LinearLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT)
-        lp.width = cardW
-        val gap = (10 * resources.displayMetrics.density).toInt()
-        lp.marginEnd = gap
-        card.root.layoutParams = lp
-        card.homeAdTitle.text = ad.optString("title")
-        val price = ad.optString("price")
-        card.homeAdPrice.isVisible = price.isNotBlank()
-        card.homeAdPrice.text = if (price.isBlank()) "" else "قیمت کل $price"
-        val loc = ad.optString("location")
-        card.homeAdLoc.isVisible = loc.isNotBlank()
-        card.homeAdLoc.text = loc
-        val listed = ad.optString("listed_label")
-        card.homeAdWhen.isVisible = listed.isNotBlank()
-        card.homeAdWhen.text = listed
-        val facts = ad.optJSONArray("facts")
-        val factLine = buildString {
-            if (facts != null) {
-                for (i in 0 until facts.length()) {
-                    val bit = facts.optString(i)
-                    if (bit.isBlank()) continue
-                    if (isNotEmpty()) append(" · ")
-                    append(bit)
-                }
-            }
-        }.ifBlank { ad.optString("area") }
-        card.homeAdArea.isVisible = factLine.isNotBlank()
-        card.homeAdArea.text = factLine
-        card.homeAdIntro.isVisible = isApproved
-        card.homeAdCall.setOnClickListener { openAd(ad) }
-        card.homeAdIntro.setOnClickListener { openCustomer() }
-        val shots = ad.optInt("image_count")
-        card.homeAdShots.isVisible = shots > 1
-        if (shots > 1) card.homeAdShotsText.text = PartnerFormat.toman(shots)
-        val comm = ad.optInt("commission_amount")
-        card.homeAdComm.isVisible = isApproved && comm > 0
-        if (isApproved && comm > 0) {
-            card.homeAdComm.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
-        }
-        PartnerImages.roundClip(card.root, 15f)
-        card.homeAdImage.tag = ad.optString("image_url")
-        card.root.setOnClickListener { openAd(ad) }
-        return card
+        return "رشد این ماه $sign$body٪"
     }
 
     private fun openVinorOrExternal(raw: String) {
@@ -1083,26 +1695,6 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun openAd(ad: JSONObject) {
-        val token = ad.optString("token")
-        val source = ad.optString("source")
-        val url = ad.optString("url")
-        when {
-            source == "vinor" && token.isNotBlank() -> (activity as? MainActivity)?.openLand(token)
-            source == "divar" && token.isNotBlank() ->
-                (activity as? MainActivity)?.openLand("divar:$token")
-            url.isNotBlank() -> openVinorOrExternal(url)
-        }
-    }
-
-    private fun alignAdsToStart(b: FragmentDashboardBinding) {
-        val range = (b.dashboardAds.width - b.dashboardAdsScroll.width).coerceAtLeast(0)
-        val start = if (b.dashboardAdsScroll.layoutDirection == View.LAYOUT_DIRECTION_RTL) range else 0
-        if (b.dashboardAdsScroll.scrollX != start) {
-            b.dashboardAdsScroll.scrollTo(start, 0)
-        }
-    }
-
     private fun rememberHome(obj: JSONObject) {
         val ads = obj.optJSONArray("divar_pro_ads")?.length() ?: 0
         val prompts = obj.optJSONArray("ai_quick_prompts")?.length() ?: 0
@@ -1111,37 +1703,14 @@ class DashboardFragment : Fragment() {
         rememberedHome = JSONObject(obj.toString())
     }
 
-    private fun bindVisibleCarouselImages() {
-        val b = _binding ?: return
-        bindVisibleRowImages(b.dashboardAdsScroll, b.dashboardAds) { it.findViewById(R.id.homeAdImage) }
-    }
-
-    private fun bindVisibleRowImages(
-        host: View,
-        row: ViewGroup,
-        imageOf: (View) -> ImageView?,
-    ) {
-        val extra = (80 * resources.displayMetrics.density).toInt()
-        val vis = Rect()
-        if (!host.getGlobalVisibleRect(vis)) return
-        vis.inset(-extra, -extra)
-        val childBox = Rect()
-        for (i in 0 until row.childCount) {
-            val child = row.getChildAt(i)
-            val img = imageOf(child) ?: continue
-            if (img.getTag(R.id.homeAdImage) == true) continue
-            if (!child.getGlobalVisibleRect(childBox)) continue
-            if (!Rect.intersects(vis, childBox)) continue
-            img.setTag(R.id.homeAdImage, true)
-            PartnerImages.bind(scope, img, img.tag as? String)
-        }
-    }
-
     private fun bindChat(obj: JSONObject) {
-        if (!wantChatLayer) return
-        threadId = obj.optString("thread_id").takeIf { it.isNotBlank() }
-        val messages = obj.optJSONArray("messages") ?: JSONArray()
+        val account = currentAccountKey() ?: return
+        if (!wantChatLayer || chatAccount != account) return
+        rememberHistory(obj)
+        val messages = ChatLive.messagesOf(obj)
         boundMessageCount = messages.length()
+        boundFingerprint = ChatLive.fingerprint(messages)
+        lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(messages))
         val gen = chatBindGen
         val codes = landCodesIn(messages)
         for (code in codes) {
@@ -1158,7 +1727,9 @@ class DashboardFragment : Fragment() {
             }
             if (_binding == null) return@launch
             if (gen != chatBindGen || !wantChatLayer) return@launch
-            renderMessages(messages)
+            if (boundFingerprint == ChatLive.fingerprint(messages)) {
+                renderMessages(messages, stick = followingLatest())
+            }
         }
     }
 
@@ -1185,15 +1756,10 @@ class DashboardFragment : Fragment() {
         val path = "/api/express/$code"
         val ctx = context ?: return
         try {
-            val cached = withContext(Dispatchers.IO) { PartnerApi.peekJson(path, ctx) }
-            val fromCache = cached?.optJSONObject("land")
-            if (fromCache != null) {
-                if (!fromCache.has("code")) fromCache.put("code", code)
-                landsByCode[code] = fromCache
-                VinorLandCardCache.put(code, fromCache)
-                if (withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }) return
-            }
             val obj = withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
+            if (PartnerApi.isSessionExpired(obj) || obj.optInt("http_status") == 401 || obj.optInt("http_status") == 403) {
+                return
+            }
             val land = obj.optJSONObject("land") ?: return
             if (!land.has("code")) land.put("code", code)
             landsByCode[code] = land
@@ -1202,18 +1768,7 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun adsFingerprint(ads: JSONArray): String {
-        val b = StringBuilder(ads.length() * 24)
-        for (i in 0 until ads.length()) {
-            val ad = ads.optJSONObject(i) ?: continue
-            b.append(ad.optString("token")).append('\u0001')
-                .append(ad.optString("image_url")).append('\u0001')
-                .append(ad.optString("price")).append('\u0002')
-        }
-        return b.toString()
-    }
-
-    private fun renderMessages(messages: JSONArray) {
+    private fun renderMessages(messages: JSONArray, stick: Boolean = true) {
         if (!wantChatLayer || !chatLayerOpen) {
             showHomeEmpty()
             return
@@ -1221,6 +1776,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardChatList.removeAllViews()
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
+            if (ChatLive.isHidden(msg)) continue
             val att = msg.optJSONObject("attachment")
                 ?: msg.optJSONObject("meta")?.optJSONObject("attachment")
             addBubble(msg.optString("role"), msg.optString("content"), msg.optJSONArray("land_codes"), att)
@@ -1228,14 +1784,27 @@ class DashboardFragment : Fragment() {
         if (chatLayerOpen && wantChatLayer) {
             hideHomeDashboardWidgets()
             syncComposerVisible()
-            binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+            if (stick) binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
             return
         }
         showHomeEmpty()
     }
 
-    private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null) {
-        if (content.isBlank() && (codes == null || codes.length() == 0) && attachment == null) return
+    private fun followingLatest(): Boolean {
+        val scroll = _binding?.dashboardScroll ?: return true
+        val child = scroll.getChildAt(0) ?: return true
+        val slack = (96 * resources.displayMetrics.density).toInt()
+        return child.bottom <= scroll.height + scroll.scrollY + slack
+    }
+
+    private fun stickToLatestIfFollowing() {
+        if (!followingLatest()) return
+        val scroll = _binding?.dashboardScroll ?: return
+        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun addBubble(role: String, content: String, codes: JSONArray?, attachment: JSONObject? = null): View? {
+        if (content.isBlank() && (codes == null || codes.length() == 0) && attachment == null) return null
         val bubble = ItemChatBubbleBinding.inflate(layoutInflater, binding.dashboardChatList, false)
         val isUser = role == "user"
         bubble.chatBubbleAvatar.isVisible = !isUser
@@ -1289,13 +1858,14 @@ class DashboardFragment : Fragment() {
         }
         host.isVisible = attached > 0
         binding.dashboardChatList.addView(bubble.root)
+        return bubble.root
     }
 
     private fun inflateLandCard(land: JSONObject, parent: ViewGroup): ItemLandCardBinding {
         val card = ItemLandCardBinding.inflate(layoutInflater, parent, false)
         val code = land.optString("code")
         card.landCardTitle.text = land.optString("title", "—")
-        card.landCardPrice.text = PartnerFormat.toman(land.optInt("price_total")) + " تومان"
+        card.landCardPrice.text = PartnerFormat.toman(WalletWithdraw.money(land, "price_total", "price")) + " تومان"
         val city = land.optString("city").ifBlank { land.optString("location") }
         card.landCardMeta.text = if (city.isNotBlank()) "در $city" else ""
         PartnerImages.roundClip(card.landCardImage)
@@ -1317,6 +1887,13 @@ class DashboardFragment : Fragment() {
     }
 
     private fun sendChat(prefill: String? = null, chipIntent: String = "") {
+        val account = currentAccountKey()
+        if (account == null) {
+            (activity as? MainActivity)?.requireChatLogin()
+            return
+        }
+        if (ChatSessionGate.shouldDropMemory(chatAccount, account)) discardAccountChat()
+        chatAccount = account
         val text = prefill?.trim().orEmpty().ifBlank {
             binding.dashboardChatInput.text?.toString()?.trim().orEmpty()
         }
@@ -1325,6 +1902,7 @@ class DashboardFragment : Fragment() {
             Toast.makeText(requireContext(), "صبر کنید تا آپلود تمام شود.", Toast.LENGTH_SHORT).show()
             return
         }
+        if (chatSending) return
         if (text.isEmpty() && attach == null) return
         closeAttach()
         binding.dashboardChatInput.setText("")
@@ -1334,12 +1912,20 @@ class DashboardFragment : Fragment() {
         syncSendEnabled()
         wantChatLayer = true
         chatLayerOpen = true
+        chatSending = true
         chatBindGen += 1
+        chatWriteGen += 1
+        pollPaused = false
+        emptyPollStreak = 0
         hideHomeDashboardWidgets()
         syncComposerVisible()
         (activity as? MainActivity)?.syncDivarTab()
-        addBubble("user", text, null, toSend)
+        startChatPoll()
+        context?.let { PartnerApi.forget(ChatLive.HISTORY, it) }
+        val pending = addBubble("user", text, null, toSend)
+        val thinking = addBubble("assistant", "…", null, null)
         scope.launch {
+            var delivered = false
             try {
                 val body = JSONObject().put("message", text)
                 threadId?.let { body.put("thread_id", it) }
@@ -1348,11 +1934,10 @@ class DashboardFragment : Fragment() {
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postJson("/express/partner/ai/chat", body, requireContext())
                 }
-                if (_binding == null) return@launch
-                if (!wantChatLayer || !chatLayerOpen) return@launch
+                if (_binding == null || currentAccountKey() != account) return@launch
                 val http = resp.optInt("http_status")
-                if (http == 401 || http == 403) {
-                    if (toSend != null) {
+                if (http == 401 || http == 403 || resp.optBoolean("session_expired")) {
+                    if ((http == 401 || resp.optBoolean("session_expired")) && toSend != null) {
                         pendingAttachment = toSend
                         showAttachPreview(
                             toSend.optString("kind"),
@@ -1361,30 +1946,84 @@ class DashboardFragment : Fragment() {
                             uploading = false,
                         )
                     }
-                    (activity as? MainActivity)?.openDrawer()
+                    releaseChatAccount()
+                    (activity as? MainActivity)?.requireChatLogin(
+                        sessionExpired = http == 401 || resp.optBoolean("session_expired"),
+                    )
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("reply").isNotBlank()) {
-                    threadId = resp.optString("thread_id").takeIf { it.isNotBlank() } ?: threadId
-                    val codes = resp.optJSONArray("land_codes")
-                    if (codes != null) {
-                        for (i in 0 until codes.length()) prefetchLand(codes.optString(i))
+                    val stored = ChatLive.applyExchange(cachedHistory, text, toSend, resp, threadId)
+                    cachedHistory = stored
+                    threadId = stored.optString("thread_id").takeIf { it.isNotBlank() } ?: threadId
+                    val transcript = ChatLive.messagesOf(stored)
+                    boundMessageCount = transcript.length()
+                    boundFingerprint = ChatLive.fingerprint(transcript)
+                    lastSyncAt = ChatLive.laterSyncAt(lastSyncAt, ChatLive.lastSyncAt(transcript))
+                    context?.let { PartnerApi.remember(ChatLive.HISTORY, stored, it) }
+                    if (wantChatLayer && chatLayerOpen) {
+                        thinking?.let { _binding?.dashboardChatList?.removeView(it) }
+                        renderMessages(transcript, stick = true)
+                        paintMissingLands(transcript)
+                    } else {
+                        _binding?.dashboardChatList?.removeAllViews()
+                        boundFingerprint = ""
                     }
-                    addBubble("assistant", resp.optString("reply"), codes)
-                    binding.dashboardScroll.post { binding.dashboardScroll.fullScroll(View.FOCUS_DOWN) }
+                    delivered = true
                 } else {
                     val err = resp.optString("error").ifBlank { "ارسال ناموفق بود." }
                     if (err.contains("ورود") || err.contains("لاگین")) {
-                        (activity as? MainActivity)?.openDrawer()
+                        releaseChatAccount()
+                        (activity as? MainActivity)?.requireChatLogin()
                     } else {
+                        restoreFailedSend(pending, thinking, text, toSend)
                         Toast.makeText(requireContext(), err, Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                if (_binding != null && wantChatLayer) {
+                    restoreFailedSend(pending, thinking, text, toSend)
+                    Toast.makeText(requireContext(), e.message ?: "خطای شبکه", Toast.LENGTH_SHORT).show()
+                }
             } finally {
+                chatSending = false
+                if (!delivered) {
+                    _binding?.dashboardChatList?.let { list -> thinking?.let { list.removeView(it) } }
+                }
                 if (_binding != null) syncSendEnabled()
+                if (delivered && wantChatLayer && chatLayerOpen) pollSync()
             }
         }
+    }
+
+    private fun paintMissingLands(messages: JSONArray) {
+        val missing = landCodesIn(messages).filter { !landsByCode.containsKey(it) }
+        if (missing.isEmpty()) return
+        val gen = chatBindGen
+        val fp = boundFingerprint
+        scope.launch {
+            coroutineScope { missing.map { code -> async { prefetchLand(code) } }.awaitAll() }
+            if (_binding == null || gen != chatBindGen || !wantChatLayer) return@launch
+            if (fp == boundFingerprint) renderMessages(messages, stick = followingLatest())
+        }
+    }
+
+    private fun restoreFailedSend(pending: View?, thinking: View?, text: String, attachment: JSONObject?) {
+        val b = _binding ?: return
+        thinking?.let { b.dashboardChatList.removeView(it) }
+        pending?.let { b.dashboardChatList.removeView(it) }
+        if (text.isNotBlank() && b.dashboardChatInput.text.isNullOrBlank()) {
+            b.dashboardChatInput.setText(text)
+        }
+        if (attachment != null && pendingAttachment == null) {
+            pendingAttachment = attachment
+            showAttachPreview(
+                attachment.optString("kind"),
+                attachment.optString("name"),
+                attachment.optLong("size"),
+                false,
+            )
+        }
+        syncSendEnabled()
     }
 }

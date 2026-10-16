@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#000000"
+    android:background="@color/vinor_chrome"
+    android:clipChildren="false"
     android:elevation="8dp"
     android:layoutDirection="rtl"
     android:orientation="vertical">
@@ -11,33 +12,34 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1FFFFFFF" />
+        android:background="@color/vinor_border" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="bottom"
-        android:minHeight="56dp"
-        android:orientation="horizontal"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp">
+        android:layout_height="56dp"
+        android:baselineAligned="false"
+        android:clipChildren="false"
+        android:gravity="center"
+        android:orientation="horizontal">
 
         <LinearLayout
             android:id="@+id/tabAds"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:clipChildren="false"
             android:clickable="true"
-            android:contentDescription="آگهی‌ها"
+            android:contentDescription="خانه"
             android:focusable="true"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="2dp">
+            android:paddingHorizontal="2dp">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:clipChildren="false">
 
                 <ImageView
                     android:id="@+id/tabAdsIcon"
@@ -46,18 +48,21 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_home"
-                    app:tint="#FFFFFF" />
+                    app:tint="@color/vinor_nav_selected" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/tabAdsLabel"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
                 android:includeFontPadding="false"
-                android:text="آگهی‌ها"
-                android:textColor="#FFFFFF"
+                android:maxLines="1"
+                android:text="خانه"
+                android:textColor="@color/vinor_nav_selected"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -65,19 +70,21 @@
         <LinearLayout
             android:id="@+id/tabSearch"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:clipChildren="false"
             android:clickable="true"
             android:contentDescription="جستجو"
             android:focusable="true"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="2dp">
+            android:paddingHorizontal="2dp">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:clipChildren="false">
 
                 <ImageView
                     android:id="@+id/tabSearchIcon"
@@ -86,37 +93,42 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_search"
-                    app:tint="#A3A3A3" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/tabSearchLabel"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
                 android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="جستجو"
-                android:textColor="#A3A3A3"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/tabPost"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:clipChildren="false"
             android:clickable="true"
-            android:contentDescription="ثبت آگهی"
+            android:contentDescription="افزودن"
             android:focusable="true"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="2dp">
+            android:paddingHorizontal="2dp">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:clipChildren="false">
 
                 <ImageView
                     android:id="@+id/tabPostIcon"
@@ -125,37 +137,42 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_add"
-                    app:tint="#A3A3A3" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/tabPostLabel"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
                 android:includeFontPadding="false"
-                android:text="ثبت آگهی"
-                android:textColor="#A3A3A3"
+                android:maxLines="1"
+                android:text="افزودن"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/tabChat"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:clipChildren="false"
             android:clickable="true"
             android:contentDescription="AI چت"
             android:focusable="true"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="2dp">
+            android:paddingHorizontal="2dp">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:clipChildren="false">
 
                 <ImageView
                     android:id="@+id/tabChatIcon"
@@ -164,7 +181,7 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_chat"
-                    app:tint="#A3A3A3" />
+                    app:tint="@color/vinor_nav_unselected" />
 
                 <TextView
                     android:id="@+id/tabChatBadge"
@@ -176,7 +193,7 @@
                     android:includeFontPadding="false"
                     android:minWidth="14dp"
                     android:paddingHorizontal="3dp"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/vinor_on_primary"
                     android:textSize="8sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
@@ -184,32 +201,37 @@
 
             <TextView
                 android:id="@+id/tabChatLabel"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
                 android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="AI چت"
-                android:textColor="#A3A3A3"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/tabMe"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:clipChildren="false"
             android:clickable="true"
             android:contentDescription="وینور من"
             android:focusable="true"
-            android:gravity="center_horizontal"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="2dp">
+            android:paddingHorizontal="2dp">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:clipChildren="false">
 
                 <ImageView
                     android:id="@+id/tabMeIcon"
@@ -218,18 +240,21 @@
                     android:layout_gravity="center"
                     android:contentDescription=""
                     android:src="@drawable/ic_tab_me"
-                    app:tint="#A3A3A3" />
+                    app:tint="@color/vinor_nav_unselected" />
             </FrameLayout>
 
             <TextView
                 android:id="@+id/tabMeLabel"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn"
+                android:gravity="center"
                 android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="وینور من"
-                android:textColor="#A3A3A3"
+                android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/customerFieldLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/customerFieldInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_invite_link"
+        android:fontFamily="@font/vazirmatn"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:textAlignment="viewStart"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textSize="15sp" />
+</LinearLayout>

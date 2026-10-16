@@ -52,6 +52,10 @@
         android:name="ir.vinor.app.LoginStep1Fragment"
         android:label="ورود"
         tools:layout="@layout/fragment_login_step1">
+        <argument
+            android:name="auth_reason"
+            app:argType="string"
+            android:defaultValue="" />
         <action
             android:id="@+id/action_loginStep1_to_loginStep2"
             app:destination="@id/loginStep2Fragment"
@@ -108,6 +112,12 @@
         tools:layout="@layout/fragment_my_property" />
 
     <fragment
+        android:id="@+id/addHubFragment"
+        android:name="ir.vinor.app.AddHubFragment"
+        android:label="افزودن"
+        tools:layout="@layout/fragment_add_hub" />
+
+    <fragment
         android:id="@+id/myPropertyFormFragment"
         android:name="ir.vinor.app.MyPropertyFormFragment"
         android:label="ثبت آگهی"
@@ -116,6 +126,25 @@
             android:name="publicListing"
             app:argType="boolean"
             android:defaultValue="false" />
+        <argument
+            android:name="editCode"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/myPropertyManageFragment"
+        android:name="ir.vinor.app.MyPropertyManageFragment"
+        android:label="مدیریت ملک"
+        tools:layout="@layout/fragment_my_property_manage">
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
     </fragment>
 
     <fragment
@@ -145,6 +174,17 @@
         android:name="ir.vinor.app.ConsultantOnboardingFragment"
         android:label="بازاریاب وینور"
         tools:layout="@layout/fragment_consultant_onboarding" />
+
+    <fragment
+        android:id="@+id/customersFragment"
+        android:name="ir.vinor.app.CustomersFragment"
+        android:label="مشتریان"
+        tools:layout="@layout/fragment_customers">
+        <argument
+            android:name="url"
+            app:argType="string"
+            android:defaultValue="https://vinor.ir/express/partner/customers" />
+    </fragment>
 
     <fragment
         android:id="@+id/partnerPageFragment"

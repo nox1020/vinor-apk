@@ -49,11 +49,11 @@
 | Security | HTTPS، بدون سکرت در APK، App Links بدون `/d` |
 | Performance | کاروسل آگهی lazy؛ WebView فقط صفحات فرعی |
 
-## مشتریان CRM (1.0.319)
+## مشتریان CRM (1.0.345)
 
-ردیف «مشتریان» در تب من فقط وقتی `is_approved` و `crm_ui_enabled` هر دو روشن باشند. فلگ روی `GET /express/partner/home/data` است؛ اگر `profile/data` هم کلید را بفرستد همان مقدم است. باز شدن صفحه داخل اپ با `PartnerPageFragment` و دیپ‌لینک `/express/partner/customers` به همان WebView می‌رود. API JSON مشتریان در APK نیست؛ بک‌اند عوض نشده.
+ردیف «مشتریان» در تب من فقط وقتی `is_approved` و `crm_ui_enabled` هر دو روشن باشند. فلگ روی `GET /express/partner/home/data` است؛ اگر `profile/data` هم کلید را بفرستد همان مقدم است. باز شدن صفحه نیتیو `CustomersFragment` است. فهرست، تب و فرم از HTML همان `GET/POST /express/partner/customers` خوانده می‌شود. API JSON جدا نیست. POST با `X-CSRFToken` و Referer همان صفحه است و در صف آفلاین نمی‌رود.
 
-فایل‌ها: `ProfileFragment.kt`, `PartnerCrm.kt`, `MainActivity.kt`, `DeepLinkRouter.kt`, `DeepLinkRouterTest.kt`, `PartnerCrmTest.kt`, `version.txt`, همین اسناد.
+فایل‌ها: `CustomersFragment.kt`, `PartnerCustomers.kt`, `PartnerApi.kt`, `MainActivity.kt`, `DeepLinkRouter.kt`, `version.txt`.
 
 ## تغییرات دور 1.0.286
 
@@ -86,5 +86,5 @@
 | `/profile/edit` | `ProfileEditFragment` | Native | aligned | aligned | same | banner | via profile |
 | `/notifications` | `NotificationsFragment` | Native | Partial | list≠thread | same | banner | yes |
 | `/lands/<code>` | `LandDetailFragment` | Native | different chrome | D vs chat inject | same | banner | guest yes |
-| `/customers` | `PartnerPageFragment` | InAppWeb | web | web؛ منو فقط approved+`crm_ui_enabled` | same HTML | overlay | yes |
+| `/customers` | `CustomersFragment` | Native | web HTML | web؛ منو فقط approved+`crm_ui_enabled` | same HTML | footer | yes |
 | `/admin` | — | Out of scope | — | — | — | — | no |

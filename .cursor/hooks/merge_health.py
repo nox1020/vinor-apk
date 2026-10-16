@@ -119,8 +119,9 @@ def render_body(findings: list[dict[str, str]], now: datetime, required: list[st
     else:
         checks = (
             "Required checks: skipped (repository variable "
-            "MERGE_HEALTH_REQUIRED_CHECKS is empty). After the backend PR "
-            "merges, set it to android-ci-ok."
+            "MERGE_HEALTH_REQUIRED_CHECKS is empty). Set that variable to "
+            "the check names that must pass, or leave it empty to skip "
+            "check findings."
         )
     lines = [
         "## Merge health",

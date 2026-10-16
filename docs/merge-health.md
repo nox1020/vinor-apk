@@ -1,15 +1,15 @@
 # Merge health
 
-`main` accepts work only through a pull request. One CI/CD owner squash-merges one pull request at a time. Agents do not push `main` and do not merge.
+`main` accepts work only through a pull request. Agents do not push `main`. Merging follows `.cursor/rules/auto-pr-merge.mdc`: required checks first, then a merge commit, without bypassing branch protection.
 
 ## Merge procedure
 
 1. Work on a `cursor/*` branch, push only that branch, and open a pull request. Never commit or push `main`.
-2. The CI/CD agent is the only merger. Squash is the only merge method. Merge one pull request, then the next.
-3. `behind`: update the branch from `main` and wait until CI is green. The approval stays valid; do not treat an update as a new review.
-4. `dirty`: do not merge. Alert the author and let them resolve the conflict.
+2. Merge according to `auto-pr-merge.mdc` after the required checks are green. Merge one pull request, then update the next branch from `main`.
+3. `behind`: update the branch from `main` and wait until CI is green.
+4. `dirty`: do not merge. Resolve the conflict so both the pull request and the later `main` changes still behave.
 5. If the merge API returns 405 or 409, or `mergeable` is still null, retry up to 3 times. Stop if it is still not mergeable.
-6. After the squash, verify the commit is on `main` (the pull request is merged and `main` contains that squash commit). A green merge response by itself is not enough.
+6. After the merge, verify the commit is on `main` (the pull request is merged and `main` contains that commit). A green merge response by itself is not enough.
 
 The stop hook (`.cursor/hooks/auto_push.py`) fetches `origin` and pushes `HEAD` to `origin/<current branch>` with upstream set on the first push. It never force-pushes. On `main`, `master`, or a detached HEAD it does not touch the remote, prints `auto_push: refusing to push main; use a PR branch` on stderr, and exits non-zero.
 
@@ -40,7 +40,7 @@ Age for the `pr_*` codes and for the check grace is approximate. The monitor use
 
 ### Required checks
 
-The workflow reads check names from the repository variable `MERGE_HEALTH_REQUIRED_CHECKS` into `REQUIRED_CHECKS`. When the variable is empty or unset, `check_missing` and `check_failed` are skipped. After the backend pull request merges, set the variable to `android-ci-ok` (the always-run summary check). This workflow does not add that job and does not edit `android.yml`.
+The workflow reads check names from the repository variable `MERGE_HEALTH_REQUIRED_CHECKS` into `REQUIRED_CHECKS`. When the variable is empty or unset, `check_missing` and `check_failed` are skipped. Set it to the check names that must pass, or leave it empty. This workflow does not edit `android.yml`. The summary check `android-ci-ok` is not on `main`; the CI version scheme that added it was reverted.
 
 ### Issue
 
@@ -52,9 +52,9 @@ GitHub should enforce this on `main` (this pull request does not create the rule
 
 - A pull request is required before merging.
 - Direct pushes are blocked, including force-push.
-- The only merge method is squash.
-- Required status check: `android-ci-ok`, once the separate backend pull request adds that always-run job. Do not dismiss existing approvals when the branch is updated.
+- Merge with a merge commit, as `auto-pr-merge.mdc` requires. The repository also allows squash and rebase; this monitor does not require one method.
+- Required checks are whatever branch protection and `MERGE_HEALTH_REQUIRED_CHECKS` name. Do not dismiss existing approvals when the branch is updated.
 
 ## Versions
 
-Feature pull requests do not bump `version.txt`. `versionCode` and `versionName` come from CI (`GITHUB_RUN_NUMBER` with an offset once that Gradle change is on `main`). What still reads `version.txt` today, and must not be edited here, is `app/build.gradle` (`readVersionName` / `computeVersionCode`, then `max` with `GITHUB_RUN_NUMBER`) and `.github/workflows/android.yml` (push path filter, release path filter, and the APK/AAB file name). `ApkVersionUtils.kt` applies the same formula to a version string and does not open the file.
+Product changes still bump `version.txt` (`.cursor/rules/bump-app-version.mdc`). `app/build.gradle` reads that file as `versionName` and builds `versionCode` with `computeVersionCode`, then `max` with `GITHUB_RUN_NUMBER` when CI sets it. `.github/workflows/android.yml` triggers on `version.txt` for pushes to `main`, includes it in the release path filter, and names the APK/AAB from the first line. `ApkVersionUtils.kt` applies the same formula to a version string and does not open the file. This pull request does not change those files.

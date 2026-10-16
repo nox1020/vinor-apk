@@ -10,31 +10,24 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:overScrollMode="never">
+        android:overScrollMode="never"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="96dp">
+            android:paddingBottom="112dp">
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="280dp">
+                android:layout_height="300dp">
 
-                <HorizontalScrollView
+                <androidx.viewpager2.widget.ViewPager2
                     android:id="@+id/landDetailGallery"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:overScrollMode="never"
-                    android:scrollbars="none">
-
-                    <LinearLayout
-                        android:id="@+id/landDetailGalleryInner"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:orientation="horizontal" />
-                </HorizontalScrollView>
+                    android:layoutDirection="ltr" />
 
                 <ImageView
                     android:id="@+id/landDetailImage"
@@ -42,7 +35,8 @@
                     android:layout_height="match_parent"
                     android:background="@color/vinor_raised_2"
                     android:contentDescription=""
-                    android:scaleType="centerCrop"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_photo_placeholder"
                     android:visibility="gone" />
 
                 <LinearLayout
@@ -55,9 +49,10 @@
 
                     <TextView
                         android:id="@+id/landDetailBack"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:background="@drawable/bg_ld_orb"
+                        android:fontFamily="@font/vazirmatn"
                         android:gravity="center"
                         android:text="‹"
                         android:textColor="@color/vinor_text"
@@ -69,12 +64,23 @@
                         android:layout_weight="1" />
 
                     <ImageButton
+                        android:id="@+id/landDetailShare"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_ld_orb"
+                        android:contentDescription="اشتراک‌گذاری"
+                        android:padding="11dp"
+                        android:src="@drawable/ic_share_nodes"
+                        android:tint="@color/vinor_text" />
+
+                    <ImageButton
                         android:id="@+id/landDetailFav"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:background="@drawable/bg_ld_orb"
                         android:contentDescription="نشان"
-                        android:padding="10dp"
+                        android:padding="11dp"
                         android:src="@drawable/ic_bookmark"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -90,7 +96,7 @@
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
                     android:textColor="@color/vinor_text"
-                    android:textSize="11sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
             </FrameLayout>
@@ -109,14 +115,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="16dp"
                 android:background="@drawable/bg_ld_badge"
                 android:fontFamily="@font/vazirmatn"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="3dp"
-                android:text="دیوار"
                 android:textColor="@color/vinor_text_muted"
-                android:textSize="11sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -127,8 +132,9 @@
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="10dp"
                 android:fontFamily="@font/vazirmatn"
+                android:lineSpacingExtra="2dp"
                 android:textColor="@color/vinor_text"
-                android:textSize="17sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -139,7 +145,7 @@
                 android:layout_marginTop="8dp"
                 android:fontFamily="@font/vazirmatn"
                 android:textColor="@color/vinor_text"
-                android:textSize="17sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -155,24 +161,68 @@
                 android:visibility="gone" />
 
             <TextView
-                android:id="@+id/landDetailMeta"
+                android:id="@+id/landDetailPlace"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="6dp"
                 android:fontFamily="@font/vazirmatn"
                 android:textColor="@color/vinor_text_muted"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/landDetailMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="4dp"
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <HorizontalScrollView
+                android:id="@+id/landDetailFactsScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:overScrollMode="never"
+                android:paddingHorizontal="16dp"
+                android:scrollbars="none"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/landDetailFacts"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <TextView
+                android:id="@+id/landDetailSpecs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="18dp"
+                android:fontFamily="@font/vazirmatn"
+                android:text="ویژگی‌ها"
+                android:textColor="@color/vinor_text"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/landDetailRows"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_ld_surface"
                 android:divider="@drawable/div_search_row"
                 android:orientation="vertical"
-                android:showDividers="beginning|middle|end"
+                android:paddingHorizontal="14dp"
+                android:showDividers="middle"
                 android:visibility="gone" />
 
             <TextView
@@ -184,7 +234,7 @@
                 android:fontFamily="@font/vazirmatn"
                 android:text="توضیحات"
                 android:textColor="@color/vinor_text"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -197,7 +247,8 @@
                 android:fontFamily="@font/vazirmatn"
                 android:lineSpacingExtra="4dp"
                 android:textColor="@color/vinor_text"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/landDetailMore"
@@ -254,7 +305,7 @@
                     <TextView
                         android:id="@+id/landDetailPayCash"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="36dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_ld_chip"
@@ -268,7 +319,7 @@
                     <TextView
                         android:id="@+id/landDetailPayDeal"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="36dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_ld_chip"
@@ -282,7 +333,7 @@
                     <TextView
                         android:id="@+id/landDetailPaySwap"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="36dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_ld_chip"
                         android:fontFamily="@font/vazirmatn"
@@ -346,13 +397,13 @@
                 <TextView
                     android:id="@+id/landDetailPublishCta"
                     android:layout_width="match_parent"
-                    android:layout_height="42dp"
+                    android:layout_height="48dp"
                     android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_ld_cta"
+                    android:background="@drawable/bg_hub_start"
                     android:fontFamily="@font/vazirmatn"
                     android:gravity="center"
                     android:text="انتشار برای فروش"
-                    android:textColor="@color/vinor_bg"
+                    android:textColor="@color/vinor_customer_bg"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -369,27 +420,76 @@
         </LinearLayout>
     </ScrollView>
 
-    <FrameLayout
+    <LinearLayout
         android:id="@+id/landDetailSticky"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@color/vinor_bg"
-        android:paddingHorizontal="14dp"
+        android:background="@color/vinor_chrome"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
         android:paddingTop="10dp"
-        android:paddingBottom="14dp"
+        android:paddingBottom="12dp"
         android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/landDetailStickyPrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:maxLines="1"
+                android:textColor="@color/vinor_text"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/landDetailStickyHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/vazirmatn"
+                android:textColor="@color/vinor_text_muted"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/landDetailVisit"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_flat_outline_card"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:minWidth="88dp"
+            android:paddingHorizontal="14dp"
+            android:text="بازدید"
+            android:textColor="@color/vinor_text"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/landDetailDivar"
-            android:layout_width="match_parent"
-            android:layout_height="46dp"
-            android:background="@drawable/bg_ld_surface"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_hub_start"
             android:fontFamily="@font/vazirmatn"
             android:gravity="center"
-            android:text="دیدن در دیوار"
-            android:textColor="@color/vinor_text"
+            android:minWidth="96dp"
+            android:paddingHorizontal="14dp"
+            android:text="گفتگو"
+            android:textColor="@color/vinor_customer_bg"
             android:textSize="14sp"
             android:textStyle="bold" />
-    </FrameLayout>
+    </LinearLayout>
 </FrameLayout>
