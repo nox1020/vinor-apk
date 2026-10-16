@@ -121,6 +121,8 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Upload APK
+        # فقط وقتی APK امضاشده ساخته نمی‌شود؛ وگرنه کاربر اشتباهاً debug را نصب می‌کند و «App not installed» می‌گیرد.
+        if: needs.changes.outputs.release != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: vinor-debug-unsigned
@@ -128,11 +130,12 @@ jobs:
           retention-days: 7
 
       - name: Debug APK is not for phones with a release install
+        if: needs.changes.outputs.release == 'true'
         run: |
           {
             echo "## Debug artifact"
-            echo "\`vinor-debug-unsigned\` uses the debug keystore. Installing it over the store/sideload app fails with **App not installed** (signature mismatch)."
-            echo "برای گوشی، آرتیفکت **vinor-direct-apk** را بگیرید."
+            echo "روی این PR آرتیفکت debug آپلود نشد. برای گوشی فقط **vinor-direct-apk** را بگیرید."
+            echo "\`vinor-debug-unsigned\` امضای debug دارد و روی نصب release معمولاً **App not installed** می‌دهد."
           } >> "$GITHUB_STEP_SUMMARY"
 
   direct:
