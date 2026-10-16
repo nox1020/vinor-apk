@@ -3,14 +3,18 @@ package ir.vinor.app
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** فهرست عمودی فایل پیشنهادی خانه. `suggested_files` اگر پر باشد، وگرنه همان آگهی‌های `divar_pro_ads`. */
+/**
+ * فهرست عمودی فایل پیشنهادی خانه.
+ * همان کاتالوگ عمومی وب (`divar_pro_ads`) است؛ `suggested_files` فقط وقتی
+ * کاتالوگ خالی باشد می‌آید تا یک فایل مأموریت بقیهٔ آگهی‌ها را پنهان نکند.
+ */
 object HomeSuggest {
     const val LIMIT = 12
 
     fun files(home: JSONObject): JSONArray {
-        val suggested = usable(home.optJSONArray("suggested_files"))
-        if (suggested.length() > 0) return suggested
-        return usable(home.optJSONArray("divar_pro_ads"))
+        val catalog = usable(home.optJSONArray("divar_pro_ads"))
+        if (catalog.length() > 0) return catalog
+        return usable(home.optJSONArray("suggested_files"))
     }
 
     fun fingerprint(files: JSONArray): String {
@@ -285,7 +289,13 @@ object HomeSuggest {
 
     private fun dedupeKey(ad: JSONObject): String {
         val code = landCode(ad)
-        if (code.isNotBlank()) return code
+        val created = listOf("created_at", "published_at", "created")
+            .map { ad.optString(it).trim() }
+            .firstOrNull { it.isNotEmpty() && it != "null" }
+            .orEmpty()
+        if (code.isNotBlank()) {
+            return if (created.isNotEmpty()) "$code|$created" else code
+        }
         return listOf(title(ad), priceLine(ad), locationLine(ad), imageUrl(ad)).joinToString("|")
     }
 
