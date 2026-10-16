@@ -137,8 +137,8 @@ object SearchAds {
         val out = ArrayList<SearchAd>(ads.size)
         for (ad in ads) {
             val key = when {
-                ad.token.isNotBlank() -> "${ad.source}:${ad.token}"
-                ad.url.isNotBlank() -> "u:${ad.url}"
+                ad.token.isNotBlank() -> "${ad.source}:${ad.token}:${ad.createdAt}:${ad.title}:${ad.priceRaw}"
+                ad.url.isNotBlank() -> "u:${ad.url}:${ad.createdAt}:${ad.title}"
                 else -> "t:${ad.title}:${ad.location}:${ad.priceRaw}"
             }
             if (!seen.add(key)) continue

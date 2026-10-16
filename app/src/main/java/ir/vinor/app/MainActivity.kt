@@ -686,9 +686,18 @@ class MainActivity : AppCompatActivity() {
     private fun openListingCompose(publicListing: Boolean) {
         val args = Bundle().apply {
             putBoolean(MyPropertyFormFragment.ARG_PUBLIC, publicListing)
+            putString(MyPropertyFormFragment.ARG_CODE, "")
+            putString(MyPropertyFormFragment.ARG_SNAPSHOT, "")
         }
         if (navController.currentDestination?.id == R.id.myPropertyFormFragment) return
-        navigateTab(R.id.myPropertyFormFragment, args)
+        // فرم تازه نباید آرگومان ویرایش قبلی (مثلاً کد ۱) را از بک‌استک برگرداند.
+        val opts = NavOptions.Builder()
+            .setLaunchSingleTop(false)
+            .setRestoreState(false)
+            .setPopUpTo(R.id.dashboardFragment, false, false)
+            .build()
+        runCatching { navController.navigate(R.id.myPropertyFormFragment, args, opts) }
+            .onFailure { navController.navigate(R.id.myPropertyFormFragment, args) }
     }
 
     private fun navigateTab(dest: Int, args: Bundle? = null) {
