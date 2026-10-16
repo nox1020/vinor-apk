@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var notifyHelper: VinorNotifyHelper? = null
     private var keepSystemSplash = true
     private var pendingOpenVinorChat = false
+    private var pendingOpenCustomerModal = false
     private var resumeChatAfterAuth = false
     private var pendingShowHome = false
     private var drawerIsSpecial = false
@@ -151,6 +152,7 @@ class MainActivity : AppCompatActivity() {
                 profile = R.id.profileFragment,
                 myProperties = R.id.myPropertiesFragment,
                 propertyForm = R.id.myPropertyFormFragment,
+                addHub = R.id.addHubFragment,
             ),
         )
         val adsOn = tab == FooterTabs.Tab.ADS
@@ -205,6 +207,7 @@ class MainActivity : AppCompatActivity() {
 
     fun openPartnerHome() {
         pendingOpenVinorChat = false
+        pendingOpenCustomerModal = false
         pendingShowHome = true
         val nav = navController
         val dash = findDashboard()
@@ -219,6 +222,58 @@ class MainActivity : AppCompatActivity() {
             runCatching { nav.navigate(R.id.dashboardFragment) }
         }
         revealPendingHome()
+    }
+
+    /** همان شیت «مشتری دارم» روی خانه — از صفحهٔ افزودن. */
+    fun openCustomerModal() {
+        if (!PartnerApi.hasSession()) {
+            openLogin()
+            return
+        }
+        pendingOpenVinorChat = false
+        pendingShowHome = false
+        val nav = navController
+        val dash = findDashboard()
+        if (nav.currentDestination?.id == R.id.dashboardFragment && dash != null) {
+            dash.showHomeEntry()
+            dash.openCustomerModal()
+            syncDivarTab()
+            return
+        }
+        pendingOpenCustomerModal = true
+        if (nav.currentDestination?.id != R.id.dashboardFragment) {
+            if (!nav.popBackStack(R.id.dashboardFragment, false)) {
+                nav.navigate(R.id.dashboardFragment)
+            }
+        }
+        fun tryOpen(left: Int) {
+            if (!pendingOpenCustomerModal) {
+                syncDivarTab()
+                return
+            }
+            if (!PartnerApi.hasSession()) {
+                pendingOpenCustomerModal = false
+                openLogin()
+                return
+            }
+            val live = findDashboard()
+            if (live != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+                live.showHomeEntry()
+                live.openCustomerModal()
+                pendingOpenCustomerModal = false
+                syncDivarTab()
+                return
+            }
+            if (left > 0) binding.root.post { tryOpen(left - 1) }
+            else pendingOpenCustomerModal = false
+        }
+        binding.root.post { tryOpen(12) }
+    }
+
+    fun consumePendingCustomerModal(): Boolean {
+        val pending = pendingOpenCustomerModal
+        pendingOpenCustomerModal = false
+        return pending
     }
 
     /** popBackStack خانه را همان لحظه بالا نمی‌آورد؛ بدون این، تب خانه روی چت می‌ماند. */
@@ -376,6 +431,10 @@ class MainActivity : AppCompatActivity() {
             }
             "my_properties" -> {
                 openMyProperty()
+                true
+            }
+            "add_hub" -> {
+                openAddHub()
                 true
             }
             "property_form" -> {
@@ -538,6 +597,7 @@ class MainActivity : AppCompatActivity() {
             R.id.commissionsFragment -> AuthReturnStore.Dest("commissions", "")
             R.id.routineFragment -> AuthReturnStore.Dest("routine", "")
             R.id.myPropertiesFragment -> AuthReturnStore.Dest("my_properties", "")
+            R.id.addHubFragment -> AuthReturnStore.Dest("add_hub", "")
             R.id.myPropertyFormFragment -> AuthReturnStore.Dest(
                 "property_form",
                 if (args?.getBoolean(MyPropertyFormFragment.ARG_PUBLIC) == true) "1" else "0",
@@ -586,7 +646,12 @@ class MainActivity : AppCompatActivity() {
             openLogin()
             return
         }
-        openOwnerHomeForm()
+        openAddHub()
+    }
+
+    fun openAddHub() {
+        if (navController.currentDestination?.id == R.id.addHubFragment) return
+        navigateTab(R.id.addHubFragment)
     }
 
     private fun applyTabbarVisibility() {
@@ -686,9 +751,18 @@ class MainActivity : AppCompatActivity() {
     private fun openListingCompose(publicListing: Boolean) {
         val args = Bundle().apply {
             putBoolean(MyPropertyFormFragment.ARG_PUBLIC, publicListing)
+            putString(MyPropertyFormFragment.ARG_CODE, "")
+            putString(MyPropertyFormFragment.ARG_SNAPSHOT, "")
         }
         if (navController.currentDestination?.id == R.id.myPropertyFormFragment) return
-        navigateTab(R.id.myPropertyFormFragment, args)
+        // فرم تازه نباید آرگومان ویرایش قبلی (مثلاً کد ۱) را از بک‌استک برگرداند.
+        val opts = NavOptions.Builder()
+            .setLaunchSingleTop(false)
+            .setRestoreState(false)
+            .setPopUpTo(R.id.dashboardFragment, false, false)
+            .build()
+        runCatching { navController.navigate(R.id.myPropertyFormFragment, args, opts) }
+            .onFailure { navController.navigate(R.id.myPropertyFormFragment, args) }
     }
 
     private fun navigateTab(dest: Int, args: Bundle? = null) {
@@ -742,6 +816,7 @@ class MainActivity : AppCompatActivity() {
             }
             low == "/express/partner/requests" || low.startsWith("/express/partner/requests/") ->
                 openNativePage(NativePartnerFragment.PAGE_REQUESTS)
+            low.endsWith("/add") -> openAddHub()
             low.endsWith("/listings/new") -> openOwnerHomeForm()
             low.endsWith("/listings") -> openMyProperty()
             low.endsWith("/my-property") || low.endsWith("/my-properties") -> {

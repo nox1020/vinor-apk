@@ -11,6 +11,7 @@ class FooterTabsTest {
         profile = 3,
         myProperties = 4,
         propertyForm = 5,
+        addHub = 6,
     )
 
     @Test
@@ -47,6 +48,7 @@ class FooterTabsTest {
     fun propertyScreensOpenedAsTabRoot_selectPost() {
         assertEquals(FooterTabs.Tab.POST, FooterTabs.selected(listOf(1, 4), chatOpen = false, ids))
         assertEquals(FooterTabs.Tab.POST, FooterTabs.selected(listOf(1, 5), chatOpen = false, ids))
+        assertEquals(FooterTabs.Tab.POST, FooterTabs.selected(listOf(1, 6), chatOpen = false, ids))
     }
 
     @Test

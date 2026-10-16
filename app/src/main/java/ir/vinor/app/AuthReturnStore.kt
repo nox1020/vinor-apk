@@ -52,7 +52,7 @@ object AuthReturnStore {
         if (param.contains("@") || param.contains("next=", ignoreCase = true)) return false
         return when (dest.kind) {
             "home", "chat", "search", "profile", "profile_edit", "notifications",
-            "notes", "commissions", "routine", "my_properties", "consultant" -> param.isEmpty()
+            "notes", "commissions", "routine", "my_properties", "add_hub", "consultant" -> param.isEmpty()
             "property_form" -> param == "0" || param == "1"
             "land" -> isSafeLandCode(param)
             "native" -> isSafeNativePage(param)

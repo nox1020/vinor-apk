@@ -14,6 +14,7 @@ object FooterTabs {
         val profile: Int,
         val myProperties: Int,
         val propertyForm: Int,
+        val addHub: Int = 0,
     )
 
     fun selected(stack: List<Int>, chatOpen: Boolean, ids: Ids): Tab {
@@ -26,7 +27,7 @@ object FooterTabs {
         return when (pages.getOrNull(1)) {
             ids.search -> Tab.SEARCH
             ids.profile -> Tab.ME
-            ids.myProperties, ids.propertyForm -> Tab.POST
+            ids.addHub, ids.myProperties, ids.propertyForm -> Tab.POST
             else -> Tab.ADS
         }
     }

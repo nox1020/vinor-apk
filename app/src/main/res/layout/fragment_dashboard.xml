@@ -115,6 +115,42 @@
                     android:orientation="vertical">
 
                     <LinearLayout
+                        android:id="@+id/dashboardHomeSearch"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_search_field"
+                        android:clickable="true"
+                        android:contentDescription="جستجو در فایل‌های وینور"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription=""
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_search_stroke"
+                            app:tint="@color/vinor_text" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:fontFamily="@font/vazirmatn"
+                            android:maxLines="1"
+                            android:text="جستجو در فایل‌های وینور"
+                            android:textAlignment="viewStart"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:id="@+id/dashboardWallet"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -154,24 +190,24 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/dashboardWalletAmount"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:textColor="@color/vinor_text"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
                                     android:ellipsize="end"
                                     android:maxLines="1"
                                     android:text="پورسانت قابل برداشت"
                                     android:textColor="@color/vinor_text_muted"
                                     android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/dashboardWalletAmount"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:textColor="@color/vinor_text"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
                             </LinearLayout>
 
                             <TextView
@@ -189,6 +225,15 @@
                                 android:textSize="12sp"
                                 android:textStyle="bold"
                                 android:visibility="gone" />
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_marginStart="4dp"
+                                android:contentDescription=""
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_chevron_left"
+                                app:tint="@color/vinor_text_muted" />
                         </LinearLayout>
 
                         <View
@@ -270,7 +315,7 @@
                                         android:layout_height="wrap_content"
                                         android:gravity="center"
                                         android:maxLines="2"
-                                        android:text="بازدید انجام‌شده"
+                                        android:text="بازدید"
                                         android:textColor="@color/vinor_text_muted"
                                         android:textSize="12sp" />
                                 </LinearLayout>
@@ -303,7 +348,7 @@
                                         android:layout_height="wrap_content"
                                         android:gravity="center"
                                         android:maxLines="2"
-                                        android:text="معامله موفق"
+                                        android:text="معامله"
                                         android:textColor="@color/vinor_text_muted"
                                         android:textSize="12sp" />
                                 </LinearLayout>
@@ -505,16 +550,11 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
-
                     <LinearLayout
                         android:id="@+id/dashboardSuggestBlock"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="16dp"
                         android:layout_marginBottom="10dp"
                         android:orientation="vertical"
                         android:visibility="gone">
@@ -525,26 +565,18 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingHorizontal="16dp"
-                            android:paddingBottom="8dp">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:contentDescription=""
-                                android:src="@drawable/ic_home"
-                                app:tint="@color/vinor_text" />
+                            android:paddingBottom="10dp">
 
                             <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:fontFamily="@font/vazirmatn"
                                 android:maxLines="1"
-                                android:text="فایل‌های پیشنهادی برای شما"
+                                android:text="فایل‌های پیشنهادی"
                                 android:textColor="@color/vinor_text"
-                                android:textSize="14sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <LinearLayout
@@ -577,24 +609,13 @@
                             </LinearLayout>
                         </LinearLayout>
 
-                        <HorizontalScrollView
-                            android:id="@+id/dashboardSuggestScroll"
+                        <LinearLayout
+                            android:id="@+id/dashboardSuggest"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:clipToPadding="false"
                             android:layoutDirection="rtl"
-                            android:overScrollMode="never"
-                            android:paddingHorizontal="16dp"
-                            android:paddingBottom="4dp"
-                            android:scrollbars="none">
-
-                            <LinearLayout
-                                android:id="@+id/dashboardSuggest"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layoutDirection="rtl"
-                                android:orientation="horizontal" />
-                        </HorizontalScrollView>
+                            android:orientation="vertical"
+                            android:paddingHorizontal="16dp" />
                     </LinearLayout>
 
                     <FrameLayout

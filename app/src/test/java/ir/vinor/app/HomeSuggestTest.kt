@@ -8,13 +8,13 @@ import org.junit.Test
 
 class HomeSuggestTest {
     @Test
-    fun files_preferSuggestedThenDivarAds() {
-        val suggested = JSONArray().put(JSONObject().put("title", "پیشنهادی"))
-        val ads = JSONArray().put(JSONObject().put("title", "دیوار"))
+    fun files_preferCatalogThenSuggested() {
+        val suggested = JSONArray().put(JSONObject().put("code", "S").put("title", "پیشنهادی"))
+        val ads = JSONArray().put(JSONObject().put("token", "d1").put("source", "divar").put("title", "دیوار"))
         val both = JSONObject().put("suggested_files", suggested).put("divar_pro_ads", ads)
-        assertEquals("پیشنهادی", HomeSuggest.files(both).optJSONObject(0)?.optString("title"))
-        val onlyAds = JSONObject().put("suggested_files", JSONArray()).put("divar_pro_ads", ads)
-        assertEquals("دیوار", HomeSuggest.files(onlyAds).optJSONObject(0)?.optString("title"))
+        assertEquals("دیوار", HomeSuggest.files(both).optJSONObject(0)?.optString("title"))
+        val onlySuggested = JSONObject().put("suggested_files", suggested).put("divar_pro_ads", JSONArray())
+        assertEquals("پیشنهادی", HomeSuggest.files(onlySuggested).optJSONObject(0)?.optString("title"))
         assertEquals(0, HomeSuggest.files(JSONObject()).length())
     }
 
@@ -37,7 +37,7 @@ class HomeSuggestTest {
             .put("price_toman", 1_550_000_000L)
             .put("commission_amount", 31_000_000L)
         assertEquals("زمین ۵۵۰ متری", HomeSuggest.displayTitle(ad))
-        assertEquals("دماوند - گرمابسرد", HomeSuggest.locationLine(ad))
+        assertEquals("دماوند، گرمابسرد", HomeSuggest.locationLine(ad))
         assertEquals("بافت ویلایی | ۵۵۰ م²", HomeSuggest.specLine(ad))
         assertEquals("۱٬۵۵۰٬۰۰۰٬۰۰۰ تومان", HomeSuggest.priceLine(ad))
         assertEquals(2, HomeSuggest.commissionPercent(ad))
@@ -53,7 +53,7 @@ class HomeSuggestTest {
             .put("location", "۲ هفته پیش در دماوند")
         assertEquals("زمین ۲۰۰ متری به بالا", HomeSuggest.displayTitle(titled))
         assertEquals("آب و برق | ۲۰۰ م²", HomeSuggest.specLine(titled))
-        assertEquals("دماوند - گرمابسرد", HomeSuggest.locationLine(titled))
+        assertEquals("دماوند، گرمابسرد", HomeSuggest.locationLine(titled))
         assertEquals("", HomeSuggest.badge(titled))
         assertEquals("آب و برق", HomeSuggest.cardSpec(titled))
         assertEquals("green", HomeSuggest.badgeTone("پیشنهادی"))
@@ -69,6 +69,15 @@ class HomeSuggestTest {
         assertEquals("", HomeSuggest.cardSpec(JSONObject().put("title", "زمین ۵۰۰ متری")))
         assertEquals("ویژه", HomeSuggest.badge(facts))
         assertEquals("gold", HomeSuggest.badgeTone("ویژه"))
+        assertEquals("", HomeSuggest.listedAge(facts))
+        assertEquals(
+            "۴ روز پیش",
+            HomeSuggest.listedAge(JSONObject().put("listed_label", "۴ روز پیش")),
+        )
+        assertEquals(
+            "",
+            HomeSuggest.badge(JSONObject().put("listed_label", "۴ روز پیش")),
+        )
         assertEquals(0, HomeSuggest.commissionPercent(JSONObject().put("price_toman", 100)))
         assertEquals("", HomeSuggest.commissionLabel(JSONObject().put("commission_amount", 10)))
     }
