@@ -338,13 +338,10 @@ object SearchAds {
     }
 
     private fun unpublished(ad: JSONObject): Boolean {
+        if (Listings.published(ad)) return false
+        if (Listings.isPrivateOwnerHome(ad)) return true
         if (!ad.has("published_for_sale")) return false
-        return when (val value = ad.opt("published_for_sale")) {
-            is Boolean -> !value
-            is Number -> value.toInt() == 0
-            is String -> value.trim().lowercase() in setOf("false", "0", "no")
-            else -> false
-        }
+        return !Listings.flagTrue(ad, "published_for_sale")
     }
 
     private fun fromObject(ad: JSONObject, index: Int): SearchAd {

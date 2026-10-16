@@ -25,6 +25,13 @@ object VinorFavoritesStore {
     fun contains(context: Context, code: String): Boolean =
         codes(context).contains(code.trim())
 
+    /** بعد از کد تازهٔ سرور، علاقه‌مندی کد قبلی را به کد فعلی عوض می‌کند. */
+    fun replace(context: Context, from: String, to: String) {
+        val next = Listings.retargetCode(codes(context), from, to)
+        if (next == codes(context)) return
+        save(context, next)
+    }
+
     fun toggle(context: Context, code: String): Boolean {
         val trimmed = code.trim()
         if (trimmed.isBlank()) return false

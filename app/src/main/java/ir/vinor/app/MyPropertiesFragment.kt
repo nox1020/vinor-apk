@@ -161,15 +161,18 @@ class MyPropertiesFragment : Fragment() {
         binding.mpList.removeAllViews()
         if (items.length() == 0) {
             val prop = obj.optJSONObject("property") ?: JSONObject()
-            addCard(
-                JSONObject()
-                    .put("code", prop.optString("code").ifBlank { prop.optString("id") })
-                    .put("title", prop.optString("address"))
-                    .put("city", prop.optString("city"))
-                    .put("price_total", prop.optLong("estimated_value"))
-                    .put("image_url", prop.optString("cover_image"))
-                    .put("badge_label", prop.optString("badge_label")),
-            )
+            val card = JSONObject()
+                .put("code", prop.optString("code").ifBlank { prop.optString("id") })
+                .put("title", prop.optString("address"))
+                .put("city", prop.optString("city"))
+                .put("price_total", prop.optLong("estimated_value"))
+                .put("image_url", prop.optString("cover_image"))
+            if (prop.has("published_for_sale")) card.put("published_for_sale", prop.opt("published_for_sale"))
+            if (prop.has("source")) card.put("source", prop.opt("source"))
+            if (prop.has("public")) card.put("public", prop.opt("public"))
+            if (prop.has("extras")) card.put("extras", prop.opt("extras"))
+            if (prop.has("badge_label")) card.put("badge_label", prop.opt("badge_label"))
+            addCard(card)
             return
         }
         for (i in 0 until items.length()) {
@@ -183,15 +186,13 @@ class MyPropertiesFragment : Fragment() {
         card.landCardTitle.text = land.optString("title").ifBlank { "ملک شما" }
         val price = land.optLong("price_total")
         card.landCardPrice.text = if (price > 0L) PartnerFormat.toman(price) + " تومان" else ""
-        val badge = land.optString("badge_label").ifBlank {
-            if (land.optBoolean("published_for_sale")) "منتشرشده" else "خصوصی"
-        }
+        val badge = Listings.statusLabel(land)
         val meta = listOf(badge, land.optString("city"), land.optString("location"), land.optString("size"))
             .filter { it.isNotBlank() }
             .joinToString(" · ")
         card.landCardMeta.text = meta
         val comm = land.optInt("commission_amount")
-        card.landCardCommission.isVisible = comm > 0 && land.optBoolean("published_for_sale")
+        card.landCardCommission.isVisible = comm > 0 && Listings.published(land)
         if (card.landCardCommission.isVisible) {
             card.landCardCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
         }
@@ -217,7 +218,9 @@ class MyPropertiesFragment : Fragment() {
 
         internal fun remember(obj: JSONObject) {
             if (!VinorPageLoad.canRemember(obj)) return
-            remembered = VinorPageLoad.rememberedCopy(obj)
+            val copy = VinorPageLoad.rememberedCopy(obj)
+            ListingRepository.ingestTree(copy)
+            remembered = copy
         }
 
         internal fun peekRemembered(): JSONObject? = remembered

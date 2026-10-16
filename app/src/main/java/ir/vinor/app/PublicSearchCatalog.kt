@@ -65,13 +65,9 @@ object PublicSearchCatalog {
     }
 
     private fun listed(obj: JSONObject): Boolean {
+        if (Listings.published(obj)) return true
         if (!obj.has("published_for_sale")) return false
-        return when (val value = obj.opt("published_for_sale")) {
-            is Boolean -> value
-            is Number -> value.toInt() != 0
-            is String -> value.trim().lowercase() in setOf("true", "1", "yes")
-            else -> false
-        }
+        return Listings.flagTrue(obj, "published_for_sale")
     }
 
     private fun areaOf(obj: JSONObject): String {

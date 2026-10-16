@@ -70,7 +70,9 @@ class DashboardFragment : Fragment() {
         internal fun peekRememberedHome(): JSONObject? = rememberedHome
 
         internal fun rememberHome(obj: JSONObject) {
-            rememberedHome = JSONObject(obj.toString())
+            val copy = JSONObject(obj.toString())
+            ListingRepository.ingestTree(copy)
+            rememberedHome = copy
         }
     }
 

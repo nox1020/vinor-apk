@@ -551,8 +551,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLand(code: String) {
-        val trimmed = code.trim()
+        val trimmed = ListingRepository.currentCode(code).ifBlank { code.trim() }
         if (trimmed.isBlank()) return
+        if (trimmed != code.trim()) VinorFavoritesStore.replace(this, code, trimmed)
         val currentCode = navController.currentBackStackEntry?.arguments?.getString("code")
         if (navController.currentDestination?.id == R.id.landDetailFragment && currentCode == trimmed) {
             return

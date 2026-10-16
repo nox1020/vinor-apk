@@ -351,8 +351,8 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 val land = MyPropertyManage.refreshAfterPublish(fresh) {
                     withContext(Dispatchers.IO) {
-                        val path = MyPropertyManage.landDataPath(code)
-                        ListingMemory.invalidateLand(code, ctx, path)
+                        val path = MyPropertyManage.landDataPath(ListingRepository.currentCode(code).ifBlank { code })
+                        ListingMemory.forgetDisk(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
                 }
@@ -366,6 +366,7 @@ class MyPropertyManageFragment : Fragment() {
                 if (MyPropertyManage.publishAccepted(fresh, land)) {
                     if (land != null) snapshot = MyPropertyManage.mergeDetail(snapshot, land)
                     MyPropertyManage.markPublished(snapshot, true)
+                    ListingMemory.syncPublished(MyPropertyManage.codeOf(snapshot), true, ctx)
                     persistSnapshot()
                     bindPreview()
                     bindRows()
@@ -413,8 +414,8 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 val land = MyPropertyManage.refreshAfterPublish(fresh) {
                     withContext(Dispatchers.IO) {
-                        val path = MyPropertyManage.landDataPath(code)
-                        ListingMemory.invalidateLand(code, ctx, path)
+                        val path = MyPropertyManage.landDataPath(ListingRepository.currentCode(code).ifBlank { code })
+                        ListingMemory.forgetDisk(code, ctx, path)
                         PartnerApi.get(path, ctx)
                     }
                 }
@@ -428,6 +429,7 @@ class MyPropertyManageFragment : Fragment() {
                 val next = MyPropertyManage.finishUnpublish(snapshot, fresh, land)
                 if (next != null) {
                     snapshot = next
+                    ListingMemory.syncPublished(MyPropertyManage.codeOf(snapshot), false, ctx)
                     persistSnapshot()
                     bindPreview()
                     bindRows()

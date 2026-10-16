@@ -220,7 +220,7 @@ class LandDetailFragment : Fragment() {
         val isDivar = source == "divar" || code.startsWith("divar:", ignoreCase = true)
         val hasSession = PartnerApi.hasSession()
         val isMine = obj.optBoolean("is_mine")
-        val published = obj.optBoolean("published_for_sale")
+        val published = Listings.published(obj)
         val audience = LandDetailRole.audience(hasSession, isMine)
         val badge = LandDetailRole.badge(
             hasSession,
@@ -871,7 +871,9 @@ class LandDetailFragment : Fragment() {
         internal fun remember(code: String, obj: JSONObject) {
             val clean = code.trim()
             if (clean.isEmpty() || !VinorPageLoad.canRemember(obj)) return
-            remembered[clean] = VinorPageLoad.rememberedCopy(obj)
+            val copy = VinorPageLoad.rememberedCopy(obj)
+            ListingRepository.ingest(copy)
+            remembered[clean] = copy
         }
 
         internal fun peekRemembered(code: String): JSONObject? = remembered[code.trim()]

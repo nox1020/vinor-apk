@@ -61,26 +61,13 @@ object MyPropertyManage {
         return longOf(snapshot, "price")
     }
 
-    fun isPublished(snapshot: JSONObject): Boolean {
-        if (snapshot.has("published_for_sale")) return snapshot.optBoolean("published_for_sale")
-        return text(snapshot, "badge_label") == "منتشرشده"
-    }
+    fun isPublished(snapshot: JSONObject): Boolean = Listings.published(snapshot)
 
-    fun statusOf(snapshot: JSONObject): String {
-        if (snapshot.has("published_for_sale")) {
-            return if (snapshot.optBoolean("published_for_sale")) "منتشرشده" else "خصوصی"
-        }
-        val badge = text(snapshot, "badge_label")
-        if (badge.isNotBlank()) return badge
-        return "خصوصی"
-    }
+    fun statusOf(snapshot: JSONObject): String = Listings.statusLabel(snapshot)
 
     fun markPublished(snapshot: JSONObject, published: Boolean) {
-        snapshot.put("published_for_sale", published)
-        val badge = text(snapshot, "badge_label")
-        if (badge.isBlank() || badge == "منتشرشده" || badge == "خصوصی") {
-            snapshot.put("badge_label", if (published) "منتشرشده" else "خصوصی")
-        }
+        Listings.align(snapshot, published)
+        ListingRepository.adopt(snapshot)
     }
 
     fun shareUrl(code: String): String {
@@ -272,23 +259,23 @@ object MyPropertyManage {
             if (rows == null) return@forEach
             for (i in 0 until rows.length()) {
                 val row = rows.optJSONObject(i) ?: continue
-                if (codeOf(row) != code || !row.has("published_for_sale")) continue
-                return !row.optBoolean("published_for_sale")
+                if (!sameListing(row, code) || !Listings.hasPublishSignal(row)) continue
+                return !Listings.published(row)
             }
         }
         val property = post.optJSONObject("property")
-        if (property != null && codeOf(property) == code && property.has("published_for_sale")) {
-            return !property.optBoolean("published_for_sale")
+        if (property != null && sameListing(property, code) && Listings.hasPublishSignal(property)) {
+            return !Listings.published(property)
         }
         return false
     }
 
     private fun freshLandSays(land: JSONObject?, published: Boolean): Boolean {
         if (land == null || land.optBoolean("from_cache")) return false
-        if (!land.has("published_for_sale")) return false
+        if (!Listings.hasPublishSignal(land)) return false
         val landStatus = land.optInt("http_status", 200)
         if (landStatus != 0 && landStatus !in 200..299) return false
-        return land.optBoolean("published_for_sale") == published
+        return Listings.published(land) == published
     }
 
     /**
@@ -345,12 +332,13 @@ object MyPropertyManage {
         if (status != 0 && status !in 200..299) return JSONObject(card.toString())
         val full = detail.optBoolean("ok") || text(detail, "title").isNotBlank()
         if (full) return mergeDetail(card, detail)
-        if (!detail.has("published_for_sale")) return JSONObject(card.toString())
+        if (!Listings.hasPublishSignal(detail) && !detail.has("published_for_sale")) {
+            return JSONObject(card.toString())
+        }
         val out = JSONObject(card.toString())
-        val published = detail.optBoolean("published_for_sale")
-        out.put("published_for_sale", published)
         if (detail.has("can_publish")) out.put("can_publish", detail.optBoolean("can_publish"))
-        markPublished(out, published)
+        Listings.adoptCode(out, detail)
+        markPublished(out, Listings.published(detail))
         return out
     }
 
@@ -394,6 +382,7 @@ object MyPropertyManage {
     fun mergeDetail(card: JSONObject, detail: JSONObject): JSONObject {
         if (!detail.optBoolean("ok") && text(detail, "title").isBlank()) return JSONObject(card.toString())
         val out = JSONObject(card.toString())
+        Listings.adoptCode(out, detail)
         listOf("title", "city", "location", "category", "description", "image_url", "size").forEach { key ->
             if (text(out, key).isBlank()) {
                 val value = text(detail, key)
@@ -408,7 +397,9 @@ object MyPropertyManage {
             val code = text(detail, "code")
             if (code.isNotBlank()) out.put("code", code)
         }
-        if (detail.has("published_for_sale")) out.put("published_for_sale", detail.optBoolean("published_for_sale"))
+        if (Listings.hasPublishSignal(detail) || detail.has("published_for_sale")) {
+            Listings.align(out, Listings.published(detail))
+        }
         if (detail.has("can_publish")) out.put("can_publish", detail.optBoolean("can_publish"))
         if (paymentOf(out).isBlank()) {
             val pay = paymentOf(detail)
@@ -434,6 +425,14 @@ object MyPropertyManage {
         val err = obj.optString("error").trim().ifBlank { obj.optString("message").trim() }
         if (err.isBlank() || err.equals("Not Found", ignoreCase = true)) return fallback
         return err
+    }
+
+    private fun sameListing(row: JSONObject, code: String): Boolean {
+        val want = Listings.canonicalCode(code)
+        if (want.isBlank()) return false
+        if (codeOf(row) == want || Listings.codeOf(row) == want) return true
+        if (Listings.previousCode(row) == want) return true
+        return ListingRepository.currentCode(want) == Listings.codeOf(row)
     }
 
     private fun portfolioContains(items: JSONArray?, property: JSONObject?, code: String): Boolean {

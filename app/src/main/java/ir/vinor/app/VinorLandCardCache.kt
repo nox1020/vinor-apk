@@ -18,6 +18,12 @@ object VinorLandCardCache {
         }
     }
 
+    fun remove(code: String) {
+        val key = code.trim()
+        if (key.isEmpty()) return
+        synchronized(lock) { lands.remove(key) }
+    }
+
     fun put(code: String, land: JSONObject) {
         val key = code.trim()
         if (key.isEmpty()) return
