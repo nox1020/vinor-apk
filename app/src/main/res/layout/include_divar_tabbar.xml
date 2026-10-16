@@ -119,7 +119,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clipChildren="false"
             android:clickable="true"
-            android:contentDescription="ثبت آگهی"
+            android:contentDescription="افزودن"
             android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
@@ -150,7 +150,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="ثبت آگهی"
+                android:text="افزودن"
                 android:textColor="@color/vinor_nav_unselected"
                 android:textSize="11sp" />
         </LinearLayout>

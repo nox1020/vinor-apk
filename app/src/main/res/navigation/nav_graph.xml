@@ -112,6 +112,12 @@
         tools:layout="@layout/fragment_my_property" />
 
     <fragment
+        android:id="@+id/addHubFragment"
+        android:name="ir.vinor.app.AddHubFragment"
+        android:label="افزودن"
+        tools:layout="@layout/fragment_add_hub" />
+
+    <fragment
         android:id="@+id/myPropertyFormFragment"
         android:name="ir.vinor.app.MyPropertyFormFragment"
         android:label="ثبت آگهی"
