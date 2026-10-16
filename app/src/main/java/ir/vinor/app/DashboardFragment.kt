@@ -22,6 +22,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -166,6 +167,9 @@ class DashboardFragment : Fragment() {
         }
         binding.dashboardShortcutNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
+        }
+        binding.dashboardHomeSearch.setOnClickListener {
+            (activity as? MainActivity)?.openSearch()
         }
         binding.dashboardSuggestSeeAll.setOnClickListener {
             (activity as? MainActivity)?.openSearch()
@@ -1305,9 +1309,8 @@ class DashboardFragment : Fragment() {
         val reqCount = HomePulse.requests(obj).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
         if (isApproved) {
             binding.dashboardWalletAmount.text = PartnerFormat.toman(HomePulse.withdrawable(obj)) + " تومان"
-            val hasGrowth = obj.has("home_month_growth_pct") && !obj.isNull("home_month_growth_pct")
-            binding.dashboardWalletGrowth.isVisible = hasGrowth
-            if (hasGrowth) binding.dashboardWalletGrowth.text = monthGrowthLabel(obj.optInt("home_month_growth_pct"))
+            // رشد ماهانه در طرح جدید خانه نشان داده نمی‌شود؛ فقط فلش کیف پول.
+            binding.dashboardWalletGrowth.isVisible = false
             binding.dashboardPerfDeals.text = PartnerFormat.toman(HomePulse.deals(obj))
             binding.dashboardPerfVisits.text = PartnerFormat.toman(HomePulse.visits(obj))
             binding.dashboardPerfCustomers.text = PartnerFormat.toman(HomePulse.customers(obj))
@@ -1347,40 +1350,41 @@ class DashboardFragment : Fragment() {
         suggestKey = key
         binding.dashboardSuggest.removeAllViews()
         val limit = minOf(files.length(), HomeSuggest.LIMIT)
+        val dividerColor = ContextCompat.getColor(requireContext(), R.color.vinor_border)
         for (i in 0 until limit) {
             val ad = files.optJSONObject(i) ?: continue
+            if (i > 0) {
+                val line = View(requireContext()).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        (resources.displayMetrics.density).toInt().coerceAtLeast(1),
+                    )
+                    setBackgroundColor(dividerColor)
+                }
+                binding.dashboardSuggest.addView(line)
+            }
             val card = ItemHomeSuggestBinding.inflate(layoutInflater, binding.dashboardSuggest, true)
             card.suggestTitle.text = HomeSuggest.displayTitle(ad)
-            val spec = HomeSuggest.cardSpec(ad)
-            card.suggestSpec.isVisible = spec.isNotBlank()
-            card.suggestSpec.text = spec
+            card.suggestSpec.isVisible = false
             val price = HomeSuggest.priceLine(ad)
             card.suggestPrice.isVisible = price.isNotBlank()
             card.suggestPrice.text = price
             val location = HomeSuggest.locationLine(ad)
             card.suggestLocBar.isVisible = location.isNotBlank()
             card.suggestLocation.text = location
+            val age = HomeSuggest.listedAge(ad)
+            card.suggestAge.isVisible = age.isNotBlank()
+            card.suggestAge.text = age
             bindSuggestBadge(card, HomeSuggest.badge(ad))
             val commission = HomeSuggest.commissionLabel(ad)
             card.suggestCommissionRow.isVisible = commission.isNotBlank()
             card.suggestCommission.text = commission
-            PartnerImages.roundClip(card.root, 16f)
+            PartnerImages.roundClip(card.suggestImage, 12f)
             PartnerImages.bind(scope, card.suggestImage, HomeSuggest.imageUrl(ad))
             card.root.contentDescription = HomeSuggest.displayTitle(ad)
             val url = ad.optString("url").trim().let { if (it.isBlank() || it == "null") "" else it }
             card.root.isClickable = HomeSuggest.landCode(ad).isNotBlank() || url.isNotBlank()
             card.root.setOnClickListener { openSuggest(ad) }
-        }
-        binding.dashboardSuggestScroll.post {
-            val scroll = _binding?.dashboardSuggestScroll ?: return@post
-            val child = scroll.getChildAt(0) ?: return@post
-            val viewport = scroll.width - scroll.paddingLeft - scroll.paddingRight
-            val x = HomeSuggest.startScrollX(
-                child.width,
-                viewport,
-                scroll.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
-            )
-            scroll.scrollTo(x, 0)
         }
     }
 
