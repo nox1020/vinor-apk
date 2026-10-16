@@ -786,7 +786,10 @@ class MyPropertyFormFragment : Fragment() {
         val images = JSONArray()
         photos.forEach { images.put(it.path) }
         if (editCode.isBlank() || photos.isNotEmpty()) body.put("images", images)
-        if (editCode.isNotBlank()) body.put("code", editCode)
+        if (editCode.isNotBlank()) {
+            body.put("code", editCode)
+            body.put("update_existing", "1")
+        }
         video?.let { body.put("video", it.path) }
         doc1?.let { body.put("document_1", it.path) }
         doc2?.let { body.put("document_2", it.path) }

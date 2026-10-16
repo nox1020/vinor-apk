@@ -8,13 +8,13 @@ import org.junit.Test
 
 class HomeSuggestTest {
     @Test
-    fun files_preferSuggestedThenDivarAds() {
-        val suggested = JSONArray().put(JSONObject().put("title", "پیشنهادی"))
-        val ads = JSONArray().put(JSONObject().put("title", "دیوار"))
+    fun files_preferCatalogThenSuggested() {
+        val suggested = JSONArray().put(JSONObject().put("code", "S").put("title", "پیشنهادی"))
+        val ads = JSONArray().put(JSONObject().put("token", "d1").put("source", "divar").put("title", "دیوار"))
         val both = JSONObject().put("suggested_files", suggested).put("divar_pro_ads", ads)
-        assertEquals("پیشنهادی", HomeSuggest.files(both).optJSONObject(0)?.optString("title"))
-        val onlyAds = JSONObject().put("suggested_files", JSONArray()).put("divar_pro_ads", ads)
-        assertEquals("دیوار", HomeSuggest.files(onlyAds).optJSONObject(0)?.optString("title"))
+        assertEquals("دیوار", HomeSuggest.files(both).optJSONObject(0)?.optString("title"))
+        val onlySuggested = JSONObject().put("suggested_files", suggested).put("divar_pro_ads", JSONArray())
+        assertEquals("پیشنهادی", HomeSuggest.files(onlySuggested).optJSONObject(0)?.optString("title"))
         assertEquals(0, HomeSuggest.files(JSONObject()).length())
     }
 
