@@ -37,7 +37,6 @@ class MyPropertyManageFragment : Fragment() {
     private var sheetDialog: BottomSheetDialog? = null
     private var busy = false
     private var publishBusy = false
-    private var deleteHidden = false
     private var selectedPayment = "نقدی"
     private var loadGen = 0
 
@@ -53,7 +52,6 @@ class MyPropertyManageFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         snapshot = MyPropertyManage.readSnapshot(arguments?.getString(ARG_SNAPSHOT))
-        deleteHidden = arguments?.getBoolean(ARG_DELETE_GONE) == true
         binding.mpManageHeader.pageTitle.text = MyPropertyManage.PAGE_TITLE
         binding.mpManageHeader.pageBack.setOnClickListener {
             if (!findNavController().navigateUp()) {
@@ -81,7 +79,12 @@ class MyPropertyManageFragment : Fragment() {
         b.mpManagePrice.isVisible = price > 0L
         if (price > 0L) b.mpManagePrice.text = PartnerFormat.toman(price) + " تومان"
         val published = MyPropertyManage.isPublished(snapshot)
-        b.mpManageStatus.text = MyPropertyManage.statusOf(snapshot)
+        val status = MyPropertyManage.statusOf(snapshot)
+        b.mpManageStatus.text = if (ListingArchive.isArchived(snapshot)) {
+            "${ListingArchive.BADGE} · $status"
+        } else {
+            status
+        }
         b.mpManageStatus.setTextColor(
             ContextCompat.getColor(
                 requireContext(),
@@ -101,10 +104,14 @@ class MyPropertyManageFragment : Fragment() {
         host.removeAllViews()
         val price = MyPropertyManage.priceOf(snapshot)
         val published = MyPropertyManage.isPublished(snapshot)
+        val archived = ListingArchive.isArchived(snapshot)
         MyPropertyManage.actions().forEach { action ->
-            if (deleteHidden && action == MyPropertyManage.Action.DELETE) return@forEach
             val row = ItemProfileLinkBinding.inflate(layoutInflater, host, false)
-            val label = MyPropertyManage.label(action, published && action == MyPropertyManage.Action.PUBLISH)
+            val label = MyPropertyManage.label(
+                action,
+                published && action == MyPropertyManage.Action.PUBLISH,
+                archived && action == MyPropertyManage.Action.ARCHIVE,
+            )
             row.itemProfileLinkTitle.text = label
             val subtitle = when (action) {
                 MyPropertyManage.Action.PRICE -> if (price > 0L) PartnerFormat.toman(price) + " تومان" else ""
@@ -118,16 +125,11 @@ class MyPropertyManageFragment : Fragment() {
                 MyPropertyManage.Action.STATS -> R.drawable.ic_commissions
                 MyPropertyManage.Action.EDIT -> R.drawable.ic_clipboard
                 MyPropertyManage.Action.PRICE -> R.drawable.ic_wallet
-                MyPropertyManage.Action.DELETE -> R.drawable.ic_trash
+                MyPropertyManage.Action.ARCHIVE -> R.drawable.ic_lock
                 MyPropertyManage.Action.SHARE -> R.drawable.ic_share_nodes
                 MyPropertyManage.Action.PUBLISH -> R.drawable.ic_send_up
             }
             row.itemProfileLinkIcon.setImageResource(icon)
-            if (action == MyPropertyManage.Action.DELETE) {
-                val error = ContextCompat.getColor(requireContext(), R.color.vinor_error)
-                row.itemProfileLinkTitle.setTextColor(error)
-                row.itemProfileLinkIcon.imageTintList = android.content.res.ColorStateList.valueOf(error)
-            }
             val spinning = MyPropertyManage.showPublishProgress(publishBusy) && action == MyPropertyManage.Action.PUBLISH
             row.itemProfileLinkProgress.isVisible = spinning
             row.itemProfileLinkChevron.isVisible = !spinning
@@ -149,7 +151,7 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.Action.STATS -> openStats()
             MyPropertyManage.Action.EDIT -> openEdit()
             MyPropertyManage.Action.PRICE -> showPriceSheet()
-            MyPropertyManage.Action.DELETE -> showDeleteSheet()
+            MyPropertyManage.Action.ARCHIVE -> postArchive()
             MyPropertyManage.Action.SHARE -> share()
             MyPropertyManage.Action.PUBLISH -> {
                 if (MyPropertyManage.isPublished(snapshot)) showStopSheet() else showPublishSheet()
@@ -295,16 +297,6 @@ class MyPropertyManageFragment : Fragment() {
         sheet.deleteSheetConfirm.setOnClickListener {
             dialog.dismiss()
             postUnpublish()
-        }
-    }
-
-    private fun showDeleteSheet() {
-        val sheet = SheetPropertyDeleteBinding.inflate(layoutInflater)
-        val dialog = openSheet(sheet.root)
-        sheet.deleteSheetCancel.setOnClickListener { dialog.dismiss() }
-        sheet.deleteSheetConfirm.setOnClickListener {
-            dialog.dismiss()
-            postDelete()
         }
     }
 
@@ -455,60 +447,65 @@ class MyPropertyManageFragment : Fragment() {
         }
     }
 
-    private fun postDelete() {
+    private fun postArchive() {
         val code = MyPropertyManage.codeOf(snapshot)
         val ctx = context ?: return
         if (code.isBlank()) {
             toast("کد ملک نامعتبر است.")
             return
         }
-        if (busy) return
+        if (!MyPropertyManage.claimAction(busy)) return
+        val restore = ListingArchive.isArchived(snapshot)
         busy = true
+        bindRows()
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson(MyPropertyManage.DELETE_PATH, MyPropertyManage.deleteBody(code), ctx)
+                    PartnerApi.postJson(ListingArchive.path(restore), ListingArchive.body(code), ctx)
                 }
                 if (_binding == null) return@launch
-                if (fresh.optInt("http_status") == 401 || fresh.optString("error") == "unauthorized") {
-                    ListingMemory.clearSession()
-                    toast("برای این کار وارد شوید.")
-                    (activity as? MainActivity)?.openDrawer()
-                    return@launch
-                }
-                if (MyPropertyManage.deleteRouteMissing(fresh)) {
-                    deleteHidden = true
-                    arguments?.putBoolean(ARG_DELETE_GONE, true)
-                    bindRows()
-                    toast("حذف آگهی در دسترس نیست.")
-                    return@launch
-                }
-                if (MyPropertyManage.deleteNotFound(fresh)) {
-                    ListingMemory.invalidateLand(code, ctx)
-                    MyPropertiesFragment.clearRemembered()
-                    toast(fresh.optString("error").ifBlank { "این ملک پیدا نشد." })
-                    if (!findNavController().navigateUp()) {
-                        (activity as? MainActivity)?.openMyProperty()
+                when (ListingArchive.outcome(fresh)) {
+                    ListingArchive.Outcome.UNAUTHORIZED -> {
+                        ListingMemory.clearSession()
+                        toast(ListingArchive.message(fresh, "برای این کار وارد شوید."))
+                        (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     }
-                    return@launch
-                }
-                if (MyPropertyManage.deleteSucceeded(fresh)) {
-                    ListingMemory.invalidateLand(code, ctx)
-                    MyPropertiesFragment.clearRemembered()
-                    toast(fresh.optString("message").ifBlank { "ملک حذف شد." })
-                    if (!findNavController().navigateUp()) {
-                        (activity as? MainActivity)?.openMyProperty()
+                    ListingArchive.Outcome.NOT_FOUND -> {
+                        ListingMemory.invalidateLand(code, ctx)
+                        MyPropertiesFragment.clearRemembered()
+                        NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_LISTINGS)
+                        toast(ListingArchive.message(fresh, "این آگهی پیدا نشد."))
+                        if (!findNavController().navigateUp()) {
+                            (activity as? MainActivity)?.openMyProperty()
+                        }
                     }
-                } else {
-                    toast(MyPropertyManage.deleteFailure(fresh, "حذف آگهی انجام نشد."))
+                    ListingArchive.Outcome.OK -> {
+                        forgetListingLists(ctx)
+                        snapshot = ListingArchive.applyResult(snapshot, fresh)
+                        persistSnapshot()
+                        bindPreview()
+                        bindRows()
+                        toast(ListingArchive.message(fresh, if (restore) "آگهی به فهرست فعال برگشت." else "آگهی بایگانی شد."))
+                    }
+                    ListingArchive.Outcome.FORBIDDEN,
+                    ListingArchive.Outcome.OFFLINE,
+                    ListingArchive.Outcome.FAILED,
+                    -> toast(ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."), long = true)
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                toast(e.message ?: "حذف ملک انجام نشد.")
+                toast(e.message ?: "بایگانی آگهی انجام نشد.")
             } finally {
                 busy = false
+                if (_binding != null) bindRows()
             }
         }
+    }
+
+    private fun forgetListingLists(ctx: android.content.Context) {
+        ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+        MyPropertiesFragment.clearRemembered()
+        NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_LISTINGS)
     }
 
     private fun post(path: String, body: JSONObject, failure: String, onOk: (JSONObject) -> Unit) {
@@ -545,7 +542,6 @@ class MyPropertyManageFragment : Fragment() {
 
     companion object {
         const val ARG_SNAPSHOT = "snapshot"
-        const val ARG_DELETE_GONE = "delete_gone"
         private var sessionStamp = 0
 
         fun clearRemembered() {

@@ -52,7 +52,7 @@ class MyPropertyManageTest {
     fun actions_matchDivarOrder() {
         val labels = MyPropertyManage.actions().map { MyPropertyManage.label(it) }
         assertEquals(
-            listOf("نمایش ملک", "آمار", "ویرایش", "تعیین قیمت", "حذف آگهی", "اشتراک‌گذاری", "انتشار برای فروش"),
+            listOf("نمایش ملک", "آمار", "ویرایش", "تعیین قیمت", "بایگانی", "اشتراک‌گذاری", "انتشار برای فروش"),
             labels,
         )
     }
@@ -277,49 +277,24 @@ class MyPropertyManageTest {
     }
 
     @Test
-    fun deleteUsesJsonApi() {
-        val body = MyPropertyManage.deleteBody("12")
-        assertEquals(MyPropertyManage.DELETE_PATH, "/express/partner/api/my-property/delete")
+    fun ownerDeleteIsReplacedByArchive() {
+        val labels = MyPropertyManage.actions().map { MyPropertyManage.label(it) }
+        assertFalse(labels.any { it.contains("حذف") })
+        assertEquals("بایگانی", MyPropertyManage.label(MyPropertyManage.Action.ARCHIVE))
+        assertEquals(
+            "بازگردوندن به فعال",
+            MyPropertyManage.label(MyPropertyManage.Action.ARCHIVE, archived = true),
+        )
+        assertEquals(ListingArchive.ARCHIVE_PATH, ListingArchive.path(restore = false))
+        assertEquals(ListingArchive.RESTORE_PATH, ListingArchive.path(restore = true))
+        assertFalse(ListingArchive.path(restore = false).endsWith("/delete"))
+        val body = ListingArchive.body("12")
         assertEquals("12", body.getString("code"))
         assertFalse(body.has("action"))
-        assertFalse(body.has("csrf_token"))
-        val ok = JSONObject().put("ok", true).put("http_status", 200).put("code", "12").put("message", "ملک حذف شد.")
-        val missing = JSONObject().put("ok", false).put("http_status", 404).put("error", "Not Found")
-        assertTrue(MyPropertyManage.deleteSucceeded(ok))
-        assertFalse(MyPropertyManage.deleteSucceeded(missing))
-        assertTrue(MyPropertyManage.deleteRouteMissing(missing))
-        assertFalse(MyPropertyManage.deleteRouteMissing(ok))
-        val gone = JSONObject()
-            .put("ok", false)
-            .put("http_status", 404)
-            .put("error_code", "not_found")
-            .put("error", "این ملک پیدا نشد.")
-        assertFalse(MyPropertyManage.deleteRouteMissing(gone))
-        assertTrue(MyPropertyManage.deleteNotFound(gone))
         assertFalse(MyPropertyManage.claimAction(true))
         assertTrue(MyPropertyManage.claimAction(false))
         assertTrue(MyPropertyManage.showPublishProgress(true))
         assertFalse(MyPropertyManage.showPublishProgress(false))
-    }
-
-    @Test
-    fun removedFromPortfolioRequiresTheListingToDisappear() {
-        val gone = JSONObject().put("ok", true).put("http_status", 200).put("items", JSONArray())
-        val stay = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "4")))
-        val other = JSONObject().put("ok", true).put("items", JSONArray().put(JSONObject().put("code", "9")))
-        val property = JSONObject().put("has_property", true).put("property", JSONObject().put("code", "4"))
-        val unshaped = JSONObject().put("ok", true).put("message", "ملک حذف شد.")
-        val offline = JSONObject().put("offline", true).put("items", JSONArray())
-        assertTrue(MyPropertyManage.removedFromPortfolio(gone, "4"))
-        assertTrue(MyPropertyManage.removedFromPortfolio(other, "4"))
-        assertFalse(MyPropertyManage.removedFromPortfolio(stay, "4"))
-        assertFalse(MyPropertyManage.removedFromPortfolio(property, "4"))
-        assertFalse(MyPropertyManage.removedFromPortfolio(unshaped, "4"))
-        assertFalse(MyPropertyManage.removedFromPortfolio(offline, "4"))
-        val optimistic = JSONObject().put("ok", true).put("message", "آگهی حذف شد.")
-        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(optimistic, "حذف آگهی انجام نشد."))
-        val html = JSONObject().put("http_status", 200).put("ok", false).put("error", "پاسخ نامعتبر")
-        assertEquals("حذف آگهی انجام نشد.", MyPropertyManage.deleteFailure(html, "حذف آگهی انجام نشد."))
     }
 
     @Test

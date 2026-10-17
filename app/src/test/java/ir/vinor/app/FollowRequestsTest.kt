@@ -80,7 +80,7 @@ class FollowRequestsTest {
         val revisit = FollowRequests.actions(
             JSONObject().put("can_revisit", true),
             "3",
-        ).single()
+        ).single { !it.json }
         assertEquals(FollowRequests.Tone.PRIMARY, revisit.tone)
         assertEquals("/express/partner/requests/3/revisit", revisit.path)
         assertNull(revisit.confirm)
@@ -138,7 +138,7 @@ class FollowRequestsTest {
             "پورسانت ${PartnerFormat.toman(3_000_000_000L)} تومان · واریز شده",
             card.commission,
         )
-        val deposit = card.actions.single()
+        val deposit = card.actions.single { !it.json }
         assertEquals("واریز پورسانت", deposit.label)
         assertTrue(deposit.opensWallet)
         assertEquals("/express/partner/commissions", deposit.path)
@@ -172,7 +172,7 @@ class FollowRequestsTest {
             "پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز",
             card.commission,
         )
-        val deposit = card.actions.single()
+        val deposit = card.actions.single { !it.json }
         assertEquals("واریز پورسانت", deposit.label)
         assertFalse(deposit.opensWallet)
         assertEquals("/express/partner/requests/8/deal-close", deposit.path)
@@ -197,7 +197,7 @@ class FollowRequestsTest {
     fun finishedDealWithoutAmountStillOpensWallet() {
         val card = FollowRequests.card(JSONObject().put("id", 8).put("pipeline_tab", "deals"), "deals")
         assertEquals("معامله موفق", card.status)
-        val deposit = card.actions.single()
+        val deposit = card.actions.single { !it.json }
         assertEquals("واریز پورسانت", deposit.label)
         assertTrue(deposit.opensWallet)
         assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
@@ -497,5 +497,60 @@ class FollowRequestsTest {
         assertEquals("معامله", card.stageLabel)
         assertEquals("دریافتی", card.directionLabel)
         assertEquals(0, FollowRequests.feed(payload, "visits").size)
+    }
+
+    @Test
+    fun archiveToggleKeepsStageFiltersAndRestoreNotesTheListing() {
+        val payload = JSONObject()
+            .put("status", "archived")
+            .put("archive_counts", JSONObject().put("active", 3).put("archived", 2))
+            .put(
+                "cards",
+                JSONArray()
+                    .put(JSONObject().put("id", "1").put("stage", "visit").put("archived", true))
+                    .put(JSONObject().put("id", "2").put("stage", "deal").put("archived", true)),
+            )
+            .put("tab_counts", JSONObject().put("requests", 0).put("visits", 1).put("deals", 1))
+        assertEquals(3, FollowRequests.archiveCounts(payload).active)
+        assertEquals(2, FollowRequests.archiveCounts(payload).archived)
+        assertEquals(1, FollowRequests.feed(payload, "visits").size)
+        assertEquals(1, FollowRequests.counters(payload).visits)
+        assertEquals(FollowRequests.EMPTY_FILTER, FollowRequests.emptyText("archived", "requests"))
+        assertEquals(FollowRequests.EMPTY_ARCHIVED, FollowRequests.emptyText("archived", ""))
+        assertEquals(FollowRequests.EMPTY, FollowRequests.emptyText("active", ""))
+        val active = FollowRequests.card(JSONObject().put("id", "9").put("title", "بازدید"))
+        assertFalse(active.archived)
+        val archive = active.actions.single { it.json }
+        assertEquals(FollowRequests.ARCHIVE_LABEL, archive.label)
+        assertEquals("/express/partner/api/requests/9/archive", archive.path)
+        assertFalse(archive.path.endsWith("/remove"))
+        val archived = FollowRequests.card(
+            JSONObject().put("id", "9").put("archived", true).put("is_archived", true),
+        )
+        assertTrue(archived.archived)
+        val restore = archived.actions.single { it.json }
+        assertEquals(FollowRequests.RESTORE_LABEL, restore.label)
+        assertEquals("/express/partner/api/requests/9/restore", restore.path)
+        val post = JSONObject()
+            .put("ok", true)
+            .put("http_status", 200)
+            .put("message", "پیگیری به فهرست فعال برگشت.")
+            .put("listing_archived", true)
+        val note = FollowRequests.doneMessage(restore.path, post)
+        assertTrue(note.contains("پیگیری به فهرست فعال برگشت."))
+        assertTrue(note.contains(FollowRequests.LISTING_STILL_ARCHIVED))
+        val forbidden = JSONObject()
+            .put("ok", false)
+            .put("http_status", 403)
+            .put("error_code", "forbidden")
+            .put("error", "دسترسی ندارید.")
+        assertFalse(FollowRequests.isOk(forbidden))
+        assertEquals("دسترسی ندارید.", FollowRequests.userMessage(forbidden))
+        val missing = JSONObject()
+            .put("ok", false)
+            .put("http_status", 404)
+            .put("error_code", "not_found")
+            .put("error", "این پیگیری پیدا نشد.")
+        assertEquals("این پیگیری پیدا نشد.", FollowRequests.userMessage(missing))
     }
 }

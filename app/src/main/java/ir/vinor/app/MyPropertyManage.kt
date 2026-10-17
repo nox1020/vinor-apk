@@ -12,8 +12,6 @@ object MyPropertyManage {
     const val PORTFOLIO_PATH = "/express/partner/api/my-property/data"
     const val SUBMIT_PATH = "/express/partner/api/my-property/submit"
     const val PUBLISH_PATH = "/express/partner/api/my-property/publish"
-    /** حذف ملک من. بدنه JSON است: ``{"code": "..."}``. */
-    const val DELETE_PATH = "/express/partner/api/my-property/delete"
     /** همان مسیر انتشار؛ توقف با published_for_sale=false. مسیر جداگانه روی سرور نیست. */
     const val UNPUBLISH_PATH = "$PUBLISH_PATH?published_for_sale=0"
     const val STALE_UNPUBLISH = "سرور هنوز به‌روز نشده؛ توقف انتشار پشتیبانی نمی‌شود"
@@ -23,7 +21,7 @@ object MyPropertyManage {
         STATS,
         EDIT,
         PRICE,
-        DELETE,
+        ARCHIVE,
         SHARE,
         PUBLISH,
     }
@@ -33,17 +31,17 @@ object MyPropertyManage {
         Action.STATS,
         Action.EDIT,
         Action.PRICE,
-        Action.DELETE,
+        Action.ARCHIVE,
         Action.SHARE,
         Action.PUBLISH,
     )
 
-    fun label(action: Action, published: Boolean = false): String = when (action) {
+    fun label(action: Action, published: Boolean = false, archived: Boolean = false): String = when (action) {
         Action.VIEW -> "نمایش ملک"
         Action.STATS -> "آمار"
         Action.EDIT -> "ویرایش"
         Action.PRICE -> "تعیین قیمت"
-        Action.DELETE -> "حذف آگهی"
+        Action.ARCHIVE -> ListingArchive.actionLabel(archived)
         Action.SHARE -> "اشتراک‌گذاری"
         Action.PUBLISH -> if (published) "توقف انتشار فروش" else "انتشار برای فروش"
     }
@@ -107,56 +105,10 @@ object MyPropertyManage {
         return body
     }
 
-    /** بدنهٔ JSON حذف. فرم HTML صفحهٔ ملک فرستاده نمی‌شود. */
-    fun deleteBody(code: String): JSONObject =
-        JSONObject().put("code", code.trim())
-
-    fun deleteSucceeded(post: JSONObject): Boolean {
-        val status = post.optInt("http_status", 200)
-        if (status !in 200..299) return false
-        if (!post.optBoolean("ok")) return false
-        return text(post, "code").isNotBlank()
-    }
-
-    /** ۴۰۴ بدون error_code یعنی مسیر حذف روی این سرور نیست و دکمه پنهان می‌شود. */
-    fun deleteRouteMissing(post: JSONObject): Boolean =
-        post.optInt("http_status") == 404 && post.optString("error_code").isBlank()
-
-    /** ملک نیست یا مال این کاربر نیست. فهرست باید تازه شود. */
-    fun deleteNotFound(post: JSONObject): Boolean = post.optString("error_code") == "not_found"
-
     /** ضربهٔ دوم تا پایان درخواست پذیرفته نمی‌شود. */
     fun claimAction(busy: Boolean): Boolean = !busy
 
     fun showPublishProgress(publishBusy: Boolean): Boolean = publishBusy
-
-    /**
-     * موفقیت فقط وقتی است که فهرست ملک من این کد را دیگر نداشته باشد.
-     * پاسخ خام POST کافی نیست؛ ریدایرکت HTML هم نباید حذف‌نشده را موفق نشان دهد.
-     */
-    fun removedFromPortfolio(data: JSONObject, code: String): Boolean {
-        val wanted = code.trim()
-        if (wanted.isEmpty()) return false
-        val status = data.optInt("http_status", 200)
-        if (status !in 200..299) return false
-        if (data.optBoolean("offline")) return false
-        if (data.optString("error") == "unauthorized") return false
-        val items = data.optJSONArray("items") ?: data.optJSONArray("listings")
-        val property = data.optJSONObject("property")
-        val shaped = items != null || property != null || data.has("has_property")
-        if (!shaped) return false
-        if (data.optBoolean("has_property") && property == null && items == null) return false
-        return !portfolioContains(items, property, wanted)
-    }
-
-    fun deleteFailure(post: JSONObject, fallback: String): String {
-        if (post.optBoolean("ok") || post.optBoolean("success")) return fallback
-        val err = post.optString("error").trim()
-        if (err.isBlank() || err == "پاسخ نامعتبر" || err.equals("Not Found", ignoreCase = true)) {
-            return fallback
-        }
-        return failureMessage(post, fallback)
-    }
 
     /**
      * توقف همان مسیر انتشار است و پرچم توقف را می‌فرستد.
@@ -437,17 +389,6 @@ object MyPropertyManage {
         if (codeOf(row) == want || Listings.codeOf(row) == want) return true
         if (Listings.previousCode(row) == want) return true
         return ListingRepository.currentCode(want) == Listings.codeOf(row)
-    }
-
-    private fun portfolioContains(items: JSONArray?, property: JSONObject?, code: String): Boolean {
-        if (items != null) {
-            for (i in 0 until items.length()) {
-                val row = items.optJSONObject(i) ?: continue
-                if (codeOf(row) == code) return true
-            }
-        }
-        if (property != null && !property.optBoolean("is_demo") && codeOf(property) == code) return true
-        return false
     }
 
     private fun isChosenPayment(value: String): Boolean {

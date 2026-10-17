@@ -16,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
 
 class MyPropertiesFragment : Fragment() {
@@ -28,6 +27,8 @@ class MyPropertiesFragment : Fragment() {
     private var skipNextResumeLoad = true
     private var loadGen = 0
     private var rendered = false
+    private var archiveStatus = ListingArchive.ACTIVE
+    private val archiveBusy = HashSet<String>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -69,7 +70,8 @@ class MyPropertiesFragment : Fragment() {
         binding.mpEmptyCta.setOnClickListener {
             (activity as? MainActivity)?.openOwnerHomeForm()
         }
-        remembered?.let {
+        paintArchiveTabs(0, 0)
+        peek(archiveStatus)?.let {
             bind(it)
             rendered = true
         }
@@ -102,16 +104,20 @@ class MyPropertiesFragment : Fragment() {
         if (!rendered || showSpinner) binding.mpRefresh.isRefreshing = true
         val gen = ++loadGen
         val stamp = sessionStamp
+        val status = archiveStatus
+        val path = ListingArchive.portfolioPath(status)
         scope.launch {
-            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(PATH, ctx) }
+            val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                val fresh = PartnerApi.loadDisplay(PATH, ctx) { data ->
-                    if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
+                val fresh = PartnerApi.loadDisplay(path, ctx) { data ->
+                    if (_binding == null || gen != loadGen || stamp != sessionStamp || status != archiveStatus) {
+                        return@loadDisplay
+                    }
                     if (!acceptable(data)) return@loadDisplay
                     bind(data)
                     rendered = true
                 }
-                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp || status != archiveStatus) return@launch
                 if (VinorPageLoad.needsLogin(fresh)) {
                     ListingMemory.clearSession()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
@@ -129,7 +135,7 @@ class MyPropertiesFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
+                if (_binding == null || gen != loadGen || stamp != sessionStamp || status != archiveStatus) return@launch
                 VinorPageLoad.showOffline(binding.root) { load(showSpinner = true) }
             } finally {
                 if (_binding != null && gen == loadGen) binding.mpRefresh.isRefreshing = false
@@ -145,40 +151,91 @@ class MyPropertiesFragment : Fragment() {
     }
 
     private fun bind(obj: JSONObject) {
-        val items = obj.optJSONArray("items") ?: obj.optJSONArray("listings") ?: JSONArray()
-        val has = items.length() > 0 || (
-            obj.optBoolean("has_property", false) &&
-                obj.optJSONObject("property") != null &&
-                !(obj.optJSONObject("property")?.optBoolean("is_demo") ?: true)
-            )
-        if (items.length() == 0 && !has) {
+        val page = ListingArchive.page(obj, archiveStatus)
+        paintArchiveTabs(page.activeCount, page.archivedCount)
+        if (page.items.isEmpty()) {
             binding.mpContent.isVisible = false
             binding.mpEmpty.isVisible = true
+            binding.mpEmptyTitle.text = page.emptyMessage
+            binding.mpEmptyMessage.isVisible = page.showRegister
+            binding.mpEmptyCta.isVisible = page.showRegister
             return
         }
         binding.mpEmpty.isVisible = false
         binding.mpContent.isVisible = true
         binding.mpList.removeAllViews()
-        if (items.length() == 0) {
-            val prop = obj.optJSONObject("property") ?: JSONObject()
-            val card = JSONObject()
-                .put("code", prop.optString("code").ifBlank { prop.optString("id") })
-                .put("title", prop.optString("address"))
-                .put("city", prop.optString("city"))
-                .put("price_total", prop.optLong("estimated_value"))
-                .put("image_url", prop.optString("cover_image"))
-            if (prop.has("published_for_sale")) card.put("published_for_sale", prop.opt("published_for_sale"))
-            if (prop.has("source")) card.put("source", prop.opt("source"))
-            if (prop.has("public")) card.put("public", prop.opt("public"))
-            if (prop.has("extras")) card.put("extras", prop.opt("extras"))
-            if (prop.has("badge_label")) card.put("badge_label", prop.opt("badge_label"))
-            ListingWeek.copyOnto(card, prop)
-            addCard(card)
+        for (row in page.items) addCard(row)
+    }
+
+    private fun paintArchiveTabs(active: Int, archived: Int) {
+        val b = _binding ?: return
+        ArchiveChips.show(b.mpArchiveTabs, active, archived, archiveStatus) { next ->
+            val status = ListingArchive.normalize(next)
+            if (status == archiveStatus) return@show
+            archiveStatus = status
+            rendered = false
+            peek(status)?.let {
+                bind(it)
+                rendered = true
+            } ?: run {
+                binding.mpList.removeAllViews()
+                binding.mpContent.isVisible = false
+                binding.mpEmpty.isVisible = false
+                paintArchiveTabs(active, archived)
+            }
+            load(showSpinner = true)
+        }
+    }
+
+    private fun archive(land: JSONObject) {
+        val code = MyPropertyManage.codeOf(land)
+        val ctx = context ?: return
+        if (code.isBlank()) {
+            android.widget.Toast.makeText(ctx, "کد ملک نامعتبر است.", android.widget.Toast.LENGTH_SHORT).show()
             return
         }
-        for (i in 0 until items.length()) {
-            val row = items.optJSONObject(i) ?: continue
-            addCard(row)
+        if (!archiveBusy.add(code)) return
+        val restore = ListingArchive.isArchived(land)
+        binding.mpRefresh.isRefreshing = true
+        scope.launch {
+            var handedOff = false
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(ListingArchive.path(restore), ListingArchive.body(code), ctx)
+                }
+                if (_binding == null) return@launch
+                val outcome = ListingArchive.outcome(fresh)
+                if (outcome == ListingArchive.Outcome.UNAUTHORIZED) {
+                    ListingMemory.clearSession()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                android.widget.Toast.makeText(
+                    ctx,
+                    ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+                if (
+                    outcome == ListingArchive.Outcome.OK ||
+                    outcome == ListingArchive.Outcome.NOT_FOUND ||
+                    outcome == ListingArchive.Outcome.FORBIDDEN
+                ) {
+                    ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+                    clearRemembered()
+                    NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_LISTINGS)
+                    rendered = false
+                    handedOff = true
+                    load(showSpinner = true)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null) {
+                    android.widget.Toast.makeText(ctx, "بایگانی آگهی انجام نشد.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                archiveBusy.remove(code)
+                if (_binding != null && !handedOff) binding.mpRefresh.isRefreshing = false
+            }
         }
     }
 
@@ -199,6 +256,13 @@ class MyPropertiesFragment : Fragment() {
         }
         PartnerImages.bind(scope, card.landCardImage, land.optString("image_url"), card.landCardImagePlaceholder)
         val code = MyPropertyManage.codeOf(land)
+        val archived = ListingArchive.isArchived(land)
+        card.landCardBadge.isVisible = archived
+        card.landCardArchive.isVisible = true
+        card.landCardArchive.text = ListingArchive.actionLabel(archived)
+        card.landCardArchive.contentDescription = card.landCardArchive.text
+        card.landCardArchive.isEnabled = code !in archiveBusy
+        card.landCardArchive.setOnClickListener { archive(land) }
         card.root.setOnClickListener {
             if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
@@ -208,12 +272,11 @@ class MyPropertiesFragment : Fragment() {
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     companion object {
-        private const val PATH = "/express/partner/api/my-property/data"
-        private var remembered: JSONObject? = null
+        private val remembered = HashMap<String, JSONObject>()
         private var sessionStamp = 0
 
         fun clearRemembered() {
-            remembered = null
+            remembered.clear()
             sessionStamp++
         }
 
@@ -221,9 +284,11 @@ class MyPropertiesFragment : Fragment() {
             if (!VinorPageLoad.canRemember(obj)) return
             val copy = VinorPageLoad.rememberedCopy(obj)
             ListingRepository.ingestTree(copy)
-            remembered = copy
+            remembered[ListingArchive.statusOf(copy)] = copy
         }
 
-        internal fun peekRemembered(): JSONObject? = remembered
+        internal fun peekRemembered(): JSONObject? = remembered[ListingArchive.ACTIVE]
+
+        internal fun peek(status: String): JSONObject? = remembered[ListingArchive.normalize(status)]
     }
 }

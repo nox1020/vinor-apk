@@ -87,8 +87,39 @@
             android:textColor="#737373"
             android:textSize="12sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/landCardBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="6dp"
+            android:background="@drawable/bg_follow_status"
+            android:fontFamily="@font/vazirmatn_medium"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:text="بسته"
+            android:textColor="@color/vinor_text"
+            android:textSize="11sp"
+            android:visibility="gone" />
     </FrameLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/landCardArchive"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_flat_outline_card"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn_medium"
+        android:gravity="center"
+        android:text="بایگانی"
+        android:textColor="@color/vinor_text"
+        android:textSize="14sp"
+        android:visibility="gone" />
 
     <View
         android:layout_width="match_parent"

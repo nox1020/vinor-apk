@@ -10,6 +10,10 @@ object FollowRequests {
     const val FILTER_ALL = ""
     const val EMPTY = "موردی برای پیگیری نیست."
     const val EMPTY_FILTER = "موردی در این بخش نیست."
+    const val EMPTY_ARCHIVED = "پیگیری بایگانی‌شده‌ای نیست."
+    const val LISTING_STILL_ARCHIVED = "خود آگهی هنوز بایگانی یا غیرفعال است."
+    const val ARCHIVE_LABEL = "بایگانی"
+    const val RESTORE_LABEL = "بازگردوندن به پیگیری"
     const val FAIL = "ثبت ناموفق بود."
 
     enum class Tone { PRIMARY, SECONDARY, DANGER }
@@ -25,6 +29,7 @@ object FollowRequests {
         val tone: Tone,
         val confirm: String? = null,
         val opensWallet: Boolean = false,
+        val json: Boolean = false,
     )
 
     data class Counts(val requests: Int, val visits: Int, val deals: Int) {
@@ -60,6 +65,7 @@ object FollowRequests {
         val updatedAt: String = "",
         val history: List<PastVisit> = emptyList(),
         val ownerPhone: String = "",
+        val archived: Boolean = false,
     )
 
     fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
@@ -234,12 +240,44 @@ object FollowRequests {
             updatedAt = ListingWeek.formatWhen(firstText(item, "updated_at")),
             history = pastVisits(item),
             ownerPhone = firstText(item, "owner_phone"),
+            archived = ListingArchive.isArchived(item),
         )
     }
 
+    fun dataPath(status: String = ListingArchive.ACTIVE): String =
+        "$DATA_PATH?status=${ListingArchive.normalize(status)}"
+
+    fun cachePaths(): List<String> = listOf(
+        DATA_PATH,
+        dataPath(ListingArchive.ACTIVE),
+        dataPath(ListingArchive.ARCHIVED),
+    )
+
+    fun cardPath(id: String, restore: Boolean): String {
+        val action = if (restore) "restore" else "archive"
+        return "/express/partner/api/requests/${id.trim()}/$action"
+    }
+
+    fun archiveCounts(payload: JSONObject): ListingArchive.Counts {
+        val obj = payload.optJSONObject("archive_counts") ?: JSONObject()
+        return ListingArchive.Counts(obj.optInt("active"), obj.optInt("archived"))
+    }
+
+    fun emptyText(status: String, filter: String): String {
+        if (filter.isNotBlank() && filter != FILTER_ALL) return EMPTY_FILTER
+        return if (ListingArchive.normalize(status) == ListingArchive.ARCHIVED) EMPTY_ARCHIVED else EMPTY
+    }
+
+    fun listingStillArchived(payload: JSONObject): Boolean = payload.optBoolean("listing_archived")
+
     fun doneMessage(path: String, payload: JSONObject, body: JSONObject = JSONObject()): String {
         val note = payload.optString("message").trim()
-        if (note.isNotEmpty() && !note.equals("null", true)) return note
+        val base = if (note.isNotEmpty() && !note.equals("null", true)) note else fallbackDone(path, body)
+        if (!listingStillArchived(payload)) return base
+        return if (base.isBlank()) LISTING_STILL_ARCHIVED else "$base\n$LISTING_STILL_ARCHIVED"
+    }
+
+    private fun fallbackDone(path: String, body: JSONObject): String {
         val bare = path.substringBefore('?')
         val outcome = body.optString("outcome").trim()
         return when {
@@ -253,6 +291,8 @@ object FollowRequests {
             bare.endsWith("/visit-result") && outcome == "interested" -> "علاقه‌مندی ثبت شد."
             bare.endsWith("/visit-result") && outcome == "follow_up" -> "پیگیری ثبت شد."
             bare.endsWith("/visit-result") && outcome == "not_interested" -> "بی‌علاقگی ثبت شد."
+            bare.endsWith("/archive") -> "پیگیری بایگانی شد."
+            bare.endsWith("/restore") -> "پیگیری به فهرست فعال برگشت."
             else -> "ثبت شد."
         }
     }
@@ -354,7 +394,7 @@ object FollowRequests {
             if (index >= 0) all[index] = all[index].copy(tone = Tone.PRIMARY)
         }
         var primarySeen = false
-        return all.map { action ->
+        val ranked = all.map { action ->
             if (action.tone != Tone.PRIMARY) action
             else if (!primarySeen) {
                 primarySeen = true
@@ -363,6 +403,14 @@ object FollowRequests {
                 action.copy(tone = Tone.SECONDARY)
             }
         }
+        val archived = ListingArchive.isArchived(item)
+        return ranked + Action(
+            label = if (archived) RESTORE_LABEL else ARCHIVE_LABEL,
+            path = cardPath(id, archived),
+            body = JSONObject(),
+            tone = Tone.SECONDARY,
+            json = true,
+        )
     }
 
     fun isOk(payload: JSONObject): Boolean {

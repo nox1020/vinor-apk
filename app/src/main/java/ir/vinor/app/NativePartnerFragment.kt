@@ -45,12 +45,14 @@ class NativePartnerFragment : Fragment() {
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var activeTab = ""
     private var requestFilter = FollowRequests.FILTER_ALL
+    private var archiveStatus = ListingArchive.ACTIVE
     private val openHistory = HashSet<String>()
     private var followEpoch = 0
     private var followReload = false
     private var lastPayload = JSONObject()
     private var searchQuery = ""
     private var followBusy = false
+    private var listingBusy = false
     private var followCsrf = ""
     private var followSheet: BottomSheetDialog? = null
     private var loadGen = 0
@@ -110,7 +112,7 @@ class NativePartnerFragment : Fragment() {
             searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
             if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
         }
-        rememberedByPage[page]?.let {
+        rememberedByPage[memoryKey()]?.let {
             bindPayload(it)
             pageRendered = true
         }
@@ -168,7 +170,7 @@ class NativePartnerFragment : Fragment() {
             finishFollowReload(epoch)
             return
         }
-        val path = dataPath(page) ?: run {
+        val path = currentDataPath() ?: run {
             if (!pageRendered) bindEmpty("صفحه پیدا نشد.")
             finishFollowReload(epoch)
             return
@@ -213,7 +215,7 @@ class NativePartnerFragment : Fragment() {
                     bindPayload(fresh)
                     pageRendered = true
                     if (VinorPageLoad.canRemember(fresh)) {
-                        rememberedByPage[page] = VinorPageLoad.rememberedCopy(fresh)
+                        rememberedByPage[memoryKey()] = VinorPageLoad.rememberedCopy(fresh)
                     }
                 }
                 if (pageRendered && VinorPageLoad.networkFailed(wasFresh, fresh)) {
@@ -337,7 +339,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_INVITE -> bindInvite(obj)
             PAGE_APPLY -> bindApply(obj)
             PAGE_REQUESTS -> bindRequests(obj)
-            PAGE_LISTINGS -> bindLandItems(obj.optJSONArray("items") ?: JSONArray(), "آگهی‌ای ثبت نشده.")
+            PAGE_LISTINGS -> bindOwnerListings(obj)
             PAGE_TERMS, PAGE_PRIVACY -> bindLegal(obj)
             else -> bindEmpty("صفحه آماده نیست.")
         }
@@ -507,10 +509,40 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
+        val counts = FollowRequests.archiveCounts(obj)
+        showArchiveBar(counts.active, counts.archived)
         val filters = FollowRequests.filters(FollowRequests.counters(obj))
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
         bindRequestFilters(filters)
         renderRequestItems(obj, requestFilter)
+    }
+
+    private fun showArchiveBar(active: Int, archived: Int) {
+        binding.nativeArchiveScroll.isVisible = true
+        ArchiveChips.show(binding.nativeArchiveTabs, active, archived, archiveStatus) { next ->
+            val status = ListingArchive.normalize(next)
+            if (status == archiveStatus) return@show
+            archiveStatus = status
+            pageRendered = false
+            if (page == PAGE_REQUESTS) followEpoch++
+            rememberedByPage[memoryKey()]?.let {
+                bindPayload(it)
+                pageRendered = true
+            }
+            binding.nativeRefresh.isRefreshing = true
+            load(pull = true)
+        }
+    }
+
+    private fun memoryKey(): String = when (page) {
+        PAGE_REQUESTS, PAGE_LISTINGS -> "$page:$archiveStatus"
+        else -> page
+    }
+
+    private fun currentDataPath(): String? = when (page) {
+        PAGE_REQUESTS -> FollowRequests.dataPath(archiveStatus)
+        PAGE_LISTINGS -> ListingArchive.listingsPath(archiveStatus)
+        else -> dataPath(page)
     }
 
     private fun bindRequestFilters(filters: List<FollowRequests.Filter>) {
@@ -566,7 +598,7 @@ class NativePartnerFragment : Fragment() {
         }
         if (rows.isEmpty()) {
             val empty = TextView(requireContext()).apply {
-                text = if (filter.isBlank()) FollowRequests.EMPTY else FollowRequests.EMPTY_FILTER
+                text = FollowRequests.emptyText(archiveStatus, filter)
                 setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
                 textSize = 15f
                 gravity = android.view.Gravity.CENTER
@@ -594,8 +626,16 @@ class NativePartnerFragment : Fragment() {
         if (sections.length() == 0) bindEmpty("متن در دسترس نیست.")
     }
 
-    private fun bindLandItems(items: JSONArray, emptyMsg: String) {
-        hideSpecials()
+    private fun bindOwnerListings(obj: JSONObject) {
+        val state = ListingArchive.page(obj, archiveStatus)
+        showArchiveBar(state.activeCount, state.archivedCount)
+        val rows = JSONArray()
+        state.items.forEach { rows.put(it) }
+        bindLandItems(rows, state.emptyMessage, ownerArchive = true)
+    }
+
+    private fun bindLandItems(items: JSONArray, emptyMsg: String, ownerArchive: Boolean = false) {
+        if (!ownerArchive) hideSpecials()
         binding.nativeList.removeAllViews()
         if (items.length() == 0) {
             if (page == PAGE_FAVORITES) bindEmpty(FAVORITES_EMPTY) else bindEmpty(emptyMsg)
@@ -617,7 +657,15 @@ class NativePartnerFragment : Fragment() {
             card.landCardCommission.isVisible = comm > 0
             if (comm > 0) card.landCardCommission.text = "پورسانت ${PartnerFormat.toman(comm)} تومان"
             PartnerImages.bind(scope, card.landCardImage, land.optString("image_url"), card.landCardImagePlaceholder)
-            val code = land.optString("code")
+            val code = land.optString("code").ifBlank { land.optString("id") }
+            if (ownerArchive) {
+                val archived = ListingArchive.isArchived(land)
+                card.landCardBadge.isVisible = archived
+                card.landCardArchive.isVisible = true
+                card.landCardArchive.text = ListingArchive.actionLabel(archived)
+                card.landCardArchive.contentDescription = card.landCardArchive.text
+                card.landCardArchive.setOnClickListener { postListingArchive(land) }
+            }
             card.root.setOnClickListener { (activity as? MainActivity)?.openLand(code) }
             binding.nativeList.addView(card.root)
         }
@@ -659,7 +707,8 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindRequestBadges(card: ItemNativeRequestBinding, item: FollowRequests.Card) {
         card.requestCardBadges.removeAllViews()
-        val labels = listOf(item.stageLabel, item.directionLabel).filter { it.isNotBlank() } +
+        val labels = (if (item.archived) listOf(ListingArchive.BADGE) else emptyList()) +
+            listOf(item.stageLabel, item.directionLabel).filter { it.isNotBlank() } +
             if (item.revisitCount > 0) listOf("بازدید ${ListingWeek.persianDigits(item.revisitCount)}") else emptyList()
         labels.forEachIndexed { index, label ->
             val badge = TextView(requireContext()).apply {
@@ -782,6 +831,7 @@ class NativePartnerFragment : Fragment() {
                     when {
                         action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
                         action.confirm != null -> confirmFollow(action)
+                        action.json -> postJsonAction(action)
                         else -> postRequest(action.path, action.body)
                     }
                 }
@@ -845,6 +895,103 @@ class NativePartnerFragment : Fragment() {
         return dialog
     }
 
+    private fun postJsonAction(action: FollowRequests.Action) {
+        val ctx = context ?: return
+        if (followBusy) return
+        setFollowBusy(true)
+        scope.launch {
+            var handedOff = false
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(action.path, action.body, ctx)
+                }
+                if (_binding == null) return@launch
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401 || FollowRequests.isUnauthorized(resp)) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                val ok = FollowRequests.isOk(resp)
+                val note = if (ok) {
+                    FollowRequests.doneMessage(action.path, resp, action.body)
+                } else {
+                    FollowRequests.userMessage(resp, "بایگانی پیگیری انجام نشد.")
+                }
+                Toast.makeText(
+                    ctx,
+                    note,
+                    if (ok && FollowRequests.listingStillArchived(resp)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT,
+                ).show()
+                val status = resp.optInt("http_status")
+                if (ok || status == 403 || status == 404) {
+                    FollowRequests.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+                    forgetPage(PAGE_REQUESTS)
+                    handedOff = true
+                    binding.nativeRefresh.isRefreshing = true
+                    followReload = true
+                    followEpoch++
+                    load(pull = true)
+                }
+            } catch (_: Exception) {
+                if (_binding != null) Toast.makeText(ctx, "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
+            } finally {
+                if (!handedOff) {
+                    if (_binding != null) setFollowBusy(false) else followBusy = false
+                }
+            }
+        }
+    }
+
+    private fun postListingArchive(land: JSONObject) {
+        val code = MyPropertyManage.codeOf(land)
+        val ctx = context ?: return
+        if (code.isBlank()) {
+            Toast.makeText(ctx, "کد ملک نامعتبر است.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!listingBusy) listingBusy = true else return
+        binding.nativeProgress.isVisible = true
+        val restore = ListingArchive.isArchived(land)
+        scope.launch {
+            var handedOff = false
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(ListingArchive.path(restore), ListingArchive.body(code), ctx)
+                }
+                if (_binding == null) return@launch
+                val outcome = ListingArchive.outcome(fresh)
+                if (outcome == ListingArchive.Outcome.UNAUTHORIZED) {
+                    ListingMemory.clearSession()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                Toast.makeText(
+                    ctx,
+                    ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."),
+                    Toast.LENGTH_LONG,
+                ).show()
+                if (
+                    outcome == ListingArchive.Outcome.OK ||
+                    outcome == ListingArchive.Outcome.NOT_FOUND ||
+                    outcome == ListingArchive.Outcome.FORBIDDEN
+                ) {
+                    ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+                    MyPropertiesFragment.clearRemembered()
+                    forgetPage(PAGE_LISTINGS)
+                    handedOff = true
+                    pageRendered = false
+                    binding.nativeRefresh.isRefreshing = true
+                    load(pull = true)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null) Toast.makeText(ctx, "بایگانی آگهی انجام نشد.", Toast.LENGTH_SHORT).show()
+            } finally {
+                listingBusy = false
+                if (_binding != null && !handedOff) binding.nativeProgress.isVisible = false
+            }
+        }
+    }
+
     private fun postRequest(path: String, body: JSONObject) {
         val ctx = context ?: return
         if (followBusy) return
@@ -880,13 +1027,18 @@ class NativePartnerFragment : Fragment() {
                     return@launch
                 }
                 if (FollowRequests.isOk(resp)) {
-                    Toast.makeText(ctx, FollowRequests.doneMessage(path, resp, body), Toast.LENGTH_SHORT).show()
-                    PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
+                    val note = FollowRequests.doneMessage(path, resp, body)
+                    Toast.makeText(
+                        ctx,
+                        note,
+                        if (FollowRequests.listingStillArchived(resp)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT,
+                    ).show()
+                    FollowRequests.cachePaths().forEach { PartnerApi.forget(it, ctx) }
                     if (FollowRequests.refreshesWallet(path)) {
                         FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
                     }
                     if (FollowRequests.movesCard(path, body)) requestFilter = FollowRequests.FILTER_ALL
-                    rememberedByPage.remove(PAGE_REQUESTS)
+                    forgetPage(PAGE_REQUESTS)
                     binding.nativeRefresh.isRefreshing = true
                     followReload = true
                     followEpoch++
@@ -928,6 +1080,7 @@ class NativePartnerFragment : Fragment() {
         b.nativeProgress.isVisible = busy
         setEnabledRecursively(b.nativeList, !busy)
         setEnabledRecursively(b.nativeTabs, !busy)
+        setEnabledRecursively(b.nativeArchiveTabs, !busy)
         b.nativeRefresh.isEnabled = !busy
     }
 
@@ -1010,6 +1163,7 @@ class NativePartnerFragment : Fragment() {
         binding.nativeLeadBox.isVisible = false
         binding.nativeCta.isVisible = false
         binding.nativeTabsScroll.isVisible = false
+        binding.nativeArchiveScroll.isVisible = false
         binding.nativeEmpty.isVisible = false
         binding.nativeHero.isVisible = false
         binding.nativeSectionTitle.isVisible = false
@@ -1019,7 +1173,9 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindEmpty(msg: String) {
+        val keepArchive = page == PAGE_REQUESTS || page == PAGE_LISTINGS
         hideSpecials()
+        if (keepArchive) binding.nativeArchiveScroll.isVisible = true
         binding.nativeList.removeAllViews()
         binding.nativeProgress.isVisible = false
         binding.nativeRefresh.isRefreshing = false
@@ -1073,7 +1229,7 @@ class NativePartnerFragment : Fragment() {
         }
 
         fun forgetPage(page: String) {
-            rememberedByPage.remove(page)
+            rememberedByPage.keys.removeAll { it == page || it.startsWith("$page:") }
         }
 
         fun dataPath(page: String): String? = when (page) {

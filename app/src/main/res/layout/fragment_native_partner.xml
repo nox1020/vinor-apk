@@ -12,6 +12,23 @@
         layout="@layout/include_page_header" />
 
     <HorizontalScrollView
+        android:id="@+id/nativeArchiveScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="4dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/nativeArchiveTabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <HorizontalScrollView
         android:id="@+id/nativeTabsScroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * بعد از انتشار، توقف انتشار یا حذف، کش دیسک و حافظهٔ نشست جزئیات، آگهی‌های من و خانه با هم پاک می‌شوند.
+ * بعد از انتشار، توقف انتشار یا بایگانی، کش دیسک و حافظهٔ نشست جزئیات، آگهی‌های من و خانه با هم پاک می‌شوند.
  * خروج و ۴۰۱ همهٔ همین حافظه را خالی می‌کنند.
  */
 object ListingMemory {
@@ -30,7 +30,7 @@ object ListingMemory {
             val extra = detailPath.trim()
             if (extra.isNotEmpty()) paths.add(extra)
         }
-        paths.add(MyPropertyManage.PORTFOLIO_PATH)
+        ListingArchive.cachePaths().forEach { paths.add(it) }
         paths.add(DashboardFragment.HOME_DATA)
         for (path in paths) PartnerApi.forget(path, context)
         return paths.toList()
@@ -88,11 +88,10 @@ object ListingMemory {
     }
 
     private fun writeBack(context: Context, code: String) {
-        val paths = listOf(
-            MyPropertyManage.landDataPath(code),
-            MyPropertyManage.PORTFOLIO_PATH,
-            DashboardFragment.HOME_DATA,
-        )
+        val paths = ArrayList<String>()
+        paths.add(MyPropertyManage.landDataPath(code))
+        paths.addAll(ListingArchive.cachePaths())
+        paths.add(DashboardFragment.HOME_DATA)
         for (path in paths) {
             val disk = PartnerApi.peekJson(path, context) ?: continue
             disk.remove("from_cache")
