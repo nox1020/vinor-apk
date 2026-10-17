@@ -7,26 +7,13 @@ import ir.vinor.app.databinding.ItemListingWeekBinding
 import ir.vinor.app.databinding.ItemListingWeekEventBinding
 import ir.vinor.app.databinding.ItemListingWeekLineBinding
 
-/** بلوک هفتهٔ اول را زیر کارت ملک من می‌چیند. منطق نمایش در [ListingWeek] است. */
+/** بلوک آمار را در صفحهٔ آمار می‌چیند. منطق نمایش در [ListingWeek] است. */
 object ListingWeekPanel {
-    fun addTo(parent: ViewGroup, land: org.json.JSONObject, onClick: (() -> Unit)? = null) {
+    fun show(host: ViewGroup, land: org.json.JSONObject) {
+        host.removeAllViews()
         val week = ListingWeek.present(land)
         if (!week.available) return
-        val binding = ItemListingWeekBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        bind(binding, week)
-        if (onClick != null) {
-            binding.root.setOnClickListener { onClick() }
-            binding.root.isClickable = true
-        }
-        parent.addView(binding.root)
-    }
-
-    fun replace(host: ViewGroup, land: org.json.JSONObject) {
-        host.removeAllViews()
-        addTo(host, land)
-    }
-
-    private fun bind(binding: ItemListingWeekBinding, week: ListingWeek.ViewModel) {
+        val binding = ItemListingWeekBinding.inflate(LayoutInflater.from(host.context), host, false)
         binding.weekTitle.text = week.title
         binding.weekStatus.isVisible = week.statusText.isNotBlank()
         binding.weekStatus.text = week.statusText
@@ -52,5 +39,6 @@ object ListingWeekPanel {
             row.weekEventWhen.text = event.whenLabel
             binding.weekActivity.addView(row.root)
         }
+        host.addView(binding.root)
     }
 }

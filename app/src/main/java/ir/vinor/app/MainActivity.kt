@@ -665,6 +665,7 @@ class MainActivity : AppCompatActivity() {
             dest == R.id.landDetailFragment ||
             dest == R.id.myPropertyFormFragment ||
             dest == R.id.myPropertyManageFragment ||
+            dest == R.id.listingStatsFragment ||
             dest == R.id.partnerPageFragment
         val chatOpen = dest == R.id.dashboardFragment && findDashboard()?.isChatOpen() == true
         if (!chatOpen) tabbarImeHidden = false
@@ -730,6 +731,11 @@ class MainActivity : AppCompatActivity() {
     fun openMyPropertyManage(snapshot: org.json.JSONObject) {
         val args = Bundle().apply { putString(MyPropertyManageFragment.ARG_SNAPSHOT, snapshot.toString()) }
         navController.navigate(R.id.myPropertyManageFragment, args)
+    }
+
+    fun openListingStats(snapshot: org.json.JSONObject) {
+        val args = Bundle().apply { putString(ListingStatsFragment.ARG_SNAPSHOT, ListingStats.pack(snapshot)) }
+        navController.navigate(R.id.listingStatsFragment, args)
     }
 
     fun openPropertyEdit(snapshot: org.json.JSONObject) {

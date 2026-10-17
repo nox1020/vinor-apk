@@ -203,9 +203,6 @@ class MyPropertiesFragment : Fragment() {
             if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
         binding.mpList.addView(card.root)
-        ListingWeekPanel.addTo(binding.mpList, land) {
-            if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
-        }
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

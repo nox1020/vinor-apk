@@ -94,7 +94,6 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.imageOf(snapshot),
             b.mpManageImagePlaceholder,
         )
-        ListingWeekPanel.replace(b.mpManageWeek, snapshot)
     }
 
     private fun bindRows() {
@@ -109,12 +108,14 @@ class MyPropertyManageFragment : Fragment() {
             row.itemProfileLinkTitle.text = label
             val subtitle = when (action) {
                 MyPropertyManage.Action.PRICE -> if (price > 0L) PartnerFormat.toman(price) + " تومان" else ""
+                MyPropertyManage.Action.STATS -> ""
                 else -> ""
             }
             row.itemProfileLinkSubtitle.isVisible = subtitle.isNotBlank()
             row.itemProfileLinkSubtitle.text = subtitle
             val icon = when (action) {
                 MyPropertyManage.Action.VIEW -> R.drawable.ic_home
+                MyPropertyManage.Action.STATS -> R.drawable.ic_commissions
                 MyPropertyManage.Action.EDIT -> R.drawable.ic_clipboard
                 MyPropertyManage.Action.PRICE -> R.drawable.ic_wallet
                 MyPropertyManage.Action.DELETE -> R.drawable.ic_trash
@@ -137,10 +138,15 @@ class MyPropertyManageFragment : Fragment() {
         }
     }
 
+    private fun openStats() {
+        (activity as? MainActivity)?.openListingStats(snapshot)
+    }
+
     private fun onAction(action: MyPropertyManage.Action) {
         if (!MyPropertyManage.claimAction(busy)) return
         when (action) {
             MyPropertyManage.Action.VIEW -> openDetail()
+            MyPropertyManage.Action.STATS -> openStats()
             MyPropertyManage.Action.EDIT -> openEdit()
             MyPropertyManage.Action.PRICE -> showPriceSheet()
             MyPropertyManage.Action.DELETE -> showDeleteSheet()

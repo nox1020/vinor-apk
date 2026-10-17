@@ -148,6 +148,17 @@
     </fragment>
 
     <fragment
+        android:id="@+id/listingStatsFragment"
+        android:name="ir.vinor.app.ListingStatsFragment"
+        android:label="آمار"
+        tools:layout="@layout/fragment_listing_stats">
+        <argument
+            android:name="snapshot"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+
+    <fragment
         android:id="@+id/landDetailFragment"
         android:name="ir.vinor.app.LandDetailFragment"
         android:label="فایل"

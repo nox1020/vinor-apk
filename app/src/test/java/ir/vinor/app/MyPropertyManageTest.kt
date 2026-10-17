@@ -52,7 +52,7 @@ class MyPropertyManageTest {
     fun actions_matchDivarOrder() {
         val labels = MyPropertyManage.actions().map { MyPropertyManage.label(it) }
         assertEquals(
-            listOf("نمایش ملک", "ویرایش", "تعیین قیمت", "حذف آگهی", "اشتراک‌گذاری", "انتشار برای فروش"),
+            listOf("نمایش ملک", "آمار", "ویرایش", "تعیین قیمت", "حذف آگهی", "اشتراک‌گذاری", "انتشار برای فروش"),
             labels,
         )
     }

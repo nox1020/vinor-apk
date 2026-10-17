@@ -87,7 +87,7 @@ object ListingWeek {
             if (text.isBlank()) null else ActivityLine(persianDigits(text), formatWhen(event.date))
         }
         if (stats.publishedAt == null) {
-            return ViewModel(true, TITLE, false, UNPUBLISHED, emptyList(), "", events)
+            return ViewModel(true, TITLE, false, UNPUBLISHED, dateLines(stats), "", events)
         }
         val lines = ArrayList<Line>()
         lines.add(Line("بازدید همکاران در ۷ روز", persianDigits(stats.weeklyViews)))
@@ -96,12 +96,22 @@ object ListingWeek {
         lines.add(Line("درخواست بازدید از انتشار", persianDigits(stats.visitRequestsTotal)))
         val days = stats.daysSincePublish
         if (days != null) lines.add(Line("روز از انتشار", persianDigits(days)))
+        lines.addAll(dateLines(stats))
         val hint = if (days != null && days >= 3 && stats.visitRequestsTotal == 0) {
             "${persianDigits(days)} روز از انتشار گذشته و هنوز درخواست بازدید نیست. عکس اضافه کنید یا پورسانت را مشخص کنید."
         } else {
             ""
         }
         return ViewModel(true, TITLE, true, "", lines, hint, events)
+    }
+
+    private fun dateLines(stats: Stats): List<Line> {
+        val lines = ArrayList<Line>()
+        val published = stats.publishedAt?.let(::formatWhen).orEmpty()
+        if (published.isNotBlank()) lines.add(Line("تاریخ انتشار", published))
+        val first = stats.firstPublishedAt?.let(::formatWhen).orEmpty()
+        if (first.isNotBlank()) lines.add(Line("اولین انتشار", first))
+        return lines
     }
 
     /** فقط کلیدهایی که در مبدأ هستند روی کارت می‌نشینند. نبودن کلید، مقدار قبلی را پاک نمی‌کند. */

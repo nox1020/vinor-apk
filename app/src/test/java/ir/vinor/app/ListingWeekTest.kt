@@ -38,9 +38,12 @@ class ListingWeekTest {
         assertEquals("۱", view.lines.first { it.label == "درخواست بازدید در ۷ روز" }.value)
         assertEquals("۱", view.lines.first { it.label == "درخواست بازدید از انتشار" }.value)
         assertEquals("۱", view.lines.first { it.label == "روز از انتشار" }.value)
+        val expectedDay = LandVisit.display("2026-10-16")
+        val firstDay = LandVisit.display("2026-09-16")
+        assertEquals("$expectedDay · ۱۳:۱۸", view.lines.first { it.label == "تاریخ انتشار" }.value)
+        assertEquals("$firstDay · ۱۳:۱۸", view.lines.first { it.label == "اولین انتشار" }.value)
         val event = view.activity.single()
         assertEquals("برای فروش منتشر شد", event.text)
-        val expectedDay = LandVisit.display("2026-10-16")
         assertEquals("$expectedDay · ۱۳:۱۸", event.whenLabel)
         assertFalse(event.whenLabel.any { it in '0'..'9' })
     }
@@ -86,6 +89,21 @@ class ListingWeekTest {
         assertTrue(view.lines.isEmpty())
         assertEquals("", view.hint)
         assertTrue(view.activity.isEmpty())
+    }
+
+    @Test
+    fun unpublished_keepsFirstPublishedDateAndHidesCounters() {
+        val view = ListingWeek.present(
+            JSONObject()
+                .put("published_at", JSONObject.NULL)
+                .put("first_published_at", "2026-09-16T09:48:00Z")
+                .put("weekly_views", 4)
+                .put("days_since_publish", 9),
+        )
+        assertFalse(view.published)
+        assertEquals(ListingWeek.UNPUBLISHED, view.statusText)
+        assertEquals(listOf("اولین انتشار"), view.lines.map { it.label })
+        assertEquals("", view.hint)
     }
 
     @Test

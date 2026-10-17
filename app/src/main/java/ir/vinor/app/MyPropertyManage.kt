@@ -20,6 +20,7 @@ object MyPropertyManage {
 
     enum class Action {
         VIEW,
+        STATS,
         EDIT,
         PRICE,
         DELETE,
@@ -29,6 +30,7 @@ object MyPropertyManage {
 
     fun actions(): List<Action> = listOf(
         Action.VIEW,
+        Action.STATS,
         Action.EDIT,
         Action.PRICE,
         Action.DELETE,
@@ -38,6 +40,7 @@ object MyPropertyManage {
 
     fun label(action: Action, published: Boolean = false): String = when (action) {
         Action.VIEW -> "نمایش ملک"
+        Action.STATS -> "آمار"
         Action.EDIT -> "ویرایش"
         Action.PRICE -> "تعیین قیمت"
         Action.DELETE -> "حذف آگهی"
