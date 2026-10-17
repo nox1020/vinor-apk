@@ -25,6 +25,7 @@ def computeVersionCode(String ver) {
     def patch = parts.length > 2 ? parts[2].toInteger() : 0
     // versionCode = MMmmpp (e.g., 1.0.4 -> 10004)
     // بستهٔ ۱.۰.۱۴۷۲ با کد ۱۱۴۷۲ روی گوشی نصب شده است. نام نسخه نباید از ۱.۰.۱۴۷۳ پایین‌تر برود.
+    // پلی و بازار همین عدد را از version.txt می‌گیرند و به شمارهٔ اجرای CI وابسته نیستند.
     return major * 10000 + minor * 100 + patch
 }
 
@@ -54,20 +55,21 @@ def releaseKeyPassword = trimOrNull(ksProps.getProperty("keyPassword") ?: ksProp
 
 // برای نصب دستی روی گوشی فقط APK خروجی assembleRelease را کپی کنید.
 // فایل .aab (bundleRelease) برای پلی‌استور است؛ باز کردن آن روی گوشی معمولاً خطای «تجزیه بسته» می‌دهد.
+def storeVersionCode = computeVersionCode(readVersionName())
+def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")
+def ciCode = (ciRunStr != null && ciRunStr.isInteger()) ? ciRunStr.toInteger() : null
+def sideloadVersionCode = ciCode != null ? Math.max(storeVersionCode, ciCode) : storeVersionCode
+
 android {
     namespace "ir.vinor.app"
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "ir.vinor.app"
         minSdk 21
-        targetSdk 35
+        targetSdk 36
         versionName readVersionName()
-        // Keep versionCode monotonic in CI using GITHUB_RUN_NUMBER
-        def baseCode = computeVersionCode(versionName)
-        def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")
-        def ciCode = (ciRunStr != null && ciRunStr.isInteger()) ? ciRunStr.toInteger() : null
-        versionCode ciCode != null ? Math.max(baseCode, ciCode) : baseCode
+        versionCode storeVersionCode
         // APK انتشار: فقط ABIهای رایج موبایل (کاهش حجم؛ x86 فقط در debug emulator)
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"
@@ -81,6 +83,29 @@ android {
             keyAlias releaseKeyAlias
             keyPassword (releaseKeyPassword ?: releaseStorePassword)
             storeType "JKS"
+        }
+    }
+
+    flavorDimensions "channel"
+    productFlavors {
+        // نصب مستقیم از vinor.ir. به‌روزرسانی با دانلود APK همان کلید امضا.
+        sideload {
+            dimension "channel"
+            getIsDefault().set(true)
+            versionCode sideloadVersionCode
+            buildConfigField "String", "STORE", "\"sideload\""
+        }
+        // گوگل‌پلی: AAB با همین کلید به‌عنوان upload key. به‌روزرسانی از Play.
+        play {
+            dimension "channel"
+            versionCode storeVersionCode
+            buildConfigField "String", "STORE", "\"play\""
+        }
+        // کافه‌بازار: APK امضاشده. به‌روزرسانی از خود بازار.
+        bazaar {
+            dimension "channel"
+            versionCode storeVersionCode
+            buildConfigField "String", "STORE", "\"bazaar\""
         }
     }
 
@@ -103,7 +128,10 @@ android {
             minifyEnabled false
             shrinkResources false
             debuggable true
-            // همان applicationId برای جلوگیری از تداخل نصب هم‌زمان
+            // شبیه‌ساز x86_64 برای اسکرین‌شات فروشگاه. انتشار فقط ARM می‌ماند.
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+            }
         }
     }
 
@@ -140,6 +168,7 @@ android {
     }
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 }
 
@@ -169,6 +198,9 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.8.6"
     implementation "androidx.lifecycle:lifecycle-process:2.8.6"
+
+    // فقط بیلد پلی. بازار و نصب مستقیم این کتابخانه را ندارند.
+    playImplementation "com.google.android.play:app-update:2.1.0"
 
     // Firebase Cloud Messaging (push when app closed)
     implementation platform("com.google.firebase:firebase-bom:33.7.0")
@@ -208,13 +240,17 @@ tasks.register("generateAssetLinks", Exec) {
     commandLine pythonCmd, py.absolutePath
 }
 
-tasks.matching { it.name in ["preReleaseBuild", "preDirectBuild"] }.configureEach {
+tasks.matching {
+    it.name ==~ /^pre[A-Za-z0-9]*(Release|Direct)Build$/
+}.configureEach {
     dependsOn("checkDirectConstraints")
     dependsOn("generateAssetLinks")
 }
 
 // Also refresh assetlinks before assembling release artifacts
-tasks.matching { it.name in ["assembleRelease", "assembleDirect", "bundleRelease"] }.configureEach {
+tasks.matching {
+    it.name ==~ /^(assemble|bundle)[A-Za-z0-9]*(Release|Direct)$/
+}.configureEach {
     dependsOn("generateAssetLinks")
 }
 

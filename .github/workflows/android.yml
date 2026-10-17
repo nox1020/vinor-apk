@@ -88,7 +88,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Unit tests
-        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest
+        run: ./gradlew --no-daemon --stacktrace :app:testSideloadDebugUnitTest :app:testPlayDebugUnitTest :app:testBazaarDebugUnitTest
 
   debug:
     name: Build Debug APK
@@ -118,7 +118,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+        run: ./gradlew --no-daemon --stacktrace :app:assembleSideloadDebug
 
       - name: Upload APK
         # فقط وقتی APK امضاشده ساخته نمی‌شود؛ وگرنه کاربر اشتباهاً debug را نصب می‌کند و «App not installed» می‌گیرد.
@@ -126,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vinor-debug-unsigned
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/sideload/debug/*.apk
           retention-days: 7
 
       - name: Debug APK is not for phones with a release install
@@ -299,16 +299,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build Release APK
+      - name: Build sideload APK, Bazaar APK, and Play AAB
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
-
-      - name: (Optional) Build Release AAB
-        continue-on-error: true
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-        run: ./gradlew bundleRelease --stacktrace --no-daemon
+        run: ./gradlew :app:assembleSideloadRelease :app:assembleBazaarRelease :app:bundlePlayRelease --stacktrace --no-daemon
 
       - name: Read version name
         id: version
@@ -324,7 +318,7 @@ jobs:
       - name: Rename APK to include version
         shell: bash
         run: |
-          APK_DIR="app/build/outputs/apk/release"
+          APK_DIR="app/build/outputs/apk/sideload/release"
           SRC_APK="$(ls -1 "$APK_DIR"/*.apk | head -n 1)"
           if [ -z "$SRC_APK" ]; then
             echo "No APK found in $APK_DIR"
@@ -338,7 +332,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vinor-direct-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/sideload/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -350,35 +344,50 @@ jobs:
             echo ""
             echo "| Artifact | Install by opening on phone? |"
             echo "|----------|--------------------------------|"
-            echo "| **vinor-direct-apk** (\`.apk\`) | Yes — use this for direct install |"
-            echo "| **vinor-play-bundle-not-for-phone** (\`.aab\`) | **No** — Play Console only; opening it on device often shows *Problem parsing the package* |"
+            echo "| **vinor-direct-apk** (\`.apk\`) | Yes — sideload from vinor.ir |"
+            echo "| **vinor-bazaar-apk** (\`.apk\`) | Cafe Bazaar upload only |"
+            echo "| **vinor-play-aab** (\`.aab\`) | **No** — Play Console only; opening it on a phone shows a parse error |"
             echo ""
             echo "### فارسی"
-            echo "برای نصب دستی، حتماً آرتیفکت **vinor-direct-apk** (پسوند **apk**) را بگیرید. فایل **aab** شبیه اپ نیست و قابل نصب مستقیم روی گوشی نیست."
+            echo "برای نصب دستی فقط **vinor-direct-apk** را بگیرید. **vinor-bazaar-apk** برای پنل کافه‌بازار است و **vinor-play-aab** فقط برای کنسول پلی."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: (Optional) Rename AAB to include version
-        continue-on-error: true
+      - name: Rename Bazaar APK
         shell: bash
         run: |
-          AAB_DIR="app/build/outputs/bundle/release"
-          if ls "$AAB_DIR"/*.aab >/dev/null 2>&1; then
-            SRC_AAB="$(ls -1 "$AAB_DIR"/*.aab | head -n 1)"
-            DEST_AAB="$AAB_DIR/vinor-${{ steps.version.outputs.VERSION }}.aab"
-            mv "$SRC_AAB" "$DEST_AAB"
-            echo "Renamed AAB to: $DEST_AAB"
-          else
-            echo "No AAB found; skipping rename."
+          APK_DIR="app/build/outputs/apk/bazaar/release"
+          SRC_APK="$(ls -1 "$APK_DIR"/*.apk | head -n 1)"
+          if [ -z "$SRC_APK" ]; then
+            echo "No Bazaar APK found in $APK_DIR"
+            exit 1
           fi
+          mv "$SRC_APK" "$APK_DIR/vinor-${{ steps.version.outputs.VERSION }}-bazaar.apk"
 
-      - name: (Optional) Upload AAB artifact
-        if: always()
-        continue-on-error: true
+      - name: Upload Bazaar APK
         uses: actions/upload-artifact@v4
         with:
-          name: vinor-play-bundle-not-for-phone
-          path: app/build/outputs/bundle/release/*.aab
-          if-no-files-found: warn
+          name: vinor-bazaar-apk
+          path: app/build/outputs/apk/bazaar/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rename Play App Bundle
+        shell: bash
+        run: |
+          AAB_DIR="app/build/outputs/bundle/playRelease"
+          SRC_AAB="$(ls -1 "$AAB_DIR"/*.aab | head -n 1)"
+          if [ -z "$SRC_AAB" ]; then
+            echo "No Play AAB found in $AAB_DIR"
+            exit 1
+          fi
+          mv "$SRC_AAB" "$AAB_DIR/vinor-${{ steps.version.outputs.VERSION }}-play.aab"
+
+      - name: Upload Play App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinor-play-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
+          if-no-files-found: error
           retention-days: 14
 
 

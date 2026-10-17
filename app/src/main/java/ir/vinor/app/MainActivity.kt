@@ -100,7 +100,11 @@ class MainActivity : AppCompatActivity() {
         }
         runCatching { VinorCacheSession.fingerprint(this) }
         runCatching { VinorApiCacheStore.warmup(this) }
-        runCatching { VinorAppUpdateChecker.check(this, webView = null) }
+        if (StoreListing.allowsPackageInstall()) {
+            runCatching { VinorAppUpdateChecker.check(this, webView = null) }
+        } else {
+            runCatching { StoreUpdatePrompt.check(this) }
+        }
         runCatching { VinorFcmRegistrar.requestTokenAndRegister(this) }
         keepSystemSplash = false
         updateOfflineBanner()
@@ -116,8 +120,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        VinorAppUpdateController.onReturnedFromUnknownSources(this)
-        VinorAppUpdateChecker.check(this, webView = null)
+        if (StoreListing.allowsPackageInstall()) {
+            VinorAppUpdateController.onReturnedFromUnknownSources(this)
+            VinorAppUpdateChecker.check(this, webView = null)
+        } else {
+            runCatching { StoreUpdatePrompt.onResume(this) }
+        }
         updateOfflineBanner()
         refreshPartnerFlags()
     }

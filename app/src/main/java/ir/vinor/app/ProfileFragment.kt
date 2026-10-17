@@ -537,6 +537,10 @@ class ProfileFragment : Fragment() {
 
     private fun startApkUpdate() {
         val ctx = context ?: return
+        if (!StoreListing.allowsPackageInstall()) {
+            StoreListing.openListing(ctx)
+            return
+        }
         val state = VinorAppUpdateController.read(ctx.applicationContext)
         if (state.status == VinorAppUpdateStatus.READY) {
             VinorApkUpdateInstaller.install(ctx)
