@@ -322,17 +322,18 @@ class LandDetailFragment : Fragment() {
     }
 
     private fun openVisit(code: String) {
-        if (visitBusy || code.isBlank()) return
+        val current = ListingRepository.currentCode(code).ifBlank { code.trim() }
+        if (visitBusy || current.isBlank()) return
         val ctx = context ?: return
         visitBusy = true
         binding.landDetailVisit.isEnabled = false
         scope.launch {
             try {
                 val status = withContext(Dispatchers.IO) {
-                    PartnerApi.get(LandVisit.statusPath(Uri.encode(code)), ctx)
+                    PartnerApi.get(LandVisit.statusPath(Uri.encode(current)), ctx)
                 }
                 if (_binding == null) return@launch
-                when (val outcome = LandVisit.decide(code, status)) {
+                when (val outcome = LandVisit.decide(current, status)) {
                     is LandVisit.Outcome.Ready -> showVisitSheet(outcome.schedule)
                     LandVisit.Outcome.Login -> {
                         (activity as? MainActivity)?.openLogin(sessionExpired = true)
@@ -531,12 +532,13 @@ class LandDetailFragment : Fragment() {
         sheet.landVisitSubmit.alpha = 0.45f
         scope.launch {
             try {
+                val current = ListingRepository.currentCode(listingCode).ifBlank { listingCode.trim() }
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postForm(
-                        schedule.requestUrl,
+                        LandVisit.submitPath(listingCode, schedule.requestUrl),
                         LandVisit.formFields(dateIso, customer),
                         schedule.csrf,
-                        LandVisit.pagePath(Uri.encode(listingCode)),
+                        LandVisit.pagePath(Uri.encode(current)),
                         ctx,
                     )
                 }
@@ -552,6 +554,7 @@ class LandDetailFragment : Fragment() {
                     return@launch
                 }
                 PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
+                NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_REQUESTS)
                 Toast.makeText(ctx, LandVisit.successMessage(resp, dateIso), Toast.LENGTH_LONG).show()
                 visitSheet?.dismiss()
                 val redirect = resp.optString("redirect_url").trim()

@@ -199,4 +199,31 @@ class LandVisitTest {
         assertFalse(LandVisit.shouldFollowRedirect("/express/partner/dashboard/"))
         assertTrue(LandVisit.shouldFollowRedirect("/express/partner/lands/1?next=/home"))
     }
+
+    @Test
+    fun submitPostsTheCurrentCode() {
+        ListingRepository.clear()
+        try {
+            ListingRepository.ingest(
+                JSONObject()
+                    .put("code", "15")
+                    .put("extras", JSONObject().put("previous_code", "2")),
+            )
+            assertEquals(
+                "/express/partner/visit-requests/15",
+                LandVisit.submitPath("2", "/express/partner/visit-requests/2"),
+            )
+            assertEquals(
+                "https://vinor.ir/express/partner/visit-requests/15?x=1",
+                LandVisit.submitPath("2", "https://vinor.ir/express/partner/visit-requests/2?x=1"),
+            )
+            assertEquals("/express/partner/visit-requests/15", LandVisit.submitPath("2", ""))
+            assertEquals(
+                "/express/partner/visit-requests/9",
+                LandVisit.submitPath("9", "/express/partner/visit-requests/9"),
+            )
+        } finally {
+            ListingRepository.clear()
+        }
+    }
 }

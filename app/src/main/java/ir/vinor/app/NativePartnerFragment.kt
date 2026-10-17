@@ -44,9 +44,8 @@ class NativePartnerFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var activeTab = ""
-    private var pendingFollowId = ""
-    private var pendingFollowPath = ""
-    private var pendingFollowBody = JSONObject()
+    private var requestFilter = FollowRequests.FILTER_ALL
+    private val openHistory = HashSet<String>()
     private var followEpoch = 0
     private var followReload = false
     private var lastPayload = JSONObject()
@@ -508,32 +507,19 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
-        val tabs = FollowRequests.tabs(obj.optJSONArray("tabs"), obj)
-        activeTab = if (pendingFollowId.isNotBlank()) {
-            val located = FollowRequests.locateTab(obj, pendingFollowId, tabs)
-            val hint = FollowRequests.stageHint(pendingFollowPath, pendingFollowBody, tabs)
-            pendingFollowId = ""
-            pendingFollowPath = ""
-            pendingFollowBody = JSONObject()
-            FollowRequests.focusAfterAction(obj.optString("active_tab"), located, hint, tabs)
-        } else {
-            FollowRequests.activeId(activeTab, obj.optString("active_tab"), tabs)
-        }
-        bindRequestTabs(tabs)
-        renderRequestItems(obj, activeTab)
+        val filters = FollowRequests.filters(FollowRequests.counters(obj))
+        if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
+        bindRequestFilters(filters)
+        renderRequestItems(obj, requestFilter)
     }
 
-    private fun bindRequestTabs(tabs: List<FollowRequests.Tab>) {
-        binding.nativeTabsScroll.isVisible = tabs.isNotEmpty()
+    private fun bindRequestFilters(filters: List<FollowRequests.Filter>) {
+        binding.nativeTabsScroll.isVisible = filters.isNotEmpty()
         binding.nativeTabs.removeAllViews()
-        for (tab in tabs) {
-            val on = tab.id == activeTab
+        for (tab in filters) {
+            val on = tab.id == requestFilter
             val chip = TextView(requireContext()).apply {
-                text = if (tab.count > 0) {
-                    "${tab.title} ${PartnerFormat.toman(tab.count.toLong())}"
-                } else {
-                    tab.title
-                }
+                text = "${tab.title} ${ListingWeek.persianDigits(tab.count)}"
                 textSize = 14f
                 gravity = android.view.Gravity.CENTER
                 minHeight = dp(36)
@@ -546,10 +532,10 @@ class NativePartnerFragment : Fragment() {
                 setBackgroundResource(if (on) R.drawable.bg_follow_tab_on else R.drawable.bg_follow_tab)
                 setPadding(dp(14), dp(8), dp(14), dp(8))
                 setOnClickListener {
-                    if (activeTab == tab.id) return@setOnClickListener
-                    activeTab = tab.id
-                    bindRequestTabs(tabs)
-                    renderRequestItems(lastPayload, activeTab)
+                    if (requestFilter == tab.id) return@setOnClickListener
+                    requestFilter = tab.id
+                    bindRequestFilters(filters)
+                    renderRequestItems(lastPayload, requestFilter)
                 }
                 if (on) {
                     post {
@@ -568,13 +554,19 @@ class NativePartnerFragment : Fragment() {
         }
     }
 
-    private fun renderRequestItems(obj: JSONObject, tab: String) {
+    private fun renderRequestItems(obj: JSONObject, filter: String) {
         binding.nativeList.removeAllViews()
         binding.nativeEmpty.isVisible = false
-        val rows = FollowRequests.items(obj, tab)
+        val seen = HashSet<String>()
+        val rows = ArrayList<FollowRequests.Card>()
+        for (row in FollowRequests.feed(obj, filter)) {
+            val card = FollowRequests.card(row, filter)
+            if (card.id.isNotBlank() && !seen.add(card.id)) continue
+            rows.add(card)
+        }
         if (rows.isEmpty()) {
             val empty = TextView(requireContext()).apply {
-                text = FollowRequests.EMPTY
+                text = if (filter.isBlank()) FollowRequests.EMPTY else FollowRequests.EMPTY_FILTER
                 setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
                 textSize = 15f
                 gravity = android.view.Gravity.CENTER
@@ -589,7 +581,7 @@ class NativePartnerFragment : Fragment() {
             )
             return
         }
-        for (row in rows) addRequestCard(FollowRequests.card(row, tab))
+        for (row in rows) addRequestCard(row)
     }
 
     private fun bindLegal(obj: JSONObject) {
@@ -665,8 +657,62 @@ class NativePartnerFragment : Fragment() {
         binding.nativeList.addView(row, lp)
     }
 
+    private fun bindRequestBadges(card: ItemNativeRequestBinding, item: FollowRequests.Card) {
+        card.requestCardBadges.removeAllViews()
+        val labels = listOf(item.stageLabel, item.directionLabel).filter { it.isNotBlank() } +
+            if (item.revisitCount > 0) listOf("بازدید ${ListingWeek.persianDigits(item.revisitCount)}") else emptyList()
+        labels.forEachIndexed { index, label ->
+            val badge = TextView(requireContext()).apply {
+                text = label
+                textSize = 12f
+                setTypeface(card.requestCardTitle.typeface, android.graphics.Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_text))
+                setBackgroundResource(R.drawable.bg_follow_status)
+                setPadding(dp(10), dp(4), dp(10), dp(4))
+            }
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            if (index > 0) lp.marginStart = dp(6)
+            card.requestCardBadges.addView(badge, lp)
+        }
+    }
+
+    private fun bindRequestHistory(card: ItemNativeRequestBinding, item: FollowRequests.Card) {
+        val history = item.history
+        card.requestCardHistory.removeAllViews()
+        card.requestCardHistoryToggle.isVisible = history.isNotEmpty()
+        if (history.isEmpty()) {
+            card.requestCardHistory.isVisible = false
+            return
+        }
+        card.requestCardHistoryToggle.text = "تاریخچه ${ListingWeek.persianDigits(history.size)}"
+        val open = item.id.isNotBlank() && openHistory.contains(item.id)
+        card.requestCardHistory.isVisible = open
+        card.requestCardHistoryToggle.setOnClickListener {
+            val show = !card.requestCardHistory.isVisible
+            card.requestCardHistory.isVisible = show
+            if (item.id.isBlank()) return@setOnClickListener
+            if (show) openHistory.add(item.id) else openHistory.remove(item.id)
+        }
+        for (past in history) {
+            val bits = listOf(past.whenText, past.status, past.outcome, past.notes, past.updatedAt)
+                .filter { it.isNotBlank() }
+            val line = TextView(requireContext()).apply {
+                text = bits.joinToString(" · ")
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+                setPadding(0, dp(6), 0, 0)
+            }
+            card.requestCardHistory.addView(line)
+        }
+    }
+
     private fun addRequestCard(item: FollowRequests.Card) {
         val card = ItemNativeRequestBinding.inflate(layoutInflater, binding.nativeList, false)
+        card.root.tag = item.id
+        bindRequestBadges(card, item)
         card.requestCardStatus.isVisible = item.status.isNotBlank()
         card.requestCardStatus.text = item.status
         card.requestCardStatus.setTextColor(
@@ -680,8 +726,11 @@ class NativePartnerFragment : Fragment() {
             ),
         )
         card.requestCardTitle.text = item.title
+        val statusLp = card.requestCardStatus.layoutParams as ViewGroup.MarginLayoutParams
+        statusLp.topMargin = if (card.requestCardBadges.childCount > 0) dp(8) else 0
+        card.requestCardStatus.layoutParams = statusLp
         val titleLp = card.requestCardTitle.layoutParams as ViewGroup.MarginLayoutParams
-        titleLp.topMargin = if (item.status.isNotBlank()) dp(8) else 0
+        titleLp.topMargin = if (item.status.isNotBlank() || card.requestCardBadges.childCount > 0) dp(8) else 0
         card.requestCardTitle.layoutParams = titleLp
         val meta = listOf(item.whenText, item.phone).filter { it.isNotBlank() }.joinToString(" · ")
         val showPerson = item.customer.isNotBlank() || meta.isNotBlank()
@@ -692,6 +741,9 @@ class NativePartnerFragment : Fragment() {
         card.requestCardCustomer.text = item.customer
         card.requestCardWhen.isVisible = meta.isNotBlank()
         card.requestCardWhen.text = meta
+        card.requestCardUpdated.isVisible = item.updatedAt.isNotBlank()
+        card.requestCardUpdated.text = "به‌روزرسانی ${item.updatedAt}"
+        bindRequestHistory(card, item)
         val dial = PartnerApi.asciiDigits(item.phone)
         if (dial.length >= 8) {
             card.requestCardPerson.isClickable = true
@@ -833,12 +885,7 @@ class NativePartnerFragment : Fragment() {
                     if (FollowRequests.refreshesWallet(path)) {
                         FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
                     }
-                    if (FollowRequests.movesCard(path, body)) {
-                        pendingFollowId = FollowRequests.requestIdFromPath(path)
-                        pendingFollowPath = path
-                        pendingFollowBody = JSONObject(body.toString())
-                        activeTab = ""
-                    }
+                    if (FollowRequests.movesCard(path, body)) requestFilter = FollowRequests.FILTER_ALL
                     rememberedByPage.remove(PAGE_REQUESTS)
                     binding.nativeRefresh.isRefreshing = true
                     followReload = true
@@ -1023,6 +1070,10 @@ class NativePartnerFragment : Fragment() {
         fun clearRemembered() {
             rememberedByPage.clear()
             sessionStamp++
+        }
+
+        fun forgetPage(page: String) {
+            rememberedByPage.remove(page)
         }
 
         fun dataPath(page: String): String? = when (page) {

@@ -72,6 +72,23 @@ object LandVisit {
         return "/express/partner/visit-requests/$encoded"
     }
 
+    /** کد فعلی آگهی، حتی اگر صفحه با previous_code باز شده باشد. */
+    fun submitPath(listingCode: String, serverUrl: String = ""): String {
+        val current = ListingRepository.currentCode(listingCode).ifBlank { listingCode.trim() }
+        val encoded = requestPath(current)
+        val raw = serverUrl.trim()
+        if (raw.isEmpty() || current.isBlank()) return encoded
+        val marker = "/visit-requests/"
+        val index = raw.indexOf(marker)
+        if (index < 0) return encoded
+        val head = raw.substring(0, index + marker.length)
+        val tail = raw.substring(index + marker.length)
+        val cut = tail.indexOfAny(charArrayOf('?', '#'))
+        val query = if (cut >= 0) tail.substring(cut) else ""
+        val encodedCode = java.net.URLEncoder.encode(current, Charsets.UTF_8.name()).replace("+", "%20")
+        return head + encodedCode + query
+    }
+
     /**
      * وضعیت معامله همان منبع تقویم است. صفحهٔ HTML جزئیات تقویم ندارد.
      */

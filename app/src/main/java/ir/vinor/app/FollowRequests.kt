@@ -3,11 +3,13 @@ package ir.vinor.app
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** تب‌ها، کارت و نتیجهٔ ثبت صفحهٔ پیگیری. فیلدها همان پاسخ درخواست‌ها هستند. */
+/** کارت‌های پیگیری. فیلدها همان پاسخ درخواست‌ها هستند. */
 object FollowRequests {
     const val DATA_PATH = "/express/partner/api/requests/data"
     const val PAGE_PATH = "/express/partner/requests"
-    const val EMPTY = "موردی در این تب نیست."
+    const val FILTER_ALL = ""
+    const val EMPTY = "موردی برای پیگیری نیست."
+    const val EMPTY_FILTER = "موردی در این بخش نیست."
     const val FAIL = "ثبت ناموفق بود."
 
     enum class Tone { PRIMARY, SECONDARY, DANGER }
@@ -25,6 +27,21 @@ object FollowRequests {
         val opensWallet: Boolean = false,
     )
 
+    data class Counts(val requests: Int, val visits: Int, val deals: Int) {
+        val all: Int get() = requests + visits + deals
+    }
+
+    data class Filter(val id: String, val title: String, val count: Int)
+
+    data class PastVisit(
+        val id: String,
+        val whenText: String,
+        val status: String,
+        val updatedAt: String,
+        val outcome: String,
+        val notes: String,
+    )
+
     data class Card(
         val id: String,
         val title: String,
@@ -35,6 +52,14 @@ object FollowRequests {
         val phone: String = "",
         val commission: String,
         val actions: List<Action>,
+        val stage: String = "",
+        val stageLabel: String = "",
+        val direction: String = "",
+        val directionLabel: String = "",
+        val revisitCount: Int = 0,
+        val updatedAt: String = "",
+        val history: List<PastVisit> = emptyList(),
+        val ownerPhone: String = "",
     )
 
     fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
@@ -145,29 +170,52 @@ object FollowRequests {
         WalletWithdraw.HOME_DATA,
     )
 
-    fun items(payload: JSONObject, tab: String): List<JSONObject> {
-        val grouped = groupedOf(payload)
-        val scoped = grouped?.optJSONArray(tab)
-            ?: payload.optJSONArray(tab)
-        val array = scoped
-            ?: payload.optJSONArray("items")
-            ?: payload.optJSONArray("inbox_items")
-            ?: JSONArray()
-        val out = ArrayList<JSONObject>()
-        for (i in 0 until array.length()) {
-            val item = array.optJSONObject(i) ?: continue
-            if (scoped == null && tab.isNotBlank()) {
-                val effectiveTab = normalizeStage(stageOf(item).ifBlank { "requests" })
-                if (effectiveTab != normalizeStage(tab)) continue
-            }
-            out.add(item)
-        }
-        return out
+    /** لیست واحد. `cards` اگر باشد؛ وگرنه ادغام items و inbox_items و offers. */
+    fun feed(payload: JSONObject, filter: String = FILTER_ALL): List<JSONObject> {
+        val all = source(payload)
+        val want = normalizeStage(filter)
+        if (want.isBlank() || want == "all") return all
+        return all.filter { pipelineBucket(it) == want }
     }
+
+    fun items(payload: JSONObject, tab: String): List<JSONObject> {
+        val grouped = groupedOf(payload)?.optJSONArray(tab)
+        if (grouped != null) return arrayOf(grouped)
+        if (tab.isNotBlank()) {
+            val named = payload.optJSONArray(tab)
+            if (named != null) return arrayOf(named)
+        }
+        return feed(payload, tab)
+    }
+
+    fun counters(payload: JSONObject): Counts {
+        val given = payload.optJSONObject("tab_counts")
+        if (given != null) {
+            return Counts(
+                requests = countKey(given, "requests"),
+                visits = countKey(given, "visits"),
+                deals = countKey(given, "deals"),
+            )
+        }
+        val all = source(payload)
+        return Counts(
+            requests = all.count { pipelineBucket(it) == "requests" },
+            visits = all.count { pipelineBucket(it) == "visits" },
+            deals = all.count { pipelineBucket(it) == "deals" },
+        )
+    }
+
+    fun filters(counts: Counts): List<Filter> = listOf(
+        Filter(FILTER_ALL, "همه", counts.all),
+        Filter("requests", "درخواست بازدید", counts.requests),
+        Filter("visits", "بازدید", counts.visits),
+        Filter("deals", "معامله", counts.deals),
+    )
 
     fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)
         val title = firstText(item, "title", "land_title", "property_title").ifBlank { "پیگیری" }
+        val stage = cardStage(item)
         return Card(
             id = id,
             title = title,
@@ -178,6 +226,14 @@ object FollowRequests {
             phone = firstText(item, "customer_phone", "phone", "mobile", "tel"),
             commission = commissionLine(item),
             actions = actions(item, id, tab),
+            stage = stage,
+            stageLabel = stageLabel(item, stage),
+            direction = directionOf(item),
+            directionLabel = directionLabel(item),
+            revisitCount = intOf(item, "revisit_count"),
+            updatedAt = ListingWeek.formatWhen(firstText(item, "updated_at")),
+            history = pastVisits(item),
+            ownerPhone = firstText(item, "owner_phone"),
         )
     }
 
@@ -433,11 +489,177 @@ object FollowRequests {
         return out
     }
 
+    private fun source(payload: JSONObject): List<JSONObject> {
+        if (payload.has("cards") && !payload.isNull("cards")) {
+            val cards = payload.optJSONArray("cards")
+            if (cards != null) return order(dedupe(arrayOf(cards)))
+        }
+        val merged = ArrayList<JSONObject>()
+        merged.addAll(stamped(payload.optJSONArray("inbox_items"), "incoming", ""))
+        merged.addAll(stamped(payload.optJSONArray("items"), "outgoing", ""))
+        merged.addAll(stamped(payload.optJSONArray("offers"), "incoming", "deals"))
+        if (merged.isEmpty()) {
+            val grouped = groupedOf(payload)
+            if (grouped != null) {
+                val keys = grouped.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    merged.addAll(stamped(grouped.optJSONArray(key), "", key))
+                }
+            }
+        }
+        return order(dedupe(merged))
+    }
+
+    private fun stamped(array: JSONArray?, direction: String, pipeline: String): List<JSONObject> {
+        val out = ArrayList<JSONObject>()
+        if (array == null) return out
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+            val copy = JSONObject(item.toString())
+            if (direction.isNotBlank() && text(copy, "direction").isBlank()) copy.put("direction", direction)
+            val hasStage = text(copy, "stage").isNotBlank() || text(copy, "pipeline_tab").isNotBlank()
+            if (pipeline.isNotBlank() && !hasStage) copy.put("pipeline_tab", pipeline)
+            out.add(copy)
+        }
+        return out
+    }
+
+    private fun dedupe(rows: List<JSONObject>): List<JSONObject> {
+        val seen = HashSet<String>()
+        val out = ArrayList<JSONObject>()
+        for (row in rows) {
+            val id = idOf(row)
+            if (id.isNotBlank() && !seen.add(id)) continue
+            out.add(row)
+        }
+        return out
+    }
+
+    private fun order(rows: List<JSONObject>): List<JSONObject> =
+        rows.sortedWith(compareByDescending { firstText(it, "updated_at", "created_at") })
+
+    private fun arrayOf(array: JSONArray): List<JSONObject> {
+        val out = ArrayList<JSONObject>()
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+            out.add(item)
+        }
+        return out
+    }
+
+    private fun pipelineBucket(item: JSONObject): String = when (cardStage(item)) {
+        "visit" -> "visits"
+        "deal" -> "deals"
+        else -> "requests"
+    }
+
+    private fun cardStage(item: JSONObject): String {
+        val explicit = knownStage(text(item, "stage"))
+        if (explicit.isNotBlank()) return explicit
+        val pipe = normalizeStage(firstText(item, "pipeline_tab", "bucket"))
+        when (pipe) {
+            "requests", "visit_request" -> return "visit_request"
+            "visits" -> return "visit"
+            "deals", "done" -> return "deal"
+        }
+        val fromStatus = stageFromStatus(item)
+        if (fromStatus.isNotBlank()) return fromStatus
+        return "visit_request"
+    }
+
+    private fun stageFromStatus(item: JSONObject): String {
+        val status = text(item, "status").lowercase()
+        if (status == "pending") return "visit_request"
+        if (
+            flag(item, "can_confirm_deal") ||
+            flag(item, "can_close_deal") ||
+            flag(item, "can_start_deal") ||
+            flag(item, "can_approve_deal") ||
+            text(item, "deal_decision").lowercase() in setOf("approved", "closed") ||
+            text(item, "tx_status").lowercase() in setOf("in_transaction", "sold") ||
+            text(item, "assignment_status").lowercase() in setOf("in_transaction", "sold")
+        ) {
+            return "deal"
+        }
+        if (status.isNotBlank()) return "visit"
+        return ""
+    }
+
+    private fun knownStage(raw: String): String = when (raw.trim()) {
+        "visit_request", "request", "requests", "inbox", "درخواست", "درخواست‌ها", "درخواست بازدید" ->
+            "visit_request"
+        "visit", "visits", "بازدید", "بازدیدها" -> "visit"
+        "deal", "deals", "معامله", "معاملات", "done", "success", "closed", "sold", "completed", "موفق", "موفق‌ها" ->
+            "deal"
+        else -> ""
+    }
+
+    private fun stageLabel(item: JSONObject, stage: String): String {
+        val server = text(item, "stage_label")
+        if (server.isNotBlank()) return server
+        return when (stage) {
+            "visit" -> "بازدید"
+            "deal" -> "معامله"
+            else -> "درخواست بازدید"
+        }
+    }
+
+    private fun directionOf(item: JSONObject): String {
+        val raw = text(item, "direction").lowercase()
+        return if (raw == "incoming") "incoming" else "outgoing"
+    }
+
+    private fun directionLabel(item: JSONObject): String {
+        val server = text(item, "direction_label")
+        if (server.isNotBlank()) return server
+        return if (directionOf(item) == "incoming") "دریافتی" else "ارسالی"
+    }
+
+    private fun pastVisits(item: JSONObject): List<PastVisit> {
+        val array = item.optJSONArray("history") ?: return emptyList()
+        val out = ArrayList<PastVisit>()
+        for (i in 0 until array.length()) {
+            val row = array.optJSONObject(i) ?: continue
+            val date = ListingWeek.formatWhen(firstText(row, "visit_date"))
+            val time = ListingWeek.persianDigits(text(row, "visit_time"))
+            val whenText = listOf(date, time).filter { it.isNotBlank() }.joinToString(" · ")
+            out.add(
+                PastVisit(
+                    id = idOf(row),
+                    whenText = whenText,
+                    status = historyStatus(text(row, "status")),
+                    updatedAt = ListingWeek.formatWhen(firstText(row, "updated_at")),
+                    outcome = historyOutcome(text(row, "visit_outcome")),
+                    notes = text(row, "notes"),
+                ),
+            )
+        }
+        return out
+    }
+
+    private fun historyStatus(raw: String): String = when (raw.trim().lowercase()) {
+        "pending" -> "منتظر تأیید"
+        "approved" -> "منتظر بازدید"
+        "done_pending" -> "منتظر تأیید انجام"
+        "completed" -> "بازدید انجام شد"
+        "cancelled" -> "رد شده"
+        "no_show" -> "عدم حضور"
+        else -> raw.trim()
+    }
+
+    private fun historyOutcome(raw: String): String = when (raw.trim().lowercase()) {
+        "interested" -> "علاقه‌مند"
+        "follow_up" -> "پیگیری دوباره"
+        "not_interested" -> "بی‌علاقه"
+        else -> raw.trim()
+    }
+
     private fun stageOf(item: JSONObject): String =
         firstText(item, "pipeline_tab", "stage", "bucket")
 
     private fun normalizeStage(raw: String): String = when (raw.trim()) {
-        "request", "requests", "inbox", "درخواست", "درخواست‌ها" -> "requests"
+        "request", "requests", "inbox", "visit_request", "درخواست", "درخواست‌ها", "درخواست بازدید" -> "requests"
         "visit", "visits", "بازدید", "بازدیدها" -> "visits"
         "deal", "deals", "معامله", "معاملات" -> "deals"
         "done", "success", "closed", "sold", "completed", "موفق", "موفق‌ها" -> "done"
@@ -466,6 +688,18 @@ object FollowRequests {
         WalletWithdraw.money(obj, "count", "total", "badge", "items_count")
             .coerceIn(0L, Int.MAX_VALUE.toLong())
             .toInt()
+
+    private fun countKey(obj: JSONObject, key: String): Int {
+        if (!obj.has(key) || obj.isNull(key)) return 0
+        val parsed = when (val raw = obj.opt(key)) {
+            is Number -> raw.toLong()
+            is String -> raw.trim().toLongOrNull() ?: return 0
+            else -> return 0
+        }
+        return parsed.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+    }
+
+    private fun intOf(obj: JSONObject, key: String): Int = countKey(obj, key)
 
     private fun groupedOf(payload: JSONObject): JSONObject? =
         payload.optJSONObject("items_by_tab")

@@ -25,27 +25,33 @@ class FollowRequestsTest {
 
     @Test
     fun filtersPipelineAndReadsRealFields() {
-        val payload = JSONObject().put(
-            "inbox_items",
-            JSONArray()
-                .put(
-                    JSONObject()
-                        .put("id", 15)
-                        .put("pipeline_tab", "visits")
-                        .put("title", "null")
-                        .put("land_title", "آپارتمان جردن")
-                        .put("status_label", "بازدید")
-                        .put("customer_name", "مریم")
-                        .put("visit_when", "فردا ۱۰")
-                        .put("land_code", "A1")
-                        .put("can_complete", 1)
-                        .put("can_register_result", true)
-                        .put("can_remove", true),
-                )
-                .put(JSONObject().put("id", "9").put("pipeline_tab", "requests").put("title", "دیگر")),
-        )
-        assertTrue(FollowRequests.items(payload, "requests").single().optString("title") == "دیگر")
-        val card = FollowRequests.card(FollowRequests.items(payload, "visits").single())
+        val visit = JSONObject()
+            .put("id", 15)
+            .put("pipeline_tab", "visits")
+            .put("title", "null")
+            .put("land_title", "آپارتمان جردن")
+            .put("status_label", "بازدید")
+            .put("customer_name", "مریم")
+            .put("visit_when", "فردا ۱۰")
+            .put("land_code", "A1")
+            .put("can_complete", 1)
+            .put("can_register_result", true)
+            .put("can_remove", true)
+        val payload = JSONObject()
+            .put("items", JSONArray())
+            .put(
+                "inbox_items",
+                JSONArray()
+                    .put(visit)
+                    .put(JSONObject().put("id", "9").put("pipeline_tab", "requests").put("title", "دیگر")),
+            )
+        assertEquals(2, FollowRequests.feed(payload).size)
+        assertEquals("دیگر", FollowRequests.feed(payload, "requests").single().optString("title"))
+        val card = FollowRequests.card(FollowRequests.feed(payload, "visits").single())
+        assertEquals("visit", card.stage)
+        assertEquals("بازدید", card.stageLabel)
+        assertEquals("incoming", card.direction)
+        assertEquals("دریافتی", card.directionLabel)
         assertEquals("15", card.id)
         assertEquals("آپارتمان جردن", card.title)
         assertEquals("بازدید", card.status)
@@ -347,5 +353,149 @@ class FollowRequestsTest {
         assertTrue(FollowRequests.isUnauthorized(JSONObject().put("http_status", 401)))
         assertTrue(FollowRequests.isUnauthorized(JSONObject().put("error", "session_expired")))
         assertFalse(FollowRequests.isUnauthorized(JSONObject().put("http_status", 403).put("error", "forbidden")))
+    }
+
+    @Test
+    fun cardsPayloadIsTheListAndLegacyRowsStayHidden() {
+        val payload = JSONObject()
+            .put(
+                "cards",
+                JSONArray().put(
+                    JSONObject()
+                        .put("id", "7")
+                        .put("title", "کارت واحد")
+                        .put("stage", "visit")
+                        .put("stage_label", "بازدید")
+                        .put("direction", "outgoing")
+                        .put("direction_label", "ارسالی")
+                        .put("pipeline_tab", "visits")
+                        .put("owner_phone", "09120000000")
+                        .put("updated_at", "2026-10-16T09:48:00Z"),
+                ),
+            )
+            .put("items", JSONArray().put(JSONObject().put("id", "1").put("title", "قدیمی")))
+            .put("inbox_items", JSONArray().put(JSONObject().put("id", "2").put("title", "صندوق")))
+            .put(
+                "tab_counts",
+                JSONObject().put("requests", 1).put("visits", 4).put("deals", 2),
+            )
+        val card = FollowRequests.card(FollowRequests.feed(payload).single())
+        assertEquals("7", card.id)
+        assertEquals("کارت واحد", card.title)
+        assertEquals("visit", card.stage)
+        assertEquals("بازدید", card.stageLabel)
+        assertEquals("outgoing", card.direction)
+        assertEquals("ارسالی", card.directionLabel)
+        assertEquals("09120000000", card.ownerPhone)
+        assertTrue(card.updatedAt.contains("۱۳:۱۸"))
+        assertFalse(card.updatedAt.contains("۰۹:۴۸"))
+        val counts = FollowRequests.counters(payload)
+        assertEquals(1, counts.requests)
+        assertEquals(4, counts.visits)
+        assertEquals(2, counts.deals)
+        assertEquals(7, counts.all)
+        assertEquals(listOf("", "requests", "visits", "deals"), FollowRequests.filters(counts).map { it.id })
+        assertEquals("همه", FollowRequests.filters(counts).first().title)
+        assertEquals(7, FollowRequests.filters(counts).first().count)
+    }
+
+    @Test
+    fun missingStageFallsBackToPipelineThenStatus() {
+        val fromPipeline = FollowRequests.card(
+            JSONObject().put("id", "1").put("pipeline_tab", "deals").put("title", "معامله"),
+        )
+        assertEquals("deal", fromPipeline.stage)
+        assertEquals("معامله", fromPipeline.stageLabel)
+        val pending = FollowRequests.card(JSONObject().put("id", "2").put("status", "pending"))
+        assertEquals("visit_request", pending.stage)
+        assertEquals("درخواست بازدید", pending.stageLabel)
+        val approved = FollowRequests.card(JSONObject().put("id", "3").put("status", "approved"))
+        assertEquals("visit", approved.stage)
+        assertEquals("بازدید", approved.stageLabel)
+    }
+
+    @Test
+    fun sameIdIsOneCardAndNewerUpdateComesFirst() {
+        val older = JSONObject()
+            .put("id", "4")
+            .put("title", "قدیم")
+            .put("pipeline_tab", "requests")
+            .put("updated_at", "2026-10-01T08:00:00Z")
+        val newer = JSONObject()
+            .put("id", "4")
+            .put("title", "تازه")
+            .put("pipeline_tab", "visits")
+            .put("direction", "incoming")
+            .put("updated_at", "2026-10-16T09:48:00Z")
+        val other = JSONObject()
+            .put("id", "8")
+            .put("title", "دیگر")
+            .put("pipeline_tab", "deals")
+            .put("updated_at", "2026-10-10T09:00:00Z")
+        val payload = JSONObject()
+            .put("items", JSONArray().put(older).put(other))
+            .put("inbox_items", JSONArray().put(newer))
+        val rows = FollowRequests.feed(payload)
+        assertEquals(listOf("4", "8"), rows.map { FollowRequests.card(it).id })
+        assertEquals("تازه", FollowRequests.card(rows.first()).title)
+        assertEquals("incoming", FollowRequests.card(rows.first()).direction)
+        val dupCards = JSONObject().put(
+            "cards",
+            JSONArray()
+                .put(JSONObject().put("id", "4").put("title", "اول"))
+                .put(JSONObject().put("id", "4").put("title", "دوم")),
+        )
+        assertEquals("اول", FollowRequests.card(FollowRequests.feed(dupCards).single()).title)
+    }
+
+    @Test
+    fun revisitCardKeepsHistoryAndCount() {
+        val payload = JSONObject().put(
+            "cards",
+            JSONArray().put(
+                JSONObject()
+                    .put("id", "15")
+                    .put("title", "آپارتمان")
+                    .put("stage", "visit")
+                    .put("revisit_count", 2)
+                    .put("updated_at", "2026-10-16T09:48:00Z")
+                    .put(
+                        "history",
+                        JSONArray().put(
+                            JSONObject()
+                                .put("id", "h1")
+                                .put("visit_date", "2026-10-01")
+                                .put("visit_time", "10:30")
+                                .put("status", "completed")
+                                .put("updated_at", "2026-10-01T08:00:00Z")
+                                .put("visit_outcome", "follow_up")
+                                .put("notes", "تماس دوباره"),
+                        ),
+                    ),
+            ),
+        )
+        val card = FollowRequests.card(FollowRequests.feed(payload).single())
+        assertEquals(2, card.revisitCount)
+        val past = card.history.single()
+        assertEquals("h1", past.id)
+        assertEquals("بازدید انجام شد", past.status)
+        assertEquals("پیگیری دوباره", past.outcome)
+        assertEquals("تماس دوباره", past.notes)
+        assertTrue(past.whenText.contains("۱۰:۳۰"))
+        assertTrue(past.updatedAt.contains("۱۱:۳۰"))
+        assertTrue(card.updatedAt.contains("۱۳:۱۸"))
+    }
+
+    @Test
+    fun offersJoinTheFallbackListAsDeals() {
+        val payload = JSONObject()
+            .put("items", JSONArray())
+            .put("offers", JSONArray().put(JSONObject().put("id", "o1").put("title", "پیشنهاد")))
+        val card = FollowRequests.card(FollowRequests.feed(payload, "deals").single())
+        assertEquals("o1", card.id)
+        assertEquals("deal", card.stage)
+        assertEquals("معامله", card.stageLabel)
+        assertEquals("دریافتی", card.directionLabel)
+        assertEquals(0, FollowRequests.feed(payload, "visits").size)
     }
 }
