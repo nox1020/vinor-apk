@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         runCatching { CookieManager.getInstance().setAcceptCookie(true) }
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        SystemUi.install(binding.root)
         wireDivarTabbar()
         wireChatImeTabbar()
         refreshPartnerFlags()

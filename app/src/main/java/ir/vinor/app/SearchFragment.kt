@@ -586,6 +586,7 @@ class SearchFragment : Fragment() {
         val dialog = BottomSheetDialog(requireContext())
         val sheet = SheetSearchFilterBinding.inflate(layoutInflater)
         sheet.sheetTitle.text = title
+        SystemUi.installSheet(sheet.root)
         dialog.setContentView(sheet.root)
         dialog.setOnShowListener {
             val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)

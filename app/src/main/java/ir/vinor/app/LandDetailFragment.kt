@@ -504,6 +504,7 @@ class LandDetailFragment : Fragment() {
         }
         paint()
         val dialog = BottomSheetDialog(requireContext())
+        SystemUi.installSheet(sheet.root)
         dialog.setContentView(sheet.root)
         dialog.setOnShowListener {
             val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)

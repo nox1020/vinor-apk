@@ -2,7 +2,6 @@ package ir.vinor.app
 
 import android.view.View
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -21,15 +20,10 @@ object VinorLogoutSheet {
         current?.dismiss()
         val dialog = BottomSheetDialog(fragment.requireContext())
         val sheet = SheetLogoutConfirmBinding.inflate(fragment.layoutInflater)
+        SystemUi.installSheet(sheet.root)
         dialog.setContentView(sheet.root)
         dialog.setCanceledOnTouchOutside(true)
         dialog.window?.setDimAmount(0.6f)
-        val baseBottom = sheet.root.paddingBottom
-        ViewCompat.setOnApplyWindowInsetsListener(sheet.root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, baseBottom + bars.bottom)
-            insets
-        }
         dialog.setOnShowListener {
             val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
             if (panel != null) {

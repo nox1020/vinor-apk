@@ -36,7 +36,9 @@ class PreloaderActivity : AppCompatActivity() {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
 
         super.onCreate(savedInstanceState)
+        SystemUi.apply(this)
         setContentView(R.layout.activity_preloader)
+        SystemUi.install(findViewById(android.R.id.content))
 
         progress = findViewById(R.id.progress)
         statusText = findViewById(R.id.statusText)

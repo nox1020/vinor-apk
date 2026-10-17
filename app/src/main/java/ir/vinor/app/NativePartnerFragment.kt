@@ -880,6 +880,7 @@ class NativePartnerFragment : Fragment() {
     private fun openFollowSheet(content: View): BottomSheetDialog {
         followSheet?.dismiss()
         val dialog = BottomSheetDialog(requireContext())
+        SystemUi.installSheet(content)
         dialog.setContentView(content)
         dialog.setOnShowListener {
             val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)

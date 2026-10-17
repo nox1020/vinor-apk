@@ -39,6 +39,7 @@ class OnboardingActivity : AppCompatActivity() {
         SystemUi.apply(this)
         binding = ActivityOnboardingBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        SystemUi.install(binding.root)
 
         binding.onboardPager.adapter = PageAdapter(pages)
         binding.onboardPager.offscreenPageLimit = 1

@@ -303,6 +303,7 @@ class MyPropertyManageFragment : Fragment() {
     private fun openSheet(content: View): BottomSheetDialog {
         sheetDialog?.dismiss()
         val dialog = BottomSheetDialog(requireContext())
+        SystemUi.installSheet(content)
         dialog.setContentView(content)
         dialog.setOnShowListener {
             val panel = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
