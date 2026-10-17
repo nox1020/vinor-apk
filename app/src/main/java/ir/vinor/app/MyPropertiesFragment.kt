@@ -172,6 +172,7 @@ class MyPropertiesFragment : Fragment() {
             if (prop.has("public")) card.put("public", prop.opt("public"))
             if (prop.has("extras")) card.put("extras", prop.opt("extras"))
             if (prop.has("badge_label")) card.put("badge_label", prop.opt("badge_label"))
+            ListingWeek.copyOnto(card, prop)
             addCard(card)
             return
         }
@@ -202,6 +203,9 @@ class MyPropertiesFragment : Fragment() {
             if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
         binding.mpList.addView(card.root)
+        ListingWeekPanel.addTo(binding.mpList, land) {
+            if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
+        }
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

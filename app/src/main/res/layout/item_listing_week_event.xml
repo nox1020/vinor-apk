@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:paddingVertical="4dp">
+
+    <TextView
+        android:id="@+id/weekEventText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="end"
+        android:textColor="@color/vinor_text"
+        android:textDirection="rtl"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/weekEventWhen"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="end"
+        android:textColor="@color/vinor_text_muted"
+        android:textDirection="rtl"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

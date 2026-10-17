@@ -417,6 +417,7 @@ object MyPropertyManage {
             val image = imageOf(detail)
             if (image.isNotBlank()) out.put("image_url", image)
         }
+        ListingWeek.copyOnto(out, detail)
         return out
     }
 

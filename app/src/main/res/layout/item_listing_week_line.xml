@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layoutDirection="rtl"
+    android:orientation="horizontal"
+    android:paddingVertical="3dp">
+
+    <TextView
+        android:id="@+id/weekLineLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="end"
+        android:textColor="@color/vinor_text_muted"
+        android:textDirection="rtl"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/weekLineValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="start"
+        android:textColor="@color/vinor_text"
+        android:textDirection="ltr"
+        android:textSize="13sp" />
+</LinearLayout>

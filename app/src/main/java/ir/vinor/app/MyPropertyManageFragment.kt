@@ -94,6 +94,7 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.imageOf(snapshot),
             b.mpManageImagePlaceholder,
         )
+        ListingWeekPanel.replace(b.mpManageWeek, snapshot)
     }
 
     private fun bindRows() {

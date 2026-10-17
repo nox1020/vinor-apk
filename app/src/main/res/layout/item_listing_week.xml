@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="14dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_routine_card"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/weekTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="end"
+        android:textColor="@color/vinor_text"
+        android:textDirection="rtl"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/weekStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="end"
+        android:textColor="@color/vinor_text_muted"
+        android:textDirection="rtl"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/weekLines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layoutDirection="rtl"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/weekHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="end"
+        android:textColor="@color/vinor_badge_gold"
+        android:textDirection="rtl"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/weekActivityTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="end"
+        android:textColor="@color/vinor_text"
+        android:textDirection="rtl"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/weekActivity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layoutDirection="rtl"
+        android:orientation="vertical" />
+</LinearLayout>
