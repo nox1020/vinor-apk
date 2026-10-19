@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -357,30 +358,57 @@ class FollowRequestsTest {
 
     @Test
     fun cardsPayloadIsTheListAndLegacyRowsStayHidden() {
-        val payload = JSONObject()
+        val visit = JSONObject()
+            .put("id", "7")
+            .put("title", "کارت واحد")
+            .put("stage", "visit")
+            .put("stage_label", "بازدید")
+            .put("direction", "outgoing")
+            .put("direction_label", "ارسالی")
+            .put("pipeline_tab", "visits")
+            .put("owner_phone", "09120000000")
+            .put("updated_at", "2026-10-16T09:48:00Z")
+        val offer = JSONObject()
+            .put("kind", "offer")
+            .put("id", "off-9")
+            .put("pipeline_tab", "deals")
+            .put("land_code", "42")
+            .put("title", "پیشنهاد قیمت · فایل 42")
+            .put("amount", 250000000)
+            .put("terms", "نقد")
+            .put("status", "pending")
+            .put("status_label", "پیشنهاد باز")
+            .put("partner_phone", "09123333000")
+            .put("buyer_phone", "09124444000")
+            .put("can_accept", true)
+            .put("can_reject", true)
+            .put("can_counter", true)
+            .put("return_to", "visits")
             .put(
-                "cards",
-                JSONArray().put(
-                    JSONObject()
-                        .put("id", "7")
-                        .put("title", "کارت واحد")
-                        .put("stage", "visit")
-                        .put("stage_label", "بازدید")
-                        .put("direction", "outgoing")
-                        .put("direction_label", "ارسالی")
-                        .put("pipeline_tab", "visits")
-                        .put("owner_phone", "09120000000")
-                        .put("updated_at", "2026-10-16T09:48:00Z"),
-                ),
+                "actions",
+                JSONObject()
+                    .put("accept", "/express/partner/inbox-offers/off-9/accept")
+                    .put("reject", "/express/partner/inbox-offers/off-9/reject")
+                    .put("counter", "/express/partner/inbox-offers/off-9/counter"),
             )
+            .put("updated_at", "2026-10-17T09:48:00Z")
+        val payload = JSONObject()
+            .put("cards", JSONArray().put(visit).put(offer))
             .put("items", JSONArray().put(JSONObject().put("id", "1").put("title", "قدیمی")))
             .put("inbox_items", JSONArray().put(JSONObject().put("id", "2").put("title", "صندوق")))
+            .put(
+                "offers",
+                JSONArray().put(JSONObject().put("id", "off-legacy").put("title", "پیشنهاد جدا").put("amount", 1)),
+            )
             .put(
                 "tab_counts",
                 JSONObject().put("requests", 1).put("visits", 4).put("deals", 2),
             )
-        val card = FollowRequests.card(FollowRequests.feed(payload).single())
-        assertEquals("7", card.id)
+        val rows = FollowRequests.feed(payload)
+        assertEquals(listOf("off-9", "7"), rows.map { FollowRequests.card(it).id })
+        assertTrue(rows.none { FollowRequests.card(it).id == "off-legacy" })
+        assertTrue(rows.none { FollowRequests.card(it).id == "1" || FollowRequests.card(it).id == "2" })
+        val card = FollowRequests.card(rows.first { FollowRequests.card(it).id == "7" })
         assertEquals("کارت واحد", card.title)
         assertEquals("visit", card.stage)
         assertEquals("بازدید", card.stageLabel)
@@ -389,14 +417,87 @@ class FollowRequestsTest {
         assertEquals("09120000000", card.ownerPhone)
         assertTrue(card.updatedAt.contains("۱۳:۱۸"))
         assertFalse(card.updatedAt.contains("۰۹:۴۸"))
+        val deals = FollowRequests.feed(payload, "deals")
+        assertEquals(1, deals.size)
+        val offerCard = FollowRequests.card(deals.single())
+        assertEquals("offer", offerCard.kind)
+        assertEquals("deal", offerCard.stage)
+        assertEquals("پیشنهاد قیمت · فایل 42", offerCard.title)
+        assertEquals("۲۵۰،۰۰۰،۰۰۰ تومان", offerCard.amountText)
+        assertEquals("نقد", offerCard.terms)
+        assertEquals("پیشنهاد باز", offerCard.status)
+        assertTrue(offerCard.phone.startsWith("همکار: "))
+        assertTrue(offerCard.phone.contains("\u2066"))
+        assertTrue(offerCard.phone.contains("\u2069"))
+        assertTrue(offerCard.phone.contains("۰۹۱۲۳۳۳۳۰۰۰"))
+        assertFalse(offerCard.phone.contains("0912"))
+        assertTrue(offerCard.actions.none { it.json || it.label == FollowRequests.ARCHIVE_LABEL })
         val counts = FollowRequests.counters(payload)
-        assertEquals(1, counts.requests)
-        assertEquals(4, counts.visits)
-        assertEquals(2, counts.deals)
-        assertEquals(7, counts.all)
+        assertEquals(FollowRequests.feed(payload, "requests").size, counts.requests)
+        assertEquals(FollowRequests.feed(payload, "visits").size, counts.visits)
+        assertEquals(FollowRequests.feed(payload, "deals").size, counts.deals)
+        assertEquals(0, counts.requests)
+        assertEquals(1, counts.visits)
+        assertEquals(1, counts.deals)
+        assertEquals(rows.size, counts.all)
         assertEquals(listOf("", "requests", "visits", "deals"), FollowRequests.filters(counts).map { it.id })
         assertEquals("همه", FollowRequests.filters(counts).first().title)
-        assertEquals(7, FollowRequests.filters(counts).first().count)
+        assertEquals(rows.size, FollowRequests.filters(counts).first().count)
+        assertEquals(
+            "/express/partner/api/requests/data?status=active&offers_in_cards=1",
+            FollowRequests.dataPath(),
+        )
+        assertTrue(FollowRequests.cachePaths().contains(FollowRequests.dataPath(ListingArchive.ARCHIVED)))
+    }
+
+    @Test
+    fun offerCardPostsInboxFormWithoutArchive() {
+        val item = JSONObject()
+            .put("kind", "offer")
+            .put("id", "off-9")
+            .put("status", "countered")
+            .put("status_label", "پیشنهاد متقابل")
+            .put("amount", 1200000)
+            .put("terms", "چک")
+            .put("buyer_phone", "09124444000")
+            .put("can_accept", true)
+            .put("can_reject", false)
+            .put("can_counter", true)
+        val card = FollowRequests.card(item)
+        assertEquals("deal", card.stage)
+        assertEquals("پیشنهاد متقابل", card.status)
+        assertEquals("۱،۲۰۰،۰۰۰ تومان", card.amountText)
+        assertTrue(card.phone.startsWith("خریدار: "))
+        assertTrue(card.phone.contains("\u2066۰۹۱۲۴۴۴۴۰۰۰\u2069"))
+        assertEquals(listOf("پذیرش", "پیشنهاد متقابل"), card.actions.map { it.label })
+        val accept = card.actions.first()
+        assertTrue(accept.form)
+        assertFalse(accept.counter)
+        assertEquals("/express/partner/inbox-offers/off-9/accept", accept.path)
+        assertEquals("visits", accept.body.optString("return_to"))
+        assertEquals("این پیشنهاد پذیرفته شود؟", accept.confirm)
+        assertEquals("visits", FollowRequests.formFields(accept)["return_to"])
+        assertFalse(FollowRequests.formFields(accept).containsKey("csrf_token"))
+        val counter = card.actions[1]
+        assertTrue(counter.form)
+        assertTrue(counter.counter)
+        assertNull(counter.confirm)
+        assertEquals("/express/partner/inbox-offers/off-9/counter", counter.path)
+        val posted = FollowRequests.withCounter(counter, "۲۵۰،۰۰۰", "  نقد ")
+        assertNotNull(posted)
+        assertEquals("250000", posted!!.body.optString("amount"))
+        assertEquals("نقد", posted.body.optString("terms"))
+        assertEquals("visits", posted.body.optString("return_to"))
+        assertEquals("250000", FollowRequests.formFields(posted)["amount"])
+        val bare = FollowRequests.withCounter(counter, "10", "  ")
+        assertNotNull(bare)
+        assertFalse(bare!!.body.has("terms"))
+        assertNull(FollowRequests.withCounter(counter, "", "نقد"))
+        assertNull(FollowRequests.withCounter(counter, "0", "نقد"))
+        val quiet = FollowRequests.card(
+            JSONObject().put("kind", "offer").put("id", "off-1").put("can_accept", false),
+        )
+        assertTrue(quiet.actions.isEmpty())
     }
 
     @Test

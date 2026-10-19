@@ -28,6 +28,7 @@ import ir.vinor.app.databinding.ItemLandCardBinding
 import ir.vinor.app.databinding.ItemNativeCardBinding
 import ir.vinor.app.databinding.ItemNativeRequestBinding
 import ir.vinor.app.databinding.SheetFollowConfirmBinding
+import ir.vinor.app.databinding.SheetFollowCounterBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -761,6 +762,11 @@ class NativePartnerFragment : Fragment() {
     private fun addRequestCard(item: FollowRequests.Card) {
         val card = ItemNativeRequestBinding.inflate(layoutInflater, binding.nativeList, false)
         card.root.tag = item.id
+        if (item.kind == "offer") {
+            bindOfferCard(card, item)
+            binding.nativeList.addView(card.root)
+            return
+        }
         bindRequestBadges(card, item)
         card.requestCardStatus.isVisible = item.status.isNotBlank()
         card.requestCardStatus.text = item.status
@@ -809,38 +815,7 @@ class NativePartnerFragment : Fragment() {
             marginStart = if (item.customer.isNotBlank()) dp(12) else 0
         }
         item.actions.forEachIndexed { index, action ->
-            val primary = action.tone == FollowRequests.Tone.PRIMARY
-            val danger = action.tone == FollowRequests.Tone.DANGER
-            val btn = TextView(requireContext()).apply {
-                text = action.label
-                textSize = 15f
-                gravity = android.view.Gravity.CENTER
-                minHeight = dp(44)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                setBackgroundResource(if (primary) R.drawable.bg_hub_start else R.drawable.bg_flat_outline_card)
-                setTextColor(
-                    when {
-                        primary -> Color.parseColor("#052E16")
-                        danger -> ContextCompat.getColor(context, R.color.vinor_error)
-                        else -> ContextCompat.getColor(context, R.color.vinor_text)
-                    },
-                )
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    when {
-                        action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
-                        action.confirm != null -> confirmFollow(action)
-                        else -> dispatchFollow(action)
-                    }
-                }
-            }
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-            lp.topMargin = dp(if (index == 0) 12 else 8)
-            card.requestCardActions.addView(btn, lp)
+            addFollowButton(card, action, index)
         }
         val openPrimary = item.actions.isEmpty()
         card.requestCardOpen.isVisible = item.landCode.isNotBlank()
@@ -857,6 +832,129 @@ class NativePartnerFragment : Fragment() {
             }
         }
         binding.nativeList.addView(card.root)
+    }
+
+    private fun bindOfferCard(card: ItemNativeRequestBinding, item: FollowRequests.Card) {
+        card.requestCardBadges.isVisible = false
+        card.requestCardPerson.isVisible = false
+        card.requestCardUpdated.isVisible = false
+        card.requestCardHistoryToggle.isVisible = false
+        card.requestCardHistory.isVisible = false
+        card.requestCardCommission.isVisible = false
+        card.requestCardOpen.isVisible = false
+        card.requestCardTitle.text = item.title
+        val host = card.root
+        host.removeView(card.requestCardStatus)
+        var at = host.indexOfChild(card.requestCardTitle) + 1
+        fun addLine(text: String, size: Float, color: Int): TextView {
+            val view = TextView(requireContext()).apply {
+                this.text = text
+                textSize = size
+                setTextColor(ContextCompat.getColor(context, color))
+            }
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(8)
+            host.addView(view, at, lp)
+            at += 1
+            return view
+        }
+        if (item.amountText.isNotBlank()) addLine(item.amountText, 15f, R.color.vinor_text)
+        if (item.terms.isNotBlank()) addLine(item.terms, 13f, R.color.vinor_text_muted)
+        if (item.status.isNotBlank()) {
+            card.requestCardStatus.isVisible = true
+            card.requestCardStatus.text = item.status
+            card.requestCardStatus.setTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    when (FollowRequests.statusMark(item.status)) {
+                        FollowRequests.Mark.GOOD -> R.color.vinor_accent_green
+                        FollowRequests.Mark.BAD -> R.color.vinor_error
+                        FollowRequests.Mark.NEUTRAL -> R.color.vinor_text_muted
+                    },
+                ),
+            )
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.topMargin = dp(8)
+            host.addView(card.requestCardStatus, at, lp)
+            at += 1
+        }
+        if (item.phone.isNotBlank()) {
+            val phone = addLine(item.phone, 13f, R.color.vinor_text_muted)
+            val dial = PartnerApi.asciiDigits(item.phone)
+            if (dial.length >= 8) {
+                phone.isClickable = true
+                phone.isFocusable = true
+                phone.setOnClickListener {
+                    runCatching {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dial")))
+                    }
+                }
+            }
+        }
+        item.actions.forEachIndexed { index, action ->
+            addFollowButton(card, action, index)
+        }
+    }
+
+    private fun addFollowButton(card: ItemNativeRequestBinding, action: FollowRequests.Action, index: Int) {
+        val primary = action.tone == FollowRequests.Tone.PRIMARY
+        val danger = action.tone == FollowRequests.Tone.DANGER
+        val btn = TextView(requireContext()).apply {
+            text = action.label
+            textSize = 15f
+            gravity = android.view.Gravity.CENTER
+            minHeight = dp(44)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setBackgroundResource(if (primary) R.drawable.bg_hub_start else R.drawable.bg_flat_outline_card)
+            setTextColor(
+                when {
+                    primary -> Color.parseColor("#052E16")
+                    danger -> ContextCompat.getColor(context, R.color.vinor_error)
+                    else -> ContextCompat.getColor(context, R.color.vinor_text)
+                },
+            )
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                when {
+                    action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
+                    action.counter -> askCounter(action)
+                    action.confirm != null -> confirmFollow(action)
+                    else -> dispatchFollow(action)
+                }
+            }
+        }
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        lp.topMargin = dp(if (index == 0) 12 else 8)
+        card.requestCardActions.addView(btn, lp)
+    }
+
+    private fun askCounter(action: FollowRequests.Action) {
+        val sheet = SheetFollowCounterBinding.inflate(layoutInflater)
+        val dialog = openFollowSheet(sheet.root)
+        sheet.followCounterNo.setOnClickListener { dialog.dismiss() }
+        sheet.followCounterYes.setOnClickListener {
+            val next = FollowRequests.withCounter(
+                action,
+                sheet.followCounterAmount.text?.toString().orEmpty(),
+                sheet.followCounterTerms.text?.toString().orEmpty(),
+            )
+            if (next == null) {
+                Toast.makeText(requireContext(), "مبلغ را وارد کنید.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            dispatchFollow(next)
+        }
     }
 
     private fun confirmFollow(action: FollowRequests.Action) {
@@ -1323,7 +1421,7 @@ class NativePartnerFragment : Fragment() {
             PAGE_LEVELS -> "/express/partner/api/levels/data"
             PAGE_INVITE -> "/express/partner/api/invite/data"
             PAGE_APPLY -> "/express/partner/api/apply/data"
-            PAGE_REQUESTS -> FollowRequests.DATA_PATH
+            PAGE_REQUESTS -> FollowRequests.dataPath()
             PAGE_LISTINGS -> "/express/partner/api/listings/data"
             PAGE_TERMS -> "/express/partner/api/legal/data?doc=terms"
             PAGE_PRIVACY -> "/express/partner/api/legal/data?doc=privacy"

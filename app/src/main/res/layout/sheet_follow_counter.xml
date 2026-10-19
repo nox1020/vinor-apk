@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_search_sheet"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/followCounterTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:text="پیشنهاد متقابل"
+        android:textColor="@color/vinor_text"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/followCounterAmount"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_search_field"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center_vertical"
+        android:hint="مبلغ به تومان"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:paddingHorizontal="12dp"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textDirection="ltr"
+        android:textSize="15sp" />
+
+    <EditText
+        android:id="@+id/followCounterTerms"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_search_field"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center_vertical"
+        android:hint="شرایط (اختیاری)"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:paddingHorizontal="12dp"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/followCounterYes"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_hub_start"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn_bold"
+        android:gravity="center"
+        android:text="ثبت"
+        android:textColor="#052E16"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/followCounterNo"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
+        android:text="انصراف"
+        android:textColor="@color/vinor_text"
+        android:textSize="15sp" />
+</LinearLayout>

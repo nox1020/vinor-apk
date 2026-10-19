@@ -31,6 +31,7 @@ object FollowRequests {
         val opensWallet: Boolean = false,
         val json: Boolean = false,
         val form: Boolean = false,
+        val counter: Boolean = false,
     )
 
     data class Counts(val requests: Int, val visits: Int, val deals: Int) {
@@ -67,6 +68,9 @@ object FollowRequests {
         val history: List<PastVisit> = emptyList(),
         val ownerPhone: String = "",
         val archived: Boolean = false,
+        val kind: String = "",
+        val amountText: String = "",
+        val terms: String = "",
     )
 
     fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
@@ -200,15 +204,8 @@ object FollowRequests {
         return feed(payload, tab)
     }
 
+    /** شمارنده همان ردیف‌های روی صفحه است؛ پیشنهاد داخل cards یک‌بار در معامله می‌آید. */
     fun counters(payload: JSONObject): Counts {
-        val given = payload.optJSONObject("tab_counts")
-        if (given != null) {
-            return Counts(
-                requests = countKey(given, "requests"),
-                visits = countKey(given, "visits"),
-                deals = countKey(given, "deals"),
-            )
-        }
         val all = source(payload)
         return Counts(
             requests = all.count { pipelineBucket(it) == "requests" },
@@ -226,35 +223,43 @@ object FollowRequests {
 
     fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)
-        val title = firstText(item, "title", "land_title", "property_title").ifBlank { "پیگیری" }
+        val offer = isOffer(item)
+        val title = firstText(item, "title", "land_title", "property_title").ifBlank {
+            if (offer) "پیشنهاد قیمت" else "پیگیری"
+        }
         val stage = cardStage(item)
         return Card(
             id = id,
             title = title,
             status = displayStatus(item, tab),
-            customer = firstText(item, "customer_name", "customer", "client_name", "buyer_name"),
-            whenText = firstText(item, "visit_when", "when_label", "visit_label", "scheduled_label"),
+            customer = if (offer) "" else firstText(item, "customer_name", "customer", "client_name", "buyer_name"),
+            whenText = if (offer) "" else firstText(item, "visit_when", "when_label", "visit_label", "scheduled_label"),
             landCode = firstText(item, "land_code", "property_code", "file_code"),
-            phone = firstText(item, "customer_phone", "phone", "mobile", "tel"),
-            commission = commissionLine(item),
+            phone = if (offer) offerPhone(item) else firstText(item, "customer_phone", "phone", "mobile", "tel"),
+            commission = if (offer) "" else commissionLine(item),
             actions = actions(item, id, tab),
             stage = stage,
             stageLabel = stageLabel(item, stage),
-            direction = directionOf(item),
-            directionLabel = directionLabel(item),
-            revisitCount = intOf(item, "revisit_count"),
-            updatedAt = ListingWeek.formatWhen(firstText(item, "updated_at")),
-            history = pastVisits(item),
-            ownerPhone = firstText(item, "owner_phone"),
-            archived = ListingArchive.isArchived(item),
+            direction = if (offer) "" else directionOf(item),
+            directionLabel = if (offer) "" else directionLabel(item),
+            revisitCount = if (offer) 0 else intOf(item, "revisit_count"),
+            updatedAt = if (offer) "" else ListingWeek.formatWhen(firstText(item, "updated_at")),
+            history = if (offer) emptyList() else pastVisits(item),
+            ownerPhone = if (offer) "" else firstText(item, "owner_phone"),
+            archived = if (offer) false else ListingArchive.isArchived(item),
+            kind = if (offer) "offer" else "",
+            amountText = if (offer) offerAmountText(item) else "",
+            terms = if (offer) text(item, "terms") else "",
         )
     }
 
     fun dataPath(status: String = ListingArchive.ACTIVE): String =
-        "$DATA_PATH?status=${ListingArchive.normalize(status)}"
+        "$DATA_PATH?status=${ListingArchive.normalize(status)}&offers_in_cards=1"
 
     fun cachePaths(): List<String> = listOf(
         DATA_PATH,
+        "$DATA_PATH?status=${ListingArchive.ACTIVE}",
+        "$DATA_PATH?status=${ListingArchive.ARCHIVED}",
         dataPath(ListingArchive.ACTIVE),
         dataPath(ListingArchive.ARCHIVED),
     )
@@ -397,8 +402,99 @@ object FollowRequests {
 
     fun actions(item: JSONObject, id: String, tab: String = ""): List<Action> {
         if (id.isBlank()) return emptyList()
+        if (isOffer(item)) return offerActions(item, id)
         val built = if (postsToInbox(item)) ownerInboxActions(item, id) else requesterActions(item, id, tab)
         return rankActions(built) + archiveAction(item, id)
+    }
+
+    /** مبلغ و شرایط اختیاری پیشنهاد متقابل. مبلغ خالی یا صفر پست نمی‌شود. */
+    fun withCounter(action: Action, amountRaw: String, termsRaw: String): Action? {
+        val amount = PartnerApi.asciiDigits(amountRaw).toLongOrNull() ?: return null
+        if (amount <= 0L) return null
+        val body = JSONObject()
+        val keys = action.body.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key == "csrf_token" || key == "amount" || key == "terms") continue
+            body.put(key, action.body.optString(key))
+        }
+        if (body.optString("return_to").isBlank()) body.put("return_to", "visits")
+        body.put("amount", amount.toString())
+        val terms = termsRaw.trim()
+        if (terms.isNotEmpty()) body.put("terms", terms)
+        return action.copy(body = body)
+    }
+
+    private fun offerActions(item: JSONObject, id: String): List<Action> {
+        val given = item.optJSONObject("actions")
+        val ret = text(item, "return_to").ifBlank { "visits" }
+        fun path(name: String): String {
+            val raw = given?.optString(name)?.trim().orEmpty()
+            if (raw.isNotBlank() && !raw.equals("null", true)) return raw
+            return "/express/partner/inbox-offers/${id.trim()}/$name"
+        }
+        fun body(): JSONObject = JSONObject().put("return_to", ret)
+        val all = ArrayList<Action>()
+        if (flag(item, "can_accept")) {
+            all.add(
+                Action(
+                    label = "پذیرش",
+                    path = path("accept"),
+                    body = body(),
+                    tone = Tone.PRIMARY,
+                    confirm = "این پیشنهاد پذیرفته شود؟",
+                    form = true,
+                ),
+            )
+        }
+        if (flag(item, "can_reject")) {
+            all.add(
+                Action(
+                    label = "رد",
+                    path = path("reject"),
+                    body = body(),
+                    tone = Tone.DANGER,
+                    confirm = "این پیشنهاد رد شود؟",
+                    form = true,
+                ),
+            )
+        }
+        if (flag(item, "can_counter")) {
+            all.add(
+                Action(
+                    label = "پیشنهاد متقابل",
+                    path = path("counter"),
+                    body = body(),
+                    tone = Tone.SECONDARY,
+                    form = true,
+                    counter = true,
+                ),
+            )
+        }
+        return rankActions(all)
+    }
+
+    private fun isOffer(item: JSONObject): Boolean = text(item, "kind") == "offer"
+
+    private fun offerAmountText(item: JSONObject): String {
+        val amount = WalletWithdraw.money(item, "amount")
+        if (amount <= 0L) return ""
+        return "${PartnerFormat.toman(amount)} تومان"
+    }
+
+    private fun offerPhone(item: JSONObject): String {
+        val partner = text(item, "partner_phone")
+        val raw = partner.ifBlank { text(item, "buyer_phone") }
+        val shown = isolatedDigits(raw)
+        if (shown.isBlank()) return ""
+        val label = if (partner.isNotBlank()) "همکار" else "خریدار"
+        return "$label: $shown"
+    }
+
+    private fun isolatedDigits(raw: String): String {
+        val shown = ListingWeek.persianDigits(raw.trim())
+        if (shown.isBlank()) return ""
+        return "\u2066$shown\u2069"
     }
 
     private fun requesterActions(item: JSONObject, id: String, tab: String): ArrayList<Action> {
@@ -748,7 +844,8 @@ object FollowRequests {
         val out = ArrayList<JSONObject>()
         for (row in rows) {
             val id = idOf(row)
-            if (id.isNotBlank() && !seen.add(id)) continue
+            val key = if (id.isBlank()) "" else if (isOffer(row)) "offer:$id" else id
+            if (key.isNotBlank() && !seen.add(key)) continue
             out.add(row)
         }
         return out
@@ -773,6 +870,7 @@ object FollowRequests {
     }
 
     private fun cardStage(item: JSONObject): String {
+        if (isOffer(item)) return "deal"
         val explicit = knownStage(text(item, "stage"))
         if (explicit.isNotBlank()) return explicit
         val pipe = normalizeStage(firstText(item, "pipeline_tab", "bucket"))
