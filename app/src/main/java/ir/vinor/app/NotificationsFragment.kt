@@ -45,6 +45,7 @@ class NotificationsFragment : Fragment() {
     private var loadGen = 0
     private var rendered = false
     private var skipNextResume = true
+    private var paintedGeneration = -1
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -59,6 +60,8 @@ class NotificationsFragment : Fragment() {
         private const val EMPTY = "اعلانی برای نمایش وجود ندارد."
         private var remembered: JSONObject? = null
         private var sessionStamp = 0
+
+        fun generation(): Int = sessionStamp
 
         fun clearRemembered() {
             remembered = null
@@ -88,14 +91,22 @@ class NotificationsFragment : Fragment() {
         binding.notificationsMarkAll.setOnClickListener {
             markAllRead()
         }
-        remembered?.let {
-            if (paint(it)) rendered = true
+        if (!dropStaleAccountPaint()) {
+            remembered?.let {
+                if (paint(it)) rendered = true
+            }
+            paintedGeneration = sessionStamp
         }
         loadNotifications()
     }
 
     override fun onResume() {
         super.onResume()
+        if (dropStaleAccountPaint()) {
+            skipNextResume = false
+            if (_binding != null) loadNotifications()
+            return
+        }
         if (skipNextResume) {
             skipNextResume = false
             return
@@ -181,6 +192,17 @@ class NotificationsFragment : Fragment() {
         val items = mutableListOf<JSONObject>()
         for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { items.add(it) }
         bind(items)
+        return true
+    }
+
+    private fun dropStaleAccountPaint(): Boolean {
+        if (!AccountPaint.isStale(paintedGeneration, sessionStamp)) return false
+        rendered = false
+        if (_binding != null) {
+            binding.notificationsList.removeAllViews()
+            binding.notificationsEmpty.visibility = View.GONE
+        }
+        paintedGeneration = sessionStamp
         return true
     }
 

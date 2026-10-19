@@ -881,6 +881,11 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    fun forgetPreviousAccount() {
+        clearPageMemory()
+        dropChatForSignedOutAccount()
+    }
+
     private fun clearPageMemory() {
         DashboardFragment.clearRememberedHome()
         SearchFragment.clearRemembered()

@@ -59,6 +59,7 @@ class NativePartnerFragment : Fragment() {
     private var loadGen = 0
     private var pageRendered = false
     private var skipNextResume = true
+    private var paintedGeneration = -1
 
     val page: String
         get() = arguments?.getString(ARG_PAGE).orEmpty().ifBlank { PAGE_TRAINING }
@@ -113,15 +114,23 @@ class NativePartnerFragment : Fragment() {
             searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
             if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
         }
-        rememberedByPage[memoryKey()]?.let {
-            bindPayload(it)
-            pageRendered = true
+        if (!dropStaleAccountPaint()) {
+            rememberedByPage[memoryKey()]?.let {
+                bindPayload(it)
+                pageRendered = true
+            }
+            paintedGeneration = sessionStamp
         }
         load()
     }
 
     override fun onResume() {
         super.onResume()
+        if (dropStaleAccountPaint()) {
+            skipNextResume = false
+            if (page != PAGE_APPLY) load()
+            return
+        }
         if (skipNextResume) {
             skipNextResume = false
             return
@@ -534,6 +543,19 @@ class NativePartnerFragment : Fragment() {
             binding.nativeRefresh.isRefreshing = true
             load(pull = true)
         }
+    }
+
+    private fun dropStaleAccountPaint(): Boolean {
+        if (!AccountPaint.isStale(paintedGeneration, sessionStamp)) return false
+        pageRendered = false
+        lastPayload = JSONObject()
+        followCsrf = ""
+        if (_binding != null) {
+            hideSpecials()
+            binding.nativeList.removeAllViews()
+        }
+        paintedGeneration = sessionStamp
+        return true
     }
 
     private fun memoryKey(): String = when (page) {
@@ -1446,6 +1468,8 @@ class NativePartnerFragment : Fragment() {
 
         private val rememberedByPage = HashMap<String, JSONObject>()
         private var sessionStamp = 0
+
+        fun generation(): Int = sessionStamp
 
         fun clearRemembered() {
             rememberedByPage.clear()

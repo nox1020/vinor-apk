@@ -177,6 +177,7 @@ class LoginStep2Fragment : Fragment() {
                         }
                         val host = activity
                         if (host is MainActivity) {
+                            host.forgetPreviousAccount()
                             host.requestNotificationPermission()
                             val openedLink = host.consumePendingDeepLink()
                             if (ConsultantResume.consume(host)) {
