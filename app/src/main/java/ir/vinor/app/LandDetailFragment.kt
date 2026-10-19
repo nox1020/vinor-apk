@@ -46,7 +46,6 @@ class LandDetailFragment : Fragment() {
     private var selectedPayment = "نقدی"
     private var listingCode = ""
     private var listing = JSONObject()
-    private var bodyExpanded = false
     private var galleryCount = 0
     private var visitSheet: BottomSheetDialog? = null
     private var visitBusy = false
@@ -676,35 +675,9 @@ class LandDetailFragment : Fragment() {
 
     private fun bindBody(raw: String) {
         val text = raw.trim()
-        bodyExpanded = false
         binding.landDetailDescLabel.isVisible = text.isNotBlank()
         binding.landDetailBody.isVisible = text.isNotBlank()
         binding.landDetailBody.text = text
-        if (text.isBlank()) {
-            binding.landDetailMore.isVisible = false
-            return
-        }
-        binding.landDetailBody.maxLines = 5
-        binding.landDetailBody.ellipsize = android.text.TextUtils.TruncateAt.END
-        binding.landDetailBody.post {
-            val b = _binding ?: return@post
-            val layout = b.landDetailBody.layout ?: return@post
-            val needsMore = layout.lineCount >= 5 || b.landDetailBody.lineCount >= 5
-            b.landDetailMore.isVisible = needsMore
-            b.landDetailMore.text = "نمایش بیشتر"
-            b.landDetailMore.setOnClickListener {
-                bodyExpanded = !bodyExpanded
-                if (bodyExpanded) {
-                    b.landDetailBody.maxLines = Integer.MAX_VALUE
-                    b.landDetailBody.ellipsize = null
-                    b.landDetailMore.text = "نمایش کمتر"
-                } else {
-                    b.landDetailBody.maxLines = 5
-                    b.landDetailBody.ellipsize = android.text.TextUtils.TruncateAt.END
-                    b.landDetailMore.text = "نمایش بیشتر"
-                }
-            }
-        }
     }
 
     private fun bindPublish(

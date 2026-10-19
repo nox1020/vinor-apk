@@ -250,20 +250,6 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/landDetailMore"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="6dp"
-                android:fontFamily="@font/vazirmatn"
-                android:paddingVertical="2dp"
-                android:text="نمایش بیشتر"
-                android:textColor="@color/vinor_accent_green"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-
             <LinearLayout
                 android:id="@+id/landDetailPublish"
                 android:layout_width="match_parent"
