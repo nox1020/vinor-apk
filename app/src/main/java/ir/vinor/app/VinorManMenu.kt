@@ -6,6 +6,11 @@ package ir.vinor.app
  */
 object VinorManMenu {
 
+    const val ADVISOR_LABEL = "می‌خواهم بازاریاب وینور شوم"
+    const val ADVISOR_SUBTITLE = "شروع همکاری فروش و دریافت پورسانت"
+    const val ADVISOR_STATUS_LABEL = "وضعیت درخواست"
+    const val ADVISOR_STATUS_SUBTITLE = "پیگیری تأیید همکاری"
+
     const val GROUP_ADS = 1
     const val GROUP_PARTNER = 2
     const val GROUP_SETTINGS = 3
@@ -120,7 +125,8 @@ object VinorManMenu {
                 out += Row(
                     GROUP_PARTNER,
                     "consultant",
-                    "بازاریاب وینور",
+                    ADVISOR_LABEL,
+                    subtitle = ADVISOR_SUBTITLE,
                     destination = "/express/partner/consultant",
                     action = Action.CONSULTANT,
                     requiresLogin = true,
@@ -145,7 +151,8 @@ object VinorManMenu {
             out += Row(
                 GROUP_PARTNER,
                 "consultant_status",
-                "وضعیت درخواست",
+                ADVISOR_STATUS_LABEL,
+                subtitle = ADVISOR_STATUS_SUBTITLE,
                 destination = dest,
                 action = Action.CONSULTANT,
                 requiresLogin = true,

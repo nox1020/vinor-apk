@@ -1417,6 +1417,7 @@ class DashboardFragment : Fragment() {
     private fun bindPrompts(obj: JSONObject, adsCount: Int, reqCount: Int) {
         var prompts = obj.optJSONArray("ai_quick_prompts") ?: JSONArray()
         if (prompts.length() == 0) prompts = defaultPrompts(obj)
+        prompts = HomePrompts.withoutAdvisorBanner(prompts)
         var hero: JSONObject? = null
         val tiles = mutableListOf<JSONObject>()
         for (i in 0 until prompts.length()) {
@@ -1473,38 +1474,7 @@ class DashboardFragment : Fragment() {
 
     private fun defaultPrompts(obj: JSONObject): JSONArray {
         val out = JSONArray()
-        val approved = obj.optBoolean("is_approved")
-        val pending = obj.optBoolean("has_pending_app")
-        val loggedIn = PartnerApi.hasSession() ||
-            obj.optBoolean("is_logged_in") ||
-            obj.optString("me_phone").isNotBlank()
-        if (approved) {
-            // «مشتری دارم» از فوتر افزودن باز می‌شود؛ دکمهٔ خانه حذف شد.
-            return out
-        }
-        if (pending) {
-            out.put(
-                JSONObject()
-                    .put("label", "وضعیت درخواست")
-                    .put("subtitle", "پیگیری تأیید همکاری")
-                    .put("variant", "hero")
-                    .put("icon", "clipboard")
-                    .put("href", "/express/partner/thanks"),
-            )
-        } else {
-            out.put(
-                JSONObject()
-                    .put("label", "می‌خواهم بازاریاب وینور شوم")
-                    .put("subtitle", "شروع همکاری فروش و دریافت پورسانت")
-                    .put("variant", "hero")
-                    .put("icon", "handshake")
-                    .put(
-                        "href",
-                        if (loggedIn) "/express/partner/apply"
-                        else "/express/partner/home?menu=1&login_next=/express/partner/apply",
-                    ),
-            )
-        }
+        if (obj.optBoolean("is_approved")) return out
         out.put(
             JSONObject()
                 .put("label", "سطوح همکاری")
@@ -1522,9 +1492,9 @@ class DashboardFragment : Fragment() {
             return
         }
         binding.dashboardHero.isVisible = true
-        val label = prompt.optString("label").orEmpty().ifBlank { "می‌خواهم بازاریاب وینور شوم" }
         val action = prompt.optString("ui_action").orEmpty()
-        val sub = prompt.optString("subtitle").orEmpty().ifBlank { "شروع همکاری فروش و دریافت پورسانت" }
+        val sub = prompt.optString("subtitle").orEmpty()
+        val label = prompt.optString("label").orEmpty().ifBlank { sub }
         binding.dashboardHeroKicker.isVisible = false
         binding.dashboardHeroSub.isVisible = sub.isNotBlank()
         binding.dashboardHeroSub.text = sub
