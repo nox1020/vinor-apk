@@ -6,8 +6,10 @@ import java.util.Calendar
 import java.util.TimeZone
 
 /**
- * تعیین وقت بازدید در جزئیات ملک، همان قواعد صفحهٔ وب:
- * تاریخ از امروز تا ۹۰ روز، ساعت مجاز تهران، نام و موبایل مشتری.
+ * تعیین وقت بازدید در جزئیات ملک.
+ * تاریخ از امروز تا ۹۰ روز و ساعت مجاز تهران.
+ * خریدار نام و موبایل را از پروفایل می‌فرستد.
+ * بازاریاب نام مشتری، نام خانوادگی و موبایل را اختیاری می‌بیند.
  */
 object LandVisit {
     const val LABEL = "بازدید"
@@ -16,6 +18,18 @@ object LandVisit {
     const val UNAVAILABLE = "امکان ثبت درخواست بازدید برای این ملک وجود ندارد."
     const val NEED_DATE = "لطفاً تاریخ بازدید را انتخاب کنید."
     const val CALENDAR_MISSING = "تقویم بازدید از سرور نیامد. دوباره تلاش کنید."
+    const val PHONE_INVALID = "شماره تماس مشتری معتبر نیست."
+    const val NAME_PLACEHOLDER = "همکار وینور"
+    const val PROFILE_DATA = "/express/partner/profile/data"
+    const val HOME_DATA = "/express/partner/home/data"
+
+    /** نام و موبایل خود کاربر از پروفایل یا خانه. نام جایگزین «همکار وینور» نام واقعی نیست. */
+    data class Identity(
+        val approved: Boolean = false,
+        val first: String = "",
+        val last: String = "",
+        val phone: String = "",
+    )
 
     data class Schedule(
         val requestUrl: String = "",
@@ -213,44 +227,44 @@ object LandVisit {
         }
     }
 
-    /** همان normalizeIranMobileInput وب: فاصله و خط تیره، ارقام فارسی، +98 و 0098. */
+    /**
+     * رقم فارسی/عربی به لاتین، سپس فقط رقم‌ها.
+     * 0098 و 98 و +98 و شمارهٔ ۱۰ رقمیِ ۹… به 09xxxxxxxxx.
+     * فاصله، خط تیره، نقطه و بقیهٔ جداکننده‌ها کنار می‌روند.
+     */
     fun normalizePhone(raw: String): String {
-        val fa = "۰۱۲۳۴۵۶۷۸۹"
-        val ar = "٠١٢٣٤٥٦٧٨٩"
-        val sb = StringBuilder()
-        for (ch in raw.trim()) {
-            if (ch == ' ' || ch == '-' || ch == '−') continue
-            val fi = fa.indexOf(ch)
-            if (fi >= 0) {
-                sb.append(fi)
-                continue
-            }
-            val ai = ar.indexOf(ch)
-            if (ai >= 0) {
-                sb.append(ai)
-                continue
-            }
-            sb.append(ch)
+        val digits = StringBuilder()
+        for (ch in raw) {
+            val latin = latinDigit(ch) ?: continue
+            digits.append(latin)
         }
-        var s = sb.toString()
-        if (s.startsWith("+98")) s = "0" + s.drop(3)
-        if (s.startsWith("0098")) s = "0" + s.drop(4)
-        if (s.startsWith("98") && s.length == 12) s = "0" + s.drop(2)
-        return s
+        var s = digits.toString()
+        if (s.startsWith("0098")) {
+            s = s.drop(4)
+        } else if (s.startsWith("98") && s.length > 10) {
+            s = s.drop(2)
+        }
+        return when {
+            s.startsWith("0") -> if (s.length >= 11) s.take(11) else s
+            s.startsWith("9") -> if (s.length >= 10) "0" + s.take(10) else s
+            else -> s
+        }
     }
 
     fun isValidPhone(raw: String): Boolean = normalizePhone(raw).matches(Regex("^09\\d{9}$"))
 
-    fun customerError(first: String, last: String, phone: String): String {
-        if (first.trim().isEmpty()) return "نام مشتری را وارد کنید."
-        if (last.trim().isEmpty()) return "نام خانوادگی مشتری را وارد کنید."
-        if (phone.trim().isEmpty()) return "شماره تماس مشتری را وارد کنید."
-        if (!isValidPhone(phone)) return "شماره تماس مشتری معتبر نیست."
+    /** بازاریاب: شماره خالی مجاز است و فقط شمارهٔ واقعاً نامعتبر رد می‌شود. خریدار فیلد دستی ندارد. */
+    fun customerError(phone: String, advisor: Boolean): String {
+        if (!advisor || phone.isBlank()) return ""
+        if (!isValidPhone(phone)) return PHONE_INVALID
         return ""
     }
 
-    fun customer(first: String, last: String, phone: String): Customer =
-        Customer(first.trim(), last.trim(), normalizePhone(phone))
+    fun customer(first: String, last: String, phone: String): Customer {
+        val normalized = normalizePhone(phone)
+        val mobile = if (normalized.matches(Regex("^09\\d{9}$"))) normalized else ""
+        return Customer(first.trim(), last.trim(), mobile)
+    }
 
     fun formFields(dateIso: String, customer: Customer): Map<String, String> = linkedMapOf(
         "visit_date" to dateIso,
@@ -258,6 +272,61 @@ object LandVisit {
         "customer_last_name" to customer.last,
         "customer_phone" to customer.phone,
     )
+
+    /**
+     * خریدار: نام و موبایل پروفایل.
+     * بازاریاب: اگر نام مشتری خالی باشد نام خودش؛ موبایل فقط اگر وارد شده باشد.
+     * کلیدها همیشه فرستاده می‌شوند تا سرور قبلی و جدید هر دو همان فرم را ببینند.
+     */
+    fun bookingFields(dateIso: String, typed: Customer, identity: Identity): Map<String, String> {
+        val typedName = identity.approved && (typed.first.isNotEmpty() || typed.last.isNotEmpty())
+        val first = if (typedName) typed.first else identity.first
+        val last = if (typedName) typed.last else identity.last
+        val phone = if (identity.approved) typed.phone else identity.phone
+        return formFields(dateIso, Customer(first, last, phone))
+    }
+
+    fun identity(profile: JSONObject?, home: JSONObject?): Identity {
+        val approved = when {
+            profile != null && profile.has("is_approved") && !profile.isNull("is_approved") ->
+                profile.optBoolean("is_approved")
+            home != null && home.has("is_approved") && !home.isNull("is_approved") ->
+                home.optBoolean("is_approved")
+            else -> false
+        }
+        val name = personName(profile?.optString("me_name")).ifBlank { personName(home?.optString("me_name")) }
+        val (first, last) = splitName(name)
+        val phone = normalizePhone(profile?.optString("me_phone").orEmpty()).let { normalized ->
+            if (normalized.matches(Regex("^09\\d{9}$"))) normalized else ""
+        }
+        return Identity(approved, first, last, phone)
+    }
+
+    fun personName(raw: String?): String {
+        val name = raw?.trim().orEmpty()
+        if (name.isEmpty() || name == NAME_PLACEHOLDER) return ""
+        if (name.none { it.isLetter() }) return ""
+        return name
+    }
+
+    fun splitName(full: String): Pair<String, String> {
+        val clean = full.trim().replace(Regex("\\s+"), " ")
+        if (clean.isEmpty()) return "" to ""
+        val cut = clean.indexOf(' ')
+        if (cut < 0) return clean to ""
+        return clean.substring(0, cut) to clean.substring(cut + 1).trim()
+    }
+
+    private fun latinDigit(ch: Char): Char? {
+        if (ch in '0'..'9') return ch
+        val fa = "۰۱۲۳۴۵۶۷۸۹"
+        val ar = "٠١٢٣٤٥٦٧٨٩"
+        val persian = fa.indexOf(ch)
+        if (persian >= 0) return ('0'.code + persian).toChar()
+        val arabic = ar.indexOf(ch)
+        if (arabic >= 0) return ('0'.code + arabic).toChar()
+        return null
+    }
 
     fun successMessage(payload: JSONObject, selectedIso: String = ""): String {
         val booked = payload.optString("visit_date").trim()

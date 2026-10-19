@@ -328,12 +328,13 @@ class LandDetailFragment : Fragment() {
         binding.landDetailVisit.isEnabled = false
         scope.launch {
             try {
-                val status = withContext(Dispatchers.IO) {
-                    PartnerApi.get(LandVisit.statusPath(Uri.encode(current)), ctx)
+                val loaded = withContext(Dispatchers.IO) {
+                    val status = PartnerApi.get(LandVisit.statusPath(Uri.encode(current)), ctx)
+                    status to visitIdentity(ctx)
                 }
                 if (_binding == null) return@launch
-                when (val outcome = LandVisit.decide(current, status)) {
-                    is LandVisit.Outcome.Ready -> showVisitSheet(outcome.schedule)
+                when (val outcome = LandVisit.decide(current, loaded.first)) {
+                    is LandVisit.Outcome.Ready -> showVisitSheet(outcome.schedule, loaded.second)
                     LandVisit.Outcome.Login -> {
                         (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     }
@@ -359,8 +360,24 @@ class LandDetailFragment : Fragment() {
         }
     }
 
-    private fun showVisitSheet(schedule: LandVisit.Schedule) {
+    private fun visitIdentity(ctx: android.content.Context): LandVisit.Identity {
+        val fresh = runCatching { PartnerApi.get(LandVisit.PROFILE_DATA, ctx) }.getOrNull()
+        val profile = if (
+            fresh != null &&
+            fresh.optInt("http_status", 200) in 200..299 &&
+            fresh.optString("me_phone").isNotBlank()
+        ) {
+            fresh
+        } else {
+            PartnerApi.peekJson(LandVisit.PROFILE_DATA, ctx)
+        }
+        return LandVisit.identity(profile, PartnerApi.peekJson(LandVisit.HOME_DATA, ctx))
+    }
+
+    private fun showVisitSheet(schedule: LandVisit.Schedule, identity: LandVisit.Identity) {
         val sheet = SheetLandVisitBinding.inflate(layoutInflater)
+        val advisor = identity.approved
+        sheet.landVisitCustomer.isVisible = advisor
         val today = LandVisit.todayIso()
         val hour = LandVisit.tehranHour()
         val (minIso, maxIso) = LandVisit.bounds(schedule.minDate, today)
@@ -389,11 +406,7 @@ class LandDetailFragment : Fragment() {
                 ),
             )
             val ready = selected.isNotBlank() &&
-                LandVisit.customerError(
-                    sheet.landVisitFirst.text?.toString().orEmpty(),
-                    sheet.landVisitLast.text?.toString().orEmpty(),
-                    sheet.landVisitPhone.text?.toString().orEmpty(),
-                ).isEmpty()
+                LandVisit.customerError(sheet.landVisitPhone.text?.toString().orEmpty(), advisor).isEmpty()
             sheet.landVisitSubmit.alpha = if (ready) 1f else 0.45f
             val cells = LandVisit.monthCells(
                 year,
@@ -480,26 +493,22 @@ class LandDetailFragment : Fragment() {
                 sheet.landVisitError.text = LandVisit.NEED_DATE
                 return@setOnClickListener
             }
-            val error = LandVisit.customerError(
-                sheet.landVisitFirst.text?.toString().orEmpty(),
-                sheet.landVisitLast.text?.toString().orEmpty(),
-                sheet.landVisitPhone.text?.toString().orEmpty(),
-            )
+            val error = LandVisit.customerError(sheet.landVisitPhone.text?.toString().orEmpty(), advisor)
             if (error.isNotEmpty()) {
                 sheet.landVisitError.isVisible = true
                 sheet.landVisitError.text = error
                 return@setOnClickListener
             }
-            submitVisit(
-                schedule,
-                selected,
+            val typed = if (advisor) {
                 LandVisit.customer(
                     sheet.landVisitFirst.text?.toString().orEmpty(),
                     sheet.landVisitLast.text?.toString().orEmpty(),
                     sheet.landVisitPhone.text?.toString().orEmpty(),
-                ),
-                sheet,
-            )
+                )
+            } else {
+                LandVisit.Customer("", "", "")
+            }
+            submitVisit(schedule, LandVisit.bookingFields(selected, typed, identity), sheet)
         }
         paint()
         val dialog = BottomSheetDialog(requireContext())
@@ -521,8 +530,7 @@ class LandDetailFragment : Fragment() {
 
     private fun submitVisit(
         schedule: LandVisit.Schedule,
-        dateIso: String,
-        customer: LandVisit.Customer,
+        fields: Map<String, String>,
         sheet: SheetLandVisitBinding,
     ) {
         val ctx = context ?: return
@@ -536,7 +544,7 @@ class LandDetailFragment : Fragment() {
                 val resp = withContext(Dispatchers.IO) {
                     PartnerApi.postForm(
                         LandVisit.submitPath(listingCode, schedule.requestUrl),
-                        LandVisit.formFields(dateIso, customer),
+                        fields,
                         schedule.csrf,
                         LandVisit.pagePath(Uri.encode(current)),
                         ctx,
@@ -555,7 +563,7 @@ class LandDetailFragment : Fragment() {
                 }
                 PartnerApi.forget(FollowRequests.DATA_PATH, ctx)
                 NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_REQUESTS)
-                Toast.makeText(ctx, LandVisit.successMessage(resp, dateIso), Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, LandVisit.successMessage(resp, fields["visit_date"].orEmpty()), Toast.LENGTH_LONG).show()
                 visitSheet?.dismiss()
                 val redirect = resp.optString("redirect_url").trim()
                 if (LandVisit.shouldFollowRedirect(redirect)) {

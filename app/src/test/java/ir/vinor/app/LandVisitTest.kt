@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class LandVisitTest {
 
@@ -65,19 +66,86 @@ class LandVisitTest {
     }
 
     @Test
-    fun customerRulesMatchTheWebForm() {
-        assertEquals("نام مشتری را وارد کنید.", LandVisit.customerError("", "رضایی", "09121234567"))
-        assertEquals("نام خانوادگی مشتری را وارد کنید.", LandVisit.customerError("مریم", " ", "09121234567"))
-        assertEquals("شماره تماس مشتری را وارد کنید.", LandVisit.customerError("مریم", "رضایی", ""))
-        assertEquals("شماره تماس مشتری معتبر نیست.", LandVisit.customerError("مریم", "رضایی", "02112345678"))
-        assertEquals("", LandVisit.customerError("مریم", "رضایی", "۰۹۱۲۱۲۳۴۵۶۷"))
+    fun phoneNormalizesSpacesDigitsAndCountryPrefixes() {
+        assertEquals("09123456789", LandVisit.normalizePhone("0912 345 6789"))
+        assertEquals("09123456789", LandVisit.normalizePhone("۰۹۱۲ ۳۴۵ ۶۷۸۹"))
+        assertEquals("09123456789", LandVisit.normalizePhone("٠٩١٢٣٤٥٦٧٨٩"))
+        assertEquals("09123456789", LandVisit.normalizePhone("+98 912 345 6789"))
+        assertEquals("09123456789", LandVisit.normalizePhone("0098-912-345-6789"))
+        assertEquals("09123456789", LandVisit.normalizePhone("98 912 345 6789"))
+        assertEquals("09123456789", LandVisit.normalizePhone("+98 0912 345 6789"))
+        assertEquals("09123456789", LandVisit.normalizePhone("0912\u00A0345\u20136789"))
+        assertEquals("09121234567", LandVisit.normalizePhone("9121234567"))
+        assertEquals("09121234567", LandVisit.normalizePhone("0912.123.4567"))
+        assertEquals("", LandVisit.customerError("0912 345 6789", advisor = true))
+        assertEquals("", LandVisit.customerError("", advisor = true))
+        assertEquals("", LandVisit.customerError("   ", advisor = true))
+        assertEquals(LandVisit.PHONE_INVALID, LandVisit.customerError("02112345678", advisor = true))
+        assertEquals(LandVisit.PHONE_INVALID, LandVisit.customerError("0912", advisor = true))
+        assertEquals("", LandVisit.customerError("02112345678", advisor = false))
         val customer = LandVisit.customer("مریم", "رضایی", "+989121234567")
         assertEquals("09121234567", customer.phone)
-        assertEquals("09121234567", LandVisit.normalizePhone("0098 912-123-4567"))
-        assertEquals("شماره تماس مشتری معتبر نیست.", LandVisit.customerError("مریم", "رضایی", "9121234567"))
-        assertEquals("شماره تماس مشتری معتبر نیست.", LandVisit.customerError("مریم", "رضایی", "0912.123.4567"))
+        assertEquals("", LandVisit.customer("مریم", "رضایی", "021").phone)
         assertEquals("09121234567", LandVisit.formFields("2026-10-11", customer)["customer_phone"])
         assertEquals("2026-10-11", LandVisit.formFields("2026-10-11", customer)["visit_date"])
+    }
+
+    @Test
+    fun buyerSendsProfileNameAndAdvisorKeepsAnOptionalCustomer() {
+        val buyerHome = JSONObject().put("is_approved", false).put("me_name", "سارا محمدی")
+        val buyerProfile = JSONObject()
+            .put("is_approved", false)
+            .put("me_name", LandVisit.NAME_PLACEHOLDER)
+            .put("me_phone", "۰۹۱۲ ۳۴۵ ۶۷۸۹")
+        val buyer = LandVisit.identity(buyerProfile, buyerHome)
+        assertFalse(buyer.approved)
+        assertEquals("سارا", buyer.first)
+        assertEquals("محمدی", buyer.last)
+        assertEquals("09123456789", buyer.phone)
+        val typed = LandVisit.customer("مشتری", "دیگر", "09120000000")
+        val buyerFields = LandVisit.bookingFields("2026-10-11", typed, buyer)
+        assertEquals("سارا", buyerFields["customer_first_name"])
+        assertEquals("محمدی", buyerFields["customer_last_name"])
+        assertEquals("09123456789", buyerFields["customer_phone"])
+
+        val advisor = LandVisit.identity(
+            JSONObject().put("is_approved", true).put("me_name", "همکار وینور").put("me_phone", "09121111111"),
+            JSONObject().put("is_approved", false).put("me_name", "رضا کریمی"),
+        )
+        assertTrue(advisor.approved)
+        assertEquals("رضا", advisor.first)
+        assertEquals("کریمی", advisor.last)
+        val fresh = LandVisit.identity(
+            JSONObject().put("is_approved", true).put("me_name", "نرگس احمدی").put("me_phone", "09120000000"),
+            JSONObject().put("me_name", "نام قدیمی"),
+        )
+        assertEquals("نرگس", fresh.first)
+        assertEquals("احمدی", fresh.last)
+        val empty = LandVisit.bookingFields("2026-10-12", LandVisit.Customer("", "", ""), advisor)
+        assertEquals("رضا", empty["customer_first_name"])
+        assertEquals("کریمی", empty["customer_last_name"])
+        assertEquals("", empty["customer_phone"])
+        val named = LandVisit.bookingFields("2026-10-12", LandVisit.customer("نیما", "", "0912-000-0000"), advisor)
+        assertEquals("نیما", named["customer_first_name"])
+        assertEquals("", named["customer_last_name"])
+        assertEquals("09120000000", named["customer_phone"])
+        assertEquals("", LandVisit.personName("09121234567"))
+        assertEquals("", LandVisit.personName(LandVisit.NAME_PLACEHOLDER))
+        assertEquals("علی", LandVisit.splitName("علی").first)
+        assertEquals("", LandVisit.splitName("علی").second)
+    }
+
+    @Test
+    fun visitSheetKeepsOptionalCustomerFieldsAndCanScroll() {
+        val xml = visitSource("src/main/res/layout/sheet_land_visit.xml").readText()
+        assertTrue(xml.contains("landVisitCustomer"))
+        assertTrue(xml.contains("نام مشتری (اختیاری)"))
+        assertTrue(xml.contains("نام خانوادگی مشتری (اختیاری)"))
+        assertTrue(xml.contains("موبایل"))
+        assertTrue(xml.contains("NestedScrollView"))
+        val fragment = visitSource("src/main/java/ir/vinor/app/LandDetailFragment.kt").readText()
+        assertTrue(fragment.contains("landVisitCustomer.isVisible = advisor"))
+        assertTrue(fragment.contains("LandVisit.bookingFields"))
     }
 
     @Test
@@ -225,5 +293,19 @@ class LandVisitTest {
         } finally {
             ListingRepository.clear()
         }
+    }
+
+    private fun visitSource(relative: String): File {
+        val cwd = File(System.getProperty("user.dir") ?: ".")
+        var dir: File? = cwd
+        repeat(6) {
+            val current = dir ?: return@repeat
+            val direct = File(current, relative)
+            if (direct.isFile) return direct
+            val underApp = File(current, "app/$relative")
+            if (underApp.isFile) return underApp
+            dir = current.parentFile
+        }
+        throw AssertionError("missing $relative from $cwd")
     }
 }

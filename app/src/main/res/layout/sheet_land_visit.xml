@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/bg_search_sheet"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:layoutDirection="rtl"
     android:orientation="vertical"
     android:paddingBottom="16dp">
@@ -157,6 +163,12 @@
         android:textColor="@color/vinor_text_muted"
         android:textSize="13sp" />
 
+    <LinearLayout
+        android:id="@+id/landVisitCustomer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -175,7 +187,7 @@
         android:layout_marginTop="6dp"
         android:background="@drawable/bg_invite_link"
         android:fontFamily="@font/vazirmatn"
-        android:hint="نام مشتری"
+        android:hint="نام مشتری (اختیاری)"
         android:imeOptions="actionNext"
         android:inputType="textPersonName|textCapWords"
         android:minHeight="48dp"
@@ -204,7 +216,7 @@
         android:layout_marginTop="6dp"
         android:background="@drawable/bg_invite_link"
         android:fontFamily="@font/vazirmatn"
-        android:hint="نام خانوادگی مشتری"
+        android:hint="نام خانوادگی مشتری (اختیاری)"
         android:imeOptions="actionNext"
         android:inputType="textPersonName|textCapWords"
         android:minHeight="48dp"
@@ -233,7 +245,7 @@
         android:layout_marginTop="6dp"
         android:background="@drawable/bg_invite_link"
         android:fontFamily="@font/vazirmatn"
-        android:hint="۰۹۱۲…"
+        android:hint="۰۹۱۲… (اختیاری)"
         android:imeOptions="actionDone"
         android:inputType="phone"
         android:minHeight="48dp"
@@ -243,6 +255,8 @@
         android:textColorHint="@color/vinor_text_muted"
         android:textDirection="ltr"
         android:textSize="15sp" />
+
+    </LinearLayout>
 
     <TextView
         android:id="@+id/landVisitError"
@@ -268,3 +282,4 @@
         android:textColor="@color/vinor_customer_bg"
         android:textSize="15sp" />
 </LinearLayout>
+</androidx.core.widget.NestedScrollView>
