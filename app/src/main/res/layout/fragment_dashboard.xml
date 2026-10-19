@@ -115,42 +115,6 @@
                     android:orientation="vertical">
 
                     <LinearLayout
-                        android:id="@+id/dashboardHomeSearch"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginHorizontal="16dp"
-                        android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_search_field"
-                        android:clickable="true"
-                        android:contentDescription="جستجو در فایل‌های وینور"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="14dp">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription=""
-                            android:importantForAccessibility="no"
-                            android:src="@drawable/ic_search_stroke"
-                            app:tint="@color/vinor_text" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:fontFamily="@font/vazirmatn"
-                            android:maxLines="1"
-                            android:text="جستجو در فایل‌های وینور"
-                            android:textAlignment="viewStart"
-                            android:textColor="@color/vinor_text_muted"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
                         android:id="@+id/dashboardWallet"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

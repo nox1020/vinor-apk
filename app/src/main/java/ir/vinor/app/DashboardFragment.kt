@@ -170,9 +170,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
         }
-        binding.dashboardHomeSearch.setOnClickListener {
-            (activity as? MainActivity)?.openSearch()
-        }
         binding.dashboardSuggestSeeAll.setOnClickListener {
             (activity as? MainActivity)?.openSearch()
         }
