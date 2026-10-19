@@ -28,7 +28,6 @@ class MyPropertiesFragment : Fragment() {
     private var loadGen = 0
     private var rendered = false
     private var archiveStatus = ListingArchive.ACTIVE
-    private val archiveBusy = HashSet<String>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (job.isCancelled) {
@@ -187,58 +186,6 @@ class MyPropertiesFragment : Fragment() {
         }
     }
 
-    private fun archive(land: JSONObject) {
-        val code = MyPropertyManage.codeOf(land)
-        val ctx = context ?: return
-        if (code.isBlank()) {
-            android.widget.Toast.makeText(ctx, "کد ملک نامعتبر است.", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!archiveBusy.add(code)) return
-        val restore = ListingArchive.isArchived(land)
-        binding.mpRefresh.isRefreshing = true
-        scope.launch {
-            var handedOff = false
-            try {
-                val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson(ListingArchive.path(restore), ListingArchive.body(code), ctx)
-                }
-                if (_binding == null) return@launch
-                val outcome = ListingArchive.outcome(fresh)
-                if (outcome == ListingArchive.Outcome.UNAUTHORIZED) {
-                    ListingMemory.clearSession()
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
-                    return@launch
-                }
-                android.widget.Toast.makeText(
-                    ctx,
-                    ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."),
-                    android.widget.Toast.LENGTH_LONG,
-                ).show()
-                if (
-                    outcome == ListingArchive.Outcome.OK ||
-                    outcome == ListingArchive.Outcome.NOT_FOUND ||
-                    outcome == ListingArchive.Outcome.FORBIDDEN
-                ) {
-                    ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
-                    clearRemembered()
-                    NativePartnerFragment.forgetPage(NativePartnerFragment.PAGE_LISTINGS)
-                    rendered = false
-                    handedOff = true
-                    load(showSpinner = true)
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                if (_binding != null) {
-                    android.widget.Toast.makeText(ctx, "بایگانی آگهی انجام نشد.", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                archiveBusy.remove(code)
-                if (_binding != null && !handedOff) binding.mpRefresh.isRefreshing = false
-            }
-        }
-    }
-
     private fun addCard(land: JSONObject) {
         val card = ItemLandCardBinding.inflate(layoutInflater, binding.mpList, false)
         card.landCardTitle.text = land.optString("title").ifBlank { "ملک شما" }
@@ -258,11 +205,7 @@ class MyPropertiesFragment : Fragment() {
         val code = MyPropertyManage.codeOf(land)
         val archived = ListingArchive.isArchived(land)
         card.landCardBadge.isVisible = archived
-        card.landCardArchive.isVisible = true
-        card.landCardArchive.text = ListingArchive.actionLabel(archived)
-        card.landCardArchive.contentDescription = card.landCardArchive.text
-        card.landCardArchive.isEnabled = code !in archiveBusy
-        card.landCardArchive.setOnClickListener { archive(land) }
+        card.landCardArchive.isVisible = CARD_ARCHIVE_ACTION
         card.root.setOnClickListener {
             if (code.isNotBlank()) (activity as? MainActivity)?.openMyPropertyManage(land)
         }
@@ -272,6 +215,9 @@ class MyPropertiesFragment : Fragment() {
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     companion object {
+        /** بایگانی از کارت آگهی‌های من برداشته شده؛ همان کار داخل مدیریت ملک مانده است. */
+        internal const val CARD_ARCHIVE_ACTION = false
+
         private val remembered = HashMap<String, JSONObject>()
         private var sessionStamp = 0
 

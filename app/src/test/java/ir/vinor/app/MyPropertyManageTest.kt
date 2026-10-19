@@ -287,6 +287,7 @@ class MyPropertyManageTest {
         )
         assertEquals(ListingArchive.ARCHIVE_PATH, ListingArchive.path(restore = false))
         assertEquals(ListingArchive.RESTORE_PATH, ListingArchive.path(restore = true))
+        assertFalse(MyPropertiesFragment.CARD_ARCHIVE_ACTION)
         assertFalse(ListingArchive.path(restore = false).endsWith("/delete"))
         val body = ListingArchive.body("12")
         assertEquals("12", body.getString("code"))
