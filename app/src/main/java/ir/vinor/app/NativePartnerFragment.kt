@@ -510,12 +510,13 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindRequests(obj: JSONObject) {
-        val counts = FollowRequests.archiveCounts(obj)
-        showArchiveBar(counts.active, counts.archived)
-        val filters = FollowRequests.filters(FollowRequests.counters(obj))
+        binding.nativeArchiveScroll.isVisible = false
+        val counts = FollowRequests.counters(obj)
+        val filters = FollowRequests.filters(counts)
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
-        bindRequestFilters(filters)
-        renderRequestItems(obj, requestFilter)
+        val archivedCount = FollowRequests.archiveCounts(obj).archived
+        bindRequestFilters(FollowRequests.requestChips(counts, archivedCount))
+        renderRequestItems(obj, FollowRequests.listFilter(archiveStatus, requestFilter))
     }
 
     private fun showArchiveBar(active: Int, archived: Int) {
@@ -549,13 +550,28 @@ class NativePartnerFragment : Fragment() {
     private fun bindRequestFilters(filters: List<FollowRequests.Filter>) {
         binding.nativeTabsScroll.isVisible = filters.isNotEmpty()
         binding.nativeTabs.removeAllViews()
-        for (tab in filters) {
-            val on = tab.id == requestFilter
+        val labels = filters.map { "${it.title} ${ListingWeek.persianDigits(it.count)}" }
+        val sample = TextView(requireContext()).apply { textSize = 13f }
+        val pad = dp(8) * 2
+        val gap = dp(6)
+        val needed = labels.sumOf { sample.paint.measureText(it).toInt() + pad } +
+            gap * (filters.size - 1).coerceAtLeast(0)
+        val available = resources.displayMetrics.widthPixels - dp(32)
+        val equal = filters.isNotEmpty() && needed <= available
+        binding.nativeTabsScroll.isFillViewport = equal
+        binding.nativeTabs.layoutParams = binding.nativeTabs.layoutParams.apply {
+            width = if (equal) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+        filters.forEachIndexed { index, tab ->
+            val on = FollowRequests.chipSelected(requestFilter, archiveStatus, tab.id)
             val chip = TextView(requireContext()).apply {
-                text = "${tab.title} ${ListingWeek.persianDigits(tab.count)}"
-                textSize = 14f
+                text = labels[index]
+                textSize = 13f
                 gravity = android.view.Gravity.CENTER
                 minHeight = dp(36)
+                maxLines = 1
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(
                     ContextCompat.getColor(
                         context,
@@ -563,28 +579,53 @@ class NativePartnerFragment : Fragment() {
                     ),
                 )
                 setBackgroundResource(if (on) R.drawable.bg_follow_tab_on else R.drawable.bg_follow_tab)
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-                setOnClickListener {
-                    if (requestFilter == tab.id) return@setOnClickListener
-                    requestFilter = tab.id
-                    bindRequestFilters(filters)
-                    renderRequestItems(lastPayload, requestFilter)
-                }
-                if (on) {
-                    post {
-                        val scroller = binding.nativeTabsScroll
-                        val target = (left + width / 2 - scroller.width / 2).coerceAtLeast(0)
-                        scroller.smoothScrollTo(target, 0)
-                    }
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                setOnClickListener { onRequestChip(tab.id) }
+            }
+            val lp = if (equal) {
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            } else {
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+            }
+            if (index < filters.lastIndex) lp.marginEnd = gap
+            binding.nativeTabs.addView(chip, lp)
+            if (on && !equal) {
+                chip.post {
+                    val scroller = binding.nativeTabsScroll
+                    val target = (chip.left + chip.width / 2 - scroller.width / 2).coerceAtLeast(0)
+                    scroller.smoothScrollTo(target, 0)
                 }
             }
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-            lp.marginEnd = dp(8)
-            binding.nativeTabs.addView(chip, lp)
         }
+    }
+
+    private fun onRequestChip(chipId: String) {
+        val (nextFilter, nextArchive) = FollowRequests.afterChip(requestFilter, archiveStatus, chipId)
+        val archiveChanged = ListingArchive.normalize(nextArchive) != ListingArchive.normalize(archiveStatus)
+        if (!archiveChanged && nextFilter == requestFilter) return
+        requestFilter = nextFilter
+        if (archiveChanged) {
+            switchRequestArchive(nextArchive)
+            return
+        }
+        bindRequests(lastPayload)
+    }
+
+    private fun switchRequestArchive(next: String) {
+        val status = ListingArchive.normalize(next)
+        if (status == archiveStatus) return
+        archiveStatus = status
+        pageRendered = false
+        if (page == PAGE_REQUESTS) followEpoch++
+        rememberedByPage[memoryKey()]?.let {
+            bindPayload(it)
+            pageRendered = true
+        }
+        binding.nativeRefresh.isRefreshing = true
+        load(pull = true)
     }
 
     private fun renderRequestItems(obj: JSONObject, filter: String) {
@@ -1356,7 +1397,7 @@ class NativePartnerFragment : Fragment() {
     }
 
     private fun bindEmpty(msg: String) {
-        val keepArchive = page == PAGE_REQUESTS || page == PAGE_LISTINGS
+        val keepArchive = page == PAGE_LISTINGS
         hideSpecials()
         if (keepArchive) binding.nativeArchiveScroll.isVisible = true
         binding.nativeList.removeAllViews()

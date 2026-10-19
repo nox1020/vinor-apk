@@ -8,6 +8,7 @@ object FollowRequests {
     const val DATA_PATH = "/express/partner/api/requests/data"
     const val PAGE_PATH = "/express/partner/requests"
     const val FILTER_ALL = ""
+    const val ARCHIVE_CHIP = "archive"
     const val EMPTY = "موردی برای پیگیری نیست."
     const val EMPTY_FILTER = "موردی در این بخش نیست."
     const val EMPTY_ARCHIVED = "پیگیری بایگانی‌شده‌ای نیست."
@@ -220,6 +221,32 @@ object FollowRequests {
         Filter("visits", "بازدید", counts.visits),
         Filter("deals", "معامله", counts.deals),
     )
+
+    /** یک ردیف پیگیری: مرحله‌ها به‌اضافهٔ بایگانی. «فعال» در این ردیف نیست. */
+    fun requestChips(counts: Counts, archivedCount: Int): List<Filter> =
+        filters(counts) + Filter(ARCHIVE_CHIP, "بایگانی", archivedCount.coerceAtLeast(0))
+
+    /**
+     * بایگانی نما را عوض می‌کند. «همه» و مرحله‌ها همیشه به آیتم‌های فعال برمی‌گردند.
+     * فیلتر مرحله هنگام ورود به بایگانی حفظ می‌شود تا برگشت همان تب بماند.
+     */
+    fun afterChip(filter: String, archive: String, chipId: String): Pair<String, String> {
+        val status = ListingArchive.normalize(archive)
+        if (chipId == ARCHIVE_CHIP) {
+            val next = if (status == ListingArchive.ARCHIVED) ListingArchive.ACTIVE else ListingArchive.ARCHIVED
+            return filter to next
+        }
+        return chipId to ListingArchive.ACTIVE
+    }
+
+    fun chipSelected(filter: String, archive: String, chipId: String): Boolean {
+        val archived = ListingArchive.normalize(archive) == ListingArchive.ARCHIVED
+        return if (archived) chipId == ARCHIVE_CHIP else chipId == filter
+    }
+
+    /** در نمای بایگانی همهٔ ردیف‌های بایگانی دیده می‌شوند، نه فقط مرحلهٔ قبلی. */
+    fun listFilter(archive: String, filter: String): String =
+        if (ListingArchive.normalize(archive) == ListingArchive.ARCHIVED) FILTER_ALL else filter
 
     fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)

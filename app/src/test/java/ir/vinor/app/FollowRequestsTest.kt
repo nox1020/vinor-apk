@@ -443,6 +443,32 @@ class FollowRequestsTest {
         assertEquals(listOf("", "requests", "visits", "deals"), FollowRequests.filters(counts).map { it.id })
         assertEquals("همه", FollowRequests.filters(counts).first().title)
         assertEquals(rows.size, FollowRequests.filters(counts).first().count)
+        val chips = FollowRequests.requestChips(counts, 5)
+        assertEquals(listOf("", "requests", "visits", "deals", FollowRequests.ARCHIVE_CHIP), chips.map { it.id })
+        assertEquals("بایگانی", chips.last().title)
+        assertEquals(5, chips.last().count)
+        assertTrue(chips.none { it.title == "فعال" })
+        assertEquals(
+            "visits" to ListingArchive.ARCHIVED,
+            FollowRequests.afterChip("visits", ListingArchive.ACTIVE, FollowRequests.ARCHIVE_CHIP),
+        )
+        assertEquals(
+            "visits" to ListingArchive.ACTIVE,
+            FollowRequests.afterChip("visits", ListingArchive.ARCHIVED, FollowRequests.ARCHIVE_CHIP),
+        )
+        assertEquals(
+            "deals" to ListingArchive.ACTIVE,
+            FollowRequests.afterChip("visits", ListingArchive.ARCHIVED, "deals"),
+        )
+        assertEquals(
+            "" to ListingArchive.ACTIVE,
+            FollowRequests.afterChip("deals", ListingArchive.ARCHIVED, FollowRequests.FILTER_ALL),
+        )
+        assertEquals(FollowRequests.FILTER_ALL, FollowRequests.listFilter(ListingArchive.ARCHIVED, "visits"))
+        assertEquals("visits", FollowRequests.listFilter(ListingArchive.ACTIVE, "visits"))
+        assertTrue(FollowRequests.chipSelected("visits", ListingArchive.ARCHIVED, FollowRequests.ARCHIVE_CHIP))
+        assertFalse(FollowRequests.chipSelected("visits", ListingArchive.ARCHIVED, "visits"))
+        assertTrue(FollowRequests.chipSelected("visits", ListingArchive.ACTIVE, "visits"))
         assertEquals(
             "/express/partner/api/requests/data?status=active&offers_in_cards=1",
             FollowRequests.dataPath(),
