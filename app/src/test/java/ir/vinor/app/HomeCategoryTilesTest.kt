@@ -49,6 +49,21 @@ class HomeCategoryTilesTest {
         assertFalse(dash.contains("پیگیری مشتری‌ها"))
     }
 
+    @Test
+    fun suggestedListDropsTheSectionHeaderAndKeepsTheCards() {
+        val xml = source("src/main/res/layout/fragment_dashboard.xml").readText()
+        val block = xml.substring(xml.indexOf("dashboardSuggestBlock"), xml.indexOf("dashboardHero"))
+        assertTrue(block.contains("@+id/dashboardSuggest\""))
+        assertFalse(block.contains("فایل‌های پیشنهادی"))
+        assertFalse(block.contains("مشاهده همه"))
+        assertFalse(block.contains("dashboardSuggestSeeAll"))
+        assertFalse(block.contains("ic_chevron_left"))
+        val dash = source("src/main/java/ir/vinor/app/DashboardFragment.kt").readText()
+        assertFalse(dash.contains("dashboardSuggestSeeAll"))
+        assertTrue(dash.contains("dashboardSuggest"))
+        assertTrue(source("src/main/res/layout/item_home_suggest.xml").isFile)
+    }
+
     private fun source(relative: String): File {
         val cwd = File(System.getProperty("user.dir") ?: ".")
         val roots = ArrayList<File>()

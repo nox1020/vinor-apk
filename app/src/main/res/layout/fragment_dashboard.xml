@@ -486,56 +486,6 @@
                         android:visibility="gone">
 
                         <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="16dp"
-                            android:paddingBottom="10dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:fontFamily="@font/vazirmatn"
-                                android:maxLines="1"
-                                android:text="فایل‌های پیشنهادی"
-                                android:textColor="@color/vinor_text"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <LinearLayout
-                                android:id="@+id/dashboardSuggestSeeAll"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:paddingHorizontal="4dp"
-                                android:paddingVertical="4dp">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:fontFamily="@font/vazirmatn"
-                                    android:text="مشاهده همه"
-                                    android:textColor="@color/vinor_accent_green"
-                                    android:textSize="13sp" />
-
-                                <ImageView
-                                    android:layout_width="16dp"
-                                    android:layout_height="16dp"
-                                    android:layout_marginStart="2dp"
-                                    android:contentDescription=""
-                                    android:src="@drawable/ic_chevron_left"
-                                    app:tint="@color/vinor_accent_green" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <LinearLayout
                             android:id="@+id/dashboardSuggest"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
