@@ -520,7 +520,7 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindRequests(obj: JSONObject) {
         binding.nativeArchiveScroll.isVisible = false
-        val counts = FollowRequests.counters(obj)
+        val counts = FollowRequests.counters(obj, viewerPhone())
         val filters = FollowRequests.filters(counts)
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
         val archivedCount = FollowRequests.archiveCounts(obj).archived
@@ -556,6 +556,11 @@ class NativePartnerFragment : Fragment() {
         }
         paintedGeneration = sessionStamp
         return true
+    }
+
+    private fun viewerPhone(): String {
+        val ctx = context ?: return ""
+        return SessionAccount.captureFromCache(ctx)
     }
 
     private fun memoryKey(): String = when (page) {
@@ -655,7 +660,7 @@ class NativePartnerFragment : Fragment() {
         binding.nativeEmpty.isVisible = false
         val seen = HashSet<String>()
         val rows = ArrayList<FollowRequests.Card>()
-        for (row in FollowRequests.feed(obj, filter)) {
+        for (row in FollowRequests.feed(obj, filter, viewerPhone())) {
             val card = FollowRequests.card(row, filter)
             if (card.id.isNotBlank() && !seen.add(card.id)) continue
             rows.add(card)

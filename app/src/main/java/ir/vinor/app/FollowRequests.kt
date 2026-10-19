@@ -189,26 +189,30 @@ object FollowRequests {
     )
 
     /** لیست واحد. `cards` اگر باشد؛ وگرنه ادغام items و inbox_items و offers. */
-    fun feed(payload: JSONObject, filter: String = FILTER_ALL): List<JSONObject> {
-        val all = source(payload)
+    fun feed(
+        payload: JSONObject,
+        filter: String = FILTER_ALL,
+        viewerPhone: String = "",
+    ): List<JSONObject> {
+        val all = source(payload, viewerPhone)
         val want = normalizeStage(filter)
         if (want.isBlank() || want == "all") return all
         return all.filter { pipelineBucket(it) == want }
     }
 
-    fun items(payload: JSONObject, tab: String): List<JSONObject> {
+    fun items(payload: JSONObject, tab: String, viewerPhone: String = ""): List<JSONObject> {
         val grouped = groupedOf(payload)?.optJSONArray(tab)
         if (grouped != null) return arrayOf(grouped)
         if (tab.isNotBlank()) {
             val named = payload.optJSONArray(tab)
             if (named != null) return arrayOf(named)
         }
-        return feed(payload, tab)
+        return feed(payload, tab, viewerPhone)
     }
 
     /** شمارنده همان ردیف‌های روی صفحه است؛ پیشنهاد داخل cards یک‌بار در معامله می‌آید. */
-    fun counters(payload: JSONObject): Counts {
-        val all = source(payload)
+    fun counters(payload: JSONObject, viewerPhone: String = ""): Counts {
+        val all = source(payload, viewerPhone)
         return Counts(
             requests = all.count { pipelineBucket(it) == "requests" },
             visits = all.count { pipelineBucket(it) == "visits" },
@@ -850,15 +854,24 @@ object FollowRequests {
         return out
     }
 
-    private fun source(payload: JSONObject): List<JSONObject> {
+    /** دریافتی فقط برای مالک همان آگهی. ارسالی مال کسی است که بازدید را ثبت کرده. */
+    fun visibleToViewer(item: JSONObject, viewerPhone: String): Boolean {
+        if (isOffer(item) || text(item, "audience") == "offer") return true
+        if (directionOf(item) != "incoming") return true
+        return VisitAudience.samePhone(firstText(item, "owner_phone"), viewerPhone)
+    }
+
+    private fun source(payload: JSONObject, viewerPhone: String): List<JSONObject> {
         if (payload.has("cards") && !payload.isNull("cards")) {
             val cards = payload.optJSONArray("cards")
-            if (cards != null) return order(dedupe(arrayOf(cards)))
+            if (cards != null) {
+                return order(dedupe(arrayOf(cards))).filter { visibleToViewer(it, viewerPhone) }
+            }
         }
         val merged = ArrayList<JSONObject>()
         merged.addAll(stamped(payload.optJSONArray("inbox_items"), "incoming", ""))
         merged.addAll(stamped(payload.optJSONArray("items"), "outgoing", ""))
-        merged.addAll(stamped(payload.optJSONArray("offers"), "incoming", "deals"))
+        merged.addAll(stamped(payload.optJSONArray("offers"), "incoming", "deals").onEach { it.put("audience", "offer") })
         if (merged.isEmpty()) {
             val grouped = groupedOf(payload)
             if (grouped != null) {
@@ -869,7 +882,7 @@ object FollowRequests {
                 }
             }
         }
-        return order(dedupe(merged))
+        return order(dedupe(merged)).filter { visibleToViewer(it, viewerPhone) }
     }
 
     private fun stamped(array: JSONArray?, direction: String, pipeline: String): List<JSONObject> {

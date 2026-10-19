@@ -101,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         }
         runCatching { VinorCacheSession.fingerprint(this) }
         runCatching { VinorApiCacheStore.warmup(this) }
+        runCatching { SessionAccount.captureFromCache(this) }
         if (StoreListing.allowsPackageInstall()) {
             runCatching { VinorAppUpdateChecker.check(this, webView = null) }
         } else {
@@ -129,6 +130,7 @@ class MainActivity : AppCompatActivity() {
         }
         updateOfflineBanner()
         refreshPartnerFlags()
+        dropForeignVisitTray()
     }
 
     override fun onDestroy() {
@@ -884,6 +886,14 @@ class MainActivity : AppCompatActivity() {
     fun forgetPreviousAccount() {
         clearPageMemory()
         dropChatForSignedOutAccount()
+        VinorNotificationTray.dismissAll(this)
+    }
+
+    private fun dropForeignVisitTray() {
+        if (!VisitAudience.accountMismatch(SessionAccount.phone(this), VinorFcmRegistrar.registeredAudience(this))) {
+            return
+        }
+        VinorNotificationTray.dismissAll(this)
     }
 
     private fun clearPageMemory() {

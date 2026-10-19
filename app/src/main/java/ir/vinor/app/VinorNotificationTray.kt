@@ -102,6 +102,10 @@ object VinorNotificationTray {
         }
     }
 
+    fun dismissAll(context: Context) {
+        NotificationManagerCompat.from(context).cancelAll()
+    }
+
     fun normalizeUrl(raw: String?): String =
         UrlUtils.sanitizeVinorHttpsUrl(raw)
 }

@@ -741,6 +741,9 @@ object PartnerApi {
             appCtx?.let { ctx ->
                 VinorApiCacheStore.clearUser(ctx)
                 VinorAvatarCache.clear(ctx)
+                SessionAccount.clear(ctx)
+                VinorFcmRegistrar.clearAudience(ctx)
+                VinorNotificationTray.dismissAll(ctx)
                 VinorCacheSession.fingerprint(ctx)
             }
         }

@@ -189,8 +189,13 @@ class NotificationsFragment : Fragment() {
         val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
         if (code !in 200..299) return false
         val arr = obj.optJSONArray("notifications") ?: org.json.JSONArray()
+        val me = context?.let { SessionAccount.captureFromCache(it) }.orEmpty()
         val items = mutableListOf<JSONObject>()
-        for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { items.add(it) }
+        for (i in 0 until arr.length()) {
+            val row = arr.optJSONObject(i) ?: continue
+            if (!VisitAudience.showNotification(row, me)) continue
+            items.add(row)
+        }
         bind(items)
         return true
     }

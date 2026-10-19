@@ -24,6 +24,7 @@ object VinorFcmRegistrar {
     private const val PREFS = "vinor_fcm"
     private const val KEY_LAST_TOKEN = "last_token"
     private const val KEY_LAST_SENT = "last_sent_ms"
+    private const val KEY_AUDIENCE = "audience_phone"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = OkHttpClient.Builder()
@@ -112,7 +113,7 @@ object VinorFcmRegistrar {
             } catch (e: Exception) {
                 Log.d(TAG, "FCM unregister failed", e)
             } finally {
-                prefs.edit().remove(KEY_LAST_TOKEN).remove(KEY_LAST_SENT).apply()
+                prefs.edit().remove(KEY_LAST_TOKEN).remove(KEY_LAST_SENT).remove(KEY_AUDIENCE).apply()
                 lastRegisteredToken = null
             }
         }
@@ -179,10 +180,12 @@ object VinorFcmRegistrar {
                 client.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         lastRegisteredToken = tokenTrim
-                        prefs.edit()
+                        val audience = SessionAccount.phone(context)
+                        val edit = prefs.edit()
                             .putString(KEY_LAST_TOKEN, tokenTrim)
                             .putLong(KEY_LAST_SENT, now)
-                            .apply()
+                        if (audience.isNotBlank()) edit.putString(KEY_AUDIENCE, audience)
+                        edit.apply()
                         Log.d(TAG, "FCM token registered")
                     } else {
                         Log.d(TAG, "FCM register HTTP ${resp.code}")
@@ -192,6 +195,20 @@ object VinorFcmRegistrar {
                 Log.d(TAG, "FCM register failed", e)
             }
         }
+    }
+
+    fun registeredAudience(context: Context): String =
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_AUDIENCE, "")
+            .orEmpty()
+
+    fun clearAudience(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_AUDIENCE)
+            .apply()
     }
 
     fun destroy() {

@@ -166,6 +166,7 @@ class LoginStep2Fragment : Fragment() {
                     b.loginStep2Submit.isEnabled = true
                     if (success) {
                         unregisterSmsReceiver()
+                        SessionAccount.remember(requireContext(), phone)
                         PartnerApi.markLoggedIn()
                         VinorFcmRegistrar.registerAfterLogin(requireContext())
                         if (isAdded) {

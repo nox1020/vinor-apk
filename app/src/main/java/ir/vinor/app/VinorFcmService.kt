@@ -31,6 +31,12 @@ class VinorFcmService : FirebaseMessagingService() {
                 ?: message.data["body"]
                 ?: "پیام جدید در وینور اکسپرس"
             val url = message.data["url"]
+            val session = SessionAccount.phone(applicationContext)
+            val registered = VinorFcmRegistrar.registeredAudience(applicationContext)
+            if (!VisitAudience.showPush(message.data, session, registered)) {
+                Log.d(TAG, "drop push — recipient is not the signed-in listing owner")
+                return@runCatching
+            }
 
             Log.d(TAG, "FCM received title=$title foreground=${VinorAppForeground.isInForeground}")
 

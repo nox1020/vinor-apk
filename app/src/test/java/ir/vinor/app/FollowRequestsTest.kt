@@ -38,17 +38,25 @@ class FollowRequestsTest {
             .put("can_complete", 1)
             .put("can_register_result", true)
             .put("can_remove", true)
+            .put("owner_phone", "09120000000")
         val payload = JSONObject()
             .put("items", JSONArray())
             .put(
                 "inbox_items",
                 JSONArray()
                     .put(visit)
-                    .put(JSONObject().put("id", "9").put("pipeline_tab", "requests").put("title", "دیگر")),
+                    .put(
+                        JSONObject()
+                            .put("id", "9")
+                            .put("pipeline_tab", "requests")
+                            .put("title", "دیگر")
+                            .put("owner_phone", "09120000000"),
+                    ),
             )
-        assertEquals(2, FollowRequests.feed(payload).size)
-        assertEquals("دیگر", FollowRequests.feed(payload, "requests").single().optString("title"))
-        val card = FollowRequests.card(FollowRequests.feed(payload, "visits").single())
+        val owner = "09120000000"
+        assertEquals(2, FollowRequests.feed(payload, FollowRequests.FILTER_ALL, owner).size)
+        assertEquals("دیگر", FollowRequests.feed(payload, "requests", owner).single().optString("title"))
+        val card = FollowRequests.card(FollowRequests.feed(payload, "visits", owner).single())
         assertEquals("visit", card.stage)
         assertEquals("بازدید", card.stageLabel)
         assertEquals("incoming", card.direction)
@@ -282,10 +290,11 @@ class FollowRequestsTest {
                     .put("customer", "سارا")
                     .put("customer_phone", "۰۹۱۲۱۲۳۴۵۶۷")
                     .put("property_code", "B2")
-                    .put("visit_when", "پنجشنبه"),
+                    .put("visit_when", "پنجشنبه")
+                    .put("owner_phone", "09120000000"),
             ),
         )
-        val card = FollowRequests.card(FollowRequests.items(inbox, "visit").single())
+        val card = FollowRequests.card(FollowRequests.items(inbox, "visit", "09120000000").single())
         assertEquals("9", card.id)
         assertEquals("سارا", card.customer)
         assertEquals("پنجشنبه", card.whenText)
@@ -553,6 +562,7 @@ class FollowRequestsTest {
             .put("title", "تازه")
             .put("pipeline_tab", "visits")
             .put("direction", "incoming")
+            .put("owner_phone", "09120000000")
             .put("updated_at", "2026-10-16T09:48:00Z")
         val other = JSONObject()
             .put("id", "8")
@@ -562,7 +572,7 @@ class FollowRequestsTest {
         val payload = JSONObject()
             .put("items", JSONArray().put(older).put(other))
             .put("inbox_items", JSONArray().put(newer))
-        val rows = FollowRequests.feed(payload)
+        val rows = FollowRequests.feed(payload, FollowRequests.FILTER_ALL, "09120000000")
         assertEquals(listOf("4", "8"), rows.map { FollowRequests.card(it).id })
         assertEquals("تازه", FollowRequests.card(rows.first()).title)
         assertEquals("incoming", FollowRequests.card(rows.first()).direction)
