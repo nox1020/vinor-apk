@@ -1,16 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="72dp"
-    android:layout_height="72dp"
-    android:layout_marginEnd="8dp">
+    android:layout_width="84dp"
+    android:layout_height="84dp"
+    android:layout_marginEnd="8dp"
+    android:padding="2dp">
 
     <ImageView
         android:id="@+id/mpPhotoThumb"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/bg_attach_thumb"
-        android:contentDescription=""
+        android:clickable="true"
+        android:contentDescription="انتخاب به‌عنوان عکس سرصفحه"
+        android:focusable="true"
         android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/mpPhotoCover"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#CCE22828"
+        android:gravity="center"
+        android:paddingVertical="2dp"
+        android:text="سرصفحه"
+        android:textColor="#FFFFFF"
+        android:textSize="9sp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/mpPhotoRemove"
@@ -19,6 +35,7 @@
         android:layout_gravity="top|start"
         android:layout_margin="4dp"
         android:background="@drawable/bg_mp_submit"
+        android:contentDescription="حذف عکس"
         android:gravity="center"
         android:text="×"
         android:textColor="#FFFFFF"

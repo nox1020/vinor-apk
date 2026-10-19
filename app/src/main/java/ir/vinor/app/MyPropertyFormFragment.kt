@@ -1,5 +1,7 @@
 package ir.vinor.app
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -19,11 +21,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import java.io.File
 import ir.vinor.app.databinding.FragmentMyPropertyFormBinding
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +71,9 @@ class MyPropertyFormFragment : Fragment() {
     private var formDirty = false
     private var bindingForm = false
     private var skipNextResume = true
+    private var photosTouched = false
+    private var galleryGen = 0
+    private var cameraOutput: Uri? = null
 
     private val pickPhotos = registerForActivityResult(
         ActivityResultContracts.GetMultipleContents()
@@ -73,6 +81,18 @@ class MyPropertyFormFragment : Fragment() {
         if (uris.isNullOrEmpty()) return@registerForActivityResult
         val room = (MAX_PHOTOS - photos.size).coerceAtLeast(0)
         uris.take(room).forEach { upload("image", it) }
+    }
+
+    private val takePicture = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = cameraOutput
+        cameraOutput = null
+        if (ok && uri != null) upload("image", uri)
+    }
+
+    private val cameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) launchCamera() else toast("برای گرفتن عکس، دسترسی دوربین لازم است.")
     }
 
     private val pickVideo = registerForActivityResult(
@@ -126,7 +146,7 @@ class MyPropertyFormFragment : Fragment() {
                 toast("حداکثر ۱۲ تصویر")
                 return@setOnClickListener
             }
-            pickPhotos.launch("image/*")
+            choosePhotoSource()
         }
         binding.mpFormVideoPick.setOnClickListener {
             if (video != null) {
@@ -177,6 +197,10 @@ class MyPropertyFormFragment : Fragment() {
         watchDirty(binding.mpFormSize)
         watchDirty(binding.mpFormPrice)
         watchDirty(binding.mpFormCommission)
+        if (editCode.isNotBlank()) {
+            adoptExistingPhotos(runCatching { JSONObject(editSnapshot) }.getOrNull())
+            loadExistingGallery()
+        }
         val memory = rememberedByPath[formPath()]
         if (memory != null) {
             bindMeta(memory)
@@ -405,6 +429,7 @@ class MyPropertyFormFragment : Fragment() {
         if (commission.isNotBlank() && b.mpFormCommission.text.isNullOrBlank()) {
             b.mpFormCommission.setText(commission)
         }
+        adoptExistingPhotos(obj)
     }
 
     private fun selectNamed(spinner: Spinner, items: MutableList<String>, value: String) {
@@ -650,6 +675,7 @@ class MyPropertyFormFragment : Fragment() {
                     else -> {
                         if (photos.size < MAX_PHOTOS) {
                             photos.add(slot)
+                            photosTouched = true
                             bindPhotos()
                         }
                     }
@@ -663,19 +689,100 @@ class MyPropertyFormFragment : Fragment() {
         }
     }
 
+    private fun choosePhotoSource() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("افزودن عکس")
+            .setItems(arrayOf("گالری", "دوربین")) { _, which ->
+                if (which == 0) pickPhotos.launch("image/*") else requestCamera()
+            }
+            .show()
+    }
+
+    private fun requestCamera() {
+        val ctx = context ?: return
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchCamera() {
+        val ctx = context ?: return
+        val dir = File(ctx.cacheDir, "camera").apply { mkdirs() }
+        val file = File.createTempFile("capture_", ".jpg", dir)
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        cameraOutput = uri
+        takePicture.launch(uri)
+    }
+
+    private fun loadExistingGallery() {
+        val code = editCode
+        if (code.isBlank()) return
+        val ctx = context ?: return
+        val path = MyPropertyManage.landDataPath(code)
+        val gen = ++galleryGen
+        scope.launch {
+            val obj = try {
+                withContext(Dispatchers.IO) { PartnerApi.get(path, ctx) }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                return@launch
+            }
+            if (gen != galleryGen || _binding == null || photosTouched) return@launch
+            val status = if (obj.has("http_status")) obj.optInt("http_status") else 200
+            if (status !in 200..299) return@launch
+            adoptExistingPhotos(obj)
+        }
+    }
+
+    private fun adoptExistingPhotos(obj: JSONObject?) {
+        if (photosTouched || obj == null) return
+        val slots = CoverPhotos.slotsFrom(obj)
+        if (slots.isEmpty()) return
+        if (photos.isNotEmpty() && slots.size < photos.size) return
+        photos.clear()
+        slots.forEach { photos.add(MediaSlot(it.path, it.url, it.name)) }
+        if (_binding != null) bindPhotos()
+    }
+
+    private fun coverSlots(): List<CoverPhotos.Slot> =
+        photos.map { CoverPhotos.Slot(it.path, it.url, it.name) }
+
     private fun bindPhotos() {
         val row = binding.mpFormPhotos
         row.removeAllViews()
         binding.mpFormPhotosScroll.isVisible = photos.isNotEmpty()
+        binding.mpFormCoverHint.isVisible = photos.isNotEmpty()
+        binding.mpFormCoverHint.text = when {
+            photos.size > 1 -> "عکس اول سرصفحه است. روی عکس دیگر بزنید تا عوض شود."
+            photos.isNotEmpty() -> "این عکس سرصفحه آگهی است."
+            else -> ""
+        }
         binding.mpFormPhotoHint.text = "حداکثر ۱۲ تصویر · بلافاصله آپلود می‌شود" +
             if (photos.isNotEmpty()) " · ${fa(photos.size)} از ۱۲" else ""
-        photos.forEach { slot ->
+        photos.forEachIndexed { index, slot ->
             val item = layoutInflater.inflate(R.layout.item_mp_photo, row, false)
             val thumb = item.findViewById<ImageView>(R.id.mpPhotoThumb)
+            val cover = index == 0
             PartnerImages.roundClip(thumb, 8f)
             PartnerImages.bind(scope, thumb, slot.url)
+            thumb.contentDescription = if (cover) "عکس سرصفحه" else "انتخاب به‌عنوان عکس سرصفحه"
+            item.setBackgroundResource(if (cover) R.drawable.bg_mp_cover_ring else 0)
+            item.findViewById<TextView>(R.id.mpPhotoCover).isVisible = cover
+            thumb.setOnClickListener {
+                if (index == 0 || photos.size < 2) return@setOnClickListener
+                val next = CoverPhotos.withCover(coverSlots(), index)
+                photos.clear()
+                next.forEach { photos.add(MediaSlot(it.path, it.url, it.name)) }
+                photosTouched = true
+                noteDirty()
+                bindPhotos()
+            }
             item.findViewById<View>(R.id.mpPhotoRemove).setOnClickListener {
                 photos.removeAll { it.path == slot.path }
+                photosTouched = true
+                noteDirty()
                 bindPhotos()
             }
             row.addView(item)
@@ -783,9 +890,9 @@ class MyPropertyFormFragment : Fragment() {
                 }
             }
         }
-        val images = JSONArray()
-        photos.forEach { images.put(it.path) }
-        if (editCode.isBlank() || photos.isNotEmpty()) body.put("images", images)
+        if (CoverPhotos.includeOnSubmit(editCode.isNotBlank(), photosTouched, photos.size)) {
+            body.put("images", CoverPhotos.paths(coverSlots()))
+        }
         if (editCode.isNotBlank()) {
             body.put("code", editCode)
             body.put("update_existing", "1")

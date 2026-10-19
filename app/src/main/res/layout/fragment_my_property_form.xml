@@ -142,6 +142,17 @@
                 </HorizontalScrollView>
 
                 <TextView
+                    android:id="@+id/mpFormCoverHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="6dp"
+                    android:text="عکس اول سرصفحه است. روی عکس دیگر بزنید تا عوض شود."
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="10sp"
+                    android:visibility="gone" />
+
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"

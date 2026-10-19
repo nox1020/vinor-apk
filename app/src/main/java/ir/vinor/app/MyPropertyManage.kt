@@ -323,6 +323,15 @@ object MyPropertyManage {
         if (size > 0L) out.put("size", size.toString())
         val code = text(body, "code")
         if (code.isNotBlank()) out.put("code", code)
+        val images = body.optJSONArray("images")
+        if (images != null && images.length() > 0) {
+            val ordered = CoverPhotos.slotsFrom(JSONObject().put("images", images))
+            if (ordered.isNotEmpty()) {
+                out.put("images", CoverPhotos.displayArray(ordered))
+                val cover = ordered.first().url.ifBlank { CoverPhotos.displayUrl(ordered.first().path) }
+                if (cover.isNotBlank()) out.put("image_url", cover)
+            }
+        }
         return out
     }
 
@@ -372,6 +381,7 @@ object MyPropertyManage {
             val image = imageOf(detail)
             if (image.isNotBlank()) out.put("image_url", image)
         }
+        CoverPhotos.adoptGallery(out, detail)
         ListingWeek.copyOnto(out, detail)
         return out
     }
