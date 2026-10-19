@@ -485,6 +485,13 @@
                         android:orientation="vertical"
                         android:visibility="gone">
 
+                        <View
+                            android:id="@+id/dashboardSuggestDivider"
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginBottom="12dp"
+                            android:background="@color/vinor_border" />
+
                         <LinearLayout
                             android:id="@+id/dashboardSuggest"
                             android:layout_width="match_parent"
