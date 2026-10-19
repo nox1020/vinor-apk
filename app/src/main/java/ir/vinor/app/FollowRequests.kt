@@ -72,6 +72,7 @@ object FollowRequests {
         val kind: String = "",
         val amountText: String = "",
         val terms: String = "",
+        val showLand: Boolean = false,
     )
 
     fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
@@ -277,6 +278,7 @@ object FollowRequests {
             kind = if (offer) "offer" else "",
             amountText = if (offer) offerAmountText(item) else "",
             terms = if (offer) text(item, "terms") else "",
+            showLand = showsLand(item),
         )
     }
 
@@ -431,7 +433,8 @@ object FollowRequests {
         if (id.isBlank()) return emptyList()
         if (isOffer(item)) return offerActions(item, id)
         val built = if (postsToInbox(item)) ownerInboxActions(item, id) else requesterActions(item, id, tab)
-        return rankActions(built) + archiveAction(item, id)
+        val ranked = rankActions(built)
+        return if (showsArchive(item)) ranked + archiveAction(item, id) else ranked
     }
 
     /** مبلغ و شرایط اختیاری پیشنهاد متقابل. مبلغ خالی یا صفر پست نمی‌شود. */
@@ -694,6 +697,23 @@ object FollowRequests {
             }
         }
     }
+
+    /** پرچم غایب یعنی رفتار قبلی: دکمهٔ بایگانی هست. false آن را برمی‌دارد. */
+    private fun showsArchive(item: JSONObject): Boolean {
+        if (isOffer(item) || idBlank(item)) return false
+        if (!item.has("can_archive") || item.isNull("can_archive")) return true
+        return flag(item, "can_archive")
+    }
+
+    /** پرچم غایب یعنی رفتار قبلی: با داشتن کد ملک، «نمایش ملک» هست. */
+    private fun showsLand(item: JSONObject): Boolean {
+        if (isOffer(item)) return false
+        if (firstText(item, "land_code", "property_code", "file_code").isBlank()) return false
+        if (!item.has("can_view_land") || item.isNull("can_view_land")) return true
+        return flag(item, "can_view_land")
+    }
+
+    private fun idBlank(item: JSONObject): Boolean = idOf(item).isBlank()
 
     private fun archiveAction(item: JSONObject, id: String): Action {
         val archived = ListingArchive.isArchived(item)

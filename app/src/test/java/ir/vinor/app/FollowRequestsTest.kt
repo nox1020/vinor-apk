@@ -876,4 +876,64 @@ class FollowRequestsTest {
         )
         assertEquals("معاملهٔ در جریانی برای این کار پیدا نشد.", FollowRequests.userMessage(json))
     }
+
+    @Test
+    fun noShowOwnerArchivesByCardIdAndHiddenLandStaysClosed() {
+        val owner = JSONObject()
+            .put("id", "noshow-private")
+            .put("direction", "incoming")
+            .put("status", "no_show")
+            .put("land_code", "42")
+            .put("can_archive", true)
+            .put("can_view_land", true)
+            .put("land_available", true)
+        val card = FollowRequests.card(owner)
+        assertTrue(card.showLand)
+        val archive = card.actions.single { it.json }
+        assertEquals(FollowRequests.ARCHIVE_LABEL, archive.label)
+        assertEquals("/express/partner/api/requests/noshow-private/archive", archive.path)
+        assertTrue(archive.json)
+        assertFalse(archive.form)
+
+        val hidden = FollowRequests.card(
+            JSONObject()
+                .put("id", "noshow-hidden")
+                .put("direction", "incoming")
+                .put("land_code", "77")
+                .put("can_archive", true)
+                .put("can_view_land", false)
+                .put("land_available", false),
+        )
+        assertFalse(hidden.showLand)
+        assertEquals(
+            "/express/partner/api/requests/noshow-hidden/archive",
+            hidden.actions.single { it.json }.path,
+        )
+
+        val blocked = FollowRequests.card(
+            JSONObject()
+                .put("id", "other")
+                .put("land_code", "1")
+                .put("can_archive", false)
+                .put("can_view_land", false),
+        )
+        assertFalse(blocked.showLand)
+        assertTrue(blocked.actions.none { it.json || it.label == FollowRequests.ARCHIVE_LABEL })
+
+        val legacy = FollowRequests.card(JSONObject().put("id", "9").put("land_code", "3"))
+        assertTrue(legacy.showLand)
+        assertEquals("/express/partner/api/requests/9/archive", legacy.actions.single { it.json }.path)
+
+        val archived = FollowRequests.card(
+            JSONObject()
+                .put("id", "noshow-private")
+                .put("archived", true)
+                .put("can_archive", true)
+                .put("can_view_land", false)
+                .put("land_code", "42"),
+        )
+        assertFalse(archived.showLand)
+        assertEquals(FollowRequests.RESTORE_LABEL, archived.actions.single { it.json }.label)
+        assertEquals("/express/partner/api/requests/noshow-private/restore", archived.actions.single { it.json }.path)
+    }
 }

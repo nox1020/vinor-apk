@@ -859,8 +859,8 @@ class NativePartnerFragment : Fragment() {
             addFollowButton(card, action, index)
         }
         val openPrimary = item.actions.isEmpty()
-        card.requestCardOpen.isVisible = item.landCode.isNotBlank()
-        if (item.landCode.isNotBlank()) {
+        card.requestCardOpen.isVisible = item.showLand
+        if (item.showLand) {
             card.requestCardOpen.setBackgroundResource(
                 if (openPrimary) R.drawable.bg_hub_start else R.drawable.bg_flat_outline_card,
             )

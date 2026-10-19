@@ -10,6 +10,22 @@ import org.junit.Test
 class LandDetailRoleTest {
 
     @Test
+    fun missingListingUsesServerError() {
+        assertEquals(
+            "این آگهی دیگر در دسترس نیست.",
+            LandDetailFragment.missingMessage(JSONObject().put("ok", false).put("http_status", 404).put("error", "این آگهی دیگر در دسترس نیست.")),
+        )
+        assertEquals(
+            "آگهی پیدا نشد.",
+            LandDetailFragment.missingMessage(JSONObject().put("ok", false).put("http_status", 404).put("error", "آگهی پیدا نشد.")),
+        )
+        assertEquals(
+            "آگهی پیدا نشد.",
+            LandDetailFragment.missingMessage(JSONObject().put("ok", false).put("http_status", 404)),
+        )
+    }
+
+    @Test
     fun guest_seesPublicListingAndLoginChat() {
         assertEquals(LandDetailRole.Audience.GUEST, LandDetailRole.audience(false, false))
         assertEquals(LandDetailRole.Audience.GUEST, LandDetailRole.audience(false, true))

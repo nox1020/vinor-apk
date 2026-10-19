@@ -171,7 +171,7 @@ class LandDetailFragment : Fragment() {
                 when {
                     rendered && VinorPageLoad.networkFailed(wasFresh, obj) ->
                         VinorPageLoad.showOffline(binding.root) { load(code) }
-                    !rendered && missing(obj) -> showMissing()
+                    !rendered && missing(obj) -> showMissing(obj)
                     !rendered -> showOffline()
                 }
             } catch (e: Exception) {
@@ -199,10 +199,10 @@ class LandDetailFragment : Fragment() {
         return !obj.optBoolean("ok") && obj.optString("title").isBlank()
     }
 
-    private fun showMissing() {
+    private fun showMissing(obj: JSONObject) {
         val b = _binding ?: return
         b.landDetailError.isVisible = true
-        b.landDetailError.text = "آگهی پیدا نشد."
+        b.landDetailError.text = missingMessage(obj)
     }
 
     private fun showOffline() {
@@ -839,6 +839,12 @@ class LandDetailFragment : Fragment() {
     companion object {
         private val remembered = HashMap<String, JSONObject>()
         private var sessionStamp = 0
+
+        fun missingMessage(payload: JSONObject): String {
+            val error = payload.optString("error").trim()
+            if (error.isNotEmpty() && !error.equals("null", true)) return error
+            return "آگهی پیدا نشد."
+        }
 
         fun clearRemembered() {
             remembered.clear()
