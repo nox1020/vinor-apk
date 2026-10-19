@@ -831,8 +831,7 @@ class NativePartnerFragment : Fragment() {
                     when {
                         action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
                         action.confirm != null -> confirmFollow(action)
-                        action.json -> postJsonAction(action)
-                        else -> postRequest(action.path, action.body)
+                        else -> dispatchFollow(action)
                     }
                 }
             }
@@ -873,7 +872,92 @@ class NativePartnerFragment : Fragment() {
         sheet.followConfirmNo.setOnClickListener { dialog.dismiss() }
         sheet.followConfirmYes.setOnClickListener {
             dialog.dismiss()
-            postRequest(action.path, action.body)
+            dispatchFollow(action)
+        }
+    }
+
+    private fun dispatchFollow(action: FollowRequests.Action) {
+        when {
+            action.json -> postJsonAction(action)
+            action.form -> postInboxAction(action)
+            else -> postRequest(action.path, action.body)
+        }
+    }
+
+    private fun postInboxAction(action: FollowRequests.Action) {
+        val ctx = context ?: return
+        if (followBusy) return
+        setFollowBusy(true)
+        scope.launch {
+            try {
+                var token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx) }
+                var resp = withContext(Dispatchers.IO) {
+                    PartnerApi.postInboxForm(
+                        action.path,
+                        FollowRequests.formFields(action),
+                        token,
+                        FollowRequests.PAGE_PATH,
+                        ctx,
+                    )
+                }
+                if (PartnerCustomers.isCsrfExpired(resp)) {
+                    val rejected = token
+                    val rotated = resp.optString("csrf_token").trim()
+                    followCsrf = rotated.takeIf { it.isNotBlank() && it != rejected }.orEmpty()
+                    token = withContext(Dispatchers.IO) { ensureFollowCsrf(ctx, rejected) }
+                    if (token.isNotBlank() && token != rejected) {
+                        resp = withContext(Dispatchers.IO) {
+                            PartnerApi.postInboxForm(
+                                action.path,
+                                FollowRequests.formFields(action),
+                                token,
+                                FollowRequests.PAGE_PATH,
+                                ctx,
+                            )
+                        }
+                    }
+                }
+                if (_binding == null) return@launch
+                val freshCsrf = resp.optString("csrf_token").trim()
+                if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
+                if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (FollowRequests.isUnauthorized(resp)) {
+                    followCsrf = ""
+                    Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
+                    (activity as? MainActivity)?.openLogin()
+                    return@launch
+                }
+                if (FollowRequests.isOk(resp)) {
+                    val note = FollowRequests.doneMessage(action.path, resp, action.body)
+                    Toast.makeText(
+                        ctx,
+                        note,
+                        if (FollowRequests.listingStillArchived(resp)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT,
+                    ).show()
+                    FollowRequests.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+                    if (FollowRequests.refreshesWallet(action.path)) {
+                        FollowRequests.walletRefreshPaths().forEach { PartnerApi.forget(it, ctx) }
+                    }
+                    if (FollowRequests.movesCard(action.path, action.body)) requestFilter = FollowRequests.FILTER_ALL
+                    forgetPage(PAGE_REQUESTS)
+                    binding.nativeRefresh.isRefreshing = true
+                    followReload = true
+                    followEpoch++
+                    load(pull = true)
+                } else {
+                    Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null) Toast.makeText(ctx, "اتصال برقرار نشد", Toast.LENGTH_SHORT).show()
+            } finally {
+                if (!followReload) {
+                    if (_binding != null) setFollowBusy(false) else followBusy = false
+                }
+            }
         }
     }
 

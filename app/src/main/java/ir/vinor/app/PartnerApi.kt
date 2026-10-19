@@ -408,6 +408,139 @@ object PartnerApi {
         return execute(builder.build())
     }
 
+    /**
+     * POST فرم صندوق پیگیری. ریدایرکت دنبال نمی‌شود تا کوکی فلش قبل از خواندن HTML ذخیره شود.
+     */
+    fun postInboxForm(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context? = null,
+    ): JSONObject {
+        val ctx = context ?: appCtx
+        if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
+            return JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+        return try {
+            var token = csrf.trim()
+            var resp = executeInbox(path, fields, token, refererPath, context)
+            if (PartnerCustomers.isCsrfExpired(resp)) {
+                val next = resp.optString("csrf_token").trim()
+                if (next.isNotBlank() && next != token) {
+                    token = next
+                    resp = executeInbox(path, fields, token, refererPath, context)
+                }
+            }
+            resp
+        } catch (_: Exception) {
+            JSONObject()
+                .put("ok", false)
+                .put("offline", true)
+                .put("http_status", 0)
+                .put("message", "برای انجام این عملیات اینترنت لازم است.")
+        }
+    }
+
+    private val redirectless by lazy {
+        client.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
+    }
+
+    private fun executeInbox(
+        path: String,
+        fields: Map<String, String>,
+        csrf: String,
+        refererPath: String,
+        context: Context?,
+    ): JSONObject {
+        val form = FormBody.Builder()
+        if (csrf.isNotBlank()) form.add("csrf_token", csrf)
+        for ((key, value) in fields) {
+            if (key == "csrf_token") continue
+            form.add(key, value)
+        }
+        val referer = if (refererPath.startsWith("http")) refererPath else PartnerCustomers.ORIGIN + refererPath
+        val builder = requestBuilder(path, context)
+            .post(form.build())
+            .addHeader("X-Requested-With", "XMLHttpRequest")
+            .addHeader("Origin", PartnerCustomers.ORIGIN)
+            .addHeader("Referer", referer)
+        if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        redirectless.newCall(builder.build()).execute().use { resp ->
+            saveCookies(resp)
+            val status = resp.code
+            val postedPath = resp.request.url.encodedPath
+            val location = resp.header("Location").orEmpty().trim()
+            if (status in 300..399 && location.isNotBlank()) {
+                val next = resp.request.url.resolve(location)
+                if (next == null || !vinorHost(next.host)) {
+                    return JSONObject().put("ok", false).put("http_status", status).put("error", "پاسخ نامعتبر")
+                }
+                if (next.encodedPath.startsWith("/express/partner/login")) {
+                    return inboxUnauthorized()
+                }
+                client.newCall(htmlGet(next.toString(), context)).execute().use { page ->
+                    saveCookies(page)
+                    val finalPath = page.request.url.encodedPath
+                    if (finalPath.startsWith("/express/partner/login") || page.code == 401) {
+                        return inboxUnauthorized()
+                    }
+                    return FollowRequests.inboxResponse(
+                        page.code,
+                        page.body?.string().orEmpty(),
+                        finalPath,
+                        redirected = true,
+                    )
+                }
+            }
+            if (status == 401 || postedPath.startsWith("/express/partner/login")) return inboxUnauthorized()
+            return FollowRequests.inboxResponse(
+                status,
+                resp.body?.string().orEmpty(),
+                postedPath,
+                redirected = false,
+            )
+        }
+    }
+
+    private fun htmlGet(url: String, context: Context?): Request {
+        val builder = Request.Builder().url(url).addHeader("Accept", "text/html")
+        val cookie = cookieHeader()
+        if (cookie.isNotBlank()) builder.addHeader("Cookie", cookie)
+        if (context != null) {
+            builder.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
+            VinorUserAgent.webViewLoadHeaders(context).forEach { (key, value) ->
+                builder.addHeader(key, value)
+            }
+        }
+        return builder.get().build()
+    }
+
+    private fun vinorHost(host: String): Boolean {
+        val name = host.trim().lowercase(Locale.US)
+        return name == "vinor.ir" || name.endsWith(".vinor.ir")
+    }
+
+    private fun inboxUnauthorized(): JSONObject {
+        val obj = JSONObject()
+            .put("ok", false)
+            .put("success", false)
+            .put("error", "unauthorized")
+            .put("http_status", 401)
+        if (hasSession()) {
+            obj.put("session_expired", true)
+            expireSession(notifyUi = true)
+        }
+        return obj
+    }
+
     fun getHtml(path: String, context: Context? = null): String {
         val url = if (path.startsWith("http")) path else "$BASE$path"
         val b = Request.Builder()

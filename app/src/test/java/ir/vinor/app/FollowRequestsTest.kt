@@ -60,15 +60,15 @@ class FollowRequestsTest {
         assertEquals("A1", card.landCode)
         assertEquals("علاقه‌مند", card.actions.first().label)
         assertEquals(FollowRequests.Tone.PRIMARY, card.actions.first().tone)
-        assertEquals("/express/partner/requests/15/visit-result", card.actions.first().path)
+        assertTrue(card.actions.first().form)
+        assertEquals("/express/partner/inbox-visits/15/result", card.actions.first().path)
         assertEquals("interested", card.actions.first().body.optString("outcome"))
+        assertEquals("", card.actions.first().body.optString("notes"))
         val done = card.actions.first { it.label == "انجام شد" }
         assertEquals(FollowRequests.Tone.SECONDARY, done.tone)
-        assertEquals("/express/partner/requests/15/complete", done.path)
-        val remove = card.actions.first { it.label == "حذف" }
-        assertEquals(FollowRequests.Tone.DANGER, remove.tone)
-        assertEquals("این مورد از پیگیری حذف شود؟", remove.confirm)
-        assertEquals("/express/partner/requests/15/remove", remove.path)
+        assertEquals("/express/partner/inbox-visits/15/complete", done.path)
+        assertTrue(card.actions.none { it.label == "حذف" })
+        assertTrue(card.actions.any { it.json && it.path == "/express/partner/api/requests/15/archive" })
     }
 
     @Test
@@ -552,5 +552,201 @@ class FollowRequestsTest {
             .put("error_code", "not_found")
             .put("error", "این پیگیری پیدا نشد.")
         assertEquals("این پیگیری پیدا نشد.", FollowRequests.userMessage(missing))
+    }
+
+    @Test
+    fun incomingOwnerCardPostsInboxFormPerAction() {
+        val item = JSONObject()
+            .put("id", "15")
+            .put("direction", "incoming")
+            .put("is_own_request", false)
+            .put("can_approve", true)
+            .put("can_reject", true)
+            .put("can_complete", true)
+            .put("can_no_show", true)
+            .put("can_reject_done", true)
+            .put("can_register_result", true)
+            .put("can_start_deal", true)
+            .put("can_confirm_deal", true)
+            .put("can_approve_deal", true)
+            .put("can_close_deal", true)
+            .put("can_reject_deal", true)
+            .put("can_remove", true)
+            .put("can_revisit", true)
+        val card = FollowRequests.card(item)
+        assertEquals("incoming", card.direction)
+        val byLabel = card.actions.filter { !it.json }.associateBy { it.label }
+        assertEquals("/express/partner/inbox-visits/15/approve", byLabel.getValue("تأیید بازدید").path)
+        assertTrue(byLabel.getValue("تأیید بازدید").form)
+        assertNull(byLabel.getValue("تأیید بازدید").confirm)
+        val reject = byLabel.getValue("رد بازدید")
+        assertEquals("/express/partner/inbox-visits/15/reject", reject.path)
+        assertEquals(FollowRequests.Tone.DANGER, reject.tone)
+        assertEquals("این بازدید رد شود؟", reject.confirm)
+        assertEquals("/express/partner/inbox-visits/15/complete", byLabel.getValue("انجام شد").path)
+        assertEquals("/express/partner/inbox-visits/15/no_show", byLabel.getValue("عدم حضور").path)
+        assertEquals("عدم حضور مشتری ثبت شود؟", byLabel.getValue("عدم حضور").confirm)
+        val redo = byLabel.getValue("رد انجام")
+        assertEquals("/express/partner/inbox-visits/15/reject_done", redo.path)
+        assertEquals("انجام بازدید رد شود؟", redo.confirm)
+        listOf("interested" to "علاقه‌مند", "follow_up" to "پیگیری", "not_interested" to "بی‌علاقه").forEach { (outcome, label) ->
+            val action = byLabel.getValue(label)
+            assertEquals("/express/partner/inbox-visits/15/result", action.path)
+            assertEquals(mapOf("outcome" to outcome, "notes" to ""), FollowRequests.formFields(action))
+        }
+        val start = byLabel.getValue("ثبت معامله")
+        assertEquals("/express/partner/inbox-visits/15/start_deal", start.path)
+        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", start.confirm)
+        val sale = byLabel.getValue("تأیید فروش")
+        assertEquals("/express/partner/inbox-visits/15/approve_deal", sale.path)
+        assertEquals("فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.", sale.confirm)
+        val dealReject = byLabel.getValue("رد معامله")
+        assertEquals("/express/partner/inbox-visits/15/reject_deal", dealReject.path)
+        assertEquals("این معامله رد شود؟", dealReject.confirm)
+        assertTrue(card.actions.none { it.path.endsWith("/confirm_deal") || it.path.endsWith("/close_deal") })
+        assertTrue(card.actions.none { it.path.endsWith("/decline_deal") || it.path.contains("/express/partner/requests/") })
+        assertTrue(card.actions.none { it.label == "حذف" || it.label == "بازدید مجدد" })
+        assertTrue(FollowRequests.refreshesWallet(sale.path))
+    }
+
+    @Test
+    fun aliasedDealFlagsStayHiddenWhenTheSpecificFlagIsSet() {
+        val confirmOnly = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_confirm_deal", true),
+            "3",
+        ).single { it.form }
+        assertEquals("/express/partner/inbox-visits/3/confirm_deal", confirmOnly.path)
+        assertEquals("تأیید نهایی", confirmOnly.label)
+        val closeOnly = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_close_deal", true),
+            "3",
+        ).single { it.form }
+        assertEquals("/express/partner/inbox-visits/3/close_deal", closeOnly.path)
+        val decline = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_reject_deal", true),
+            "3",
+        ).single { it.form }
+        assertEquals("/express/partner/inbox-visits/3/decline_deal", decline.path)
+    }
+
+    @Test
+    fun outgoingCardsKeepJsonRoutesWhenIncomingFlagsArePresent() {
+        val item = JSONObject()
+            .put("id", "15")
+            .put("direction", "outgoing")
+            .put("is_own_request", false)
+            .put("can_approve", true)
+            .put("can_start_deal", true)
+            .put("can_approve_deal", true)
+            .put("can_register_result", true)
+            .put("can_complete", true)
+            .put("can_confirm_deal", true)
+            .put("can_close_deal", true)
+            .put("can_no_show", true)
+            .put("can_remove", true)
+        val actions = FollowRequests.card(item).actions
+        assertTrue(actions.none { it.form || it.path.contains("/inbox-visits/") })
+        assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "تأیید فروش" })
+        assertEquals(
+            "/express/partner/requests/15/visit-result",
+            actions.first { it.label == "علاقه‌مند" }.path,
+        )
+        assertEquals("interested", actions.first { it.label == "علاقه‌مند" }.body.optString("outcome"))
+        assertFalse(actions.first { it.label == "علاقه‌مند" }.form)
+        assertEquals("/express/partner/requests/15/complete", actions.first { it.label == "انجام شد" }.path)
+        assertEquals("/express/partner/requests/15/deal-confirm", actions.first { it.label == "تأیید نهایی" }.path)
+        assertEquals("/express/partner/requests/15/deal-close", actions.first { it.label == "انجام معامله" }.path)
+        assertEquals("/express/partner/requests/15/remove", actions.first { it.label == "حذف" }.path)
+        val ownIncoming = JSONObject()
+            .put("id", "8")
+            .put("direction", "incoming")
+            .put("is_own_request", true)
+            .put("can_complete", true)
+            .put("can_approve", true)
+        val own = FollowRequests.card(ownIncoming).actions
+        assertEquals("/express/partner/requests/8/complete", own.single { !it.json }.path)
+        assertTrue(own.none { it.form || it.label == "تأیید بازدید" })
+    }
+
+    @Test
+    fun missingDirectionUsesOwnRequestAndDoesNotAssumeOutgoing() {
+        val blank = FollowRequests.card(JSONObject().put("id", "1").put("title", "بی‌جهت"))
+        assertEquals("", blank.direction)
+        assertEquals("", blank.directionLabel)
+        val owned = FollowRequests.card(
+            JSONObject().put("id", "2").put("is_own_request", true).put("can_complete", true),
+        )
+        assertEquals("outgoing", owned.direction)
+        assertEquals("ارسالی", owned.directionLabel)
+        assertEquals("/express/partner/requests/2/complete", owned.actions.single { !it.json }.path)
+        val theirs = FollowRequests.card(
+            JSONObject().put("id", "3").put("is_own_request", false).put("can_approve", true),
+        )
+        assertEquals("incoming", theirs.direction)
+        assertEquals("دریافتی", theirs.directionLabel)
+        assertEquals("/express/partner/inbox-visits/3/approve", theirs.actions.single { it.form }.path)
+        val labeled = FollowRequests.card(
+            JSONObject().put("id", "4").put("direction_label", "دریافتی").put("can_reject", true),
+        )
+        assertEquals("incoming", labeled.direction)
+        assertEquals("/express/partner/inbox-visits/4/reject", labeled.actions.single { it.form }.path)
+        val explicit = FollowRequests.card(
+            JSONObject()
+                .put("id", "5")
+                .put("direction", "outgoing")
+                .put("is_own_request", false)
+                .put("can_complete", true),
+        )
+        assertEquals("outgoing", explicit.direction)
+        assertEquals("/express/partner/requests/5/complete", explicit.actions.single { !it.json }.path)
+    }
+
+    @Test
+    fun inboxHtmlRedirectIsSuccessUnlessAWarningFlashIsPresent() {
+        val warning = """
+            <div id="partnerRequestsPage">
+              <div class="rounded-xl border px-4 py-3 text-sm border-amber-500/30 bg-amber-950/30 text-amber-100">
+                اجازه مدیریت این درخواست را ندارید.
+              </div>
+            </div>
+        """.trimIndent()
+        val failed = FollowRequests.inboxResponse(200, warning, "/express/partner/requests", redirected = true)
+        assertFalse(FollowRequests.isOk(failed))
+        assertEquals("اجازه مدیریت این درخواست را ندارید.", FollowRequests.userMessage(failed))
+        val success = """
+            <div id="rqFeed">
+              <div class="rounded-xl border px-4 py-3 text-sm border-emerald-500/30 bg-emerald-950/30 text-emerald-200">
+                بازدید تأیید شد.
+              </div>
+            </div>
+        """.trimIndent()
+        val ok = FollowRequests.inboxResponse(200, success, "/express/partner/requests", redirected = true)
+        assertTrue(FollowRequests.isOk(ok))
+        assertEquals("بازدید تأیید شد.", FollowRequests.doneMessage("/express/partner/inbox-visits/15/approve", ok))
+        val both = warning.replace(
+            "اجازه مدیریت این درخواست را ندارید.",
+            "اجازه مدیریت این درخواست را ندارید.",
+        ) + success
+        val mixed = FollowRequests.inboxResponse(200, both, "/express/partner/requests", redirected = true)
+        assertFalse(FollowRequests.isOk(mixed))
+        val quiet = FollowRequests.inboxResponse(
+            200,
+            "<div id=\"partnerRequestsPage\"></div>",
+            "/express/partner/requests?status=active",
+            redirected = true,
+        )
+        assertTrue(FollowRequests.isOk(quiet))
+        assertEquals("بازدید تأیید شد.", FollowRequests.doneMessage("/express/partner/inbox-visits/15/approve", quiet))
+        val garbage = FollowRequests.inboxResponse(200, "<html>nope</html>", "/express/partner/inbox-visits/15/approve", false)
+        assertFalse(FollowRequests.isOk(garbage))
+        val login = FollowRequests.inboxResponse(200, "<html></html>", "/express/partner/login", true)
+        assertTrue(FollowRequests.isUnauthorized(login))
+        val json = FollowRequests.inboxResponse(
+            400,
+            """{"ok":false,"error":"معاملهٔ در جریانی برای این کار پیدا نشد."}""",
+            "/express/partner/inbox-visits/15/close_deal",
+            false,
+        )
+        assertEquals("معاملهٔ در جریانی برای این کار پیدا نشد.", FollowRequests.userMessage(json))
     }
 }

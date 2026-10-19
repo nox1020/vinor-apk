@@ -30,6 +30,7 @@ object FollowRequests {
         val confirm: String? = null,
         val opensWallet: Boolean = false,
         val json: Boolean = false,
+        val form: Boolean = false,
     )
 
     data class Counts(val requests: Int, val visits: Int, val deals: Int) {
@@ -169,7 +170,12 @@ object FollowRequests {
         return best
     }
 
-    fun refreshesWallet(path: String): Boolean = path.substringBefore('?').endsWith("/deal-close")
+    fun refreshesWallet(path: String): Boolean {
+        val bare = path.substringBefore('?')
+        return bare.endsWith("/deal-close") ||
+            bare.endsWith("/approve_deal") ||
+            bare.endsWith("/close_deal")
+    }
 
     fun walletRefreshPaths(): List<String> = listOf(
         "/express/partner/commissions/data",
@@ -281,16 +287,26 @@ object FollowRequests {
         val bare = path.substringBefore('?')
         val outcome = body.optString("outcome").trim()
         return when {
-            bare.endsWith("/deal-close") -> "معامله انجام شد. پورسانت به کیف پول واریز می‌شود."
-            bare.endsWith("/deal-confirm") -> "تأیید نهایی ثبت شد."
-            bare.endsWith("/deal-reject") -> "معامله رد شد."
+            bare.endsWith("/deal-close") || bare.endsWith("/close_deal") ->
+                "معامله انجام شد. پورسانت به کیف پول واریز می‌شود."
+            bare.endsWith("/deal-confirm") || bare.endsWith("/confirm_deal") -> "تأیید نهایی ثبت شد."
+            bare.endsWith("/deal-reject") || bare.endsWith("/decline_deal") || bare.endsWith("/reject_deal") ->
+                "معامله رد شد."
             bare.endsWith("/remove") -> "از پیگیری حذف شد."
-            bare.endsWith("/no-show") -> "عدم حضور ثبت شد."
+            bare.endsWith("/no-show") || bare.endsWith("/no_show") -> "عدم حضور ثبت شد."
             bare.endsWith("/revisit") -> "بازدید مجدد ثبت شد."
             bare.endsWith("/complete") -> "بازدید انجام شد."
-            bare.endsWith("/visit-result") && outcome == "interested" -> "علاقه‌مندی ثبت شد."
-            bare.endsWith("/visit-result") && outcome == "follow_up" -> "پیگیری ثبت شد."
-            bare.endsWith("/visit-result") && outcome == "not_interested" -> "بی‌علاقگی ثبت شد."
+            bare.endsWith("/approve_deal") -> "فروش تأیید شد."
+            bare.endsWith("/start_deal") -> "معامله ثبت شد."
+            bare.endsWith("/reject_done") -> "انجام بازدید رد شد."
+            bare.endsWith("/approve") -> "بازدید تأیید شد."
+            bare.endsWith("/reject") -> "بازدید رد شد."
+            (bare.endsWith("/visit-result") || bare.endsWith("/result")) && outcome == "interested" ->
+                "علاقه‌مندی ثبت شد."
+            (bare.endsWith("/visit-result") || bare.endsWith("/result")) && outcome == "follow_up" ->
+                "پیگیری ثبت شد."
+            (bare.endsWith("/visit-result") || bare.endsWith("/result")) && outcome == "not_interested" ->
+                "بی‌علاقگی ثبت شد."
             bare.endsWith("/archive") -> "پیگیری بایگانی شد."
             bare.endsWith("/restore") -> "پیگیری به فهرست فعال برگشت."
             else -> "ثبت شد."
@@ -313,8 +329,79 @@ object FollowRequests {
         return Mark.NEUTRAL
     }
 
+    fun formFields(action: Action): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        val keys = action.body.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key == "csrf_token") continue
+            out[key] = action.body.optString(key)
+        }
+        return out
+    }
+
+    /**
+     * نتیجهٔ POST فرم صندوق. ریدایرکت به صفحهٔ پیگیری موفقیت است،
+     * مگر فلش هشدار داخل HTML باشد.
+     */
+    fun inboxResponse(
+        status: Int,
+        body: String,
+        finalPath: String,
+        redirected: Boolean,
+    ): JSONObject {
+        val text = body.trim()
+        if (text.startsWith("{")) {
+            val parsed = runCatching { JSONObject(text) }.getOrNull()
+            if (parsed != null) {
+                if (!parsed.has("http_status")) parsed.put("http_status", status)
+                return parsed
+            }
+        }
+        val path = finalPath.substringBefore('?')
+        if (path.startsWith("/express/partner/login")) {
+            return JSONObject()
+                .put("ok", false)
+                .put("success", false)
+                .put("error", "unauthorized")
+                .put("http_status", 401)
+        }
+        val flashes = htmlFlashes(text)
+        val warnings = flashes.filter { it.first }
+        if (warnings.isNotEmpty()) {
+            val message = warnings.joinToString("\n") { it.second }
+            return JSONObject()
+                .put("ok", false)
+                .put("http_status", 400)
+                .put("error", message)
+                .put("message", message)
+        }
+        val notes = flashes.filter { !it.first }
+        if (notes.isNotEmpty()) {
+            return JSONObject()
+                .put("ok", true)
+                .put("http_status", 200)
+                .put("message", notes.joinToString("\n") { it.second })
+        }
+        val follow = path.contains("/requests") ||
+            text.contains("id=\"partnerRequestsPage\"") ||
+            text.contains("id=\"rqFeed\"")
+        if (redirected && status in 200..299 && follow) {
+            return JSONObject().put("ok", true).put("http_status", 200).put("message", "")
+        }
+        return JSONObject()
+            .put("ok", false)
+            .put("http_status", if (status in 400..599) status else 400)
+            .put("error", "پاسخ نامعتبر")
+    }
+
     fun actions(item: JSONObject, id: String, tab: String = ""): List<Action> {
         if (id.isBlank()) return emptyList()
+        val built = if (postsToInbox(item)) ownerInboxActions(item, id) else requesterActions(item, id, tab)
+        return rankActions(built) + archiveAction(item, id)
+    }
+
+    private fun requesterActions(item: JSONObject, id: String, tab: String): ArrayList<Action> {
         val base = "/express/partner/requests/$id"
         val all = ArrayList<Action>()
         fun add(
@@ -389,12 +476,92 @@ object FollowRequests {
                 ),
             )
         }
-        if (all.none { it.tone == Tone.PRIMARY }) {
-            val index = all.indexOfFirst { it.tone == Tone.SECONDARY }
-            if (index >= 0) all[index] = all[index].copy(tone = Tone.PRIMARY)
+        return all
+    }
+
+    private fun ownerInboxActions(item: JSONObject, id: String): ArrayList<Action> {
+        val all = ArrayList<Action>()
+        fun add(
+            label: String,
+            action: String,
+            tone: Tone,
+            confirm: String? = null,
+            body: JSONObject = JSONObject(),
+        ) {
+            all.add(
+                Action(
+                    label = label,
+                    path = inboxPath(id, action),
+                    body = body,
+                    tone = tone,
+                    confirm = confirm,
+                    form = true,
+                ),
+            )
+        }
+        if (flag(item, "can_register_result")) {
+            add("علاقه‌مند", "result", Tone.PRIMARY, body = resultBody("interested"))
+        }
+        if (flag(item, "can_approve")) add("تأیید بازدید", "approve", Tone.PRIMARY)
+        if (flag(item, "can_complete")) add("انجام شد", "complete", Tone.PRIMARY)
+        val startDeal = flag(item, "can_start_deal")
+        val approveDeal = flag(item, "can_approve_deal")
+        if (startDeal) {
+            add(
+                "ثبت معامله",
+                "start_deal",
+                Tone.PRIMARY,
+                "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
+            )
+        } else if (flag(item, "can_confirm_deal")) {
+            add("تأیید نهایی", "confirm_deal", Tone.PRIMARY, "تأیید نهایی این پرونده ثبت شود؟")
+        }
+        if (approveDeal) {
+            add(
+                "تأیید فروش",
+                "approve_deal",
+                Tone.PRIMARY,
+                "فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.",
+            )
+        } else if (flag(item, "can_close_deal")) {
+            add(
+                "انجام معامله",
+                "close_deal",
+                Tone.SECONDARY,
+                "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
+            )
+        }
+        if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
+        if (flag(item, "can_register_result")) {
+            add("پیگیری", "result", Tone.SECONDARY, body = resultBody("follow_up"))
+            add("بی‌علاقه", "result", Tone.SECONDARY, body = resultBody("not_interested"))
+        }
+        if (flag(item, "can_reject")) add("رد بازدید", "reject", Tone.DANGER, "این بازدید رد شود؟")
+        if (flag(item, "can_reject_done")) add("رد انجام", "reject_done", Tone.DANGER, "انجام بازدید رد شود؟")
+        if (flag(item, "can_reject_deal")) {
+            if (approveDeal) add("رد معامله", "reject_deal", Tone.DANGER, "این معامله رد شود؟")
+            else add("رد معامله", "decline_deal", Tone.DANGER, "این معامله رد شود؟")
+        }
+        return all
+    }
+
+    private fun resultBody(outcome: String): JSONObject =
+        JSONObject().put("outcome", outcome).put("notes", "")
+
+    private fun inboxPath(id: String, action: String): String =
+        "/express/partner/inbox-visits/${id.trim()}/$action"
+
+    private fun postsToInbox(item: JSONObject): Boolean =
+        directionOf(item) == "incoming" && ownRequest(item) != true
+
+    private fun rankActions(all: List<Action>): List<Action> {
+        val ranked = ArrayList(all)
+        if (ranked.none { it.tone == Tone.PRIMARY }) {
+            val index = ranked.indexOfFirst { it.tone == Tone.SECONDARY }
+            if (index >= 0) ranked[index] = ranked[index].copy(tone = Tone.PRIMARY)
         }
         var primarySeen = false
-        val ranked = all.map { action ->
+        return ranked.map { action ->
             if (action.tone != Tone.PRIMARY) action
             else if (!primarySeen) {
                 primarySeen = true
@@ -403,8 +570,11 @@ object FollowRequests {
                 action.copy(tone = Tone.SECONDARY)
             }
         }
+    }
+
+    private fun archiveAction(item: JSONObject, id: String): Action {
         val archived = ListingArchive.isArchived(item)
-        return ranked + Action(
+        return Action(
             label = if (archived) RESTORE_LABEL else ARCHIVE_LABEL,
             path = cardPath(id, archived),
             body = JSONObject(),
@@ -655,13 +825,62 @@ object FollowRequests {
 
     private fun directionOf(item: JSONObject): String {
         val raw = text(item, "direction").lowercase()
-        return if (raw == "incoming") "incoming" else "outgoing"
+        if (raw == "incoming" || raw == "outgoing") return raw
+        when (text(item, "direction_label")) {
+            "دریافتی" -> return "incoming"
+            "ارسالی" -> return "outgoing"
+        }
+        return when (ownRequest(item)) {
+            true -> "outgoing"
+            false -> "incoming"
+            null -> ""
+        }
+    }
+
+    private fun ownRequest(item: JSONObject): Boolean? {
+        if (!item.has("is_own_request") || item.isNull("is_own_request")) return null
+        return flag(item, "is_own_request")
     }
 
     private fun directionLabel(item: JSONObject): String {
         val server = text(item, "direction_label")
         if (server.isNotBlank()) return server
-        return if (directionOf(item) == "incoming") "دریافتی" else "ارسالی"
+        return when (directionOf(item)) {
+            "incoming" -> "دریافتی"
+            "outgoing" -> "ارسالی"
+            else -> ""
+        }
+    }
+
+    private fun htmlFlashes(html: String): List<Pair<Boolean, String>> {
+        val out = ArrayList<Pair<Boolean, String>>()
+        val blocks = Regex(
+            """<div\b([^>]*\bclass\s*=\s*["'][^"']*(?:border-amber|border-emerald)[^"']*["'][^>]*)>(.*?)</div>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        val classAttr = Regex("""class\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
+        for (match in blocks.findAll(html)) {
+            val cls = classAttr.find(match.groupValues[1])?.groupValues?.get(1).orEmpty()
+            if (!cls.contains("rounded-xl")) continue
+            val warning = cls.contains("border-amber")
+            val success = cls.contains("border-emerald")
+            if (!warning && !success) continue
+            val inner = unescapeHtml(match.groupValues[2].replace(Regex("<[^>]+>"), " "))
+            if (inner.isEmpty()) continue
+            out.add(warning to inner)
+        }
+        return out
+    }
+
+    private fun unescapeHtml(raw: String): String {
+        return raw
+            .replace("&#39;", "'")
+            .replace("&quot;", "\"")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun pastVisits(item: JSONObject): List<PastVisit> {
