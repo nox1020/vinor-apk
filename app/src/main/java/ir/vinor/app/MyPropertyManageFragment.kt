@@ -38,6 +38,9 @@ class MyPropertyManageFragment : Fragment() {
     private var busy = false
     private var publishBusy = false
     private var selectedPayment = "نقدی"
+    private var saleFetchedAt = 0L
+    private var saleSubtitle: TextView? = null
+    private val saleTicker = Runnable { tickSaleCountdown() }
     private var loadGen = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -64,7 +67,16 @@ class MyPropertyManageFragment : Fragment() {
         loadDetail()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (_binding == null) return
+        paintSaleCountdown()
+        scheduleSaleTicker()
+    }
+
     override fun onDestroyView() {
+        _binding?.root?.removeCallbacks(saleTicker)
+        saleSubtitle = null
         sheetDialog?.dismiss()
         sheetDialog = null
         job.cancel()
@@ -102,6 +114,7 @@ class MyPropertyManageFragment : Fragment() {
     private fun bindRows() {
         val host = _binding?.mpManageActions ?: return
         host.removeAllViews()
+        saleSubtitle = null
         val price = MyPropertyManage.priceOf(snapshot)
         val published = MyPropertyManage.isPublished(snapshot)
         val archived = ListingArchive.isArchived(snapshot)
@@ -118,8 +131,11 @@ class MyPropertyManageFragment : Fragment() {
                 MyPropertyManage.Action.STATS -> ""
                 else -> ""
             }
-            row.itemProfileLinkSubtitle.isVisible = subtitle.isNotBlank()
-            row.itemProfileLinkSubtitle.text = subtitle
+            val countdown = if (action == MyPropertyManage.Action.PUBLISH) saleLabel() else null
+            val line = if (action == MyPropertyManage.Action.PUBLISH) countdown.orEmpty() else subtitle
+            row.itemProfileLinkSubtitle.isVisible = line.isNotBlank()
+            row.itemProfileLinkSubtitle.text = line
+            if (action == MyPropertyManage.Action.PUBLISH) saleSubtitle = row.itemProfileLinkSubtitle
             val icon = when (action) {
                 MyPropertyManage.Action.VIEW -> R.drawable.ic_home
                 MyPropertyManage.Action.STATS -> R.drawable.ic_commissions
@@ -135,9 +151,49 @@ class MyPropertyManageFragment : Fragment() {
             row.itemProfileLinkChevron.isVisible = !spinning
             row.root.isEnabled = !busy
             row.root.setOnClickListener { onAction(action) }
-            row.root.contentDescription = label
+            row.root.contentDescription = if (action == MyPropertyManage.Action.PUBLISH && !countdown.isNullOrBlank()) {
+                "$label، $countdown"
+            } else {
+                label
+            }
             host.addView(row.root)
         }
+        scheduleSaleTicker()
+    }
+
+    private fun saleLabel(now: Long = System.currentTimeMillis()): String? {
+        if (saleFetchedAt == 0L && SalePublishCountdown.hasSignal(snapshot)) saleFetchedAt = now
+        return SalePublishCountdown.label(
+            MyPropertyManage.isPublished(snapshot),
+            snapshot,
+            saleFetchedAt,
+            now,
+        )
+    }
+
+    private fun resetSaleClock(now: Long = System.currentTimeMillis()) {
+        saleFetchedAt = if (SalePublishCountdown.hasSignal(snapshot)) now else 0L
+    }
+
+    private fun paintSaleCountdown() {
+        val view = saleSubtitle ?: return
+        val text = saleLabel().orEmpty()
+        view.isVisible = text.isNotBlank()
+        view.text = text
+    }
+
+    private fun scheduleSaleTicker() {
+        val root = _binding?.root ?: return
+        root.removeCallbacks(saleTicker)
+        if (SalePublishCountdown.isLiveCountdown(saleSubtitle?.text?.toString())) {
+            root.postDelayed(saleTicker, SalePublishCountdown.TICK_MS)
+        }
+    }
+
+    private fun tickSaleCountdown() {
+        if (_binding == null) return
+        paintSaleCountdown()
+        scheduleSaleTicker()
     }
 
     private fun openStats() {
@@ -225,7 +281,9 @@ class MyPropertyManageFragment : Fragment() {
     }
 
     private fun applyDetail(fresh: JSONObject) {
+        val carried = SalePublishCountdown.carries(fresh)
         snapshot = MyPropertyManage.applyListingDetail(snapshot, fresh)
+        if (carried) resetSaleClock()
         persistSnapshot()
         bindPreview()
         bindRows()
@@ -365,7 +423,11 @@ class MyPropertyManageFragment : Fragment() {
                 }
                 if (MyPropertyManage.publishAccepted(fresh, land)) {
                     if (land != null) snapshot = MyPropertyManage.mergeDetail(snapshot, land)
+                    val clock = land?.takeIf { SalePublishCountdown.carries(it) }
+                        ?: SalePublishCountdown.propertyClock(fresh, code)
+                    if (clock != null) SalePublishCountdown.copyOnto(snapshot, clock)
                     MyPropertyManage.markPublished(snapshot, true)
+                    if (clock != null) resetSaleClock()
                     ListingMemory.syncPublished(MyPropertyManage.codeOf(snapshot), true, ctx)
                     persistSnapshot()
                     bindPreview()

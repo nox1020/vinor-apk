@@ -294,6 +294,7 @@ object MyPropertyManage {
         if (detail.has("can_publish")) out.put("can_publish", detail.optBoolean("can_publish"))
         Listings.adoptCode(out, detail)
         markPublished(out, Listings.published(detail))
+        SalePublishCountdown.copyOnto(out, detail)
         return out
     }
 
@@ -383,6 +384,7 @@ object MyPropertyManage {
         }
         CoverPhotos.adoptGallery(out, detail)
         ListingWeek.copyOnto(out, detail)
+        SalePublishCountdown.copyOnto(out, detail)
         return out
     }
 
