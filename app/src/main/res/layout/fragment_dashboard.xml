@@ -320,48 +320,43 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <LinearLayout
+                    <HorizontalScrollView
                         android:id="@+id/dashboardShortcuts"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="16dp"
                         android:layout_marginTop="12dp"
-                        android:orientation="vertical">
+                        android:clipToPadding="false"
+                        android:fillViewport="false"
+                        android:layoutDirection="rtl"
+                        android:overScrollMode="never"
+                        android:scrollbars="none">
 
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:baselineAligned="false"
-                            android:orientation="horizontal">
+                            android:layoutDirection="rtl"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="16dp">
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutTrain"
-                                android:layout_width="0dp"
-                                android:layout_height="118dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_dash_tile"
+                                android:layout_width="80dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="12dp"
                                 android:clickable="true"
-                                android:contentDescription="آموزش فروش"
+                                android:contentDescription="آموزش"
                                 android:focusable="true"
                                 android:gravity="center_horizontal"
-                                android:orientation="vertical"
-                                android:paddingHorizontal="8dp"
-                                android:paddingTop="16dp"
-                                android:paddingBottom="12dp">
+                                android:orientation="vertical">
 
                                 <FrameLayout
-                                    android:layout_width="56dp"
-                                    android:layout_height="52dp">
-
-                                    <View
-                                        android:layout_width="48dp"
-                                        android:layout_height="48dp"
-                                        android:layout_gravity="center"
-                                        android:background="@drawable/bg_tile_icon_glow" />
+                                    android:layout_width="64dp"
+                                    android:layout_height="64dp"
+                                    android:background="@drawable/bg_home_category">
 
                                     <ImageView
-                                        android:layout_width="36dp"
-                                        android:layout_height="36dp"
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
                                         android:layout_gravity="center"
                                         android:contentDescription=""
                                         android:importantForAccessibility="no"
@@ -370,53 +365,36 @@
 
                                 <TextView
                                     android:layout_width="match_parent"
-                                    android:layout_height="0dp"
-                                    android:layout_marginTop="6dp"
-                                    android:layout_weight="1"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
                                     android:ellipsize="end"
-                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:fontFamily="@font/vazirmatn"
                                     android:gravity="center"
-                                    android:maxLines="1"
-                                    android:text="آموزش فروش"
+                                    android:maxLines="2"
+                                    android:text="آموزش"
                                     android:textColor="@color/vinor_text"
-                                    app:autoSizeMaxTextSize="15sp"
-                                    app:autoSizeMinTextSize="11sp"
-                                    app:autoSizeStepGranularity="1sp"
-                                    app:autoSizeTextType="uniform" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
-
-                            <View
-                                android:layout_width="12dp"
-                                android:layout_height="1dp" />
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutNews"
-                                android:layout_width="0dp"
-                                android:layout_height="118dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_dash_tile"
+                                android:layout_width="80dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="12dp"
                                 android:clickable="true"
-                                android:contentDescription="خبر وینور"
+                                android:contentDescription="خبر"
                                 android:focusable="true"
                                 android:gravity="center_horizontal"
-                                android:orientation="vertical"
-                                android:paddingHorizontal="8dp"
-                                android:paddingTop="16dp"
-                                android:paddingBottom="12dp">
+                                android:orientation="vertical">
 
                                 <FrameLayout
-                                    android:layout_width="56dp"
-                                    android:layout_height="52dp">
-
-                                    <View
-                                        android:layout_width="48dp"
-                                        android:layout_height="48dp"
-                                        android:layout_gravity="center"
-                                        android:background="@drawable/bg_tile_icon_glow" />
+                                    android:layout_width="64dp"
+                                    android:layout_height="64dp"
+                                    android:background="@drawable/bg_home_category">
 
                                     <ImageView
-                                        android:layout_width="34dp"
-                                        android:layout_height="34dp"
+                                        android:layout_width="30dp"
+                                        android:layout_height="30dp"
                                         android:layout_gravity="center"
                                         android:contentDescription=""
                                         android:importantForAccessibility="no"
@@ -425,54 +403,36 @@
 
                                 <TextView
                                     android:layout_width="match_parent"
-                                    android:layout_height="0dp"
-                                    android:layout_marginTop="6dp"
-                                    android:layout_weight="1"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
                                     android:ellipsize="end"
-                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:fontFamily="@font/vazirmatn"
                                     android:gravity="center"
-                                    android:maxLines="1"
-                                    android:text="خبر وینور"
+                                    android:maxLines="2"
+                                    android:text="خبر"
                                     android:textColor="@color/vinor_text"
-                                    app:autoSizeMaxTextSize="15sp"
-                                    app:autoSizeMinTextSize="11sp"
-                                    app:autoSizeStepGranularity="1sp"
-                                    app:autoSizeTextType="uniform" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
-
-                            <View
-                                android:layout_width="12dp"
-                                android:layout_height="1dp" />
 
                             <LinearLayout
                                 android:id="@+id/dashboardShortcutFollow"
-                                android:layout_width="0dp"
-                                android:layout_height="118dp"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_dash_tile"
+                                android:layout_width="80dp"
+                                android:layout_height="wrap_content"
                                 android:clickable="true"
-                                android:contentDescription="پیگیری مشتری‌ها"
+                                android:contentDescription="پیگیری"
                                 android:focusable="true"
                                 android:gravity="center_horizontal"
-                                android:orientation="vertical"
-                                android:paddingHorizontal="6dp"
-                                android:paddingTop="16dp"
-                                android:paddingBottom="12dp">
+                                android:orientation="vertical">
 
                                 <FrameLayout
-                                    android:layout_width="56dp"
-                                    android:layout_height="52dp"
+                                    android:layout_width="64dp"
+                                    android:layout_height="64dp"
+                                    android:background="@drawable/bg_home_category"
                                     android:layoutDirection="ltr">
 
-                                    <View
-                                        android:layout_width="48dp"
-                                        android:layout_height="48dp"
-                                        android:layout_gravity="center"
-                                        android:background="@drawable/bg_tile_icon_glow" />
-
                                     <ImageView
-                                        android:layout_width="30dp"
-                                        android:layout_height="30dp"
+                                        android:layout_width="28dp"
+                                        android:layout_height="28dp"
                                         android:layout_gravity="center"
                                         android:contentDescription=""
                                         android:importantForAccessibility="no"
@@ -481,38 +441,36 @@
                                     <TextView
                                         android:id="@+id/dashboardFollowBadge"
                                         android:layout_width="wrap_content"
-                                        android:layout_height="22dp"
+                                        android:layout_height="18dp"
                                         android:layout_gravity="top|end"
+                                        android:layout_marginTop="4dp"
+                                        android:layout_marginEnd="4dp"
                                         android:background="@drawable/bg_tile_badge"
                                         android:fontFamily="@font/vazirmatn_bold"
                                         android:gravity="center"
                                         android:includeFontPadding="false"
-                                        android:minWidth="22dp"
+                                        android:minWidth="18dp"
                                         android:paddingHorizontal="4dp"
                                         android:textColor="@color/vinor_on_primary"
-                                        android:textSize="12sp"
+                                        android:textSize="10sp"
                                         android:visibility="gone" />
                                 </FrameLayout>
 
                                 <TextView
                                     android:id="@+id/dashboardShortcutFollowTitle"
                                     android:layout_width="match_parent"
-                                    android:layout_height="0dp"
-                                    android:layout_marginTop="6dp"
-                                    android:layout_weight="1"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="8dp"
                                     android:ellipsize="end"
-                                    android:fontFamily="@font/vazirmatn_bold"
+                                    android:fontFamily="@font/vazirmatn"
                                     android:gravity="center"
-                                    android:maxLines="1"
-                                    android:text="پیگیری مشتری‌ها"
+                                    android:maxLines="2"
+                                    android:text="پیگیری"
                                     android:textColor="@color/vinor_text"
-                                    app:autoSizeMaxTextSize="15sp"
-                                    app:autoSizeMinTextSize="10sp"
-                                    app:autoSizeStepGranularity="1sp"
-                                    app:autoSizeTextType="uniform" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
                         </LinearLayout>
-                    </LinearLayout>
+                    </HorizontalScrollView>
 
                     <LinearLayout
                         android:id="@+id/dashboardSuggestBlock"

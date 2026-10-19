@@ -1313,8 +1313,8 @@ class DashboardFragment : Fragment() {
             binding.dashboardPerfDeals.text = PartnerFormat.toman(HomePulse.deals(obj))
             binding.dashboardPerfVisits.text = PartnerFormat.toman(HomePulse.visits(obj))
             binding.dashboardPerfCustomers.text = PartnerFormat.toman(HomePulse.customers(obj))
-            binding.dashboardShortcutFollowTitle.text = "پیگیری مشتری‌ها"
-            binding.dashboardShortcutFollow.contentDescription = "پیگیری مشتری‌ها"
+            binding.dashboardShortcutFollowTitle.text = "پیگیری"
+            binding.dashboardShortcutFollow.contentDescription = "پیگیری"
             binding.dashboardFollowBadge.isVisible = reqCount > 0
             if (reqCount > 0) binding.dashboardFollowBadge.text = PartnerFormat.toman(reqCount)
             binding.dashboardShortcutFollow.setOnClickListener {
