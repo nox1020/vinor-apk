@@ -55,10 +55,11 @@ class HomeSearchBoxTest {
         assertTrue(dash.contains("setOnRefreshListener { onPullRefresh() }"))
         assertTrue(dash.contains("search.refreshAds"))
         assertTrue(search.contains("load(forceSkeleton = rememberedAds == null)"))
-        assertTrue(search.contains("PartnerApi.get(\"/express/partner/api/public-lands\", ctx)"))
-        assertTrue(search.contains("PartnerApi.get(\"/express/partner/dashboard/data\", ctx)"))
+        assertTrue(search.contains("PartnerApi.getFresh(\"/express/partner/api/public-lands\", ctx)"))
+        assertTrue(search.contains("PartnerApi.getFresh(\"/express/partner/dashboard/data\", ctx)"))
         assertTrue(search.contains("SearchAds.fromObjects(publicPayload.optJSONArray(\"public_lands\")"))
         assertTrue(search.contains("SearchAds.fromObjects(dashboardPayload.optJSONArray(\"public_lands\")"))
+        assertTrue(search.contains("SearchAds.fromObjects(home.optJSONArray(\"public_lands\")"))
     }
 
     @Test
