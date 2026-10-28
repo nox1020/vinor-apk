@@ -254,11 +254,6 @@ class SearchFragment : Fragment() {
         }
         ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
         render()
-        _binding?.searchList?.let { rows ->
-            homeScroll?.post {
-                homeScroll?.smoothScrollTo(0, rows.top + binding.searchRefresh.top + binding.searchScroll.top)
-            }
-        }
     }
 
     private fun clearFilters() {
