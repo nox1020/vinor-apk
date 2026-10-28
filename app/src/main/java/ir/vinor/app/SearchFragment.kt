@@ -83,6 +83,20 @@ class SearchFragment : Fragment() {
         // هنگام نمایش در خانه، اسکرول و کشیدن برای رفرش را صفحهٔ والد مدیریت می‌کند.
         binding.searchRefresh.isEnabled = false
         binding.searchScroll.isNestedScrollingEnabled = false
+        // Remove both the inner scrolling and the nested refresh gestures entirely.
+        // The parent dashboardScroll is the only gesture/scroll owner for ads.
+        val content = binding.searchScroll.getChildAt(0)
+        if (content != null) {
+            binding.searchScroll.removeView(content)
+            binding.searchRefresh.isVisible = false
+            binding.root.addView(
+                content,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
         homeScroll = (parentFragment as? DashboardFragment)?.view?.findViewById(R.id.dashboardScroll)
         homeScroll?.viewTreeObserver?.addOnScrollChangedListener(scrollListener)
@@ -138,9 +152,32 @@ class SearchFragment : Fragment() {
             runCatching { outer.viewTreeObserver.removeOnScrollChangedListener(scrollListener) }
         }
         homeScroll = null
+        // These views belong to our binding; release the dashboard host on teardown.
+        val host = (parentFragment as? DashboardFragment)?.searchHeaderHost()
+        if (host != null) {
+            listOf(binding.searchHeader, binding.searchChipScroll, binding.searchHeaderBorder).forEach {
+                if (it.parent === host) host.removeView(it)
+            }
+        }
         job.cancel()
         super.onDestroyView()
         _binding = null
+    }
+
+    /** Reparent the actual filter controls into the fixed header above the home feed. */
+    fun attachToHomeHeader(host: LinearLayout) {
+        val b = _binding ?: return
+        for (control in listOf(b.searchHeader, b.searchChipScroll, b.searchHeaderBorder)) {
+            if (control.parent === host) continue
+            (control.parent as? ViewGroup)?.removeView(control)
+            host.addView(
+                control,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
     }
 
     fun refreshAds() {
