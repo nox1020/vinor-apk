@@ -48,6 +48,7 @@ class ProfileFragment : Fragment() {
     private var skipNextResume = true
     private var shimmer: ValueAnimator? = null
     private var shimmerPrimed = false
+    private var summaryFetchGen = -1
 
     private sealed class ViewState {
         data object Loading : ViewState()
@@ -84,6 +85,27 @@ class ProfileFragment : Fragment() {
             }
         }
         binding.profileAvatarFrame.clipToOutline = true
+        binding.profileNotifications.setOnClickListener {
+            if (PartnerApi.hasSession()) (activity as? MainActivity)?.openNotifications()
+            else openLoginScreen()
+        }
+        binding.profileSummaryWallet.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/commissions")
+        }
+        binding.profileQuickTraining.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/training")
+        }
+        binding.profileQuickNews.setOnClickListener {
+            (activity as? MainActivity)?.openPath("/express/partner/news")
+        }
+        binding.profileQuickFollow.setOnClickListener {
+            val path = if (latestProfile?.optBoolean("is_approved") == true) {
+                "/express/partner/requests"
+            } else {
+                "/express/partner/levels"
+            }
+            (activity as? MainActivity)?.openPath(path)
+        }
         binding.profileGuestLogin.setOnClickListener { openLoginScreen() }
         binding.profileRetry.setOnClickListener { loadData(forceSkeleton = true) }
         rememberedProfile?.let { applyPayload(it, loadGen) }
@@ -109,6 +131,7 @@ class ProfileFragment : Fragment() {
     override fun onDestroyView() {
         stopShimmer()
         shimmerPrimed = false
+        summaryFetchGen = -1
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -175,7 +198,34 @@ class ProfileFragment : Fragment() {
             ),
         )
         refreshUnread(gen, profile, name)
+        refreshWorkSummary(gen, obj)
         return true
+    }
+
+    /** Live account figures use the same home/data contract as the former home dashboard. */
+    private fun refreshWorkSummary(gen: Int, profile: JSONObject) {
+        val b = _binding ?: return
+        val approved = profile.optBoolean("is_approved")
+        b.profileSummaryWallet.isVisible = approved
+        b.profileSummaryPerformance.isVisible = approved
+        b.profileQuickFollow.text = if (approved) "پیگیری" else "سطوح"
+        if (!approved || summaryFetchGen == gen) return
+        summaryFetchGen = gen
+        val currentStamp = sessionStamp
+        val ctx = context ?: return
+        scope.launch {
+            val home = withContext(Dispatchers.IO) {
+                runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
+            } ?: return@launch
+            if (_binding == null || gen != loadGen || sessionStamp != currentStamp) return@launch
+            val code = if (home.has("http_status")) home.optInt("http_status") else 200
+            if (code !in 200..299 || home.optBoolean("offline") || home.optBoolean("session_expired")) return@launch
+            val current = _binding ?: return@launch
+            current.profileSummaryAmount.text = PartnerFormat.toman(HomePulse.withdrawable(home)) + " تومان"
+            current.profileSummaryCustomers.text = PartnerFormat.toman(HomePulse.customers(home))
+            current.profileSummaryVisits.text = PartnerFormat.toman(HomePulse.visits(home))
+            current.profileSummaryDeals.text = PartnerFormat.toman(HomePulse.deals(home))
+        }
     }
 
     private fun menuProfile(obj: JSONObject, crm: Boolean, unread: Int): VinorManMenu.Profile {
@@ -218,6 +268,7 @@ class ProfileFragment : Fragment() {
                 b.profileGuest.isVisible = false
                 b.profileError.isVisible = false
                 b.profileRow.isVisible = false
+                b.profileWorkSummary.isVisible = false
                 b.profileMenu.isVisible = false
                 startShimmer()
             }
@@ -228,6 +279,7 @@ class ProfileFragment : Fragment() {
                 b.profileGuest.isVisible = true
                 b.profileError.isVisible = false
                 b.profileRow.isVisible = false
+                b.profileWorkSummary.isVisible = false
                 b.profileMenu.isVisible = true
                 renderRows(VinorManMenu.rows(state.profile, PHASE_A_FLAGS), state.profile)
             }
@@ -238,6 +290,7 @@ class ProfileFragment : Fragment() {
                 b.profileGuest.isVisible = false
                 b.profileError.isVisible = false
                 b.profileRow.isVisible = true
+                b.profileWorkSummary.isVisible = true
                 b.profileMenu.isVisible = true
                 b.profileName.text = state.name
                 b.profilePhone.text = state.maskedPhone
@@ -256,6 +309,7 @@ class ProfileFragment : Fragment() {
                 b.profileGuest.isVisible = false
                 b.profileError.isVisible = true
                 b.profileRow.isVisible = false
+                b.profileWorkSummary.isVisible = false
                 b.profileMenu.isVisible = true
                 renderRows(VinorManMenu.supportRows(), VinorManMenu.Profile(loggedIn = false))
             }
