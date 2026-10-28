@@ -140,6 +140,7 @@ class DashboardFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        installHomeSearch()
         binding.dashboardMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.dashboardBrand.setOnClickListener {
             (activity as? MainActivity)?.closeDrawer()
@@ -222,6 +223,26 @@ class DashboardFragment : Fragment() {
         loadAll(forceSkeleton = !homeRendered)
     }
 
+    /** ابزار کامل جستجو داخل اسکرول خانه است، نه یک مقصد مستقل در ناوبری. */
+    private fun installHomeSearch() {
+        if (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) != null) return
+        childFragmentManager.beginTransaction()
+            .replace(R.id.dashboardSearchContainer, SearchFragment())
+            .commitNow()
+    }
+
+    /** مقصد لینک‌های جستجوی قدیمی، همین بخش از خانه است. */
+    fun revealHomeSearch() {
+        showHomeEntry()
+        val b = _binding ?: return
+        b.dashboardScroll.post {
+            if (_binding == null) return@post
+            b.dashboardScroll.smoothScrollTo(0, b.dashboardSearchContainer.top)
+            (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment)
+                ?.focusInput()
+        }
+    }
+
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         val snap = rememberedHome ?: return
@@ -276,6 +297,7 @@ class DashboardFragment : Fragment() {
             return
         }
         loadAll(fromPull = true)
+        (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment)?.refreshAds()
     }
 
     private fun finishRefreshUi() {
@@ -1328,7 +1350,8 @@ class DashboardFragment : Fragment() {
 
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         bindPrompts(obj, adsCount, reqCount)
-        bindSuggest(obj)
+        // ردیف پیشنهادها با فهرست کامل جستجوی خانه تکراری است.
+        binding.dashboardSuggestBlock.isVisible = false
         binding.dashboardTiles.isVisible = false
     }
 
