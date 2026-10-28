@@ -260,6 +260,17 @@ class SearchQueryTest {
         assertEquals(listOf("تازه", "قدیمی"), SearchAds.apply(ads, SearchQuery()).map { it.title })
         val again = SearchAds.dedupe(ads + ads.first())
         assertEquals(2, again.size)
+        // Public and Home endpoints can describe the same code with
+        // different timestamps and prices: only one visible card is allowed.
+        val duplicate = SearchAd(
+            title = "عنوان به‌روزشده",
+            priceRaw = "۴٬۰۰۰٬۰۰۰٬۰۰۰",
+            token = "2",
+            source = "vinor",
+            createdAt = 99L,
+        )
+        val originals = SearchAds.fromObjects(array)
+        assertEquals(2, SearchAds.dedupe(originals + duplicate).size)
     }
 
     @Test
