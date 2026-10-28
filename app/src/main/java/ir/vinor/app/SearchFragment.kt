@@ -19,6 +19,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
@@ -40,7 +41,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** تب جستجو — پیش‌فرض همه استان‌ها، آگهی‌های منتشرشده از جدید به قدیم. */
+/** بخش جستجوی خانه؛ پیش‌فرض همه استان‌ها و آگهی‌های منتشرشده از جدید به قدیم. */
 class SearchFragment : Fragment() {
 
     private var _binding: FragmentSearchBinding? = null
@@ -58,6 +59,7 @@ class SearchFragment : Fragment() {
     private var sheetDialog: BottomSheetDialog? = null
     private var loadGen = 0
     private var skipNextResume = true
+    private var homeScroll: ScrollView? = null
 
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener {
         if (_binding == null || !isAdded) return@OnScrollChangedListener
@@ -78,7 +80,12 @@ class SearchFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
         binding.searchRefresh.setProgressBackgroundColorSchemeColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
+        // هنگام نمایش در خانه، اسکرول و کشیدن برای رفرش را صفحهٔ والد مدیریت می‌کند.
+        binding.searchRefresh.isEnabled = false
+        binding.searchScroll.isNestedScrollingEnabled = false
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
+        homeScroll = (parentFragment as? DashboardFragment)?.view?.findViewById(R.id.dashboardScroll)
+        homeScroll?.viewTreeObserver?.addOnScrollChangedListener(scrollListener)
         binding.searchClear.setOnClickListener {
             binding.searchInput.setText("")
             binding.searchInput.requestFocus()
@@ -127,9 +134,21 @@ class SearchFragment : Fragment() {
         sheetDialog?.dismiss()
         sheetDialog = null
         runCatching { binding.searchScroll.viewTreeObserver.removeOnScrollChangedListener(scrollListener) }
+        homeScroll?.let { outer ->
+            runCatching { outer.viewTreeObserver.removeOnScrollChangedListener(scrollListener) }
+        }
+        homeScroll = null
         job.cancel()
         super.onDestroyView()
         _binding = null
+    }
+
+    fun refreshAds() {
+        if (_binding != null) load(forceSkeleton = !hasSnapshot)
+    }
+
+    fun focusInput() {
+        _binding?.searchInput?.requestFocus()
     }
 
     private fun load(fromPull: Boolean = false, forceSkeleton: Boolean = false) {
@@ -235,7 +254,11 @@ class SearchFragment : Fragment() {
         }
         ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
         render()
-        _binding?.searchScroll?.scrollTo(0, 0)
+        _binding?.searchList?.let { rows ->
+            homeScroll?.post {
+                homeScroll?.smoothScrollTo(0, rows.top + binding.searchRefresh.top + binding.searchScroll.top)
+            }
+        }
     }
 
     private fun clearFilters() {
@@ -373,7 +396,7 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         val extra = (80 * resources.displayMetrics.density).toInt()
         val vis = Rect()
-        if (!b.searchScroll.getGlobalVisibleRect(vis)) return
+        if (!(homeScroll ?: b.searchScroll).getGlobalVisibleRect(vis)) return
         vis.inset(0, -extra)
         val childBox = Rect()
         for (i in 0 until b.searchList.childCount) {
