@@ -309,7 +309,6 @@ class DashboardFragment : Fragment() {
             return
         }
         refreshHomeAds()
-        loadAll(fromPull = true)
     }
 
     /** The explicit button and swipe use the same property-feed refresh path. */
@@ -320,6 +319,7 @@ class DashboardFragment : Fragment() {
             return
         }
         b.dashboardRefresh.isRefreshing = true
+        loadAll(fromPull = true)
         val search = childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment
         if (search == null) {
             finishRefreshUi()
