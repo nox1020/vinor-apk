@@ -329,7 +329,95 @@ jobs:
             echo "Android aapt not found"
             exit 1
           fi
-          BADGING="$("$AAPT" dump badging "$APK" | head -n 1)"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          BADGING="${BADGING%%
+          echo "$BADGING"
+          if [[ "$BADGING" != *"versionName='$VERSION'"* || "$BADGING" != *"versionCode='$VERSION_CODE'"* ]]; then
+            echo "APK version does not match computed build version: $VERSION ($VERSION_CODE)"
+            exit 1
+          fi
+          echo "STORE_VERSION=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "### Signed APK version: $VERSION (code $VERSION_CODE)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rename APK to include version
+        shell: bash
+        run: |
+          APK_DIR="app/build/outputs/apk/sideload/release"
+          SRC_APK="$(ls -1 "$APK_DIR"/*.apk | head -n 1)"
+          if [ -z "$SRC_APK" ]; then
+            echo "No APK found in $APK_DIR"
+            exit 1
+          fi
+          DEST_APK="$APK_DIR/vinor-${{ steps.version.outputs.VERSION }}.apk"
+          mv "$SRC_APK" "$DEST_APK"
+          echo "Renamed to: $DEST_APK"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinor-direct-apk
+          path: app/build/outputs/apk/sideload/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # فایل .aab با باز کردن در گوشی نصب نمی‌شود و خطای «مشکلی در تجزیه بسته» می‌دهد؛ فقط APK را برای سایدلود استفاده کنید.
+      - name: Sideload hint (APK vs AAB)
+        run: |
+          {
+            echo "## Android sideload — APK vs AAB"
+            echo ""
+            echo "| Artifact | Install by opening on phone? |"
+            echo "|----------|--------------------------------|"
+            echo "| **vinor-direct-apk** (\`.apk\`) | Yes — sideload from vinor.ir |"
+            echo "| **vinor-bazaar-apk** (\`.apk\`) | Cafe Bazaar upload only |"
+            echo "| **vinor-play-aab** (\`.aab\`) | **No** — Play Console only; opening it on a phone shows a parse error |"
+            echo ""
+            echo "### فارسی"
+            echo "برای نصب دستی فقط **vinor-direct-apk** را بگیرید. **vinor-bazaar-apk** برای پنل کافه‌بازار است و **vinor-play-aab** فقط برای کنسول پلی."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rename Bazaar APK
+        shell: bash
+        run: |
+          APK_DIR="app/build/outputs/apk/bazaar/release"
+          SRC_APK="$(ls -1 "$APK_DIR"/*.apk | head -n 1)"
+          if [ -z "$SRC_APK" ]; then
+            echo "No Bazaar APK found in $APK_DIR"
+            exit 1
+          fi
+          mv "$SRC_APK" "$APK_DIR/vinor-${{ steps.version.outputs.STORE_VERSION }}-bazaar.apk"
+
+      - name: Upload Bazaar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinor-bazaar-apk
+          path: app/build/outputs/apk/bazaar/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rename Play App Bundle
+        shell: bash
+        run: |
+          AAB_DIR="app/build/outputs/bundle/playRelease"
+          SRC_AAB="$(ls -1 "$AAB_DIR"/*.aab | head -n 1)"
+          if [ -z "$SRC_AAB" ]; then
+            echo "No Play AAB found in $AAB_DIR"
+            exit 1
+          fi
+          mv "$SRC_AAB" "$AAB_DIR/vinor-${{ steps.version.outputs.STORE_VERSION }}-play.aab"
+
+      - name: Upload Play App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinor-play-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+
+\n'*}"
           echo "$BADGING"
           if [[ "$BADGING" != *"versionName='$VERSION'"* || "$BADGING" != *"versionCode='$VERSION_CODE'"* ]]; then
             echo "APK version does not match computed build version: $VERSION ($VERSION_CODE)"
