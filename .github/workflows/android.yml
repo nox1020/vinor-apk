@@ -304,16 +304,40 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: ./gradlew :app:assembleSideloadRelease :app:assembleBazaarRelease :app:bundlePlayRelease --stacktrace --no-daemon
 
-      - name: Read version name
+      - name: Verify signed APK version and derive artifact name
         id: version
         shell: bash
         run: |
-          VERSION="$(head -n1 version.txt | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-          if [ -z "$VERSION" ]; then
-            echo "version.txt is empty; cannot derive version."
+          set -euo pipefail
+          BASE_VERSION="$(head -n1 version.txt | tr -d '\r' | xargs)"
+          if [[ ! "$BASE_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "version.txt must be major.minor.patch"
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          VERSION="$MAJOR.$MINOR.$((PATCH + GITHUB_RUN_NUMBER))"
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH + GITHUB_RUN_NUMBER))
+          APK="$(find app/build/outputs/apk/sideload/release -maxdepth 1 -name '*.apk' -print -quit)"
+          if [ ! -s "$APK" ]; then
+            echo "Signed sideload APK not found"
+            exit 1
+          fi
+          AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -1)"
+          if [ -z "$AAPT" ]; then
+            echo "Android aapt not found"
+            exit 1
+          fi
+          BADGING="$("$AAPT" dump badging "$APK" | head -n 1)"
+          echo "$BADGING"
+          if [[ "$BADGING" != *"versionName='$VERSION'"* || "$BADGING" != *"versionCode='$VERSION_CODE'"* ]]; then
+            echo "APK version does not match computed build version: $VERSION ($VERSION_CODE)"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "### Signed APK version: $VERSION (code $VERSION_CODE)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Rename APK to include version
         shell: bash
