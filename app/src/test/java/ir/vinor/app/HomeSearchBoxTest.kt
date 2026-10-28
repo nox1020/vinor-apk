@@ -7,17 +7,19 @@ import java.io.File
 
 class HomeSearchBoxTest {
     @Test
-    fun homeLayoutDropsTheFileSearchBoxAndKeepsTheSearchScreen() {
+    fun homeContainsSearchFiltersWithoutSeparateSearchDestination() {
         val home = source("src/main/res/layout/fragment_dashboard.xml")
         val xml = home.readText()
-        assertFalse(xml.contains("dashboardHomeSearch"))
-        assertFalse(xml.contains("جستجو در فایل‌های وینور"))
+        assertTrue(xml.contains("dashboardSearchContainer"))
         assertTrue(xml.contains("dashboardShortcuts"))
         val dash = source("src/main/java/ir/vinor/app/DashboardFragment.kt").readText()
-        assertFalse(dash.contains("dashboardHomeSearch"))
-        val search = source("src/main/res/layout/fragment_search.xml")
-        assertTrue(search.isFile)
-        assertTrue(search.length() > 0L)
+        assertTrue(dash.contains("installHomeSearch()"))
+        val search = source("src/main/res/layout/fragment_search.xml").readText()
+        assertTrue(search.contains("searchChipPrice"))
+        assertTrue(search.contains("searchChipArea"))
+        assertTrue(search.contains("searchChipDistrict"))
+        val graph = source("src/main/res/navigation/nav_graph.xml").readText()
+        assertFalse(graph.contains("android:id=\"@+id/searchFragment\""))
     }
 
     private fun source(relative: String): File {
