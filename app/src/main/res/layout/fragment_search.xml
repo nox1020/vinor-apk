@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:background="@color/vinor_bg"
     android:layoutDirection="rtl"
     android:orientation="vertical">
@@ -190,14 +190,13 @@
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/searchRefresh"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="wrap_content">
 
         <ScrollView
             android:id="@+id/searchScroll"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
+            android:layout_height="wrap_content"
+            android:fillViewport="false"
             android:overScrollMode="never">
 
             <LinearLayout
