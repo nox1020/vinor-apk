@@ -34,6 +34,8 @@ class HomeSearchBoxTest {
         assertTrue(search.contains("binding.searchScroll.removeView(content)"))
         assertTrue(search.contains("binding.searchRefresh.isVisible = false"))
         assertTrue(search.contains("attachToHomeHeader(host: LinearLayout)"))
+        assertTrue(search.contains("homeScroll?.viewTreeObserver?.addOnScrollChangedListener"))
+        assertTrue(dashboard.contains("binding.dashboardAccountBlock.isVisible = false"))
     }
 
     @Test
