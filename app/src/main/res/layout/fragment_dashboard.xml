@@ -80,6 +80,7 @@
         <!-- Always-visible property search and filter controls; no independent scroll. -->
         <LinearLayout
             android:id="@+id/dashboardSearchHeaderHost"
+            android:layoutDirection="rtl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/vinor_chrome"
