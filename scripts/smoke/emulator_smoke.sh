@@ -125,14 +125,14 @@ BLOCK_IDS = {
     "loginStep2Code",
     "onboardNext",
     "tabAds",
-    "tabSearch",
+    "tabCustomers",
     "tabPost",
     "tabChat",
     "tabMe",
     "tabAdsIcon",
     "tabAdsLabel",
-    "tabSearchIcon",
-    "tabSearchLabel",
+    "tabCustomersIcon",
+    "tabCustomersLabel",
     "tabPostIcon",
     "tabPostLabel",
     "tabChatIcon",
@@ -1183,7 +1183,8 @@ run_smoke() {
   fi
   check_crash
 
-  if open_tab tabSearch searchInput 20 || open_tab tabSearch searchHeader 8; then
+  # Search is now embedded in the home, rather than a separate footer tab.
+  if open_tab tabAds dashboardSearchContainer 20 || open_tab tabAds searchInput 8; then
     if capture search; then
       record search pass "$LAST_SHOT"
     else
