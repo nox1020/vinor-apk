@@ -200,6 +200,10 @@ class DashboardFragment : Fragment() {
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.dashboardRefresh.setProgressViewOffset(true, headerPad / 2, headerPad + (36 * resources.displayMetrics.density).toInt())
         binding.dashboardRefresh.setOnRefreshListener { onPullRefresh() }
+        // Swipe-to-refresh is allowed only at the top of the single home ScrollView.
+        binding.dashboardRefresh.setOnChildScrollUpCallback { _, _ ->
+            binding.dashboardScroll.scrollY > 0 || binding.dashboardScroll.canScrollVertically(-1)
+        }
         binding.dashboardChatInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -224,11 +228,18 @@ class DashboardFragment : Fragment() {
     }
 
     /** ابزار کامل جستجو داخل اسکرول خانه است، نه یک مقصد مستقل در ناوبری. */
+    fun searchHeaderHost(): LinearLayout? = _binding?.dashboardSearchHeaderHost
+
     private fun installHomeSearch() {
-        if (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) != null) return
-        childFragmentManager.beginTransaction()
-            .replace(R.id.dashboardSearchContainer, SearchFragment())
-            .commitNow()
+        var search = childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment
+        if (search == null) {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dashboardSearchContainer, SearchFragment())
+                .commitNow()
+            search = childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment
+        }
+        // The filter bar is reparented, but its callbacks and state remain in SearchFragment.
+        search?.attachToHomeHeader(binding.dashboardSearchHeaderHost)
     }
 
     /** مقصد لینک‌های جستجوی قدیمی، همین بخش از خانه است. */
@@ -356,6 +367,7 @@ class DashboardFragment : Fragment() {
     private fun hideHomeDashboardWidgets() {
         val b = _binding ?: return
         b.dashboardHomeHeader.isVisible = false
+        b.dashboardSearchHeaderHost.isVisible = false
         b.dashboardEmpty.isVisible = false
         b.dashboardHeader.isVisible = true
     }
@@ -884,6 +896,7 @@ class DashboardFragment : Fragment() {
         b.dashboardProgress.isVisible = true
         b.dashboardEmpty.isVisible = false
         b.dashboardHomeHeader.isVisible = false
+        b.dashboardSearchHeaderHost.isVisible = true
     }
 
     private fun showOfflineSnackbar() {
@@ -910,7 +923,8 @@ class DashboardFragment : Fragment() {
         val b = _binding ?: return
         chatLayerOpen = false
         b.dashboardHeader.isVisible = false
-        b.dashboardHomeHeader.isVisible = true
+        b.dashboardHomeHeader.isVisible = false
+        b.dashboardSearchHeaderHost.isVisible = true
         b.dashboardEmpty.isVisible = true
         hideKeyboard()
         syncComposerVisible()
@@ -1308,9 +1322,11 @@ class DashboardFragment : Fragment() {
             binding.dashboardEmpty.isVisible = false
             binding.dashboardHeader.isVisible = true
             binding.dashboardHomeHeader.isVisible = false
+            binding.dashboardSearchHeaderHost.isVisible = false
         } else {
             binding.dashboardHeader.isVisible = false
-            binding.dashboardHomeHeader.isVisible = true
+            binding.dashboardHomeHeader.isVisible = false
+            binding.dashboardSearchHeaderHost.isVisible = true
             binding.dashboardEmpty.isVisible = true
         }
 
@@ -1350,7 +1366,9 @@ class DashboardFragment : Fragment() {
 
         val adsCount = obj.optInt("divar_pro_ads_count").let { if (it > 0) it else ads.length() }
         bindPrompts(obj, adsCount, reqCount)
-        // ردیف پیشنهادها با فهرست کامل جستجوی خانه تکراری است.
+        // All account widgets now belong to Vinor Man, while the home feed holds only listings.
+        binding.dashboardAccountBlock.isVisible = false
+        binding.dashboardHero.isVisible = false
         binding.dashboardSuggestBlock.isVisible = false
         binding.dashboardTiles.isVisible = false
     }
