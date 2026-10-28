@@ -196,7 +196,11 @@ class SearchFragment : Fragment() {
             ui = SearchStateReducer.loading()
             render()
         }
-        val ctx = context ?: return
+        val ctx = context
+        if (ctx == null) {
+            onComplete?.invoke()
+            return
+        }
         val gen = ++loadGen
         val stamp = sessionStamp
         scope.launch {
@@ -214,8 +218,13 @@ class SearchFragment : Fragment() {
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                val previous = if (kept.isNotEmpty()) {
-                    SearchUiState(SearchPhase.CONTENT, kept, query.hasClearableFilters())
+                val fallback = if (kept.isNotEmpty()) kept else rawAds.ifEmpty { homeFallbackAds }
+                val previous = if (fallback.isNotEmpty()) {
+                    SearchUiState(
+                        SearchPhase.CONTENT,
+                        SearchAds.apply(fallback, query),
+                        query.hasClearableFilters(),
+                    )
                 } else {
                     SearchStateReducer.loading()
                 }
@@ -250,7 +259,7 @@ class SearchFragment : Fragment() {
         // Fetch published Vinor properties directly. The search HTML and home
         // carousel can be empty when ad promotion is disabled, even with live lands.
         val publicPayload = runCatching {
-            PartnerApi.get("/express/partner/api/public-lands", ctx)
+            PartnerApi.getFresh("/express/partner/api/public-lands", ctx)
         }.getOrNull()
         val publicAds = if (
             publicPayload?.optBoolean("success") == true &&
@@ -268,7 +277,7 @@ class SearchFragment : Fragment() {
         // This endpoint is safe for guests too and must never be gated by
         // the optional home advertisement/promotion settings.
         val dashboardPayload = runCatching {
-            PartnerApi.get("/express/partner/dashboard/data", ctx)
+            PartnerApi.getFresh("/express/partner/dashboard/data", ctx)
         }.getOrNull()
         val dashboardAds = if (
             dashboardPayload?.optBoolean("success") == true &&
@@ -291,11 +300,12 @@ class SearchFragment : Fragment() {
             PartnerApi.getHtml("/express/partner/search?sort=newest", ctx)
         }.getOrDefault("")
         val searchRows = SearchPageHtml.parse(searchHtml)
-        val home = runCatching { PartnerApi.get("/express/partner/home/data", ctx) }.getOrNull()
+        val home = runCatching { PartnerApi.getFresh("/express/partner/home/data", ctx) }.getOrNull()
         val homeAds = if (home == null) {
             emptyList()
         } else {
-            SearchAds.fromObjects(home.optJSONArray("divar_pro_ads") ?: JSONArray()) +
+            SearchAds.fromObjects(home.optJSONArray("public_lands") ?: JSONArray()) +
+                SearchAds.fromObjects(home.optJSONArray("divar_pro_ads") ?: JSONArray()) +
                 SearchAds.fromObjects(home.optJSONArray("suggested_files") ?: JSONArray())
         }
         val homeHtmlAds = if (searchRows.isEmpty() && homeAds.isEmpty()) {
@@ -314,7 +324,7 @@ class SearchFragment : Fragment() {
     /** مهمان ردیف SSR ندارد؛ sitemap نشانی ملک‌های منتشرشدهٔ عمومی است. */
     private fun publicPublished(ctx: Context): List<SearchAd> {
         val xml = runCatching { PartnerApi.getHtml(PublicSearchCatalog.SITEMAP_PATH, ctx) }.getOrDefault("")
-        val refs = PublicSearchCatalog.landRefs(xml).take(PublicSearchCatalog.MAX)
+        val refs = PublicSearchCatalog.landRefs(xml).take(24)
         val out = ArrayList<SearchAd>(refs.size)
         for (ref in refs) {
             val obj = runCatching {
