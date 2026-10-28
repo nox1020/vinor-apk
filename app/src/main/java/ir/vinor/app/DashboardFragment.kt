@@ -1319,6 +1319,10 @@ class DashboardFragment : Fragment() {
         isApproved = obj.optBoolean("is_approved")
         val ads = obj.optJSONArray("divar_pro_ads") ?: JSONArray()
         rememberHome(obj)
+        // Use the catalog already obtained by Home as the immediate result
+        // source; the embedded search still refreshes from its own endpoint.
+        (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment)
+            ?.acceptHomeListings(obj)
         if (isChatOpen()) {
             binding.dashboardEmpty.isVisible = false
             binding.dashboardHeader.isVisible = true
