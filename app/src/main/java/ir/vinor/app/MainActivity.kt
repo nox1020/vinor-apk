@@ -159,7 +159,7 @@ class MainActivity : AppCompatActivity() {
             findDashboard()?.isChatOpen() == true,
             FooterTabs.Ids(
                 dashboard = R.id.dashboardFragment,
-                search = R.id.searchFragment,
+                customers = R.id.customersFragment,
                 profile = R.id.profileFragment,
                 myProperties = R.id.myPropertiesFragment,
                 propertyForm = R.id.myPropertyFormFragment,
@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
             ),
         )
         val adsOn = tab == FooterTabs.Tab.ADS
-        val searchOn = tab == FooterTabs.Tab.SEARCH
+        val customersOn = tab == FooterTabs.Tab.CUSTOMERS
         val postOn = tab == FooterTabs.Tab.POST
         val chatOn = tab == FooterTabs.Tab.CHAT
         val meOn = tab == FooterTabs.Tab.ME
@@ -179,11 +179,11 @@ class MainActivity : AppCompatActivity() {
             R.drawable.ic_home,
         )
         paintTab(
-            binding.divarTabbar.tabSearchIcon,
-            binding.divarTabbar.tabSearchLabel,
-            searchOn,
-            R.drawable.ic_tab_search,
-            R.drawable.ic_search,
+            binding.divarTabbar.tabCustomersIcon,
+            binding.divarTabbar.tabCustomersLabel,
+            customersOn,
+            R.drawable.ic_users_stroke,
+            R.drawable.ic_users_stroke,
         )
         paintTab(
             binding.divarTabbar.tabPostIcon,
@@ -513,13 +513,18 @@ class MainActivity : AppCompatActivity() {
         navController.navigate(R.id.consultantOnboardingFragment)
     }
 
+    /** لینک‌های جستجوی قدیمی به جستجوی ادغام‌شده در خانه منتقل می‌شوند. */
     fun openSearch() {
-        if (navController.currentDestination?.id == R.id.searchFragment) return
-        if (popToInStack(R.id.searchFragment)) {
-            syncDivarTab()
-            return
+        openPartnerHome()
+        fun reveal(left: Int) {
+            val dash = findDashboard()
+            if (dash != null && navController.currentDestination?.id == R.id.dashboardFragment) {
+                dash.revealHomeSearch()
+            } else if (left > 0) {
+                binding.root.post { reveal(left - 1) }
+            }
         }
-        navigateTab(R.id.searchFragment)
+        binding.root.post { reveal(12) }
     }
 
     /** اگر ریشهٔ همین تب زیر صفحهٔ فعلی است، همان را نشان بده و فرگمنت را از نو نساز. */
@@ -558,7 +563,7 @@ class MainActivity : AppCompatActivity() {
         val current = navController.currentBackStackEntry?.arguments?.getString("url")
         if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
         val args = Bundle().apply { putString("url", url) }
-        navController.navigate(R.id.customersFragment, args)
+        navigateTab(R.id.customersFragment, args)
     }
 
     fun openLand(code: String) {
@@ -601,7 +606,6 @@ class MainActivity : AppCompatActivity() {
                 if (findDashboard()?.isChatOpen() == true) "chat" else "home",
                 "",
             )
-            R.id.searchFragment -> AuthReturnStore.Dest("search", "")
             R.id.profileFragment -> AuthReturnStore.Dest("profile", "")
             R.id.profileEditFragment -> AuthReturnStore.Dest("profile_edit", "")
             R.id.notificationsFragment -> AuthReturnStore.Dest("notifications", "")
@@ -637,7 +641,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun wireDivarTabbar() {
         binding.divarTabbar.tabAds.setOnClickListener { openPartnerHome() }
-        binding.divarTabbar.tabSearch.setOnClickListener { openSearch() }
+        binding.divarTabbar.tabCustomers.setOnClickListener {
+            openCustomers(Uri.parse("${PartnerApi.BASE}/express/partner/customers"))
+        }
         binding.divarTabbar.tabPost.setOnClickListener { openPostAd() }
         binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
         binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
