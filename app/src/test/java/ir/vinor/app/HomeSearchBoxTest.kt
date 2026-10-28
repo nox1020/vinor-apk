@@ -31,10 +31,14 @@ class HomeSearchBoxTest {
         assertTrue(home.contains("dashboardAccountBlock"))
         assertTrue(dashboard.contains("setOnChildScrollUpCallback"))
         assertTrue(dashboard.contains("attachToHomeHeader"))
-        assertTrue(search.contains("binding.searchScroll.removeView(content)"))
-        assertTrue(search.contains("binding.searchRefresh.isVisible = false"))
+        val searchXml = source("src/main/res/layout/fragment_search.xml").readText()
+        assertTrue(searchXml.contains("searchResultsContent"))
+        assertFalse(searchXml.contains("android:id=\"@+id/searchScroll\""))
+        assertFalse(searchXml.contains("android:id=\"@+id/searchRefresh\""))
         assertTrue(search.contains("attachToHomeHeader(host: LinearLayout)"))
         assertTrue(search.contains("homeScroll?.viewTreeObserver?.addOnScrollChangedListener"))
+        assertTrue(search.contains("fun acceptHomeListings(home: JSONObject)"))
+        assertTrue(dashboard.contains("?.acceptHomeListings(obj)"))
         assertTrue(dashboard.contains("binding.dashboardAccountBlock.isVisible = false"))
     }
 
