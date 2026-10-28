@@ -22,6 +22,35 @@ class HomeSearchBoxTest {
         assertFalse(graph.contains("android:id=\"@+id/searchFragment\""))
     }
 
+    @Test
+    fun homeHasFixedSearchHeaderAndOneScrollRefreshOwner() {
+        val home = source("src/main/res/layout/fragment_dashboard.xml").readText()
+        val dashboard = source("src/main/java/ir/vinor/app/DashboardFragment.kt").readText()
+        val search = source("src/main/java/ir/vinor/app/SearchFragment.kt").readText()
+        assertTrue(home.contains("dashboardSearchHeaderHost"))
+        assertTrue(home.contains("dashboardAccountBlock"))
+        assertTrue(dashboard.contains("setOnChildScrollUpCallback"))
+        assertTrue(dashboard.contains("attachToHomeHeader"))
+        assertTrue(search.contains("binding.searchScroll.removeView(content)"))
+        assertTrue(search.contains("binding.searchRefresh.isVisible = false"))
+        assertTrue(search.contains("attachToHomeHeader(host: LinearLayout)"))
+    }
+
+    @Test
+    fun vinorManHoldsAccountOverviewAndNotifications() {
+        val profile = source("src/main/res/layout/fragment_profile.xml").readText()
+        val profileCode = source("src/main/java/ir/vinor/app/ProfileFragment.kt").readText()
+        assertTrue(profile.contains("profileNotifications"))
+        assertTrue(profile.contains("profileSummaryWallet"))
+        assertTrue(profile.contains("profileSummaryCustomers"))
+        assertTrue(profile.contains("profileSummaryVisits"))
+        assertTrue(profile.contains("profileSummaryDeals"))
+        assertTrue(profile.contains("profileQuickTraining"))
+        assertTrue(profile.contains("profileQuickNews"))
+        assertTrue(profile.contains("profileQuickFollow"))
+        assertTrue(profileCode.contains("refreshWorkSummary"))
+    }
+
     private fun source(relative: String): File {
         val cwd = File(System.getProperty("user.dir") ?: ".")
         val roots = ArrayList<File>()
