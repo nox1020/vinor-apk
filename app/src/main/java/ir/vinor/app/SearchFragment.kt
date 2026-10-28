@@ -100,6 +100,7 @@ class SearchFragment : Fragment() {
         binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
         homeScroll = (parentFragment as? DashboardFragment)?.view?.findViewById(R.id.dashboardScroll)
         homeScroll?.viewTreeObserver?.addOnScrollChangedListener(scrollListener)
+        (parentFragment as? DashboardFragment)?.searchHeaderHost()?.let(::attachToHomeHeader)
         binding.searchClear.setOnClickListener {
             binding.searchInput.setText("")
             binding.searchInput.requestFocus()
