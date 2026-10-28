@@ -166,28 +166,29 @@ class SearchFragment : Fragment() {
      *  the separate search endpoint is unavailable or slow. Never replace a
      *  richer search result with an empty home response. */
     fun acceptHomeListings(home: JSONObject) {
-        val candidates = SearchAds.fromObjects(HomeSuggest.files(home))
-        if (candidates.isEmpty()) return
-        homeFallbackAds = candidates
-        if (_binding == null || rawAds.isNotEmpty()) return
-        rawAds = candidates
-        hasSnapshot = true
-        rememberedAds = candidates
         approved = home.optBoolean("is_approved")
         rememberedApproved = approved
+        val candidates = SearchAds.fromObjects(HomeSuggest.files(home))
+        homeFallbackAds = candidates
+        if (_binding == null || candidates.isEmpty()) return
+        // The public feed renders first; Home's promoted/Divar cards join it later.
+        rawAds = SearchAds.dedupe(rawAds + candidates)
+        hasSnapshot = true
+        rememberedAds = rawAds
         ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
         render()
     }
 
-    fun refreshAds() {
-        if (_binding != null) load(forceSkeleton = !hasSnapshot)
+    fun refreshAds(onComplete: (() -> Unit)? = null) {
+        if (_binding != null) load(fromPull = true, onComplete = onComplete)
+        else onComplete?.invoke()
     }
 
     fun focusInput() {
         _binding?.searchInput?.requestFocus()
     }
 
-    private fun load(fromPull: Boolean = false, forceSkeleton: Boolean = false) {
+    private fun load(fromPull: Boolean = false, forceSkeleton: Boolean = false, onComplete: (() -> Unit)? = null) {
         val kept = ui.items.takeIf {
             it.isNotEmpty() && (ui.phase == SearchPhase.CONTENT || ui.phase == SearchPhase.ERROR)
         }.orEmpty()
@@ -199,6 +200,7 @@ class SearchFragment : Fragment() {
         val gen = ++loadGen
         val stamp = sessionStamp
         scope.launch {
+            try {
             val loaded = try {
                 withContext(Dispatchers.IO) { fetchAds(ctx) }
             } catch (e: CancellationException) {
@@ -223,12 +225,15 @@ class SearchFragment : Fragment() {
                 return@launch
             }
             approved = loaded?.approved == true || (homeFallbackAds.isNotEmpty() && approved)
-            rawAds = loaded?.ads.orEmpty().ifEmpty { homeFallbackAds }
+            rawAds = SearchAds.dedupe(loaded?.ads.orEmpty() + homeFallbackAds)
             hasSnapshot = true
             rememberedAds = rawAds
             rememberedApproved = approved
             ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
             render()
+            } finally {
+                onComplete?.invoke()
+            }
         }
     }
 
@@ -242,6 +247,24 @@ class SearchFragment : Fragment() {
     }
 
     private fun fetchAds(ctx: Context): SearchLoad {
+        // Fetch published Vinor properties directly. The search HTML and home
+        // carousel can be empty when ad promotion is disabled, even with live lands.
+        val publicPayload = runCatching {
+            PartnerApi.get("/express/partner/api/public-lands", ctx)
+        }.getOrNull()
+        val publicAds = if (
+            publicPayload?.optBoolean("success") == true &&
+            publicPayload.optInt("http_status", 200) in 200..299
+        ) {
+            SearchAds.fromObjects(publicPayload.optJSONArray("public_lands") ?: JSONArray())
+        } else {
+            emptyList()
+        }
+        if (publicAds.isNotEmpty()) {
+            return SearchLoad(SearchAds.dedupe(publicAds), approved, failed = false)
+        }
+        // Older server versions and a genuinely empty published feed still have
+        // the existing home/search/HTML fallback.
         val searchHtml = runCatching {
             PartnerApi.getHtml("/express/partner/search?sort=newest", ctx)
         }.getOrDefault("")
