@@ -6,11 +6,11 @@ package ir.vinor.app
  */
 object FooterTabs {
 
-    enum class Tab { ADS, SEARCH, POST, CHAT, ME }
+    enum class Tab { ADS, CUSTOMERS, POST, CHAT, ME }
 
     data class Ids(
         val dashboard: Int,
-        val search: Int,
+        val customers: Int,
         val profile: Int,
         val myProperties: Int,
         val propertyForm: Int,
@@ -25,7 +25,7 @@ object FooterTabs {
             return if (chatOpen) Tab.CHAT else Tab.ADS
         }
         return when (pages.getOrNull(1)) {
-            ids.search -> Tab.SEARCH
+            ids.customers -> Tab.CUSTOMERS
             ids.profile -> Tab.ME
             ids.addHub, ids.myProperties, ids.propertyForm -> Tab.POST
             else -> Tab.ADS
