@@ -263,6 +263,28 @@ class SearchFragment : Fragment() {
         if (publicAds.isNotEmpty()) {
             return SearchLoad(SearchAds.dedupe(publicAds), approved, failed = false)
         }
+        // Some deployed backends expose the same public catalog through
+        // dashboard/data before the standalone public endpoint is available.
+        // This endpoint is safe for guests too and must never be gated by
+        // the optional home advertisement/promotion settings.
+        val dashboardPayload = runCatching {
+            PartnerApi.get("/express/partner/dashboard/data", ctx)
+        }.getOrNull()
+        val dashboardAds = if (
+            dashboardPayload?.optBoolean("success") == true &&
+            dashboardPayload.optInt("http_status", 200) in 200..299
+        ) {
+            SearchAds.fromObjects(dashboardPayload.optJSONArray("public_lands") ?: JSONArray())
+        } else {
+            emptyList()
+        }
+        if (dashboardAds.isNotEmpty()) {
+            return SearchLoad(
+                SearchAds.dedupe(dashboardAds),
+                dashboardPayload?.optBoolean("is_approved") == true,
+                failed = false,
+            )
+        }
         // Older server versions and a genuinely empty published feed still have
         // the existing home/search/HTML fallback.
         val searchHtml = runCatching {
