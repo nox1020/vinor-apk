@@ -610,6 +610,13 @@
                         </LinearLayout>
                     </FrameLayout>
 
+                    <!-- جستجوی کامل ملک و فیلترها در همان صفحه خانه. -->
+                    <androidx.fragment.app.FragmentContainerView
+                        android:id="@+id/dashboardSearchContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp" />
+
                     <LinearLayout
                         android:id="@+id/dashboardTiles"
                         android:layout_width="match_parent"
