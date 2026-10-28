@@ -23,6 +23,17 @@ class HomeSearchBoxTest {
     }
 
     @Test
+    fun reparentedHeaderKeepsXmlHeightsSoBorderCannotCoverFeed() {
+        val search = source("src/main/java/ir/vinor/app/SearchFragment.kt").readText()
+        val attach = search.substringAfter("fun attachToHomeHeader(host: LinearLayout)").substringBefore("fun acceptHomeListings")
+        assertTrue(attach.contains("control.layoutParams?.height"))
+        assertFalse(attach.contains("ViewGroup.LayoutParams.WRAP_CONTENT,\n"))
+        val xml = source("src/main/res/layout/fragment_search.xml").readText()
+        val border = xml.substringAfter("android:id=\"@+id/searchHeaderBorder\"").substringBefore("/>")
+        assertTrue(border.contains("android:layout_height=\"1dp\""))
+    }
+
+    @Test
     fun homeHasFixedSearchHeaderAndOneScrollRefreshOwner() {
         val home = source("src/main/res/layout/fragment_dashboard.xml").readText()
         val dashboard = source("src/main/java/ir/vinor/app/DashboardFragment.kt").readText()

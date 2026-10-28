@@ -151,13 +151,14 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         for (control in listOf(b.searchHeader, b.searchChipScroll, b.searchHeaderBorder)) {
             if (control.parent === host) continue
+            // Keep the XML height (56dp header, 48dp chips, 1dp border). A plain View
+            // with WRAP_CONTENT takes all remaining height, so the 1dp border used to
+            // grow into a grey block that covered the whole listing feed on Home.
+            val height = control.layoutParams?.height ?: ViewGroup.LayoutParams.WRAP_CONTENT
             (control.parent as? ViewGroup)?.removeView(control)
             host.addView(
                 control,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height),
             )
         }
     }
