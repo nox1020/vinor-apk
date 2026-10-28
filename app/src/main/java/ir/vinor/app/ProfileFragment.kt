@@ -220,6 +220,10 @@ class ProfileFragment : Fragment() {
             if (_binding == null || gen != loadGen || sessionStamp != currentStamp) return@launch
             val code = if (home.has("http_status")) home.optInt("http_status") else 200
             if (code !in 200..299 || home.optBoolean("offline") || home.optBoolean("session_expired")) return@launch
+            if (!home.optBoolean("success") && !home.has("is_approved")) return@launch
+            val profilePhone = profile.optString("me_phone").trim()
+            val homePhone = home.optString("me_phone").trim()
+            if (homePhone.isNotEmpty() && profilePhone.isNotEmpty() && homePhone != profilePhone) return@launch
             val current = _binding ?: return@launch
             current.profileSummaryAmount.text = PartnerFormat.toman(HomePulse.withdrawable(home)) + " تومان"
             current.profileSummaryCustomers.text = PartnerFormat.toman(HomePulse.customers(home))
