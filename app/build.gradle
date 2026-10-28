@@ -64,11 +64,14 @@ def parts = baseVersionName.split('\\.')
 if (parts.length != 3 || !parts.every { it.isInteger() }) {
     throw new GradleException("version.txt must contain major.minor.patch")
 }
-def resolvedVersionName = ciRunNumber > 0
+// Marketplace releases stay on version.txt; the direct installer uses the
+// ever-increasing Android CI run number to guarantee a proper upgrade.
+def storeVersionCode = computeVersionCode(baseVersionName)
+def sideloadVersionName = ciRunNumber > 0
     ? "${parts[0]}.${parts[1]}.${parts[2].toInteger() + ciRunNumber}"
     : baseVersionName
-def resolvedVersionCode = computeVersionCode(resolvedVersionName)
-logger.lifecycle("Vinor version: ${resolvedVersionName} (code ${resolvedVersionCode}, CI run ${ciRunNumber})")
+def sideloadVersionCode = computeVersionCode(sideloadVersionName)
+logger.lifecycle("Vinor direct: ${sideloadVersionName} (${sideloadVersionCode}); stores: ${baseVersionName} (${storeVersionCode})")
 
 android {
     namespace "ir.vinor.app"
@@ -78,8 +81,8 @@ android {
         applicationId "ir.vinor.app"
         minSdk 21
         targetSdk 36
-        versionName resolvedVersionName
-        versionCode resolvedVersionCode
+        versionName baseVersionName
+        versionCode storeVersionCode
         // APK انتشار: فقط ABIهای رایج موبایل (کاهش حجم؛ x86 فقط در debug emulator)
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"
@@ -102,19 +105,20 @@ android {
         sideload {
             dimension "channel"
             getIsDefault().set(true)
-            versionCode resolvedVersionCode
+            versionName sideloadVersionName
+            versionCode sideloadVersionCode
             buildConfigField "String", "STORE", "\"sideload\""
         }
         // گوگل‌پلی: AAB با همین کلید به‌عنوان upload key. به‌روزرسانی از Play.
         play {
             dimension "channel"
-            versionCode resolvedVersionCode
+            versionCode storeVersionCode
             buildConfigField "String", "STORE", "\"play\""
         }
         // کافه‌بازار: APK امضاشده. به‌روزرسانی از خود بازار.
         bazaar {
             dimension "channel"
-            versionCode resolvedVersionCode
+            versionCode storeVersionCode
             buildConfigField "String", "STORE", "\"bazaar\""
         }
     }
