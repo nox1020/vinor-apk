@@ -49,6 +49,7 @@ class SearchFragment : Fragment() {
     private var job = Job()
     private var scope = CoroutineScope(Dispatchers.Main + job)
     private var rawAds: List<SearchAd> = emptyList()
+    private var homeFallbackAds: List<SearchAd> = emptyList()
     private var query = SearchQuery()
     private var ui = SearchStateReducer.loading()
     private var approved = false
@@ -161,6 +162,23 @@ class SearchFragment : Fragment() {
         }
     }
 
+    /** Paint Home's already-available published catalog immediately, even if
+     *  the separate search endpoint is unavailable or slow. Never replace a
+     *  richer search result with an empty home response. */
+    fun acceptHomeListings(home: JSONObject) {
+        val candidates = SearchAds.fromObjects(HomeSuggest.files(home))
+        if (candidates.isEmpty()) return
+        homeFallbackAds = candidates
+        if (_binding == null || rawAds.isNotEmpty()) return
+        rawAds = candidates
+        hasSnapshot = true
+        rememberedAds = candidates
+        approved = home.optBoolean("is_approved")
+        rememberedApproved = approved
+        ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
+        render()
+    }
+
     fun refreshAds() {
         if (_binding != null) load(forceSkeleton = !hasSnapshot)
     }
@@ -189,7 +207,7 @@ class SearchFragment : Fragment() {
                 null
             }
             if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
-            if (loaded == null || loaded.failed) {
+            if (loaded == null || (loaded.failed && homeFallbackAds.isEmpty())) {
                 if (loaded?.sessionExpired == true && kept.isEmpty() && rememberedAds.isNullOrEmpty()) {
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
@@ -204,11 +222,11 @@ class SearchFragment : Fragment() {
                 if (ui.items.isNotEmpty()) showOfflineBar()
                 return@launch
             }
-            approved = loaded.approved
-            rawAds = loaded.ads
+            approved = loaded?.approved == true || (homeFallbackAds.isNotEmpty() && approved)
+            rawAds = loaded?.ads.orEmpty().ifEmpty { homeFallbackAds }
             hasSnapshot = true
-            rememberedAds = loaded.ads
-            rememberedApproved = loaded.approved
+            rememberedAds = rawAds
+            rememberedApproved = approved
             ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
             render()
         }
