@@ -13,12 +13,6 @@
         tools:layout="@layout/fragment_dashboard" />
 
     <fragment
-        android:id="@+id/searchFragment"
-        android:name="ir.vinor.app.SearchFragment"
-        android:label="جستجو"
-        tools:layout="@layout/fragment_search" />
-
-    <fragment
         android:id="@+id/commissionsFragment"
         android:name="ir.vinor.app.CommissionsFragment"
         android:label="پورسانت"
