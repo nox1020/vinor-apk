@@ -38,6 +38,7 @@ class HomeSearchBoxTest {
         assertTrue(search.contains("attachToHomeHeader(host: LinearLayout)"))
         assertTrue(search.contains("homeScroll?.viewTreeObserver?.addOnScrollChangedListener"))
         assertTrue(search.contains("fun acceptHomeListings(home: JSONObject)"))
+        assertTrue(search.contains("SearchAds.fromObjects(home.optJSONArray(\"public_lands\")"))
         assertTrue(dashboard.contains("?.acceptHomeListings(obj)"))
         assertTrue(dashboard.contains("binding.dashboardAccountBlock.isVisible = false"))
     }
