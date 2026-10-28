@@ -137,8 +137,10 @@ object SearchAds {
         val out = ArrayList<SearchAd>(ads.size)
         for (ad in ads) {
             val key = when {
-                ad.token.isNotBlank() -> "${ad.source}:${ad.token}:${ad.createdAt}:${ad.title}:${ad.priceRaw}"
-                ad.url.isNotBlank() -> "u:${ad.url}:${ad.createdAt}:${ad.title}"
+                // One property must remain one card even when Home and public
+                // endpoints supply different dates, prices or display titles.
+                ad.token.isNotBlank() -> "${ad.source}:${ad.token}"
+                ad.url.isNotBlank() -> "u:${ad.url}"
                 else -> "t:${ad.title}:${ad.location}:${ad.priceRaw}"
             }
             if (!seen.add(key)) continue
