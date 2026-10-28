@@ -7,7 +7,7 @@ class FooterTabsTest {
 
     private val ids = FooterTabs.Ids(
         dashboard = 1,
-        search = 2,
+        customers = 2,
         profile = 3,
         myProperties = 4,
         propertyForm = 5,
@@ -31,10 +31,10 @@ class FooterTabsTest {
     }
 
     @Test
-    fun searchStack_staysSearch() {
+    fun customersStack_staysCustomers() {
         val land = 8
-        assertEquals(FooterTabs.Tab.SEARCH, FooterTabs.selected(listOf(1, 2), chatOpen = false, ids))
-        assertEquals(FooterTabs.Tab.SEARCH, FooterTabs.selected(listOf(1, 2, land), chatOpen = false, ids))
+        assertEquals(FooterTabs.Tab.CUSTOMERS, FooterTabs.selected(listOf(1, 2), chatOpen = false, ids))
+        assertEquals(FooterTabs.Tab.CUSTOMERS, FooterTabs.selected(listOf(1, 2, land), chatOpen = false, ids))
     }
 
     @Test
@@ -56,7 +56,7 @@ class FooterTabsTest {
         val graph = 99
         val land = 8
         assertEquals(FooterTabs.Tab.ME, FooterTabs.selected(listOf(graph, 1, 3), chatOpen = false, ids))
-        assertEquals(FooterTabs.Tab.SEARCH, FooterTabs.selected(listOf(graph, 1, 2, land), chatOpen = false, ids))
+        assertEquals(FooterTabs.Tab.CUSTOMERS, FooterTabs.selected(listOf(graph, 1, 2, land), chatOpen = false, ids))
         assertEquals(FooterTabs.Tab.POST, FooterTabs.selected(listOf(graph, 1, 4), chatOpen = false, ids))
         assertEquals(FooterTabs.Tab.CHAT, FooterTabs.selected(listOf(graph, 1), chatOpen = true, ids))
         assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(graph, 1, 9), chatOpen = true, ids))
