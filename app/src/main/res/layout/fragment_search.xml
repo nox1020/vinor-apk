@@ -187,22 +187,13 @@
         android:textSize="12sp"
         android:visibility="gone" />
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/searchRefresh"
+    <!-- A single scroll owner lives in DashboardFragment. Listing content must
+         be present in the XML from inflation onward, never detached/reparented. -->
+    <LinearLayout
+        android:id="@+id/searchResultsContent"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <ScrollView
-            android:id="@+id/searchScroll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fillViewport="false"
-            android:overScrollMode="never">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
                 <LinearLayout
                     android:id="@+id/searchSkeleton"
@@ -321,7 +312,5 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
-            </LinearLayout>
-        </ScrollView>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </LinearLayout>
 </LinearLayout>
