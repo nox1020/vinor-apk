@@ -78,26 +78,8 @@ class SearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.searchRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.vinor_accent_green))
-        binding.searchRefresh.setProgressBackgroundColorSchemeColor(ContextCompat.getColor(requireContext(), R.color.vinor_raised))
-        // هنگام نمایش در خانه، اسکرول و کشیدن برای رفرش را صفحهٔ والد مدیریت می‌کند.
-        binding.searchRefresh.isEnabled = false
-        binding.searchScroll.isNestedScrollingEnabled = false
-        // Remove both the inner scrolling and the nested refresh gestures entirely.
-        // The parent dashboardScroll is the only gesture/scroll owner for ads.
-        val content = binding.searchScroll.getChildAt(0)
-        if (content != null) {
-            binding.searchScroll.removeView(content)
-            binding.searchRefresh.isVisible = false
-            binding.root.addView(
-                content,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-        }
-        binding.searchRefresh.setOnRefreshListener { load(fromPull = true) }
+        // The results are direct children of this fragment's layout. The outer
+        // Dashboard ScrollView owns scrolling and pull-to-refresh exclusively.
         homeScroll = (parentFragment as? DashboardFragment)?.view?.findViewById(R.id.dashboardScroll)
         homeScroll?.viewTreeObserver?.addOnScrollChangedListener(scrollListener)
         (parentFragment as? DashboardFragment)?.searchHeaderHost()?.let(::attachToHomeHeader)
@@ -129,7 +111,6 @@ class SearchFragment : Fragment() {
         binding.searchChipPrice.setOnClickListener { showPriceSheet() }
         binding.searchChipArea.setOnClickListener { showAreaSheet() }
         binding.searchCity.setOnClickListener { showCitySheet() }
-        binding.searchScroll.viewTreeObserver.addOnScrollChangedListener(scrollListener)
         if (rememberedAds != null) paintRemembered()
         load(forceSkeleton = rememberedAds == null)
     }
@@ -148,7 +129,6 @@ class SearchFragment : Fragment() {
         stopShimmer()
         sheetDialog?.dismiss()
         sheetDialog = null
-        runCatching { binding.searchScroll.viewTreeObserver.removeOnScrollChangedListener(scrollListener) }
         homeScroll?.let { outer ->
             runCatching { outer.viewTreeObserver.removeOnScrollChangedListener(scrollListener) }
         }
@@ -209,7 +189,6 @@ class SearchFragment : Fragment() {
                 null
             }
             if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
-            binding.searchRefresh.isRefreshing = false
             if (loaded == null || loaded.failed) {
                 if (loaded?.sessionExpired == true && kept.isEmpty() && rememberedAds.isNullOrEmpty()) {
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
@@ -429,7 +408,7 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         val extra = (80 * resources.displayMetrics.density).toInt()
         val vis = Rect()
-        if (!(homeScroll ?: b.searchScroll).getGlobalVisibleRect(vis)) return
+        if (!(homeScroll ?: b.searchResultsContent).getGlobalVisibleRect(vis)) return
         vis.inset(0, -extra)
         val childBox = Rect()
         for (i in 0 until b.searchList.childCount) {
