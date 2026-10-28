@@ -266,6 +266,34 @@ object PartnerApi {
         }
     }
 
+    /**
+     * Network-first fetch for the public Home feed. A stale offline flag or
+     * expired API cache must not hide newly published cards after pull-to-refresh.
+     * On genuine network failure keep the last usable snapshot, if available.
+     */
+    fun getFresh(path: String, context: Context? = null): JSONObject {
+        return try {
+            val req = requestBuilder(path, context)
+                .header("Cache-Control", "no-cache")
+                .get()
+                .build()
+            val obj = execute(req)
+            val code = obj.optInt("http_status")
+            if (code in 200..299 && !obj.optBoolean("non_json")) {
+                remember(path, obj, context)
+            }
+            if (code == 401 || code == 403 || obj.optBoolean("session_expired")) {
+                obj
+            } else if (code in 200..299) {
+                obj
+            } else {
+                peekJson(path, context) ?: obj
+            }
+        } catch (_: Exception) {
+            peekJson(path, context) ?: offlineMiss()
+        }
+    }
+
     data class PageBody(val code: Int, val url: String, val body: String)
 
     /** HTML بدون ذخیره. برای صفحه‌هایی که شماره و نام مشتری دارند. */
