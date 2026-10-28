@@ -34,6 +34,16 @@ class HomeSearchBoxTest {
     }
 
     @Test
+    fun listingRowGrowsSoPlaceLineIsNeverClipped() {
+        val row = source("src/main/res/layout/item_ads_all_row.xml").readText()
+        val column = row.substringBefore("android:id=\"@+id/adsAllTitle\"")
+            .substringAfterLast("<LinearLayout")
+        assertTrue(column.contains("android:layout_height=\"wrap_content\""))
+        assertTrue(column.contains("android:minHeight=\"104dp\""))
+        assertTrue(row.contains("android:id=\"@+id/adsAllLoc\""))
+    }
+
+    @Test
     fun homeHasFixedSearchHeaderAndOneScrollRefreshOwner() {
         val home = source("src/main/res/layout/fragment_dashboard.xml").readText()
         val dashboard = source("src/main/java/ir/vinor/app/DashboardFragment.kt").readText()
