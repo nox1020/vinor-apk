@@ -893,8 +893,9 @@ class DashboardFragment : Fragment() {
     private fun showHomeLoading() {
         val b = _binding ?: return
         if (wantChatLayer || chatLayerOpen) return
-        b.dashboardProgress.isVisible = true
-        b.dashboardEmpty.isVisible = false
+        // Search has its own loading state: never block the property feed on account data.
+        b.dashboardProgress.isVisible = false
+        b.dashboardEmpty.isVisible = true
         b.dashboardHomeHeader.isVisible = false
         b.dashboardSearchHeaderHost.isVisible = true
     }
