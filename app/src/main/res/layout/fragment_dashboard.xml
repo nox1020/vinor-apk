@@ -12,6 +12,7 @@
 
         <LinearLayout
             android:id="@+id/dashboardHomeHeader"
+            android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/vinor_chrome"
@@ -76,10 +77,13 @@
                 app:tint="@color/vinor_text" />
         </LinearLayout>
 
-        <View
+        <!-- Always-visible property search and filter controls; no independent scroll. -->
+        <LinearLayout
+            android:id="@+id/dashboardSearchHeaderHost"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/vinor_border" />
+            android:layout_height="wrap_content"
+            android:background="@color/vinor_chrome"
+            android:orientation="vertical" />
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -113,6 +117,14 @@
                     android:layout_weight="1"
                     android:layoutDirection="rtl"
                     android:orientation="vertical">
+
+                    <!-- Kept for layout binding compatibility; account overview now lives in Vinor Man. -->
+                    <LinearLayout
+                        android:id="@+id/dashboardAccountBlock"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
 
                     <LinearLayout
                         android:id="@+id/dashboardWallet"
@@ -501,8 +513,11 @@
                             android:paddingHorizontal="16dp" />
                     </LinearLayout>
 
+                    </LinearLayout>
+
                     <FrameLayout
                         android:id="@+id/dashboardHero"
+                        android:visibility="gone"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginHorizontal="16dp"
