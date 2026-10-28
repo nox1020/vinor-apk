@@ -330,7 +330,7 @@ jobs:
             exit 1
           fi
           BADGING="$("$AAPT" dump badging "$APK")"
-          BADGING="${BADGING%%
+          BADGING="$(printf '%s' "$BADGING" | sed -n '1p')"
           echo "$BADGING"
           if [[ "$BADGING" != *"versionName='$VERSION'"* || "$BADGING" != *"versionCode='$VERSION_CODE'"* ]]; then
             echo "APK version does not match computed build version: $VERSION ($VERSION_CODE)"
