@@ -200,7 +200,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.dashboardRefresh.setProgressViewOffset(true, headerPad / 2, headerPad + (36 * resources.displayMetrics.density).toInt())
         binding.dashboardRefresh.setOnRefreshListener { onPullRefresh() }
-        binding.dashboardRefreshButton.setOnClickListener { refreshHomeAds() }
         // Swipe-to-refresh is allowed only at the top of the single home ScrollView.
         binding.dashboardRefresh.setOnChildScrollUpCallback { _, _ ->
             binding.dashboardScroll.scrollY > 0 || binding.dashboardScroll.canScrollVertically(-1)
