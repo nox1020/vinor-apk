@@ -168,7 +168,12 @@ class SearchFragment : Fragment() {
     fun acceptHomeListings(home: JSONObject) {
         approved = home.optBoolean("is_approved")
         rememberedApproved = approved
-        val candidates = SearchAds.fromObjects(HomeSuggest.files(home))
+        // Home/data now ships the same public catalog as the standalone feed.
+        // Render it as soon as Home loads instead of waiting for another request.
+        val candidates = SearchAds.dedupe(
+            SearchAds.fromObjects(home.optJSONArray("public_lands") ?: JSONArray()) +
+                SearchAds.fromObjects(HomeSuggest.files(home)),
+        )
         homeFallbackAds = candidates
         if (_binding == null || candidates.isEmpty()) return
         // The public feed renders first; Home's promoted/Divar cards join it later.
