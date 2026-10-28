@@ -200,6 +200,7 @@ class DashboardFragment : Fragment() {
         binding.dashboardRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1C1C1E"))
         binding.dashboardRefresh.setProgressViewOffset(true, headerPad / 2, headerPad + (36 * resources.displayMetrics.density).toInt())
         binding.dashboardRefresh.setOnRefreshListener { onPullRefresh() }
+        binding.dashboardRefreshButton.setOnClickListener { refreshHomeAds() }
         // Swipe-to-refresh is allowed only at the top of the single home ScrollView.
         binding.dashboardRefresh.setOnChildScrollUpCallback { _, _ ->
             binding.dashboardScroll.scrollY > 0 || binding.dashboardScroll.canScrollVertically(-1)
@@ -307,8 +308,26 @@ class DashboardFragment : Fragment() {
             fetchHistory(bindIfWanted = true, force = true)
             return
         }
+        refreshHomeAds()
         loadAll(fromPull = true)
-        (childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment)?.refreshAds()
+    }
+
+    /** The explicit button and swipe use the same property-feed refresh path. */
+    private fun refreshHomeAds() {
+        val b = _binding ?: return
+        if (b.dashboardCustomer.isVisible || b.dashboardAttachSheet.isVisible) {
+            b.dashboardRefresh.isRefreshing = false
+            return
+        }
+        b.dashboardRefresh.isRefreshing = true
+        val search = childFragmentManager.findFragmentById(R.id.dashboardSearchContainer) as? SearchFragment
+        if (search == null) {
+            finishRefreshUi()
+            return
+        }
+        search.refreshAds {
+            if (_binding === b) b.dashboardRefresh.isRefreshing = false
+        }
     }
 
     private fun finishRefreshUi() {
@@ -856,7 +875,7 @@ class DashboardFragment : Fragment() {
                 if (!homeRendered && !wantChatLayer && !chatLayerOpen) showHomeEmpty()
                 showOfflineSnackbar()
             } finally {
-                if (gen == loadGen && _binding != null && !wantChatLayer) finishRefreshUi()
+                if (gen == loadGen && _binding != null && !wantChatLayer && !fromPull) finishRefreshUi()
             }
         }
     }
