@@ -55,10 +55,20 @@ def releaseKeyPassword = trimOrNull(ksProps.getProperty("keyPassword") ?: ksProp
 
 // برای نصب دستی روی گوشی فقط APK خروجی assembleRelease را کپی کنید.
 // فایل .aab (bundleRelease) برای پلی‌استور است؛ باز کردن آن روی گوشی معمولاً خطای «تجزیه بسته» می‌دهد.
-def storeVersionCode = computeVersionCode(readVersionName())
-def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")
-def ciCode = (ciRunStr != null && ciRunStr.isInteger()) ? ciRunStr.toInteger() : null
-def sideloadVersionCode = ciCode != null ? Math.max(storeVersionCode, ciCode) : storeVersionCode
+// Every distinct CI run produces an installable update, even when version.txt
+// has not changed. The former max(baseCode, runNumber) stayed at the base code.
+def baseVersionName = readVersionName()
+def ciRunStr = System.getenv("GITHUB_RUN_NUMBER")?.trim()
+def ciRunNumber = (ciRunStr != null && ciRunStr.isInteger()) ? ciRunStr.toInteger() : 0
+def parts = baseVersionName.split('\\.')
+if (parts.length != 3 || !parts.every { it.isInteger() }) {
+    throw new GradleException("version.txt must contain major.minor.patch")
+}
+def resolvedVersionName = ciRunNumber > 0
+    ? "${parts[0]}.${parts[1]}.${parts[2].toInteger() + ciRunNumber}"
+    : baseVersionName
+def resolvedVersionCode = computeVersionCode(resolvedVersionName)
+logger.lifecycle("Vinor version: ${resolvedVersionName} (code ${resolvedVersionCode}, CI run ${ciRunNumber})")
 
 android {
     namespace "ir.vinor.app"
@@ -68,8 +78,8 @@ android {
         applicationId "ir.vinor.app"
         minSdk 21
         targetSdk 36
-        versionName readVersionName()
-        versionCode storeVersionCode
+        versionName resolvedVersionName
+        versionCode resolvedVersionCode
         // APK انتشار: فقط ABIهای رایج موبایل (کاهش حجم؛ x86 فقط در debug emulator)
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"
@@ -92,19 +102,19 @@ android {
         sideload {
             dimension "channel"
             getIsDefault().set(true)
-            versionCode sideloadVersionCode
+            versionCode resolvedVersionCode
             buildConfigField "String", "STORE", "\"sideload\""
         }
         // گوگل‌پلی: AAB با همین کلید به‌عنوان upload key. به‌روزرسانی از Play.
         play {
             dimension "channel"
-            versionCode storeVersionCode
+            versionCode resolvedVersionCode
             buildConfigField "String", "STORE", "\"play\""
         }
         // کافه‌بازار: APK امضاشده. به‌روزرسانی از خود بازار.
         bazaar {
             dimension "channel"
-            versionCode storeVersionCode
+            versionCode resolvedVersionCode
             buildConfigField "String", "STORE", "\"bazaar\""
         }
     }
