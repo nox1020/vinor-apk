@@ -298,8 +298,7 @@ class LandDetailFragment : Fragment() {
         binding.landDetailDivar.text = action.label
         binding.landDetailDivar.setOnClickListener {
             when (action.kind) {
-                LandDetailRole.StickyKind.LOGIN -> (activity as? MainActivity)?.requireChatLogin()
-                LandDetailRole.StickyKind.CHAT -> (activity as? MainActivity)?.openVinorChat()
+                LandDetailRole.StickyKind.CALL -> dialListing(obj)
                 LandDetailRole.StickyKind.DIVAR -> openDivar(code, divarUrl)
                 LandDetailRole.StickyKind.MANAGE -> (activity as? MainActivity)?.openMyPropertyManage(obj)
             }
@@ -873,5 +872,11 @@ class LandDetailFragment : Fragment() {
             remembered.remove(code.trim())
             sessionStamp++
         }
+    }
+
+    private fun dialListing(obj: org.json.JSONObject) {
+        val phone = LandDetailRole.callPhone(obj.optString("call_phone"))
+        val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$phone"))
+        runCatching { startActivity(intent) }
     }
 }

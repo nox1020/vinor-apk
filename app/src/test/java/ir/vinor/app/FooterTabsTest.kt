@@ -17,7 +17,7 @@ class FooterTabsTest {
     @Test
     fun homeAndChat_followDashboardOnly() {
         assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(1), chatOpen = false, ids))
-        assertEquals(FooterTabs.Tab.CHAT, FooterTabs.selected(listOf(1), chatOpen = true, ids))
+        assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(1), chatOpen = true, ids))
         assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(emptyList(), chatOpen = false, ids))
     }
 
@@ -58,7 +58,15 @@ class FooterTabsTest {
         assertEquals(FooterTabs.Tab.ME, FooterTabs.selected(listOf(graph, 1, 3), chatOpen = false, ids))
         assertEquals(FooterTabs.Tab.CUSTOMERS, FooterTabs.selected(listOf(graph, 1, 2, land), chatOpen = false, ids))
         assertEquals(FooterTabs.Tab.POST, FooterTabs.selected(listOf(graph, 1, 4), chatOpen = false, ids))
-        assertEquals(FooterTabs.Tab.CHAT, FooterTabs.selected(listOf(graph, 1), chatOpen = true, ids))
+        assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(graph, 1), chatOpen = true, ids))
         assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(graph, 1, 9), chatOpen = true, ids))
+    }
+
+    @org.junit.Test
+    fun followTabLightsOnlyForRequestsRoot() {
+        val ids = FooterTabs.Ids(dashboard = 1, customers = 2, profile = 3, myProperties = 4, propertyForm = 5, addHub = 6, follow = 7)
+        assertEquals(FooterTabs.Tab.FOLLOW, FooterTabs.selected(listOf(1, 7), chatOpen = false, ids, followOpen = true))
+        assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(1, 7), chatOpen = false, ids, followOpen = false))
+        assertEquals(FooterTabs.Tab.ADS, FooterTabs.selected(listOf(1), chatOpen = true, ids))
     }
 }

@@ -6,7 +6,7 @@ package ir.vinor.app
  */
 object FooterTabs {
 
-    enum class Tab { ADS, CUSTOMERS, POST, CHAT, ME }
+    enum class Tab { ADS, CUSTOMERS, POST, FOLLOW, ME }
 
     data class Ids(
         val dashboard: Int,
@@ -15,16 +15,19 @@ object FooterTabs {
         val myProperties: Int,
         val propertyForm: Int,
         val addHub: Int = 0,
+        val follow: Int = 0,
     )
 
-    fun selected(stack: List<Int>, chatOpen: Boolean, ids: Ids): Tab {
+    /** تب «پیگیری» جای «AI چت» است؛ چت دیگر تبی روشن نمی‌کند. */
+    fun selected(stack: List<Int>, chatOpen: Boolean, ids: Ids, followOpen: Boolean = false): Tab {
         // بک‌استک با خودِ گراف ناوبری شروع می‌شود؛ ریشهٔ تب اولین صفحه بعد از خانه است.
         val homeAt = stack.indexOf(ids.dashboard)
         val pages = if (homeAt >= 0) stack.subList(homeAt, stack.size) else stack
         if (pages.isEmpty() || pages.last() == ids.dashboard) {
-            return if (chatOpen) Tab.CHAT else Tab.ADS
+            return Tab.ADS
         }
         return when (pages.getOrNull(1)) {
+            ids.follow -> if (followOpen && ids.follow != 0) Tab.FOLLOW else Tab.ADS
             ids.customers -> Tab.CUSTOMERS
             ids.profile -> Tab.ME
             ids.addHub, ids.myProperties, ids.propertyForm -> Tab.POST

@@ -164,12 +164,14 @@ class MainActivity : AppCompatActivity() {
                 myProperties = R.id.myPropertiesFragment,
                 propertyForm = R.id.myPropertyFormFragment,
                 addHub = R.id.addHubFragment,
+                follow = R.id.nativePartnerFragment,
             ),
+            followRootIsRequests(),
         )
         val adsOn = tab == FooterTabs.Tab.ADS
         val customersOn = tab == FooterTabs.Tab.CUSTOMERS
         val postOn = tab == FooterTabs.Tab.POST
-        val chatOn = tab == FooterTabs.Tab.CHAT
+        val chatOn = tab == FooterTabs.Tab.FOLLOW
         val meOn = tab == FooterTabs.Tab.ME
         paintTab(
             binding.divarTabbar.tabAdsIcon,
@@ -196,8 +198,8 @@ class MainActivity : AppCompatActivity() {
             binding.divarTabbar.tabChatIcon,
             binding.divarTabbar.tabChatLabel,
             chatOn,
-            R.drawable.ic_tab_chat,
-            R.drawable.ic_messages,
+            R.drawable.ic_clipboard,
+            R.drawable.ic_clipboard,
         )
         paintTab(
             binding.divarTabbar.tabMeIcon,
@@ -645,7 +647,7 @@ class MainActivity : AppCompatActivity() {
             openCustomers(Uri.parse("${PartnerApi.BASE}/express/partner/customers"))
         }
         binding.divarTabbar.tabPost.setOnClickListener { openPostAd() }
-        binding.divarTabbar.tabChat.setOnClickListener { openVinorChat() }
+        binding.divarTabbar.tabChat.setOnClickListener { openFollowTab() }
         binding.divarTabbar.tabMe.setOnClickListener { openProfile() }
         binding.root.post {
             navController.addOnDestinationChangedListener { _, destination, _ ->
@@ -787,6 +789,24 @@ class MainActivity : AppCompatActivity() {
             .build()
         runCatching { navController.navigate(R.id.myPropertyFormFragment, args, opts) }
             .onFailure { navController.navigate(R.id.myPropertyFormFragment, args) }
+    }
+
+    /** تب «پیگیری»: صفحهٔ پیگیری درخواست‌ها (همان /express/partner/requests وب). */
+    private fun openFollowTab() {
+        if (!PartnerApi.hasSession()) {
+            DeepLinkPendingStore.save(this, "${PartnerApi.BASE}/express/partner/requests")
+            openLogin()
+            return
+        }
+        openNativePage(NativePartnerFragment.PAGE_REQUESTS, asTab = true)
+    }
+
+    private fun followRootIsRequests(): Boolean {
+        val stack = runCatching { navController.currentBackStack.value.toList() }.getOrDefault(emptyList())
+        val home = stack.indexOfFirst { it.destination.id == R.id.dashboardFragment }
+        val root = stack.getOrNull(home + 1) ?: return false
+        if (root.destination.id != R.id.nativePartnerFragment) return false
+        return root.arguments?.getString(NativePartnerFragment.ARG_PAGE) == NativePartnerFragment.PAGE_REQUESTS
     }
 
     private fun navigateTab(dest: Int, args: Bundle? = null) {

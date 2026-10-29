@@ -6,7 +6,7 @@ import org.json.JSONArray
 object LandDetailRole {
     enum class Audience { GUEST, PARTNER, OWNER }
 
-    enum class StickyKind { LOGIN, CHAT, DIVAR, MANAGE }
+    enum class StickyKind { CALL, DIVAR, MANAGE }
 
     data class Sticky(val kind: StickyKind, val label: String)
 
@@ -63,10 +63,15 @@ object LandDetailRole {
         val external = isDivar || showDivar || hasDivarUrl
         if (external && audience != Audience.OWNER) return Sticky(StickyKind.DIVAR, "دیدن در دیوار")
         return when (audience) {
-            Audience.GUEST -> Sticky(StickyKind.LOGIN, "ورود برای گفتگو")
-            Audience.PARTNER -> Sticky(StickyKind.CHAT, "گفتگو")
+            Audience.GUEST, Audience.PARTNER -> Sticky(StickyKind.CALL, "تماس")
             Audience.OWNER -> Sticky(StickyKind.MANAGE, "مدیریت ملک")
         }
+    }
+
+    /** شماره‌ای که خود آگهی برای تماس می‌دهد (call_phone)، وگرنه خط بازدید وینور. */
+    fun callPhone(raw: String?): String {
+        val p = raw.orEmpty().trim()
+        return if (p.isNotEmpty()) p else "09121471301"
     }
 
     fun stickyHint(audience: Audience, published: Boolean): String {
