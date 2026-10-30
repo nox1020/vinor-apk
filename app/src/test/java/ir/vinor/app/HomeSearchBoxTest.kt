@@ -89,14 +89,17 @@ class HomeSearchBoxTest {
         val profile = source("src/main/res/layout/fragment_profile.xml").readText()
         val profileCode = source("src/main/java/ir/vinor/app/ProfileFragment.kt").readText()
         assertTrue(profile.contains("profileNotifications"))
+        assertTrue(profile.contains("profileNotificationsBadge"))
         assertTrue(profile.contains("profileSummaryWallet"))
         assertTrue(profile.contains("profileSummaryCustomers"))
         assertTrue(profile.contains("profileSummaryVisits"))
         assertTrue(profile.contains("profileSummaryDeals"))
-        assertTrue(profile.contains("profileQuickTraining"))
+        assertFalse(profile.contains("profileQuickTraining"))
         assertTrue(profile.contains("profileQuickNews"))
         assertTrue(profile.contains("profileQuickFollow"))
         assertTrue(profileCode.contains("refreshWorkSummary"))
+        assertTrue(profileCode.contains("b.profileQuickFollow.isVisible = !approved"))
+        assertTrue(profileCode.contains("b.profileNotificationsBadge.isVisible = unread > 0"))
     }
 
     private fun source(relative: String): File {
