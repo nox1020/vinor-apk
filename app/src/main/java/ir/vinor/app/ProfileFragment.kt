@@ -92,9 +92,6 @@ class ProfileFragment : Fragment() {
         binding.profileSummaryWallet.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/commissions")
         }
-        binding.profileQuickTraining.setOnClickListener {
-            (activity as? MainActivity)?.openPath("/express/partner/training")
-        }
         binding.profileQuickNews.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/news")
         }
@@ -208,7 +205,10 @@ class ProfileFragment : Fragment() {
         val approved = profile.optBoolean("is_approved")
         b.profileSummaryWallet.isVisible = approved
         b.profileSummaryPerformance.isVisible = approved
-        b.profileQuickFollow.text = if (approved) "پیگیری" else "سطوح"
+        // An approved partner already has Follow-up in the menu and bottom bar.
+        // Keep the unique Levels shortcut for non-approved accounts.
+        b.profileQuickFollow.isVisible = !approved
+        b.profileQuickFollow.text = "سطوح"
         if (!approved || summaryFetchGen == gen) return
         summaryFetchGen = gen
         val currentStamp = sessionStamp
@@ -265,6 +265,15 @@ class ProfileFragment : Fragment() {
 
     private fun render(state: ViewState) {
         val b = _binding ?: return
+        val account = (state as? ViewState.Content)?.profile
+        val unread = if (account?.loggedIn == true) account.unreadCount.coerceAtLeast(0) else 0
+        b.profileNotificationsBadge.isVisible = unread > 0
+        b.profileNotificationsBadge.text = if (unread > 99) "۹۹+" else VinorManMenu.persianDigits(unread)
+        b.profileNotifications.contentDescription = if (account?.loggedIn == true) {
+            "اعلان‌ها، ${VinorManMenu.persianDigits(unread)} خوانده‌نشده"
+        } else {
+            "اعلان‌ها"
+        }
         when (state) {
             ViewState.Loading -> {
                 stopShimmer()
