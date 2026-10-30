@@ -65,7 +65,7 @@ object VinorManMenu {
     )
 
     fun groupTitle(group: Int): String? = when (group) {
-        GROUP_ADS -> "آگهی‌های من"
+        GROUP_ADS -> "ملک و علاقه‌مندی‌ها"
         GROUP_PARTNER -> "همکاری با وینور"
         GROUP_SETTINGS -> "تنظیمات و پشتیبانی"
         else -> null
@@ -108,17 +108,7 @@ object VinorManMenu {
             action = Action.FAVORITES,
             requiresLogin = true,
         )
-        if (profile.loggedIn) {
-            out += Row(
-                GROUP_ADS,
-                "notifications",
-                "اعلان‌ها",
-                badge = if (profile.unreadCount > 0) persianDigits(profile.unreadCount) else null,
-                destination = "/express/partner/notifications",
-                action = Action.NOTIFICATIONS,
-                requiresLogin = true,
-            )
-        }
+        // Notifications remain accessible through the header bell, with a visible unread badge.
 
         if (!profile.approved && !profile.pending) {
             if (flags.consultantApiEnabled) {
@@ -135,7 +125,7 @@ object VinorManMenu {
                 out += Row(
                     GROUP_PARTNER,
                     "consultant",
-                    "همکاری با وینور",
+                    "درخواست همکاری",
                     destination = "/express/partner/apply",
                     action = Action.CONSULTANT,
                     requiresLogin = true,
@@ -177,14 +167,7 @@ object VinorManMenu {
                     requiresLogin = true,
                 )
             }
-            out += Row(
-                GROUP_PARTNER,
-                "wallet",
-                "کیف پول",
-                destination = "/express/partner/commissions",
-                action = Action.WALLET,
-                requiresLogin = true,
-            )
+            // Wallet / commissions are already reachable from the balance summary card.
             out += Row(
                 GROUP_PARTNER,
                 "invite",
