@@ -95,7 +95,7 @@ class HomeSearchBoxTest {
         assertTrue(profile.contains("profileSummaryVisits"))
         assertTrue(profile.contains("profileSummaryDeals"))
         assertFalse(profile.contains("profileQuickTraining"))
-        assertTrue(profile.contains("profileQuickNews"))
+        assertFalse(profile.contains("profileQuickNews"))
         assertTrue(profile.contains("profileQuickFollow"))
         assertTrue(profileCode.contains("refreshWorkSummary"))
         assertTrue(profileCode.contains("b.profileQuickFollow.isVisible = !approved"))

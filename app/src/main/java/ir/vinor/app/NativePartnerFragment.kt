@@ -343,7 +343,6 @@ class NativePartnerFragment : Fragment() {
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
         when (page) {
-            PAGE_NEWS -> bindNews(obj)
             PAGE_TRAINING -> bindTraining(obj)
             PAGE_LEVELS -> bindLevels(obj)
             PAGE_INVITE -> bindInvite(obj)
@@ -364,27 +363,6 @@ class NativePartnerFragment : Fragment() {
                 (activity as? MainActivity)?.logoutFromDrawer(finish) ?: finish()
             }
         }
-    }
-
-    private fun bindNews(obj: JSONObject) {
-        val news = obj.optJSONArray("home_news_items") ?: JSONArray()
-        var shown = 0
-        for (i in 0 until news.length()) {
-            val raw = news.opt(i)
-            val text: String
-            val time: String
-            if (raw is JSONObject) {
-                text = raw.optString("text")
-                time = raw.optString("time")
-            } else {
-                text = news.optString(i)
-                time = ""
-            }
-            if (text.isBlank()) continue
-            addCard(text, "", time)
-            shown++
-        }
-        if (shown == 0) bindEmpty("خبری ثبت نشده.")
     }
 
     private fun bindTraining(obj: JSONObject) {
@@ -1444,7 +1422,6 @@ class NativePartnerFragment : Fragment() {
 
     companion object {
         const val ARG_PAGE = "page"
-        const val PAGE_NEWS = "news"
         const val PAGE_TRAINING = "training"
         const val PAGE_LEVELS = "levels"
         const val PAGE_INVITE = "invite"
@@ -1457,7 +1434,6 @@ class NativePartnerFragment : Fragment() {
         const val PAGE_PRIVACY = "privacy"
 
         fun titleFor(page: String): String = when (page) {
-            PAGE_NEWS -> "خبر وینور"
             PAGE_TRAINING -> "آموزش"
             PAGE_LEVELS -> "سطوح همکاری"
             PAGE_INVITE -> "دعوت"
@@ -1486,7 +1462,6 @@ class NativePartnerFragment : Fragment() {
         }
 
         fun dataPath(page: String): String? = when (page) {
-            PAGE_NEWS -> "/express/partner/home/data"
             PAGE_TRAINING -> "/express/partner/api/training/data"
             PAGE_LEVELS -> "/express/partner/api/levels/data"
             PAGE_INVITE -> "/express/partner/api/invite/data"

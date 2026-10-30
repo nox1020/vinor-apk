@@ -413,34 +413,18 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/profileQuickFollow"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/profileQuickNews"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginHorizontal="8dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_search_option"
-                    android:clickable="true" android:focusable="true"
-                    android:gravity="center"
-                    android:text="خبر"
-                    android:textColor="@color/vinor_text" />
-                <TextView
-                    android:id="@+id/profileQuickFollow"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_search_option"
-                    android:clickable="true" android:focusable="true"
-                    android:gravity="center"
-                    android:text="پیگیری"
-                    android:textColor="@color/vinor_text" />
-            </LinearLayout>
+                android:layout_marginHorizontal="8dp"
+                android:background="@drawable/bg_search_option"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="پیگیری"
+                android:textColor="@color/vinor_text" />
         </LinearLayout>
 
         <LinearLayout

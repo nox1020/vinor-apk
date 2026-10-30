@@ -168,9 +168,6 @@ class DashboardFragment : Fragment() {
         binding.dashboardShortcutTrain.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/training")
         }
-        binding.dashboardShortcutNews.setOnClickListener {
-            (activity as? MainActivity)?.openPath("/express/partner/news")
-        }
         binding.dashboardTileLevels.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/levels")
         }

@@ -842,7 +842,7 @@ class MainActivity : AppCompatActivity() {
                 val token = p.substringAfterLast('/')
                 if (token.isNotBlank()) openLand("divar:$token") else openPartnerHome()
             }
-            low.endsWith("/news") -> openNativePage(NativePartnerFragment.PAGE_NEWS)
+            low.endsWith("/news") -> openProfile()
             low.endsWith("/training") -> openNativePage(NativePartnerFragment.PAGE_TRAINING)
             low.endsWith("/levels") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)
             low.endsWith("/plus") -> openNativePage(NativePartnerFragment.PAGE_LEVELS)

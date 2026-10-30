@@ -98,7 +98,6 @@ object AuthReturnStore {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private val NATIVE_PAGES = setOf(
-        NativePartnerFragment.PAGE_NEWS,
         NativePartnerFragment.PAGE_TRAINING,
         NativePartnerFragment.PAGE_LEVELS,
         NativePartnerFragment.PAGE_INVITE,

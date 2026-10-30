@@ -256,8 +256,7 @@ object DeepLinkRouter {
 
     private fun isPublicPartnerPath(path: String): Boolean {
         val p = path.lowercase(Locale.US)
-        return p.startsWith("/express/partner/news") ||
-            p.startsWith("/express/partner/training") ||
+        return p.startsWith("/express/partner/training") ||
             p.startsWith("/express/partner/levels") ||
             p.startsWith("/express/partner/plus") ||
             p.startsWith("/express/partner/cooperation") ||

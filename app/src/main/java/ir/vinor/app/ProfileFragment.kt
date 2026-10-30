@@ -92,9 +92,6 @@ class ProfileFragment : Fragment() {
         binding.profileSummaryWallet.setOnClickListener {
             (activity as? MainActivity)?.openPath("/express/partner/commissions")
         }
-        binding.profileQuickNews.setOnClickListener {
-            (activity as? MainActivity)?.openPath("/express/partner/news")
-        }
         binding.profileQuickFollow.setOnClickListener {
             val path = if (latestProfile?.optBoolean("is_approved") == true) {
                 "/express/partner/requests"
