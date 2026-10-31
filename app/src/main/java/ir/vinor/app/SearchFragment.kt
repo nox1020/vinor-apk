@@ -497,6 +497,9 @@ class SearchFragment : Fragment() {
             val matches = previous[key]
             val reused = if (matches.isNullOrEmpty()) null else matches.removeAt(0)
             val view = reused ?: ItemAdsAllRowBinding.inflate(layoutInflater, list, false).root
+            if (reused == null) {
+                PartnerImages.roundClip(view.findViewById(R.id.adsAllThumbWrap), 12f)
+            }
             val oldAd = view.tag as? SearchAd
             if (oldAd != ad || !sameApproval) {
                 bindRow(ItemAdsAllRowBinding.bind(view), ad)
@@ -553,7 +556,6 @@ class SearchFragment : Fragment() {
             row.adsAllThumb.setImageDrawable(null)
             row.adsAllPlaceholder.isVisible = true
         }
-        PartnerImages.roundClip(row.adsAllThumbWrap, 12f)
         row.root.contentDescription = listOf(ad.title, price, area, loc)
             .filter { it.isNotBlank() }.joinToString("، ")
         row.root.setOnClickListener { openAd(ad) }

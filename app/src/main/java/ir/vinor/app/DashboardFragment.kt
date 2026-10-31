@@ -879,6 +879,9 @@ class DashboardFragment : Fragment() {
     /** آگهی‌ها قبل از اولین رسم می‌آیند تا کارت‌ها بعد از بقیهٔ خانه ظاهر نشوند. */
     private suspend fun withAds(home: JSONObject, ctx: android.content.Context): JSONObject {
         if (!homePayloadOk(home)) return home
+        // The feed already has live cards. Fetching the optional Home HTML here
+        // delays the first paint and duplicates the SearchFragment network work.
+        if ((home.optJSONArray("public_lands")?.length() ?: 0) > 0) return home
         if ((home.optJSONArray("divar_pro_ads")?.length() ?: 0) > 0) return home
         if (HomeSuggest.files(home).length() > 0) return home
         return try {
