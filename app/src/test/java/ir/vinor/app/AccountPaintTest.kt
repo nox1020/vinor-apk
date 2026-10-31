@@ -26,7 +26,7 @@ class AccountPaintTest {
     fun loginDropsRememberedVisitsAndNotificationsBeforeNavigation() {
         val login = source("src/main/java/ir/vinor/app/LoginStep2Fragment.kt").readText()
         val forgetAt = login.indexOf("forgetPreviousAccount()")
-        val navigateAt = login.indexOf("consumePendingDeepLink()")
+        val navigateAt = login.indexOf("continueAfterLogin()")
         assertTrue(forgetAt >= 0)
         assertTrue(navigateAt > forgetAt)
         val host = source("src/main/java/ir/vinor/app/MainActivity.kt").readText()

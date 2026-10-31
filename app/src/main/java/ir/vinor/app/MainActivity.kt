@@ -477,7 +477,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLogin(sessionExpired: Boolean = false) {
-        if (sessionExpired) captureAuthReturn()
+        captureAuthReturn()
         val args = Bundle().apply {
             if (sessionExpired) {
                 putString(LoginStep1Fragment.ARG_REASON, AuthReturnStore.REASON_SESSION_EXPIRED)
@@ -488,16 +488,12 @@ class MainActivity : AppCompatActivity() {
             if (sessionExpired) findLoginStep1()?.showSessionExpiredHint()
             return
         }
-        // ورود همیشه درجا: باتم‌شیت روی همین صفحه، نه صفحهٔ جدا.
-        if (!supportFragmentManager.isStateSaved) {
-            LoginSheet.show(supportFragmentManager, sessionExpired)
-            return
-        }
+        // یک صفحهٔ ورود داخل همان شِل اپ؛ «برگشت» به همان صفحهٔ قبلی می‌رود.
         navController.navigate(R.id.loginStep1Fragment, args)
     }
 
-    /** بعد از ورود از باتم‌شیت: کار معلق را ادامه بده، وگرنه همین صفحه را تازه کن. */
-    fun continueAfterInlineLogin() {
+    /** بعد از ورود موفق: کار معلق را ادامه بده، وگرنه به همان صفحه‌ای که کاربر از آن آمد برگرد. */
+    fun continueAfterLogin() {
         val openedLink = consumePendingDeepLink()
         when {
             ConsultantResume.consume(this) -> {
@@ -509,16 +505,30 @@ class MainActivity : AppCompatActivity() {
                 AuthReturnStore.clear(this)
                 clearChatResume()
             }
+            returnFromLogin() -> {
+                AuthReturnStore.clear(this)
+                openChatIfResumed()
+            }
             else -> {
-                if (!consumeAuthReturn()) refreshCurrentDestination()
+                if (!consumeAuthReturn()) openPartnerHome()
                 openChatIfResumed()
             }
         }
         syncDivarTab()
     }
 
-    fun loginSheetCancelled() {
-        clearChatResume()
+    /** صفحه‌های ورود را از پشته برمی‌دارد؛ true یعنی صفحهٔ قبلی باقی است و تازه شد. */
+    private fun returnFromLogin(): Boolean {
+        val loginIds = setOf(R.id.loginStep1Fragment, R.id.loginStep2Fragment, R.id.loginWebFragment)
+        val stack = runCatching { navController.currentBackStack.value.toList() }.getOrDefault(emptyList())
+        val firstLogin = stack.indexOfFirst { it.destination.id in loginIds }
+        if (firstLogin <= 0) return false
+        val origin = stack.subList(0, firstLogin).lastOrNull { it.destination !is androidx.navigation.NavGraph }
+            ?: return false
+        val popped = runCatching { navController.popBackStack(origin.destination.id, false) }.getOrDefault(false)
+        if (!popped) return false
+        refreshCurrentDestination()
+        return true
     }
 
     private fun refreshCurrentDestination() {
@@ -689,7 +699,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openCustomers(uri: Uri) {
-        // The Customers tab displays the OTP form in place for guests.
+        if (!PartnerApi.hasSession()) {
+            DeepLinkPendingStore.save(this, "/express/partner/customers")
+            openLogin()
+            return
+        }
         val url = uri.toString()
         val current = navController.currentBackStackEntry?.arguments?.getString("url")
         if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
@@ -922,6 +936,11 @@ class MainActivity : AppCompatActivity() {
 
     /** تب «پیگیری»: صفحهٔ پیگیری درخواست‌ها (همان /express/partner/requests وب). */
     private fun openFollowTab() {
+        if (!PartnerApi.hasSession()) {
+            DeepLinkPendingStore.save(this, "/express/partner/requests")
+            openLogin()
+            return
+        }
         // Keep the footer selected; NativePartnerFragment handles guest login inline.
         openNativePage(NativePartnerFragment.PAGE_REQUESTS, asTab = true)
     }

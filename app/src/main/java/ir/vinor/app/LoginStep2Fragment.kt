@@ -162,18 +162,7 @@ class LoginStep2Fragment : Fragment() {
                         if (host is MainActivity) {
                             host.forgetPreviousAccount()
                             host.requestNotificationPermission()
-                            val openedLink = host.consumePendingDeepLink()
-                            if (ConsultantResume.consume(host)) {
-                                AuthReturnStore.clear(host)
-                                host.clearChatResume()
-                                host.openConsultantOnboarding()
-                            } else if (openedLink) {
-                                AuthReturnStore.clear(host)
-                                host.clearChatResume()
-                            } else {
-                                if (!host.consumeAuthReturn()) host.openPartnerHome()
-                                host.openChatIfResumed()
-                            }
+                            host.continueAfterLogin()
                             return@withContext
                         }
                         val nav = findNavController()
