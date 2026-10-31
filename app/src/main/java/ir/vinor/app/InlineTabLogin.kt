@@ -1,23 +1,23 @@
 package ir.vinor.app
 
-import android.os.SystemClock
-import android.view.LayoutInflater
+import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import androidx.fragment.app.commit
 
-/** OTP UI hosted by Customers and Follow-up without changing Navigation destination. */
+/**
+ * Host the canonical LoginStep1Fragment/LoginStep2Fragment inside Customers and
+ * Follow-up instead of maintaining a duplicate OTP UI and network flow.
+ */
 object InlineTabLogin {
+    const val ARG_INLINE = "vinor_inline_tab_login"
+    private const val TAG = "vinor_shared_inline_login"
+    private const val AUTH_RESULT = "vinor_inline_login_authenticated"
+
+    fun isInline(fragment: Fragment): Boolean =
+        fragment.arguments?.getBoolean(ARG_INLINE, false) == true
+
     fun show(
         fragment: Fragment,
         container: ViewGroup,
@@ -25,175 +25,54 @@ object InlineTabLogin {
         expired: Boolean = false,
         onAuthenticated: () -> Unit,
     ) {
-        if (container.childCount > 0 && !expired) return // Preserve an in-progress OTP.
-        container.removeAllViews()
-        val form = LayoutInflater.from(container.context)
-            .inflate(R.layout.view_inline_tab_login, container, false)
-        container.addView(form)
-        val heading = form.findViewById<TextView>(R.id.inlineLoginLead)
-        val error = form.findViewById<TextView>(R.id.inlineLoginError)
-        val phone = form.findViewById<EditText>(R.id.inlineLoginPhone)
-        val code = form.findViewById<EditText>(R.id.inlineLoginCode)
-        val phoneStage = form.findViewById<View>(R.id.inlinePhoneStage)
-        val otpStage = form.findViewById<View>(R.id.inlineOtpStage)
-        val send = form.findViewById<Button>(R.id.inlineLoginSend)
-        val verify = form.findViewById<Button>(R.id.inlineLoginVerify)
-        val resend = form.findViewById<Button>(R.id.inlineLoginResend)
-        val change = form.findViewById<Button>(R.id.inlineLoginChange)
-        val progress = form.findViewById<View>(R.id.inlineLoginProgress)
-        heading.text = if (expired) "نشست شما منقضی شده است. برای مشاهده $tab دوباره وارد شوید."
-            else "برای مشاهده $tab شماره موبایل خود را تأیید کنید."
-        var normalizedPhone = ""
-        var busy = false
-        var lastSend = 0L
-        var requestId = 0
-        var pendingSmsCode: String? = null
-        var autoSubmittedCode: String? = null
-        var deliverSms: (String) -> Unit = { sms -> pendingSmsCode = sms }
-        fun report(message: String) {
-            error.text = message
-            error.isVisible = message.isNotBlank()
+        fragment.childFragmentManager.setFragmentResultListener(
+            AUTH_RESULT, fragment.viewLifecycleOwner,
+        ) { _, _ -> onAuthenticated() }
+        if (fragment.childFragmentManager.findFragmentByTag(TAG) != null && !expired) return
+        val args = Bundle().apply {
+            putBoolean(ARG_INLINE, true)
+            if (expired) putString(
+                LoginStep1Fragment.ARG_REASON,
+                LoginStep1Fragment.REASON_SESSION_EXPIRED,
+            )
         }
-        fun active(): Boolean = fragment.isAdded && container.getChildAt(0) === form
-        fun setBusy(value: Boolean) {
-            busy = value
-            progress.isVisible = value
-            send.isEnabled = !value
-            verify.isEnabled = !value
-            resend.isEnabled = !value
-            change.isEnabled = !value
+        fragment.childFragmentManager.commit {
+            setReorderingAllowed(true)
+            replace(container.id, LoginStep1Fragment().apply { arguments = args }, TAG)
         }
-        fun requestOtp(resending: Boolean) {
-            if (busy) return
-            val candidate = if (resending) normalizedPhone else PartnerApi.normalizePhone(phone.text.toString())
-            if (!candidate.matches(Regex("09[0-9]{9}"))) {
-                report("لطفاً شماره موبایل ۱۱ رقمی معتبر وارد کنید.")
-                return
-            }
-            if (resending && lastSend > 0L &&
-                SystemClock.elapsedRealtime() - lastSend < 60_000L) {
-                report("برای ارسال مجدد کد، حداقل ۶۰ ثانیه صبر کنید.")
-                return
-            }
-            report("")
-            pendingSmsCode = null
-            autoSubmittedCode = null
-            // Leave the existing OTP screen and verified phone intact if resend fails.
-            // The server's /otp/resend returns {ok}; login-request returns {success}.
-            val endpoint = if (resending) "/express/partner/otp/resend"
-                else "/express/partner/api/login-request"
-            val body = JSONObject().put("phone", candidate)
-            if (!resending) body.put("accept_legal", true)
-            val id = ++requestId
-            (fragment.activity as? MainActivity)?.startOtpSms(fragment.viewLifecycleOwner) {
-                deliverSms(it)
-            }
-            setBusy(true)
-            fragment.viewLifecycleOwner.lifecycleScope.launch {
-                val response = try {
-                    withContext(Dispatchers.IO) {
-                        PartnerApi.postJson(endpoint, body, container.context)
-                    }
-                } catch (_: Exception) {
-                    JSONObject().put("error", "خطا در ارتباط. دوباره تلاش کنید.")
-                }
-                if (!active() || id != requestId) return@launch
-                setBusy(false)
-                if (response.optBoolean(if (resending) "ok" else "success")) {
-                    lastSend = SystemClock.elapsedRealtime()
-                    normalizedPhone = candidate
-                    heading.text = if (response.optBoolean("otp_pending")) {
-                        "کد قبلی هنوز معتبر است؛ همان کد را وارد کنید."
-                    } else "کد تأیید به $candidate ارسال شد."
-                    phoneStage.isVisible = false
-                    otpStage.isVisible = true
-                    if (resending) code.text?.clear()
-                    code.requestFocus()
-                    pendingSmsCode?.let { incoming ->
-                        pendingSmsCode = null
-                        deliverSms(incoming)
-                    }
-                    if (resending) Toast.makeText(container.context, "کد تأیید دوباره ارسال شد.", Toast.LENGTH_SHORT).show()
-                } else {
-                    pendingSmsCode = null
-                    // Existing challenge may still be valid after a resend 429/network error.
-                    if (!resending) (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
-                    report(response.optString("error").ifBlank { "ارسال کد تأیید ناموفق بود." })
-                }
-            }
+    }
+
+    fun showOtp(from: LoginStep1Fragment, args: Bundle): Boolean {
+        if (!isInline(from) || from.id == View.NO_ID || !from.isAdded) return false
+        args.putBoolean(ARG_INLINE, true)
+        from.parentFragmentManager.commit {
+            setReorderingAllowed(true)
+            replace(from.id, LoginStep2Fragment().apply { arguments = args }, TAG)
         }
-        send.setOnClickListener { requestOtp(false) }
-        resend.setOnClickListener { requestOtp(true) }
-        change.setOnClickListener {
-            if (!busy) {
-                ++requestId
-                normalizedPhone = ""
-                pendingSmsCode = null
-                autoSubmittedCode = null
-                (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
-                code.text?.clear()
-                otpStage.isVisible = false
-                phoneStage.isVisible = true
-                heading.text = "برای مشاهده $tab شماره موبایل خود را تأیید کنید."
-                report("")
-            }
+        return true
+    }
+
+    fun backToPhone(from: LoginStep2Fragment): Boolean {
+        if (!isInline(from) || from.id == View.NO_ID || !from.isAdded) return false
+        val args = Bundle().apply { putBoolean(ARG_INLINE, true) }
+        from.parentFragmentManager.commit {
+            setReorderingAllowed(true)
+            replace(from.id, LoginStep1Fragment().apply { arguments = args }, TAG)
         }
-        verify.setOnClickListener {
-            if (busy) return@setOnClickListener
-            // Suppress only duplicate in-flight requests, not later corrections.
-            val otp = OtpSmsAutoFill.normalizeOtpDigits(code.text?.toString().orEmpty())
-            if (normalizedPhone.isBlank() || otp.length != 5) {
-                report("کد تأیید را به‌درستی وارد کنید.")
-                return@setOnClickListener
-            }
-            report("")
-            setBusy(true)
-            fragment.viewLifecycleOwner.lifecycleScope.launch {
-                val response = try {
-                    withContext(Dispatchers.IO) {
-                        PartnerApi.postJson(
-                            "/express/partner/api/verify",
-                            JSONObject().put("phone", normalizedPhone).put("code", otp),
-                            container.context,
-                        )
-                    }
-                } catch (_: Exception) {
-                    JSONObject().put("error", "خطا در ارتباط. دوباره تلاش کنید.")
-                }
-                if (!active()) return@launch
-                setBusy(false)
-                if (response.optBoolean("success")) {
-                    SessionAccount.remember(container.context, normalizedPhone)
-                    PartnerApi.markLoggedIn()
-                    (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
-                    (fragment.activity as? MainActivity)?.let { host ->
-                        host.forgetPreviousAccount()
-                        host.requestNotificationPermission()
-                    }
-                    VinorFcmRegistrar.registerAfterLogin(container.context)
-                    if (PartnerApi.hasSession()) onAuthenticated()
-                    else report("نشست ورود برقرار نشد. لطفاً دوباره تلاش کنید.")
-                } else {
-                    // Permit manual correction and the next SMS retry after an invalid code.
-                    autoSubmittedCode = null
-                    pendingSmsCode = null
-                    report(response.optString("error").ifBlank { "کد تأیید نادرست است." })
-                }
-            }
-        }
-        // OTP may be received before the server response: hold until step 2 is visible.
-        deliverSms = { incoming ->
-            val digits = OtpSmsAutoFill.normalizeOtpDigits(incoming)
-            if (active() && digits.length == 5) {
-                if (normalizedPhone.isBlank() || !otpStage.isVisible) {
-                    pendingSmsCode = digits
-                } else if (autoSubmittedCode != digits) {
-                    autoSubmittedCode = digits
-                    code.setText(digits)
-                    code.setSelection(digits.length)
-                    verify.performClick()
-                }
-            }
+        return true
+    }
+
+    fun finish(from: LoginStep2Fragment): Boolean {
+        if (!isInline(from)) return false
+        from.parentFragmentManager.setFragmentResult(AUTH_RESULT, Bundle.EMPTY)
+        return true
+    }
+
+    fun dismiss(parent: Fragment) {
+        val child = parent.childFragmentManager.findFragmentByTag(TAG) ?: return
+        parent.childFragmentManager.commit {
+            setReorderingAllowed(true)
+            remove(child)
         }
     }
 }
