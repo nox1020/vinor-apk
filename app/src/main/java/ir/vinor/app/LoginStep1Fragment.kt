@@ -107,12 +107,10 @@ class LoginStep1Fragment : Fragment() {
                     b.loginStep1Submit.isEnabled = true
                     if (success) {
                         if (isAdded) Toast.makeText(requireContext(), obj.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
-                        val bundle = android.os.Bundle().apply {
-                            putString("phone", phone)
-                            earlySmsOtp?.let { putString("early_sms_otp", it) }
-                        }
+                        val bundle = android.os.Bundle().apply { putString("phone", phone) }
                         view?.post {
                             if (!isAdded) return@post
+                            earlySmsOtp?.let { bundle.putString("early_sms_otp", it) }
                             try {
                                 findNavController().navigate(R.id.action_loginStep1_to_loginStep2, bundle)
                             } catch (e: Exception) {
