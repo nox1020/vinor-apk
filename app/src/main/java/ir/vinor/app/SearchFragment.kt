@@ -172,6 +172,7 @@ class SearchFragment : Fragment() {
      *  the separate search endpoint is unavailable or slow. Never replace a
      *  richer search result with an empty home response. */
     fun acceptHomeListings(home: JSONObject) {
+        val wasApproved = approved
         approved = home.optBoolean("is_approved")
         rememberedApproved = approved
         // Home/data now ships the same public catalog as the standalone feed.
@@ -181,15 +182,18 @@ class SearchFragment : Fragment() {
                 SearchAds.fromObjects(HomeSuggest.files(home)),
         )
         homeFallbackAds = candidates
-        if (_binding == null || candidates.isEmpty()) return
-        // Do not replace or append partial Home results to an already painted feed.
-        // The catalog request below reconciles both sources in one update instead.
-        if (rawAds.isNotEmpty()) return
-        rawAds = candidates
-        hasSnapshot = true
-        rememberedAds = rawAds
-        ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
-        render()
+        if (_binding == null) return
+        // Preserve already painted cards. Late Home promotions may append genuinely
+        // new listings, but must never replace or re-inflate the public feed.
+        val merged = SearchAds.appendNew(rawAds, candidates)
+        if (merged.size == rawAds.size && wasApproved == approved) return
+        rawAds = merged
+        hasSnapshot = rawAds.isNotEmpty()
+        if (hasSnapshot) {
+            rememberedAds = rawAds
+            ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
+            render()
+        }
     }
 
     fun refreshAds(onComplete: (() -> Unit)? = null) {
@@ -247,7 +251,7 @@ class SearchFragment : Fragment() {
                 return@launch
             }
             approved = loaded?.approved == true || (homeFallbackAds.isNotEmpty() && approved)
-            rawAds = SearchAds.dedupe(loaded?.ads.orEmpty() + homeFallbackAds)
+            rawAds = SearchAds.appendNew(SearchAds.dedupe(loaded?.ads.orEmpty()), homeFallbackAds)
             hasSnapshot = true
             rememberedAds = rawAds
             rememberedApproved = approved

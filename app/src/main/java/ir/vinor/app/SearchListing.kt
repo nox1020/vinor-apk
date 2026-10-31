@@ -69,6 +69,14 @@ object SearchAds {
         return "anonymous:${ad.source}:${ad.title.trim()}:${ad.location.trim()}:${ad.index}"
     }
 
+    /** Append only genuinely new Home cards; keep the order and views of live results. */
+    fun appendNew(primary: List<SearchAd>, extras: List<SearchAd>): List<SearchAd> {
+        if (extras.isEmpty()) return primary
+        val keys = primary.mapTo(HashSet(primary.size + extras.size)) { cardKey(it) }
+        val additional = extras.filter { keys.add(cardKey(it)) }
+        return if (additional.isEmpty()) primary else primary + additional
+    }
+
     fun apply(ads: List<SearchAd>, query: SearchQuery): List<SearchAd> {
         val n = query.normalized()
         val filtered = ads.filter { matches(it, n) }

@@ -115,6 +115,17 @@ class SearchQueryTest {
     }
 
     @Test
+    fun addingLateHomeCardsDoesNotReplaceOrDuplicatePublicFeed() {
+        val live = SearchAd(token = "245", title = "آگهی اصلی", index = 0)
+        val duplicate = live.copy(title = "نسخه پیشنهادی", priceRaw = "۹۰۰")
+        val extra = SearchAd(token = "300", title = "آگهی جدید", index = 1)
+        val merged = SearchAds.appendNew(listOf(live), listOf(duplicate, extra, extra))
+        assertEquals(listOf(live, extra), merged)
+        assertEquals(merged, SearchAds.appendNew(merged, listOf(duplicate, extra)))
+        assertEquals(listOf(live), SearchAds.appendNew(listOf(live), emptyList()))
+    }
+
+    @Test
     fun reducer_emptyListAndNetworkError() {
         val loading = SearchStateReducer.loading()
         assertEquals(SearchPhase.LOADING, loading.phase)
