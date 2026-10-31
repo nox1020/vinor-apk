@@ -23,8 +23,8 @@
     <string name="login_network_error">خطا در ارتباط. دوباره تلاش کنید.</string>
     <string name="login_success">ورود با موفقیت انجام شد.</string>
     <string name="login_resend_prompt">هنوز کد را دریافت نکردید؟</string>
-    <string name="login_resend_countdown">ارسال مجدد کد تا %1$d ثانیه دیگر</string>
-    <string name="login_resend_wait">لطفاً %1$d ثانیه صبر کنید.</string>
+    <string name="login_resend_countdown">ارسال مجدد کد تا %1$s ثانیه دیگر</string>
+    <string name="login_resend_wait">لطفاً %1$s ثانیه صبر کنید.</string>
     <string name="login_resend_ok">کد تأیید مجدد ارسال شد.</string>
     <string name="login_resend_fail">خطا در ارسال مجدد.</string>
     <string name="login_sms_permission_denied">بدون دسترسی پیامک، خواندن خودکار کد ممکن نیست؛ کد را دستی وارد کنید.</string>

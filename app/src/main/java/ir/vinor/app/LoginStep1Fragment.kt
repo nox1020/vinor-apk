@@ -110,7 +110,10 @@ class LoginStep1Fragment : Fragment() {
                     b.loginStep1Submit.isEnabled = true
                     if (success) {
                         if (isAdded) Toast.makeText(requireContext(), obj.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
-                        val bundle = android.os.Bundle().apply { putString("phone", phone) }
+                        val bundle = android.os.Bundle().apply {
+                            putString("phone", phone)
+                            if (obj.has("retry_after")) putInt("retry_after", obj.optInt("retry_after", 60))
+                        }
                         view?.post {
                             if (!isAdded) return@post
                             earlySmsOtp?.let { bundle.putString("early_sms_otp", it) }

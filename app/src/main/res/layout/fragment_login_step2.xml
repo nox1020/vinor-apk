@@ -76,6 +76,7 @@
                 android:hint="— — — — —"
                 android:imeOptions="actionDone"
                 android:importantForAutofill="yes"
+                android:autofillHints="smsOTPCode"
                 android:inputType="number"
                 android:letterSpacing="0.28"
                 android:maxLength="5"
