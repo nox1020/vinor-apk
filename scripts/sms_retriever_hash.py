@@ -18,7 +18,9 @@ PACKAGE_NAME = "ir.vinor.app"
 
 def sms_retriever_hash_from_cert_der(cert_der: bytes) -> str:
     """Match Android Signature.toCharsString() + AppSignatureHelper.hash()."""
-    signature = "".join(chr(b & 0xFF) for b in cert_der)
+    # Android Signature.toCharsString() emits lowercase hex characters,
+    # not the raw DER bytes. Using raw bytes produced an incompatible hash.
+    signature = cert_der.hex()
     app_info = f"{PACKAGE_NAME} {signature}"
     digest = hashlib.sha256(app_info.encode("utf-8")).digest()[:9]
     return base64.b64encode(digest).decode("ascii")[:11]
