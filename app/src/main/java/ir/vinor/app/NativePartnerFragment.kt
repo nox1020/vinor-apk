@@ -185,6 +185,13 @@ class NativePartnerFragment : Fragment() {
         binding.nativeHeader.pageTitle.text = text
     }
 
+    /** Requests keep authentication inside their own tab, other pages retain navigation. */
+    private fun requestTabLogin(sessionExpired: Boolean = false) {
+        if (!showInlineLogin(sessionExpired)) {
+            (activity as? MainActivity)?.openLogin(sessionExpired = sessionExpired)
+        }
+    }
+
     fun showInlineLogin(expired: Boolean = false): Boolean {
         if (page != PAGE_REQUESTS) return false
         val b = _binding ?: return false
@@ -266,7 +273,7 @@ class NativePartnerFragment : Fragment() {
                         showInlineLogin(expired = VinorPageLoad.needsLogin(fresh))
                     } else {
                         if (!pageRendered) bindEmpty("برای ادامه وارد شوید.")
-                        (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(fresh))
+                        requestTabLogin(sessionExpired = VinorPageLoad.needsLogin(fresh))
                     }
                     return@launch
                 }
@@ -331,7 +338,7 @@ class NativePartnerFragment : Fragment() {
             clearRemembered()
             bindEmpty("برای دیدن نشان‌ها وارد شوید.")
             binding.nativeRefresh.isRefreshing = false
-            (activity as? MainActivity)?.openLogin()
+            requestTabLogin()
             return
         }
         val codes = VinorFavoritesStore.codes(ctx)
@@ -364,7 +371,7 @@ class NativePartnerFragment : Fragment() {
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 if (VinorPageLoad.needsLogin(resp)) {
                     clearRemembered()
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    requestTabLogin(sessionExpired = true)
                     return@launch
                 }
                 val live = VinorPageLoad.canRemember(resp)
@@ -1132,13 +1139,13 @@ class NativePartnerFragment : Fragment() {
                 val freshCsrf = resp.optString("csrf_token").trim()
                 if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
                 if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    requestTabLogin(sessionExpired = true)
                     return@launch
                 }
                 if (FollowRequests.isUnauthorized(resp)) {
                     followCsrf = ""
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openLogin()
+                    requestTabLogin()
                     return@launch
                 }
                 if (FollowRequests.isOk(resp)) {
@@ -1203,7 +1210,7 @@ class NativePartnerFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401 || FollowRequests.isUnauthorized(resp)) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    requestTabLogin(sessionExpired = true)
                     return@launch
                 }
                 val ok = FollowRequests.isOk(resp)
@@ -1257,7 +1264,7 @@ class NativePartnerFragment : Fragment() {
                 val outcome = ListingArchive.outcome(fresh)
                 if (outcome == ListingArchive.Outcome.UNAUTHORIZED) {
                     ListingMemory.clearSession()
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    requestTabLogin(sessionExpired = true)
                     return@launch
                 }
                 Toast.makeText(
@@ -1313,13 +1320,13 @@ class NativePartnerFragment : Fragment() {
                 val freshCsrf = resp.optString("csrf_token").trim()
                 if (freshCsrf.isNotBlank()) followCsrf = freshCsrf
                 if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    requestTabLogin(sessionExpired = true)
                     return@launch
                 }
                 if (FollowRequests.isUnauthorized(resp)) {
                     followCsrf = ""
                     Toast.makeText(ctx, FollowRequests.userMessage(resp), Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.openLogin()
+                    requestTabLogin()
                     return@launch
                 }
                 if (FollowRequests.isOk(resp)) {
@@ -1405,7 +1412,7 @@ class NativePartnerFragment : Fragment() {
                 }
                 if (_binding == null) return@launch
                 if (PartnerApi.isSessionExpired(resp) || resp.optInt("http_status") == 401) {
-                    (activity as? MainActivity)?.openLogin(sessionExpired = resp.optBoolean("session_expired"))
+                    requestTabLogin(sessionExpired = resp.optBoolean("session_expired"))
                     return@launch
                 }
                 if (resp.optBoolean("ok") || resp.optString("status") == "pending" || resp.optString("status") == "approved") {
