@@ -114,9 +114,15 @@ class NativePartnerFragment : Fragment() {
             searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
             if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
         }
+        ensureAccountScope()
         if (!dropStaleAccountPaint()) {
-            rememberedByPage[memoryKey()]?.let {
-                bindPayload(it)
+            val privatePage = page !in PUBLIC_PAGES
+            val memory = rememberedByPage[memoryKey()]
+            val disk = currentDataPath()?.let { PartnerApi.peekJson(it, context) }
+            val cached = memory ?: disk
+            if (VinorPageLoad.canShowCached(cached, privatePage, PartnerApi.hasSession()) &&
+                cached != null && canPaint(cached)) {
+                bindPayload(cached)
                 pageRendered = true
             }
             paintedGeneration = sessionStamp
@@ -126,6 +132,7 @@ class NativePartnerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        ensureAccountScope()
         if (dropStaleAccountPaint()) {
             skipNextResume = false
             if (page != PAGE_APPLY) load()
@@ -193,12 +200,16 @@ class NativePartnerFragment : Fragment() {
         scope.launch {
             val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(path, ctx) }
             try {
-                val fresh = PartnerApi.loadDisplay(path, ctx) { data ->
+                var paintedByLoader = false
+                val fresh = if (pull) withContext(Dispatchers.IO) {
+                    PartnerApi.getFresh(path, ctx)
+                } else PartnerApi.loadDisplay(path, ctx) { data ->
                     if (_binding == null || gen != loadGen || stamp != sessionStamp || !followCurrent(epoch)) {
                         return@loadDisplay
                     }
                     if (!canPaint(data)) return@loadDisplay
                     bindPayload(data)
+                    paintedByLoader = true
                     pageRendered = true
                     binding.nativeProgress.isVisible = false
                 }
@@ -222,7 +233,7 @@ class NativePartnerFragment : Fragment() {
                     return@launch
                 }
                 if (canPaint(fresh)) {
-                    bindPayload(fresh)
+                    if (!paintedByLoader) bindPayload(fresh)
                     pageRendered = true
                     if (VinorPageLoad.canRemember(fresh)) {
                         rememberedByPage[memoryKey()] = VinorPageLoad.rememberedCopy(fresh)
@@ -521,6 +532,14 @@ class NativePartnerFragment : Fragment() {
             binding.nativeRefresh.isRefreshing = true
             load(pull = true)
         }
+    }
+
+    /** RAM snapshots must never cross an account switch, even without an explicit logout. */
+    private fun ensureAccountScope() {
+        val ctx = context ?: return
+        val account = VinorCacheSession.fingerprint(ctx)
+        if (rememberedAccount != null && rememberedAccount != account) clearRemembered()
+        rememberedAccount = account
     }
 
     private fun dropStaleAccountPaint(): Boolean {
@@ -1448,12 +1467,15 @@ class NativePartnerFragment : Fragment() {
         }
 
         private val rememberedByPage = HashMap<String, JSONObject>()
+        private var rememberedAccount: String? = null
+        private val PUBLIC_PAGES = setOf(PAGE_TRAINING, PAGE_LEVELS, PAGE_TERMS, PAGE_PRIVACY)
         private var sessionStamp = 0
 
         fun generation(): Int = sessionStamp
 
         fun clearRemembered() {
             rememberedByPage.clear()
+            rememberedAccount = null
             sessionStamp++
         }
 

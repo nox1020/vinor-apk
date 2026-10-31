@@ -24,6 +24,18 @@ class VinorPageLoadTest {
     }
 
     @Test
+    fun cachedSnapshotNeedsValidStatusAndCorrectLoginState() {
+        val live = JSONObject().put("http_status", 200).put("rows", 2)
+        assertTrue(VinorPageLoad.canShowCached(live, requiresLogin = true, loggedIn = true))
+        assertFalse(VinorPageLoad.canShowCached(live, requiresLogin = true, loggedIn = false))
+        assertTrue(VinorPageLoad.canShowCached(live, requiresLogin = false, loggedIn = false))
+        assertFalse(VinorPageLoad.canShowCached(JSONObject(), false, true))
+        assertFalse(VinorPageLoad.canShowCached(JSONObject().put("http_status", 401), true, true))
+        assertFalse(VinorPageLoad.canShowCached(JSONObject().put("http_status", 403), true, true))
+        assertFalse(VinorPageLoad.canShowCached(JSONObject().put("http_status", 200).put("offline", true), true, true))
+    }
+
+    @Test
     fun memoryKeepsLivePayloadOnly() {
         val live = JSONObject().put("http_status", 200).put("title", "ملک")
         assertTrue(VinorPageLoad.canRemember(live))

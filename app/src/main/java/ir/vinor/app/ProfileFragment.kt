@@ -102,14 +102,24 @@ class ProfileFragment : Fragment() {
         }
         binding.profileGuestLogin.setOnClickListener { openLoginScreen() }
         binding.profileRetry.setOnClickListener { loadData(forceSkeleton = true) }
-        rememberedProfile?.let { applyPayload(it, loadGen) }
-        loadData(forceSkeleton = !rendered && rememberedProfile == null)
+        val ctx = requireContext()
+        val account = VinorCacheSession.fingerprint(ctx)
+        val memory = rememberedProfile?.takeIf {
+            PartnerApi.hasSession() && rememberedProfileSession == account
+        }
+        val cached = memory ?: if (PartnerApi.hasSession()) PartnerApi.peekJson(PROFILE_DATA, ctx) else null
+        if (VinorPageLoad.canShowCached(cached, requiresLogin = true, loggedIn = PartnerApi.hasSession())) {
+            cached?.let { applyPayload(it, loadGen) }
+        }
+        loadData(forceSkeleton = !rendered)
     }
 
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
+        val ctx = context ?: return
         val snap = rememberedProfile ?: return
-        if (_binding == null) return
+        if (_binding == null || !PartnerApi.hasSession() ||
+            rememberedProfileSession != VinorCacheSession.fingerprint(ctx)) return
         applyPayload(snap, loadGen)
     }
 
@@ -146,7 +156,7 @@ class ProfileFragment : Fragment() {
                     if (applyPayload(data, gen)) showedCache = true
                 }
                 if (gen != loadGen || stamp != sessionStamp || _binding == null) return@launch
-                applyPayload(obj, gen)
+                if (!showedCache) applyPayload(obj, gen)
                 val renderedPayload = isGuest(obj) || isContent(obj)
                 val networkFailed = !wasFresh && (
                     obj.optBoolean("from_cache") ||
@@ -179,6 +189,7 @@ class ProfileFragment : Fragment() {
         val copy = JSONObject(obj.toString())
         copy.remove("from_cache")
         rememberedProfile = copy
+        rememberedProfileSession = context?.let { VinorCacheSession.fingerprint(it) }
         latestProfile = copy
         val crm = customersMenuVisible(obj)
         val profile = menuProfile(obj, crm, unreadCount)
@@ -210,23 +221,30 @@ class ProfileFragment : Fragment() {
         summaryFetchGen = gen
         val currentStamp = sessionStamp
         val ctx = context ?: return
+        // Immediately paint the same account-scoped home snapshot as the Home tab.
+        val cachedHome = DashboardFragment.peekRememberedHome()
+            ?: PartnerApi.peekJson(HOME_DATA, ctx)
+        if (cachedHome != null) paintWorkSummary(cachedHome, profile)
         scope.launch {
             val home = withContext(Dispatchers.IO) {
                 runCatching { PartnerApi.get(HOME_DATA, ctx) }.getOrNull()
             } ?: return@launch
             if (_binding == null || gen != loadGen || sessionStamp != currentStamp) return@launch
-            val code = if (home.has("http_status")) home.optInt("http_status") else 200
-            if (code !in 200..299 || home.optBoolean("offline") || home.optBoolean("session_expired")) return@launch
-            if (!home.optBoolean("success") && !home.has("is_approved")) return@launch
-            val profilePhone = profile.optString("me_phone").trim()
-            val homePhone = home.optString("me_phone").trim()
-            if (homePhone.isNotEmpty() && profilePhone.isNotEmpty() && homePhone != profilePhone) return@launch
-            val current = _binding ?: return@launch
-            current.profileSummaryAmount.text = PartnerFormat.toman(HomePulse.withdrawable(home)) + " تومان"
-            current.profileSummaryCustomers.text = PartnerFormat.toman(HomePulse.customers(home))
-            current.profileSummaryVisits.text = PartnerFormat.toman(HomePulse.visits(home))
-            current.profileSummaryDeals.text = PartnerFormat.toman(HomePulse.deals(home))
+            paintWorkSummary(home, profile)
         }
+    }
+
+    private fun paintWorkSummary(home: JSONObject, profile: JSONObject) {
+        val current = _binding ?: return
+        if (!VinorPageLoad.canShowCached(home, requiresLogin = true, loggedIn = PartnerApi.hasSession())) return
+        if (!home.optBoolean("success") && !home.has("is_approved")) return
+        val profilePhone = profile.optString("me_phone").trim()
+        val homePhone = home.optString("me_phone").trim()
+        if (homePhone.isNotEmpty() && profilePhone.isNotEmpty() && homePhone != profilePhone) return
+        current.profileSummaryAmount.text = PartnerFormat.toman(HomePulse.withdrawable(home)) + " تومان"
+        current.profileSummaryCustomers.text = PartnerFormat.toman(HomePulse.customers(home))
+        current.profileSummaryVisits.text = PartnerFormat.toman(HomePulse.visits(home))
+        current.profileSummaryDeals.text = PartnerFormat.toman(HomePulse.deals(home))
     }
 
     private fun menuProfile(obj: JSONObject, crm: Boolean, unread: Int): VinorManMenu.Profile {
@@ -707,11 +725,13 @@ class ProfileFragment : Fragment() {
         private val PHASE_A_FLAGS = VinorManMenu.Flags(consultantApiEnabled = true)
 
         private var rememberedProfile: JSONObject? = null
+        private var rememberedProfileSession: String? = null
         private var rememberedCustomers: Boolean? = null
         private var sessionStamp = 0
 
         fun clearRemembered() {
             rememberedProfile = null
+            rememberedProfileSession = null
             rememberedCustomers = null
             sessionStamp++
         }

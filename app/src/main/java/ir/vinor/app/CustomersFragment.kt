@@ -22,6 +22,8 @@ import ir.vinor.app.databinding.ItemCustomerFactBinding
 import ir.vinor.app.databinding.ItemCustomerFieldBinding
 import ir.vinor.app.databinding.ItemCustomerRowBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -136,7 +138,10 @@ class CustomersFragment : Fragment() {
         val url = pageUrl
         val gen = ++loadGen
         val stamp = sessionStamp
-        val snap = remembered[url]
+        // Like Home, paint the last snapshot synchronously, then revalidate in background.
+        // Customer names/phones stay in session-scoped RAM, never in the disk API cache.
+        val account = VinorCacheSession.fingerprint(ctx)
+        val snap = remembered[url]?.takeIf { it.account == account }
         if (snap != null) {
             page = snap.page
             csrf = snap.csrf
@@ -152,9 +157,14 @@ class CustomersFragment : Fragment() {
         }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val doc = withContext(Dispatchers.IO) { PartnerApi.getPage(url, ctx) }
-                val profile = withContext(Dispatchers.IO) {
-                    runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }.getOrElse { JSONObject() }
+                // Fetch the HTML and the auth/CSRF fallback concurrently; no serial wait.
+                val (doc, profile) = coroutineScope {
+                    val document = async(Dispatchers.IO) { PartnerApi.getPage(url, ctx) }
+                    val session = async(Dispatchers.IO) {
+                        runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }
+                            .getOrElse { JSONObject() }
+                    }
+                    document.await() to session.await()
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp || pageUrl != url) return@launch
                 binding.customersProgress.isVisible = false
@@ -184,7 +194,7 @@ class CustomersFragment : Fragment() {
                 val fromPage = PartnerCustomers.csrfFromHtml(doc.body)
                 csrf = fromPage.ifBlank { profile.optString("csrf_token").trim() }
                 page = PartnerCustomers.parse(doc.body)
-                remembered[url] = CustomersMemory(page, csrf)
+                remembered[url] = CustomersMemory(page, csrf, account)
                 rendered = true
                 boundUrl = url
                 bindPage()
@@ -414,6 +424,8 @@ class CustomersFragment : Fragment() {
                 return@launch
             }
             if (PartnerCustomers.isOk(resp)) {
+                // All customer tabs/counts can be affected by a create/delete.
+                remembered.clear()
                 Toast.makeText(ctx, PartnerCustomers.userMessage(resp, fallback), Toast.LENGTH_SHORT).show()
                 onOk()
             } else {
@@ -432,7 +444,11 @@ class CustomersFragment : Fragment() {
         }
     }
 
-    private data class CustomersMemory(val page: PartnerCustomers.Page, val csrf: String)
+    private data class CustomersMemory(
+        val page: PartnerCustomers.Page,
+        val csrf: String,
+        val account: String,
+    )
 
     companion object {
         private val remembered = HashMap<String, CustomersMemory>()

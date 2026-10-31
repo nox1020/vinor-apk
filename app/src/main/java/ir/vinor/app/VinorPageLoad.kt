@@ -25,6 +25,15 @@ object VinorPageLoad {
             PartnerApi.isSessionExpired(obj)
     }
 
+    /** A cached snapshot may paint immediately only when it belongs to an active session. */
+    fun canShowCached(obj: JSONObject?, requiresLogin: Boolean, loggedIn: Boolean): Boolean {
+        if (obj == null || obj.length() == 0) return false
+        if (requiresLogin && !loggedIn) return false
+        if (obj.optBoolean("offline") || obj.optBoolean("non_json") || needsLogin(obj)) return false
+        val code = if (obj.has("http_status")) obj.optInt("http_status") else 200
+        return code in 200..299 && obj.optString("error") != "unauthorized"
+    }
+
     fun canRemember(obj: JSONObject): Boolean {
         if (obj.optBoolean("from_cache") || obj.optBoolean("offline")) return false
         if (obj.optBoolean("session_expired") || obj.optBoolean("non_json")) return false
