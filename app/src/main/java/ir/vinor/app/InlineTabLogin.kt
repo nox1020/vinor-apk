@@ -64,6 +64,10 @@ object InlineTabLogin {
 
     fun finish(from: LoginStep2Fragment): Boolean {
         if (!isInline(from)) return false
+        (from.activity as? MainActivity)?.apply {
+            forgetPreviousAccount()
+            requestNotificationPermission()
+        }
         from.parentFragmentManager.setFragmentResult(AUTH_RESULT, Bundle.EMPTY)
         return true
     }
