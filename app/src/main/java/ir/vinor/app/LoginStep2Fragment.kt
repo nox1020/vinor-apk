@@ -50,13 +50,15 @@ class LoginStep2Fragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         phone = arguments?.getString("phone")?.trim() ?: ""
         if (phone.length != 11 || !phone.startsWith("09")) {
-            findNavController().navigateUp()
+            if (!InlineTabLogin.backToPhone(this)) findNavController().navigateUp()
             return
         }
         binding.loginStep2PhoneLabel.text = getString(R.string.login_otp_sent_to, phone)
         startResendCountdown()
 
-        binding.loginStep2Back.setOnClickListener { findNavController().navigateUp() }
+        binding.loginStep2Back.setOnClickListener {
+            if (!InlineTabLogin.backToPhone(this)) findNavController().navigateUp()
+        }
         binding.loginStep2Submit.setOnClickListener { submitCode(phone) }
         binding.loginStep2Resend.isEnabled = false
         binding.loginStep2Resend.setOnClickListener { resendCode(phone) }
@@ -155,6 +157,7 @@ class LoginStep2Fragment : Fragment() {
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }
+                        if (InlineTabLogin.finish(this@LoginStep2Fragment)) return@withContext
                         val host = activity
                         if (host is MainActivity) {
                             host.forgetPreviousAccount()
