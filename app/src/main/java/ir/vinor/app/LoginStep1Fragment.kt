@@ -55,6 +55,13 @@ class LoginStep1Fragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        if (!InlineTabLogin.isInline(this) && PartnerApi.hasSession() &&
+            arguments?.getString(ARG_REASON) != REASON_SESSION_EXPIRED
+        ) {
+            // صفحهٔ ورود برای کاربر واردشده (مثلاً با «برگشت») بلافاصله کنار می‌رود.
+            view.post { (activity as? MainActivity)?.continueAfterLogin() }
+            return
+        }
         binding.loginStep1Back.setOnClickListener {
             if (InlineTabLogin.isInline(this)) (activity as? MainActivity)?.openPartnerHome()
             else findNavController().navigateUp()

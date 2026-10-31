@@ -477,6 +477,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openLogin(sessionExpired: Boolean = false) {
+        // قبلاً وارد شده: صفحهٔ ورود باز نمی‌شود.
+        if (!sessionExpired && PartnerApi.hasSession()) return
         captureAuthReturn()
         val args = Bundle().apply {
             if (sessionExpired) {
@@ -494,6 +496,9 @@ class MainActivity : AppCompatActivity() {
 
     /** بعد از ورود موفق: کار معلق را ادامه بده، وگرنه به همان صفحه‌ای که کاربر از آن آمد برگرد. */
     fun continueAfterLogin() {
+        // ریشهٔ حلقهٔ «برگشت به لاگین»: مقصد معلق روی صفحه‌های ورود باز می‌شد و آن‌ها در پشته می‌ماندند.
+        // اول صفحه‌های ورود برداشته می‌شوند، بعد مقصد باز می‌شود؛ «برگشت» دیگر به ورود نمی‌رسد.
+        val backAtOrigin = dropLoginScreens()
         val openedLink = consumePendingDeepLink()
         when {
             ConsultantResume.consume(this) -> {
@@ -505,8 +510,9 @@ class MainActivity : AppCompatActivity() {
                 AuthReturnStore.clear(this)
                 clearChatResume()
             }
-            returnFromLogin() -> {
+            backAtOrigin -> {
                 AuthReturnStore.clear(this)
+                refreshCurrentDestination()
                 openChatIfResumed()
             }
             else -> {
@@ -517,18 +523,16 @@ class MainActivity : AppCompatActivity() {
         syncDivarTab()
     }
 
-    /** صفحه‌های ورود را از پشته برمی‌دارد؛ true یعنی صفحهٔ قبلی باقی است و تازه شد. */
-    private fun returnFromLogin(): Boolean {
+    /** همهٔ صفحه‌های ورود را از پشته برمی‌دارد؛ true یعنی صفحهٔ مبدأ زیر آن‌ها باقی است. */
+    private fun dropLoginScreens(): Boolean {
         val loginIds = setOf(R.id.loginStep1Fragment, R.id.loginStep2Fragment, R.id.loginWebFragment)
         val stack = runCatching { navController.currentBackStack.value.toList() }.getOrDefault(emptyList())
         val firstLogin = stack.indexOfFirst { it.destination.id in loginIds }
-        if (firstLogin <= 0) return false
-        val origin = stack.subList(0, firstLogin).lastOrNull { it.destination !is androidx.navigation.NavGraph }
-            ?: return false
-        val popped = runCatching { navController.popBackStack(origin.destination.id, false) }.getOrDefault(false)
-        if (!popped) return false
-        refreshCurrentDestination()
-        return true
+        if (firstLogin < 0) return navController.currentDestination?.id !in loginIds
+        runCatching { navController.popBackStack(stack[firstLogin].destination.id, true) }
+        val now = navController.currentDestination?.id
+        return now != null && now !in loginIds && firstLogin > 0 &&
+            stack.subList(0, firstLogin).any { it.destination !is androidx.navigation.NavGraph }
     }
 
     private fun refreshCurrentDestination() {

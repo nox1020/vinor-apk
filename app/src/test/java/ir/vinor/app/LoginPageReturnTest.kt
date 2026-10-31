@@ -30,10 +30,20 @@ class LoginPageReturnTest {
 
     @Test
     fun successReturnsToOriginBeforeFallingBackHome() {
-        val cont = main.substringAfter("fun continueAfterLogin()").substringBefore("private fun returnFromLogin")
-        assertTrue(cont.indexOf("returnFromLogin()") in 1 until cont.indexOf("openPartnerHome()"))
+        val cont = main.substringAfter("fun continueAfterLogin()").substringBefore("private fun dropLoginScreens")
+        val drop = cont.indexOf("dropLoginScreens()")
+        assertTrue(drop in 0 until cont.indexOf("consumePendingDeepLink()"))
+        assertTrue(cont.indexOf("backAtOrigin ->") in 1 until cont.indexOf("openPartnerHome()"))
         val step2 = src("src/main/java/ir/vinor/app/LoginStep2Fragment.kt")
         assertTrue(step2.contains("host.continueAfterLogin()"))
+    }
+
+    @Test
+    fun loggedInUsersNeverSeeTheLoginPage() {
+        val open = main.substringAfter("fun openLogin(").substringBefore("captureAuthReturn()")
+        assertTrue(open.contains("PartnerApi.hasSession()) return"))
+        val step1 = src("src/main/java/ir/vinor/app/LoginStep1Fragment.kt")
+        assertTrue(step1.contains("continueAfterLogin()"))
     }
 
     @Test
