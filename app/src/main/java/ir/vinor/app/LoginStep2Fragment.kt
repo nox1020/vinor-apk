@@ -240,8 +240,8 @@ class LoginStep2Fragment : Fragment() {
             }
             return
         }
+        // Keep the old code usable when the provider rejects the resend.
         otpFilled = false
-        binding.loginStep2Code.setText("")
         binding.loginStep2Error.visibility = View.GONE
         binding.loginStep2Resend.isEnabled = false
         setupSmsAutoFill()
@@ -260,6 +260,7 @@ class LoginStep2Fragment : Fragment() {
                         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                     }
                     if (_binding != null && ok) {
+                        binding.loginStep2Code.setText("")
                         resendCooldownUntil = android.os.SystemClock.elapsedRealtime() +
                             RESEND_COOLDOWN_SEC * 1000L
                         startResendCountdown()
