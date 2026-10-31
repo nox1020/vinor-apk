@@ -46,6 +46,9 @@ object InlineTabLogin {
         var normalizedPhone = ""
         var busy = false
         var lastSend = 0L
+        var pendingSmsCode: String? = null
+        var autoSubmittedCode: String? = null
+        var deliverSms: (String) -> Unit = { sms -> pendingSmsCode = sms }
         fun report(message: String) {
             error.text = message
             error.isVisible = message.isNotBlank()
@@ -71,6 +74,12 @@ object InlineTabLogin {
                 return
             }
             report("")
+            pendingSmsCode = null
+            autoSubmittedCode = null
+            normalizedPhone = ""
+            (fragment.activity as? MainActivity)?.startOtpSms(fragment.viewLifecycleOwner) {
+                deliverSms(it)
+            }
             setBusy(true)
             fragment.viewLifecycleOwner.lifecycleScope.launch {
                 val response = try {
@@ -93,8 +102,14 @@ object InlineTabLogin {
                     phoneStage.isVisible = false
                     otpStage.isVisible = true
                     code.requestFocus()
+                    pendingSmsCode?.let { incoming ->
+                        pendingSmsCode = null
+                        deliverSms(incoming)
+                    }
                     if (resending) Toast.makeText(container.context, "کد تأیید دوباره ارسال شد.", Toast.LENGTH_SHORT).show()
                 } else {
+                    pendingSmsCode = null
+                    (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
                     report(response.optString("error").ifBlank { "ارسال کد تأیید ناموفق بود." })
                 }
             }
@@ -104,6 +119,9 @@ object InlineTabLogin {
         change.setOnClickListener {
             if (!busy) {
                 normalizedPhone = ""
+                pendingSmsCode = null
+                autoSubmittedCode = null
+                (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
                 code.text?.clear()
                 otpStage.isVisible = false
                 phoneStage.isVisible = true
@@ -137,6 +155,7 @@ object InlineTabLogin {
                 if (response.optBoolean("success")) {
                     SessionAccount.remember(container.context, normalizedPhone)
                     PartnerApi.markLoggedIn()
+                    (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
                     (fragment.activity as? MainActivity)?.let { host ->
                         host.forgetPreviousAccount()
                         host.requestNotificationPermission()
@@ -146,6 +165,20 @@ object InlineTabLogin {
                     else report("نشست ورود برقرار نشد. لطفاً دوباره تلاش کنید.")
                 } else {
                     report(response.optString("error").ifBlank { "کد تأیید نادرست است." })
+                }
+            }
+        }
+        // OTP may be received before the server response: hold until step 2 is visible.
+        deliverSms = { incoming ->
+            val digits = OtpSmsAutoFill.normalizeOtpDigits(incoming)
+            if (active() && digits.length == 5) {
+                if (normalizedPhone.isBlank() || !otpStage.isVisible || busy) {
+                    pendingSmsCode = digits
+                } else if (autoSubmittedCode != digits) {
+                    autoSubmittedCode = digits
+                    code.setText(digits)
+                    code.setSelection(digits.length)
+                    verify.performClick()
                 }
             }
         }
