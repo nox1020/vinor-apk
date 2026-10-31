@@ -287,4 +287,12 @@
                 android:textSize="16sp" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- The native OTP form stays within the selected Customers tab. -->
+    <FrameLayout
+        android:id="@+id/customersInlineLogin"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/vinor_bg"
+        android:visibility="gone" />
 </FrameLayout>

@@ -114,6 +114,10 @@ class NativePartnerFragment : Fragment() {
             searchQuery = binding.nativeSearch.text?.toString().orEmpty().trim()
             if (page == PAGE_TRAINING && lastPayload.length() > 0) renderFaqs(lastPayload, activeTab)
         }
+        if (page == PAGE_REQUESTS && !PartnerApi.hasSession()) {
+            showInlineLogin()
+            return
+        }
         ensureAccountScope()
         if (!dropStaleAccountPaint()) {
             // Favorites have a separate cards API and renderer, not bindPayload().
@@ -135,6 +139,17 @@ class NativePartnerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        if (page == PAGE_REQUESTS && !PartnerApi.hasSession()) {
+            showInlineLogin()
+            return
+        }
+        if (page == PAGE_REQUESTS && _binding?.nativeInlineLogin?.isVisible == true) {
+            binding.nativeInlineLogin.isVisible = false
+            binding.nativeInlineLogin.removeAllViews()
+            binding.nativeRefresh.isVisible = true
+            load()
+            return
+        }
         ensureAccountScope()
         if (dropStaleAccountPaint()) {
             skipNextResume = false
@@ -170,7 +185,33 @@ class NativePartnerFragment : Fragment() {
         binding.nativeHeader.pageTitle.text = text
     }
 
+    fun showInlineLogin(expired: Boolean = false): Boolean {
+        if (page != PAGE_REQUESTS) return false
+        val b = _binding ?: return false
+        ++loadGen
+        ++followEpoch
+        pageRendered = false
+        b.nativeProgress.isVisible = false
+        b.nativeRefresh.isRefreshing = false
+        b.nativeRefresh.isVisible = false
+        b.nativeTabsScroll.isVisible = false
+        b.nativeArchiveScroll.isVisible = false
+        b.nativeInlineLogin.isVisible = true
+        InlineTabLogin.show(this, b.nativeInlineLogin, "پیگیری", expired) {
+            val current = _binding ?: return@show
+            current.nativeInlineLogin.isVisible = false
+            current.nativeInlineLogin.removeAllViews()
+            current.nativeRefresh.isVisible = true
+            load()
+        }
+        return true
+    }
+
     private fun load(pull: Boolean = false) {
+        if (page == PAGE_REQUESTS && !PartnerApi.hasSession()) {
+            showInlineLogin()
+            return
+        }
         when (page) {
             PAGE_SETTINGS -> {
                 binding.nativeRefresh.isRefreshing = false
@@ -221,8 +262,12 @@ class NativePartnerFragment : Fragment() {
                     (page == PAGE_REQUESTS && FollowRequests.isUnauthorized(fresh))
                 if (VinorPageLoad.needsLogin(fresh) || unauthorized) {
                     clearRemembered()
-                    if (!pageRendered) bindEmpty("برای ادامه وارد شوید.")
-                    (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(fresh))
+                    if (page == PAGE_REQUESTS) {
+                        showInlineLogin(expired = VinorPageLoad.needsLogin(fresh))
+                    } else {
+                        if (!pageRendered) bindEmpty("برای ادامه وارد شوید.")
+                        (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(fresh))
+                    }
                     return@launch
                 }
                 if (fresh.optInt("http_status") == 403) {

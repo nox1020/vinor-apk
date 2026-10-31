@@ -508,4 +508,13 @@
             </LinearLayout>
         </ScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- Replaces the feed only while this tab is signed out; header/footer remain. -->
+    <FrameLayout
+        android:id="@+id/nativeInlineLogin"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/vinor_bg"
+        android:visibility="gone" />
 </LinearLayout>

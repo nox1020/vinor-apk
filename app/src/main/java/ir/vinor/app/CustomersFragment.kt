@@ -100,8 +100,7 @@ class CustomersFragment : Fragment() {
             },
         )
         if (!PartnerApi.hasSession()) {
-            (activity as? MainActivity)?.openLogin()
-            runCatching { findNavController().navigateUp() }
+            showInlineLogin()
             return
         }
         load()
@@ -113,7 +112,15 @@ class CustomersFragment : Fragment() {
             skipNextResume = false
             return
         }
-        if (_binding == null || !PartnerApi.hasSession()) return
+        if (_binding == null) return
+        if (!PartnerApi.hasSession()) {
+            showInlineLogin()
+            return
+        }
+        if (binding.customersInlineLogin.isVisible) {
+            binding.customersInlineLogin.isVisible = false
+            binding.customersInlineLogin.removeAllViews()
+        }
         if (binding.customersSheet.isVisible) return
         load()
     }
@@ -134,7 +141,28 @@ class CustomersFragment : Fragment() {
         }
     }
 
+    /** Keep phone/OTP inside this page instead of navigating away from the footer. */
+    fun showInlineLogin(expired: Boolean = false): Boolean {
+        val b = _binding ?: return false
+        ++loadGen
+        rendered = false
+        b.customersProgress.isVisible = false
+        b.customersSheet.isVisible = false
+        b.customersInlineLogin.isVisible = true
+        InlineTabLogin.show(this, b.customersInlineLogin, "مشتریان", expired) {
+            val current = _binding ?: return@show
+            current.customersInlineLogin.isVisible = false
+            current.customersInlineLogin.removeAllViews()
+            load()
+        }
+        return true
+    }
+
     private fun load() {
+        if (!PartnerApi.hasSession()) {
+            showInlineLogin()
+            return
+        }
         val ctx = context ?: return
         val url = pageUrl
         val gen = ++loadGen
@@ -181,7 +209,7 @@ class CustomersFragment : Fragment() {
                 }
                 if (PartnerCustomers.isLoginDocument(doc.url, doc.body) || VinorPageLoad.needsLogin(profile)) {
                     clearRemembered()
-                    (activity as? MainActivity)?.openLogin(sessionExpired = VinorPageLoad.needsLogin(profile))
+                    showInlineLogin(expired = VinorPageLoad.needsLogin(profile))
                     return@launch
                 }
                 if (doc.code !in 200..299) {
@@ -427,7 +455,7 @@ class CustomersFragment : Fragment() {
             if (fresh.isNotBlank()) csrf = fresh
             if (PartnerCustomers.isUnauthorized(resp)) {
                 Toast.makeText(ctx, PartnerCustomers.userMessage(resp, fallback), Toast.LENGTH_SHORT).show()
-                (activity as? MainActivity)?.openLogin()
+                showInlineLogin()
                 return@launch
             }
             if (PartnerCustomers.isOk(resp)) {

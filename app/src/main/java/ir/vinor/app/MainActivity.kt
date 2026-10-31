@@ -97,7 +97,14 @@ class MainActivity : AppCompatActivity() {
         PartnerApi.setSessionExpiredListener {
             if (isFinishing || isDestroyed) return@setSessionExpiredListener
             clearPageMemory()
-            openLogin(sessionExpired = true)
+            val host = supportFragmentManager.findFragmentById(R.id.navHostFragment) as? NavHostFragment
+            val current = host?.childFragmentManager?.primaryNavigationFragment
+            val shownInline = when (current) {
+                is CustomersFragment -> current.showInlineLogin(expired = true)
+                is NativePartnerFragment -> current.showInlineLogin(expired = true)
+                else -> false
+            }
+            if (!shownInline) openLogin(sessionExpired = true)
         }
         runCatching { VinorCacheSession.fingerprint(this) }
         runCatching { VinorApiCacheStore.warmup(this) }
@@ -556,11 +563,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openCustomers(uri: Uri) {
-        if (!PartnerApi.hasSession()) {
-            DeepLinkPendingStore.save(this, uri.toString())
-            openLogin()
-            return
-        }
+        // The Customers tab displays the OTP form in place for guests.
         val url = uri.toString()
         val current = navController.currentBackStackEntry?.arguments?.getString("url")
         if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
@@ -793,11 +796,7 @@ class MainActivity : AppCompatActivity() {
 
     /** تب «پیگیری»: صفحهٔ پیگیری درخواست‌ها (همان /express/partner/requests وب). */
     private fun openFollowTab() {
-        if (!PartnerApi.hasSession()) {
-            DeepLinkPendingStore.save(this, "${PartnerApi.BASE}/express/partner/requests")
-            openLogin()
-            return
-        }
+        // Keep the footer selected; NativePartnerFragment handles guest login inline.
         openNativePage(NativePartnerFragment.PAGE_REQUESTS, asTab = true)
     }
 
@@ -987,7 +986,9 @@ class MainActivity : AppCompatActivity() {
         }
         val uri = intent?.data?.toString() ?: data ?: return
         val route = DeepLinkRouter.resolve(uri)
-        if (route.requiresAuth && !PartnerApi.hasSession()) {
+        val inlineAuthTab = route.type == DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS ||
+            route.type == DeepLinkRouter.DestinationType.PARTNER_REQUESTS
+        if (route.requiresAuth && !PartnerApi.hasSession() && !inlineAuthTab) {
             DeepLinkPendingStore.save(this, uri)
             openLogin()
             return
