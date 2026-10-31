@@ -145,6 +145,7 @@ class NativePartnerFragment : Fragment() {
         }
         if (page == PAGE_REQUESTS && _binding?.nativeInlineLogin?.isVisible == true) {
             binding.nativeInlineLogin.isVisible = false
+            binding.nativeHeader.root.isVisible = true
             InlineTabLogin.dismiss(this)
             binding.nativeRefresh.isVisible = true
             load()
@@ -204,9 +205,11 @@ class NativePartnerFragment : Fragment() {
         b.nativeTabsScroll.isVisible = false
         b.nativeArchiveScroll.isVisible = false
         b.nativeInlineLogin.isVisible = true
+        b.nativeHeader.root.isVisible = false // The original login owns its top bar.
         InlineTabLogin.show(this, b.nativeInlineLogin, "پیگیری", expired) {
             val current = _binding ?: return@show
             current.nativeInlineLogin.isVisible = false
+            current.nativeHeader.root.isVisible = true
             InlineTabLogin.dismiss(this)
             current.nativeRefresh.isVisible = true
             load()
