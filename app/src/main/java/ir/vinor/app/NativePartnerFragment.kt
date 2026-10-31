@@ -145,7 +145,7 @@ class NativePartnerFragment : Fragment() {
         }
         if (page == PAGE_REQUESTS && _binding?.nativeInlineLogin?.isVisible == true) {
             binding.nativeInlineLogin.isVisible = false
-            binding.nativeInlineLogin.removeAllViews()
+            InlineTabLogin.dismiss(this)
             binding.nativeRefresh.isVisible = true
             load()
             return
@@ -207,7 +207,7 @@ class NativePartnerFragment : Fragment() {
         InlineTabLogin.show(this, b.nativeInlineLogin, "پیگیری", expired) {
             val current = _binding ?: return@show
             current.nativeInlineLogin.isVisible = false
-            current.nativeInlineLogin.removeAllViews()
+            InlineTabLogin.dismiss(this)
             current.nativeRefresh.isVisible = true
             load()
         }
