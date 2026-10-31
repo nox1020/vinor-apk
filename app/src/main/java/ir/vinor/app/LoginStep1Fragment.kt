@@ -55,7 +55,10 @@ class LoginStep1Fragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.loginStep1Back.setOnClickListener { findNavController().navigateUp() }
+        binding.loginStep1Back.setOnClickListener {
+            if (InlineTabLogin.isInline(this)) (activity as? MainActivity)?.openPartnerHome()
+            else findNavController().navigateUp()
+        }
         binding.loginStep1Submit.setOnClickListener { submitPhone() }
         bindReauthHint()
         binding.loginStep1Phone.setOnEditorActionListener { _, actionId, _ ->
@@ -111,6 +114,7 @@ class LoginStep1Fragment : Fragment() {
                         view?.post {
                             if (!isAdded) return@post
                             earlySmsOtp?.let { bundle.putString("early_sms_otp", it) }
+                            if (InlineTabLogin.showOtp(this@LoginStep1Fragment, bundle)) return@post
                             try {
                                 findNavController().navigate(R.id.action_loginStep1_to_loginStep2, bundle)
                             } catch (e: Exception) {
