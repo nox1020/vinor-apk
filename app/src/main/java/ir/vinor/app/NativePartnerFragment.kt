@@ -116,14 +116,17 @@ class NativePartnerFragment : Fragment() {
         }
         ensureAccountScope()
         if (!dropStaleAccountPaint()) {
-            val privatePage = page !in PUBLIC_PAGES
-            val memory = rememberedByPage[memoryKey()]
-            val disk = currentDataPath()?.let { PartnerApi.peekJson(it, context) }
-            val cached = memory ?: disk
-            if (VinorPageLoad.canShowCached(cached, privatePage, PartnerApi.hasSession()) &&
-                cached != null && canPaint(cached)) {
-                bindPayload(cached)
-                pageRendered = true
+            // Favorites have a separate cards API and renderer, not bindPayload().
+            if (page != PAGE_FAVORITES) {
+                val privatePage = page !in PUBLIC_PAGES
+                val memory = rememberedByPage[memoryKey()]
+                val disk = currentDataPath()?.let { PartnerApi.peekJson(it, context) }
+                val cached = memory ?: disk
+                if (VinorPageLoad.canShowCached(cached, privatePage, PartnerApi.hasSession()) &&
+                    cached != null && canPaint(cached)) {
+                    bindPayload(cached)
+                    pageRendered = true
+                }
             }
             paintedGeneration = sessionStamp
         }

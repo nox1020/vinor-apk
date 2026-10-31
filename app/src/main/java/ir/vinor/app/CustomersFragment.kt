@@ -53,6 +53,7 @@ class CustomersFragment : Fragment() {
     private var loadGen = 0
     private var rendered = false
     private var boundUrl = ""
+    private var boundAccount = ""
     private var skipNextResume = true
     private var detail: PartnerCustomers.Row? = null
     private var pendingDelete: Boolean = false
@@ -141,12 +142,17 @@ class CustomersFragment : Fragment() {
         // Like Home, paint the last snapshot synchronously, then revalidate in background.
         // Customer names/phones stay in session-scoped RAM, never in the disk API cache.
         val account = VinorCacheSession.fingerprint(ctx)
+        if (boundAccount.isNotEmpty() && boundAccount != account) {
+            rendered = false
+            csrf = ""
+        }
         val snap = remembered[url]?.takeIf { it.account == account }
         if (snap != null) {
             page = snap.page
             csrf = snap.csrf
             rendered = true
             boundUrl = url
+            boundAccount = account
             bindPage()
             binding.customersProgress.isVisible = false
         } else if (!rendered || boundUrl != url) {
@@ -197,6 +203,7 @@ class CustomersFragment : Fragment() {
                 remembered[url] = CustomersMemory(page, csrf, account)
                 rendered = true
                 boundUrl = url
+                boundAccount = account
                 bindPage()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
