@@ -488,7 +488,44 @@ class MainActivity : AppCompatActivity() {
             if (sessionExpired) findLoginStep1()?.showSessionExpiredHint()
             return
         }
+        // ورود همیشه درجا: باتم‌شیت روی همین صفحه، نه صفحهٔ جدا.
+        if (!supportFragmentManager.isStateSaved) {
+            LoginSheet.show(supportFragmentManager, sessionExpired)
+            return
+        }
         navController.navigate(R.id.loginStep1Fragment, args)
+    }
+
+    /** بعد از ورود از باتم‌شیت: کار معلق را ادامه بده، وگرنه همین صفحه را تازه کن. */
+    fun continueAfterInlineLogin() {
+        val openedLink = consumePendingDeepLink()
+        when {
+            ConsultantResume.consume(this) -> {
+                AuthReturnStore.clear(this)
+                clearChatResume()
+                openConsultantOnboarding()
+            }
+            openedLink -> {
+                AuthReturnStore.clear(this)
+                clearChatResume()
+            }
+            else -> {
+                if (!consumeAuthReturn()) refreshCurrentDestination()
+                openChatIfResumed()
+            }
+        }
+        syncDivarTab()
+    }
+
+    fun loginSheetCancelled() {
+        clearChatResume()
+    }
+
+    private fun refreshCurrentDestination() {
+        val entry = navController.currentBackStackEntry ?: return
+        val id = entry.destination.id
+        val opts = NavOptions.Builder().setPopUpTo(id, true).setLaunchSingleTop(false).build()
+        runCatching { navController.navigate(id, entry.arguments, opts) }
     }
 
     /** بعد از ورود موفق؛ false یعنی مقصدی نبود. */

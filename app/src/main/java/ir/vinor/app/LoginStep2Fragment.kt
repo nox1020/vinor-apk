@@ -54,7 +54,7 @@ class LoginStep2Fragment : Fragment() {
             return
         }
         binding.loginStep2PhoneLabel.text = getString(R.string.login_otp_sent_to, phone)
-        startResendCountdown()
+        startResendCountdown(arguments?.getInt("retry_after", RESEND_COOLDOWN_SEC) ?: RESEND_COOLDOWN_SEC)
 
         binding.loginStep2Back.setOnClickListener {
             if (!InlineTabLogin.backToPhone(this)) findNavController().navigateUp()
@@ -208,10 +208,11 @@ class LoginStep2Fragment : Fragment() {
     private val handler = Handler(Looper.getMainLooper())
     private var resendCountdownJob: Runnable? = null
 
-    private fun startResendCountdown() {
+    private fun startResendCountdown(seconds: Int = RESEND_COOLDOWN_SEC) {
         resendCountdownJob?.let { handler.removeCallbacks(it) }
         binding.loginStep2Resend.isEnabled = false
-        var secLeft = RESEND_COOLDOWN_SEC
+        var secLeft = seconds.coerceIn(0, 600)
+        resendCooldownUntil = android.os.SystemClock.elapsedRealtime() + secLeft * 1000L
         fun updateUi() {
             if (_binding == null) return
             if (secLeft <= 0) {
@@ -219,7 +220,7 @@ class LoginStep2Fragment : Fragment() {
                 binding.loginStep2Resend.isEnabled = true
                 return
             }
-            binding.loginStep2Timer.text = getString(R.string.login_resend_countdown, secLeft)
+            binding.loginStep2Timer.text = getString(R.string.login_resend_countdown, ListingWeek.persianDigits(secLeft))
             secLeft--
             resendCountdownJob = Runnable { updateUi() }
             handler.postDelayed(resendCountdownJob!!, 1000L)
@@ -237,7 +238,7 @@ class LoginStep2Fragment : Fragment() {
             if (_binding != null && isAdded) {
                 Toast.makeText(
                     requireContext(),
-                    getString(R.string.login_resend_wait, sec),
+                    getString(R.string.login_resend_wait, ListingWeek.persianDigits(sec.coerceAtLeast(1))),
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -262,11 +263,13 @@ class LoginStep2Fragment : Fragment() {
                     if (_binding != null && isAdded) {
                         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                     }
+                    // retry_after از سرور: تایمر با مهلت واقعی سرویس OTP هم‌گام می‌ماند.
+                    val wait = obj.optInt("retry_after", 0)
                     if (_binding != null && ok) {
                         binding.loginStep2Code.setText("")
-                        resendCooldownUntil = android.os.SystemClock.elapsedRealtime() +
-                            RESEND_COOLDOWN_SEC * 1000L
-                        startResendCountdown()
+                        startResendCountdown(if (wait > 0) wait else RESEND_COOLDOWN_SEC)
+                    } else if (_binding != null && wait > 0) {
+                        startResendCountdown(wait)
                     } else if (_binding != null) {
                         binding.loginStep2Resend.isEnabled = true
                     }

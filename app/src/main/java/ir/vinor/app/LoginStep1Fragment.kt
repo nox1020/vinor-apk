@@ -56,7 +56,9 @@ class LoginStep1Fragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.loginStep1Back.setOnClickListener {
-            if (InlineTabLogin.isInline(this)) (activity as? MainActivity)?.openPartnerHome()
+            val sheet = LoginSheet.of(this)
+            if (sheet != null) sheet.dismiss()
+            else if (InlineTabLogin.isInline(this)) (activity as? MainActivity)?.openPartnerHome()
             else findNavController().navigateUp()
         }
         binding.loginStep1Submit.setOnClickListener { submitPhone() }

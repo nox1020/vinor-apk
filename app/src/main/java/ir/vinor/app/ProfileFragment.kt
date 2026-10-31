@@ -499,11 +499,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun openLoginScreen() {
-        try {
-            findNavController().navigate(R.id.action_profile_to_login)
-        } catch (_: Exception) {
-            (activity as? MainActivity)?.openLogin()
-        }
+        (activity as? MainActivity)?.openLogin()
     }
 
     private fun openProfileEdit() {
