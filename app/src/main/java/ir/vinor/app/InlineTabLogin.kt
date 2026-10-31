@@ -46,6 +46,7 @@ object InlineTabLogin {
         var normalizedPhone = ""
         var busy = false
         var lastSend = 0L
+        var requestId = 0
         var pendingSmsCode: String? = null
         var autoSubmittedCode: String? = null
         var deliverSms: (String) -> Unit = { sms -> pendingSmsCode = sms }
@@ -64,19 +65,26 @@ object InlineTabLogin {
         }
         fun requestOtp(resending: Boolean) {
             if (busy) return
-            val candidate = PartnerApi.normalizePhone(phone.text.toString())
+            val candidate = if (resending) normalizedPhone else PartnerApi.normalizePhone(phone.text.toString())
             if (!candidate.matches(Regex("09[0-9]{9}"))) {
                 report("لطفاً شماره موبایل ۱۱ رقمی معتبر وارد کنید.")
                 return
             }
-            if (resending && SystemClock.elapsedRealtime() - lastSend < 60_000L) {
-                report("برای ارسال مجدد کد، کمی صبر کنید.")
+            if (resending && lastSend > 0L &&
+                SystemClock.elapsedRealtime() - lastSend < 60_000L) {
+                report("برای ارسال مجدد کد، حداقل ۶۰ ثانیه صبر کنید.")
                 return
             }
             report("")
             pendingSmsCode = null
             autoSubmittedCode = null
-            normalizedPhone = ""
+            // Leave the existing OTP screen and verified phone intact if resend fails.
+            // The server's /otp/resend returns {ok}; login-request returns {success}.
+            val endpoint = if (resending) "/express/partner/otp/resend"
+                else "/express/partner/api/login-request"
+            val body = JSONObject().put("phone", candidate)
+            if (!resending) body.put("accept_legal", true)
+            val id = ++requestId
             (fragment.activity as? MainActivity)?.startOtpSms(fragment.viewLifecycleOwner) {
                 deliverSms(it)
             }
@@ -84,23 +92,20 @@ object InlineTabLogin {
             fragment.viewLifecycleOwner.lifecycleScope.launch {
                 val response = try {
                     withContext(Dispatchers.IO) {
-                        PartnerApi.postJson(
-                            "/express/partner/api/login-request",
-                            JSONObject().put("phone", candidate).put("accept_legal", true),
-                            container.context,
-                        )
+                        PartnerApi.postJson(endpoint, body, container.context)
                     }
                 } catch (_: Exception) {
                     JSONObject().put("error", "خطا در ارتباط. دوباره تلاش کنید.")
                 }
-                if (!active()) return@launch
+                if (!active() || id != requestId) return@launch
                 setBusy(false)
-                if (response.optBoolean("success")) {
+                if (response.optBoolean(if (resending) "ok" else "success")) {
                     lastSend = SystemClock.elapsedRealtime()
                     normalizedPhone = candidate
                     heading.text = "کد تأیید به $candidate ارسال شد."
                     phoneStage.isVisible = false
                     otpStage.isVisible = true
+                    if (resending) code.text?.clear()
                     code.requestFocus()
                     pendingSmsCode?.let { incoming ->
                         pendingSmsCode = null
@@ -109,7 +114,8 @@ object InlineTabLogin {
                     if (resending) Toast.makeText(container.context, "کد تأیید دوباره ارسال شد.", Toast.LENGTH_SHORT).show()
                 } else {
                     pendingSmsCode = null
-                    (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
+                    // Existing challenge may still be valid after a resend 429/network error.
+                    if (!resending) (fragment.activity as? MainActivity)?.stopOtpSms(fragment.viewLifecycleOwner)
                     report(response.optString("error").ifBlank { "ارسال کد تأیید ناموفق بود." })
                 }
             }
@@ -118,6 +124,7 @@ object InlineTabLogin {
         resend.setOnClickListener { requestOtp(true) }
         change.setOnClickListener {
             if (!busy) {
+                ++requestId
                 normalizedPhone = ""
                 pendingSmsCode = null
                 autoSubmittedCode = null
@@ -131,6 +138,7 @@ object InlineTabLogin {
         }
         verify.setOnClickListener {
             if (busy) return@setOnClickListener
+            // Suppress only duplicate in-flight requests, not later corrections.
             val otp = OtpSmsAutoFill.normalizeOtpDigits(code.text?.toString().orEmpty())
             if (normalizedPhone.isBlank() || otp.length != 5) {
                 report("کد تأیید را به‌درستی وارد کنید.")
@@ -164,6 +172,9 @@ object InlineTabLogin {
                     if (PartnerApi.hasSession()) onAuthenticated()
                     else report("نشست ورود برقرار نشد. لطفاً دوباره تلاش کنید.")
                 } else {
+                    // Permit manual correction and the next SMS retry after an invalid code.
+                    autoSubmittedCode = null
+                    pendingSmsCode = null
                     report(response.optString("error").ifBlank { "کد تأیید نادرست است." })
                 }
             }
@@ -172,7 +183,7 @@ object InlineTabLogin {
         deliverSms = { incoming ->
             val digits = OtpSmsAutoFill.normalizeOtpDigits(incoming)
             if (active() && digits.length == 5) {
-                if (normalizedPhone.isBlank() || !otpStage.isVisible || busy) {
+                if (normalizedPhone.isBlank() || !otpStage.isVisible) {
                     pendingSmsCode = digits
                 } else if (autoSubmittedCode != digits) {
                     autoSubmittedCode = digits
