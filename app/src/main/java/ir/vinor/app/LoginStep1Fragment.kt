@@ -24,6 +24,8 @@ class LoginStep1Fragment : Fragment() {
 
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
+    // Capture fast OTPs arriving before the app navigates to the code screen.
+    private var earlySmsOtp: String? = null
 
     companion object {
         private const val TAG = "LoginStep1"
@@ -66,6 +68,7 @@ class LoginStep1Fragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        (activity as? MainActivity)?.stopOtpSms(viewLifecycleOwner)
         job.cancel()
         super.onDestroyView()
         _binding = null
@@ -81,6 +84,10 @@ class LoginStep1Fragment : Fragment() {
             return
         }
 
+        earlySmsOtp = null
+        (activity as? MainActivity)?.startOtpSms(viewLifecycleOwner) { incoming ->
+            earlySmsOtp = OtpSmsAutoFill.normalizeOtpDigits(incoming).takeIf { it.length == 5 }
+        }
         binding.loginStep1Progress.visibility = View.VISIBLE
         binding.loginStep1Submit.isEnabled = false
 
@@ -100,7 +107,10 @@ class LoginStep1Fragment : Fragment() {
                     b.loginStep1Submit.isEnabled = true
                     if (success) {
                         if (isAdded) Toast.makeText(requireContext(), obj.optString("message", "کد تأیید ارسال شد."), Toast.LENGTH_SHORT).show()
-                        val bundle = android.os.Bundle().apply { putString("phone", phone) }
+                        val bundle = android.os.Bundle().apply {
+                            putString("phone", phone)
+                            earlySmsOtp?.let { putString("early_sms_otp", it) }
+                        }
                         view?.post {
                             if (!isAdded) return@post
                             try {
@@ -115,6 +125,8 @@ class LoginStep1Fragment : Fragment() {
                             }
                         }
                     } else {
+                        (activity as? MainActivity)?.stopOtpSms(viewLifecycleOwner)
+                        earlySmsOtp = null
                         b.loginStep1Error.text = obj.optString("error", "خطا در ارتباط. دوباره تلاش کنید.")
                         b.loginStep1Error.visibility = View.VISIBLE
                     }
@@ -125,6 +137,8 @@ class LoginStep1Fragment : Fragment() {
                     val b = _binding ?: return@withContext
                     b.loginStep1Progress.visibility = View.GONE
                     b.loginStep1Submit.isEnabled = true
+                    (activity as? MainActivity)?.stopOtpSms(viewLifecycleOwner)
+                    earlySmsOtp = null
                     b.loginStep1Error.text = "خطا در ارتباط. دوباره تلاش کنید."
                     b.loginStep1Error.visibility = View.VISIBLE
                 }

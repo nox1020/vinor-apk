@@ -73,6 +73,10 @@ class LoginStep2Fragment : Fragment() {
         }
 
         setupSmsAutoFill()
+        arguments?.getString("early_sms_otp")?.let { early ->
+            arguments?.remove("early_sms_otp")
+            if (early.length == 5) applyOtpCode(early, autoSubmit = true)
+        }
     }
 
     private fun setupSmsAutoFill() {
@@ -224,9 +228,9 @@ class LoginStep2Fragment : Fragment() {
 
     private fun resendCode(phone: String) {
         if (phone.length != 11) return
-        val now = System.currentTimeMillis()
+        val now = android.os.SystemClock.elapsedRealtime()
         if (now < resendCooldownUntil) {
-            val sec = ((resendCooldownUntil - now) / 1000).toInt()
+            val sec = ((resendCooldownUntil - now + 999) / 1000).toInt()
             if (_binding != null && isAdded) {
                 Toast.makeText(
                     requireContext(),
@@ -240,7 +244,6 @@ class LoginStep2Fragment : Fragment() {
         binding.loginStep2Code.setText("")
         binding.loginStep2Error.visibility = View.GONE
         binding.loginStep2Resend.isEnabled = false
-        resendCooldownUntil = now + RESEND_COOLDOWN_SEC * 1000L
         setupSmsAutoFill()
         scope.launch {
             try {
@@ -256,8 +259,13 @@ class LoginStep2Fragment : Fragment() {
                     if (_binding != null && isAdded) {
                         Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                     }
-                    if (_binding != null && ok) startResendCountdown()
-                    else if (_binding != null) binding.loginStep2Resend.isEnabled = true
+                    if (_binding != null && ok) {
+                        resendCooldownUntil = android.os.SystemClock.elapsedRealtime() +
+                            RESEND_COOLDOWN_SEC * 1000L
+                        startResendCountdown()
+                    } else if (_binding != null) {
+                        binding.loginStep2Resend.isEnabled = true
+                    }
                 }
             } catch (_: Exception) {
                 withContext(Dispatchers.Main) {
