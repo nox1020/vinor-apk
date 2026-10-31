@@ -119,7 +119,7 @@ class CustomersFragment : Fragment() {
         }
         if (binding.customersInlineLogin.isVisible) {
             binding.customersInlineLogin.isVisible = false
-            binding.customersInlineLogin.removeAllViews()
+            InlineTabLogin.dismiss(this)
         }
         if (binding.customersSheet.isVisible) return
         load()
@@ -152,7 +152,7 @@ class CustomersFragment : Fragment() {
         InlineTabLogin.show(this, b.customersInlineLogin, "مشتریان", expired) {
             val current = _binding ?: return@show
             current.customersInlineLogin.isVisible = false
-            current.customersInlineLogin.removeAllViews()
+            InlineTabLogin.dismiss(this)
             load()
         }
         return true
