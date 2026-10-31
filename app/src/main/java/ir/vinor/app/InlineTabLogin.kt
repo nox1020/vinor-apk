@@ -102,7 +102,9 @@ object InlineTabLogin {
                 if (response.optBoolean(if (resending) "ok" else "success")) {
                     lastSend = SystemClock.elapsedRealtime()
                     normalizedPhone = candidate
-                    heading.text = "کد تأیید به $candidate ارسال شد."
+                    heading.text = if (response.optBoolean("otp_pending")) {
+                        "کد قبلی هنوز معتبر است؛ همان کد را وارد کنید."
+                    } else "کد تأیید به $candidate ارسال شد."
                     phoneStage.isVisible = false
                     otpStage.isVisible = true
                     if (resending) code.text?.clear()
