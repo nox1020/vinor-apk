@@ -61,6 +61,14 @@ object SearchStateReducer {
 }
 
 object SearchAds {
+    /** UI identity survives price/title/date edits and different Home/API snapshots. */
+    fun cardKey(ad: SearchAd): String {
+        val code = openCode(ad)
+        if (code.isNotBlank()) return "code:$code"
+        if (ad.url.isNotBlank()) return "url:${ad.url.trim()}"
+        return "anonymous:${ad.source}:${ad.title.trim()}:${ad.location.trim()}:${ad.index}"
+    }
+
     fun apply(ads: List<SearchAd>, query: SearchQuery): List<SearchAd> {
         val n = query.normalized()
         val filtered = ads.filter { matches(it, n) }

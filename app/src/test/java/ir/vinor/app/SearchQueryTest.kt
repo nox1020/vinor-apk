@@ -98,6 +98,23 @@ class SearchQueryTest {
     }
 
     @Test
+    fun homeCardKeyRemainsStableWhenListingChanges() {
+        val before = SearchAd(token = "245", source = "vinor", title = "خانه قدیمی", priceRaw = "۹۰۰")
+        val after = before.copy(title = "خانه تازه", priceRaw = "۱۰۰۰", imageUrl = "/new.jpg", createdAt = 99)
+        assertEquals(SearchAds.cardKey(before), SearchAds.cardKey(after))
+        assertEquals("code:245", SearchAds.cardKey(after))
+        assertEquals("code:divar:245", SearchAds.cardKey(SearchAd(token = "245", source = "divar")))
+        assertEquals(
+            SearchAds.cardKey(SearchAd(url = "/express/partner/lands/245", title = "الف")),
+            SearchAds.cardKey(SearchAd(url = "/express/partner/lands/245", title = "ب")),
+        )
+        assertFalse(
+            SearchAds.cardKey(SearchAd(token = "245")) ==
+                SearchAds.cardKey(SearchAd(token = "246"))
+        )
+    }
+
+    @Test
     fun reducer_emptyListAndNetworkError() {
         val loading = SearchStateReducer.loading()
         assertEquals(SearchPhase.LOADING, loading.phase)

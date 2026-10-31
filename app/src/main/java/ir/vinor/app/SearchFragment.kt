@@ -54,6 +54,9 @@ class SearchFragment : Fragment() {
     private var ui = SearchStateReducer.loading()
     private var approved = false
     private var hasSnapshot = false
+    /** Tracks actual painted rows, not every overlapping Home/API response. */
+    private var paintedUi: SearchUiState? = null
+    private var paintedApproved: Boolean? = null
     private var suppressQueryWatch = false
     private var searchDebounce: Runnable? = null
     private var shimmer: ValueAnimator? = null
@@ -73,6 +76,8 @@ class SearchFragment : Fragment() {
             scope = CoroutineScope(Dispatchers.Main + job)
         }
         skipNextResume = true
+        paintedUi = null
+        paintedApproved = null
         _binding = FragmentSearchBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -177,8 +182,10 @@ class SearchFragment : Fragment() {
         )
         homeFallbackAds = candidates
         if (_binding == null || candidates.isEmpty()) return
-        // The public feed renders first; Home's promoted/Divar cards join it later.
-        rawAds = SearchAds.dedupe(rawAds + candidates)
+        // Do not replace or append partial Home results to an already painted feed.
+        // The catalog request below reconciles both sources in one update instead.
+        if (rawAds.isNotEmpty()) return
+        rawAds = candidates
         hasSnapshot = true
         rememberedAds = rawAds
         ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
@@ -349,7 +356,7 @@ class SearchFragment : Fragment() {
             return
         }
         ui = SearchStateReducer.onLoaded(SearchAds.apply(rawAds, query), query.hasClearableFilters())
-        render()
+        render(preservePosition = false)
     }
 
     private fun clearFilters() {
@@ -373,8 +380,12 @@ class SearchFragment : Fragment() {
         b.searchInput.postDelayed(task, 400)
     }
 
-    private fun render() {
+    private fun render(preservePosition: Boolean = true) {
         val b = _binding ?: return
+        // Chip text may change even when the list is identical (e.g. a search term).
+        bindChips()
+        if (paintedUi == ui && paintedApproved == approved) return
+        val sameApproval = paintedApproved == approved
         val showList = ui.phase == SearchPhase.CONTENT || (ui.phase == SearchPhase.ERROR && ui.items.isNotEmpty())
         val showSkeleton = ui.phase == SearchPhase.LOADING && ui.items.isEmpty()
         val showEmpty = ui.phase == SearchPhase.EMPTY
@@ -391,15 +402,16 @@ class SearchFragment : Fragment() {
             b.searchEmptyClear.isVisible = filters
         }
         if (showList) {
-            bindRows(ui.items)
-            b.searchList.post { bindVisibleImages() }
-        } else {
-            b.searchList.removeAllViews()
+            bindRows(ui.items, sameApproval, preservePosition)
+            b.searchList.post { if (_binding === b) bindVisibleImages() }
         }
+        // Keep existing views when temporarily showing empty/error/loading.
+        // Destroying them here used to trigger another complete image reload.
         val count = if (showList) ui.items.size else 0
         b.searchCount.isVisible = count > 0
         if (count > 0) b.searchCount.text = "${PartnerFormat.digits(count)} آگهی"
-        bindChips()
+        paintedUi = ui
+        paintedApproved = approved
     }
 
     private fun bindChips() {
@@ -447,40 +459,104 @@ class SearchFragment : Fragment() {
         }
     }
 
-    private fun bindRows(items: List<SearchAd>) {
+    /**
+     * Reuse the actual card views when Home, the cached feed and the network
+     * deliver consecutive snapshots. Re-inflating every row caused flashing,
+     * repeated thumbnail requests, and ScrollView re-measure/scroll jumps.
+     */
+    private fun bindRows(items: List<SearchAd>, sameApproval: Boolean, preservePosition: Boolean) {
         val b = _binding ?: return
-        b.searchList.removeAllViews()
-        items.forEachIndexed { index, ad ->
-            val row = ItemAdsAllRowBinding.inflate(layoutInflater, b.searchList, false)
-            row.adsAllTitle.text = ad.title
-            val price = SearchAds.cardPrice(ad.priceRaw)
-            row.adsAllPrice.text = price
-            val area = SearchAds.cardArea(ad.areaRaw)
-            row.adsAllArea.isVisible = area.isNotBlank()
-            row.adsAllArea.text = area
-            val loc = SearchAds.cardPlace(ad)
-            row.adsAllLoc.text = loc
-            row.adsAllLoc.isVisible = loc.isNotBlank()
-            if (approved && ad.commissionAmount > 0) {
-                row.adsAllComm.isVisible = true
-                row.adsAllComm.text = "پورسانت ${PartnerFormat.toman(ad.commissionAmount)} تومان"
-            } else {
-                row.adsAllComm.isVisible = false
-            }
-            row.adsAllShots.isVisible = ad.imageCount > 1
-            if (ad.imageCount > 1) {
-                row.adsAllShots.text = PartnerFormat.digits(ad.imageCount)
-                val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)?.mutate()
-                camera?.setTint(ContextCompat.getColor(requireContext(), R.color.vinor_text))
-                row.adsAllShots.setCompoundDrawablesRelativeWithIntrinsicBounds(camera, null, null, null)
-            }
-            row.adsAllDivider.isVisible = index != items.lastIndex
-            PartnerImages.roundClip(row.adsAllThumbWrap, 12f)
-            row.adsAllThumb.tag = ad.imageUrl
-            row.root.contentDescription = listOf(ad.title, price, area, loc).filter { it.isNotBlank() }.joinToString("، ")
-            row.root.setOnClickListener { openAd(ad) }
-            b.searchList.addView(row.root)
+        val list = b.searchList
+        val previous = LinkedHashMap<String, MutableList<View>>()
+        for (i in 0 until list.childCount) {
+            val view = list.getChildAt(i)
+            val ad = view.tag as? SearchAd ?: continue
+            previous.getOrPut(SearchAds.cardKey(ad)) { ArrayList() }.add(view)
         }
+
+        // If a new item arrives above the visible one, keep the reader's place.
+        val scroll = homeScroll
+        val scrollBefore = scroll?.scrollY ?: 0
+        val visible = Rect()
+        val anchor = if (preservePosition && scrollBefore > 0 &&
+            scroll?.getGlobalVisibleRect(visible) == true) {
+            (0 until list.childCount).map { list.getChildAt(it) }
+                .firstOrNull { row ->
+                    val rect = Rect()
+                    row.getGlobalVisibleRect(rect) && Rect.intersects(rect, visible)
+                }
+        } else null
+        val oldScreenTop = anchor?.let {
+            val xy = IntArray(2)
+            it.getLocationOnScreen(xy)
+            xy[1]
+        }
+
+        items.forEachIndexed { index, ad ->
+            val key = SearchAds.cardKey(ad)
+            val matches = previous[key]
+            val reused = if (matches.isNullOrEmpty()) null else matches.removeAt(0)
+            val view = reused ?: ItemAdsAllRowBinding.inflate(layoutInflater, list, false).root
+            val oldAd = view.tag as? SearchAd
+            if (oldAd != ad || !sameApproval) {
+                bindRow(ItemAdsAllRowBinding.bind(view), ad)
+                view.tag = ad
+            }
+            val divider = view.findViewById<View>(R.id.adsAllDivider)
+            divider.isVisible = index != items.lastIndex
+            if (list.getChildAt(index) !== view) {
+                (view.parent as? ViewGroup)?.removeView(view)
+                list.addView(view, index)
+            }
+        }
+        while (list.childCount > items.size) list.removeViewAt(list.childCount - 1)
+
+        if (anchor != null && oldScreenTop != null && anchor.parent === list && scroll != null) {
+            scroll.post {
+                if (_binding !== b || scroll.scrollY != scrollBefore || anchor.parent !== list) return@post
+                val xy = IntArray(2)
+                anchor.getLocationOnScreen(xy)
+                val delta = xy[1] - oldScreenTop
+                if (delta != 0) scroll.scrollBy(0, delta)
+            }
+        }
+    }
+
+    private fun bindRow(row: ItemAdsAllRowBinding, ad: SearchAd) {
+        row.adsAllTitle.text = ad.title
+        val price = SearchAds.cardPrice(ad.priceRaw)
+        row.adsAllPrice.text = price
+        val area = SearchAds.cardArea(ad.areaRaw)
+        row.adsAllArea.isVisible = area.isNotBlank()
+        row.adsAllArea.text = area
+        val loc = SearchAds.cardPlace(ad)
+        row.adsAllLoc.text = loc
+        row.adsAllLoc.isVisible = loc.isNotBlank()
+        if (approved && ad.commissionAmount > 0) {
+            row.adsAllComm.isVisible = true
+            row.adsAllComm.text = "پورسانت ${PartnerFormat.toman(ad.commissionAmount)} تومان"
+        } else {
+            row.adsAllComm.isVisible = false
+        }
+        row.adsAllShots.isVisible = ad.imageCount > 1
+        if (ad.imageCount > 1) {
+            row.adsAllShots.text = PartnerFormat.digits(ad.imageCount)
+            val camera = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_camera_small)?.mutate()
+            camera?.setTint(ContextCompat.getColor(requireContext(), R.color.vinor_text))
+            row.adsAllShots.setCompoundDrawablesRelativeWithIntrinsicBounds(camera, null, null, null)
+        }
+        // Don't restart an already loaded thumbnail unless the URL actually changed.
+        if (row.adsAllThumb.tag != ad.imageUrl) {
+            row.adsAllThumb.tag = ad.imageUrl
+            row.adsAllThumb.setTag(R.id.adsAllThumb, false)
+            row.adsAllThumb.setTag(R.id.vinor_image_request, null)
+            row.adsAllThumb.setImageDrawable(null)
+            row.adsAllPlaceholder.isVisible = true
+        }
+        PartnerImages.roundClip(row.adsAllThumbWrap, 12f)
+        row.root.contentDescription = listOf(ad.title, price, area, loc)
+            .filter { it.isNotBlank() }.joinToString("، ")
+        row.root.setOnClickListener { openAd(ad) }
     }
 
     private fun bindVisibleImages() {

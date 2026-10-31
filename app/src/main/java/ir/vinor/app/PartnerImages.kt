@@ -65,6 +65,9 @@ object PartnerImages {
 
     fun bind(scope: CoroutineScope, view: ImageView, url: String?, fallback: View? = null) {
         val resolved = resolve(url)
+        val previous = view.getTag(R.id.vinor_image_request) as? String
+        view.setTag(R.id.vinor_image_request, resolved)
+        if (previous != resolved) view.setImageDrawable(null)
         if (resolved.isBlank()) {
             view.setImageDrawable(null)
             fallback?.isVisible = true
@@ -79,8 +82,11 @@ object PartnerImages {
         val maxEdge = maxOf(view.width, view.height).let { size ->
             if (size > 1) size else (320 * view.resources.displayMetrics.density).toInt()
         }
+        fallback?.isVisible = true
         scope.launch {
             val bmp = withContext(Dispatchers.IO) { decode(resolved, view.context, maxEdge) }
+            // A recycled/rebound card must never receive the previous item's image.
+            if (view.getTag(R.id.vinor_image_request) != resolved) return@launch
             if (bmp == null) {
                 fallback?.isVisible = true
                 return@launch
