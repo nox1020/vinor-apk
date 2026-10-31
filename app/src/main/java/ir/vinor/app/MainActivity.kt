@@ -10,12 +10,16 @@ import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.isVisible
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
@@ -40,6 +44,18 @@ class MainActivity : AppCompatActivity() {
     private var tabbarForcedHidden = false
     private var tabbarImeHidden = false
     private var connectivityCallback: android.net.ConnectivityManager.NetworkCallback? = null
+    private var otpOwner: LifecycleOwner? = null
+    private var otpObserver: DefaultLifecycleObserver? = null
+    private var otpReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
+    private var otpOnCode: ((String) -> Unit)? = null
+    private var otpRetry = 0
+    private val otpConsentLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            OtpSmsAutoFill.handleConsentResult(
+                OtpSmsAutoFill.SMS_CONSENT_REQUEST_CODE, result.resultCode, result.data,
+            ) { code -> deliverOtp(code) }
+            if (otpReceiver != null) OtpSmsAutoFill.startSmsUserConsent(this)
+        }
 
     fun notifyHelperOrNull(): VinorNotifyHelper? = notifyHelper
 
@@ -141,10 +157,83 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopOtpSms()
         PartnerApi.setSessionExpiredListener(null)
         unregisterConnectivityCallback()
         notifyHelper?.destroy()
         super.onDestroy()
+    }
+
+    /** SMS Retriever without READ_SMS, with Android SMS User Consent as fallback. */
+    fun startOtpSms(owner: LifecycleOwner, onCode: (String) -> Unit) {
+        stopOtpSms()
+        otpOwner = owner
+        otpOnCode = onCode
+        otpRetry = 0
+        val observer = object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                if (otpOwner === owner) armOtpSms()
+            }
+            override fun onStop(owner: LifecycleOwner) {
+                if (otpOwner === owner) unregisterOtpSms()
+            }
+            override fun onDestroy(owner: LifecycleOwner) {
+                stopOtpSms(owner)
+            }
+        }
+        otpObserver = observer
+        owner.lifecycle.addObserver(observer)
+    }
+
+    fun stopOtpSms(owner: LifecycleOwner? = null) {
+        if (owner != null && owner !== otpOwner) return
+        unregisterOtpSms()
+        otpObserver?.let { observer -> otpOwner?.lifecycle?.removeObserver(observer) }
+        otpObserver = null
+        otpOwner = null
+        otpOnCode = null
+        otpRetry = 0
+    }
+
+    private fun deliverOtp(code: String) {
+        if (otpOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true) {
+            otpOnCode?.invoke(code)
+        }
+    }
+
+    private fun armOtpSms() {
+        unregisterOtpSms()
+        val receiver = OtpSmsAutoFill.SmsRetrieverReceiver(
+            onCode = { code -> runOnUiThread { deliverOtp(code) } },
+            onConsentRequired = { intent ->
+                runOnUiThread {
+                    if (otpOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true) {
+                        runCatching { otpConsentLauncher.launch(intent) }
+                    }
+                }
+            },
+            onTimeout = {
+                runOnUiThread {
+                    if (otpReceiver != null &&
+                        otpOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true &&
+                        otpRetry < 2
+                    ) {
+                        otpRetry++
+                        OtpSmsAutoFill.startSmsRetriever(this)
+                        OtpSmsAutoFill.startSmsUserConsent(this)
+                    }
+                }
+            },
+        )
+        otpReceiver = receiver
+        OtpSmsAutoFill.registerSmsRetrieverReceiver(this, receiver)
+        OtpSmsAutoFill.startSmsRetriever(this)
+        OtpSmsAutoFill.startSmsUserConsent(this)
+    }
+
+    private fun unregisterOtpSms() {
+        otpReceiver?.let { OtpSmsAutoFill.unregisterReceiver(this, it) }
+        otpReceiver = null
     }
 
     fun requestNotificationPermission() {

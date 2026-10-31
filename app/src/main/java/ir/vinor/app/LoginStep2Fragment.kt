@@ -33,7 +33,6 @@ class LoginStep2Fragment : Fragment() {
 
     private var phone: String = ""
     private var otpFilled = false
-    private var smsRetrieverReceiver: OtpSmsAutoFill.SmsRetrieverReceiver? = null
 
     companion object {
         private const val TAG = "LoginStep2"
@@ -77,33 +76,9 @@ class LoginStep2Fragment : Fragment() {
     }
 
     private fun setupSmsAutoFill() {
-        registerSmsReceiver()
-        OtpSmsAutoFill.startSmsRetriever(requireContext())
-    }
-
-    private fun registerSmsReceiver() {
-        unregisterSmsReceiver()
-        smsRetrieverReceiver = OtpSmsAutoFill.SmsRetrieverReceiver(
-            onCode = { code ->
-                activity?.runOnUiThread { applyOtpCode(code, autoSubmit = true) }
-            },
-            onTimeout = {
-                activity?.runOnUiThread {
-                    OtpSmsAutoFill.startSmsRetriever(requireContext())
-                }
-            },
-        )
-        OtpSmsAutoFill.registerSmsRetrieverReceiver(
-            requireContext(),
-            smsRetrieverReceiver!!,
-        )
-    }
-
-    private fun unregisterSmsReceiver() {
-        smsRetrieverReceiver?.let {
-            context?.let { c -> OtpSmsAutoFill.unregisterReceiver(c, it) }
+        (activity as? MainActivity)?.startOtpSms(viewLifecycleOwner) { sms ->
+            applyOtpCode(sms, autoSubmit = true)
         }
-        smsRetrieverReceiver = null
     }
 
     private fun applyOtpCode(code: String, autoSubmit: Boolean) {
@@ -122,7 +97,7 @@ class LoginStep2Fragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        unregisterSmsReceiver()
+        (activity as? MainActivity)?.stopOtpSms(viewLifecycleOwner)
         resendCountdownJob?.let { handler.removeCallbacks(it) }
         resendCountdownJob = null
         job.cancel()
@@ -165,7 +140,7 @@ class LoginStep2Fragment : Fragment() {
                     b.loginStep2Progress.visibility = View.GONE
                     b.loginStep2Submit.isEnabled = true
                     if (success) {
-                        unregisterSmsReceiver()
+                        (activity as? MainActivity)?.stopOtpSms(viewLifecycleOwner)
                         SessionAccount.remember(requireContext(), phone)
                         PartnerApi.markLoggedIn()
                         VinorFcmRegistrar.registerAfterLogin(requireContext())
@@ -266,7 +241,7 @@ class LoginStep2Fragment : Fragment() {
         binding.loginStep2Error.visibility = View.GONE
         binding.loginStep2Resend.isEnabled = false
         resendCooldownUntil = now + RESEND_COOLDOWN_SEC * 1000L
-        OtpSmsAutoFill.startSmsRetriever(requireContext().applicationContext)
+        setupSmsAutoFill()
         scope.launch {
             try {
                 val body = JSONObject().put("phone", phone)
