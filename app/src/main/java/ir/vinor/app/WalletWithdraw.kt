@@ -30,6 +30,7 @@ object WalletWithdraw {
         val ownerName: String,
         val sheba: String,
         val isDefault: Boolean,
+        val maskedPan: String = "",
     )
 
     data class BodyFields(
@@ -159,6 +160,7 @@ object WalletWithdraw {
                     ownerName = firstString(obj, "owner_name", "holder_name", "account_holder", "owner", "full_name"),
                     sheba = normalizeSheba(sheba),
                     isDefault = truthy(obj, "is_default") || truthy(obj, "default") || truthy(obj, "is_primary"),
+                    maskedPan = firstString(obj, "masked_pan"),
                 )
                 if (seen.add(account.id + "|" + account.sheba)) out.add(account)
             }

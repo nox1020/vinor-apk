@@ -233,8 +233,8 @@ class CommissionsFragment : Fragment() {
         withdrawable = amount.coerceAtLeast(0L)
         withdrawableKnown = true
         val label = PartnerFormat.toman(withdrawable) + " تومان"
-        binding.commissionsWithdrawBtn.isEnabled = withdrawableKnown && withdrawable >= minWithdrawal
-        binding.commissionsWithdrawBtn.alpha = if (binding.commissionsWithdrawBtn.isEnabled) 1f else 0.5f
+        // Keep account management accessible even below the minimum.
+        // The actual request is checked against the server-provided limit.
         binding.commissionsWithdrawable.text = label
         if (binding.withdrawSheet.isVisible) binding.withdrawAvailable.text = label
     }
@@ -358,8 +358,19 @@ class CommissionsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val bankRequest = async(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.BANK_ACCOUNTS, ctx) }
             val profileRequest = async(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.PROFILE_DATA, ctx) }
-            val banks = bankRequest.await()
-            val profile = profileRequest.await()
+            val banks: JSONObject
+            val profile: JSONObject
+            try {
+                banks = bankRequest.await()
+                profile = profileRequest.await()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (_binding != null) {
+                    setBusy(false)
+                    showRequestError("دریافت حساب‌های بانکی ناموفق بود. دوباره تلاش کنید.")
+                }
+                return@launch
+            }
             if (_binding == null) return@launch
             setBusy(false)
             fields = WalletWithdraw.BodyFields()
@@ -399,7 +410,9 @@ class CommissionsFragment : Fragment() {
             binding.withdrawAccountSub.text = "برای واریز، یک شبا ثبت کنید"
         } else {
             binding.withdrawAccountTitle.text = WalletWithdraw.accountTitle(selected)
-            binding.withdrawAccountSub.text = WalletWithdraw.formatSheba(selected.sheba)
+            binding.withdrawAccountSub.text = if (selected.sheba.isNotBlank())
+                WalletWithdraw.formatSheba(selected.sheba)
+            else selected.maskedPan.ifBlank { "حساب بانکی" }
         }
         binding.withdrawAvailable.text = if (withdrawableKnown) {
             PartnerFormat.toman(withdrawable) + " تومان"
@@ -417,7 +430,8 @@ class CommissionsFragment : Fragment() {
         for (account in accounts) {
             val row = ItemBankAccountBinding.inflate(layoutInflater, list, false)
             row.bankAccountTitle.text = WalletWithdraw.accountTitle(account)
-            row.bankAccountSheba.text = WalletWithdraw.formatSheba(account.sheba)
+            row.bankAccountSheba.text = if (account.sheba.isNotBlank())
+                WalletWithdraw.formatSheba(account.sheba) else account.maskedPan
             val picked = account.id == selectedId
             row.bankAccountTitle.setTextColor(
                 ContextCompat.getColor(
