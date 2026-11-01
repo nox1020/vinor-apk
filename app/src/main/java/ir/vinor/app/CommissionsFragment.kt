@@ -6,6 +6,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import android.widget.ArrayAdapter
+import androidx.appcompat.app.AlertDialog
+import kotlinx.coroutines.async
+import org.json.JSONArray
+import java.util.UUID
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -37,6 +42,8 @@ class CommissionsFragment : Fragment() {
     private var csrf: String = ""
     private var withdrawable: Long = 0L
     private var withdrawableKnown: Boolean = false
+    private var minWithdrawal: Long = 10_000_000L
+    private var bankCatalog = JSONObject()
     private var busy: Boolean = false
     private var step: Step = Step.REQUEST
     private var addFromPick: Boolean = false
@@ -157,11 +164,13 @@ class CommissionsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val wasFresh = withContext(Dispatchers.IO) { PartnerApi.isFresh(COMMISSIONS_DATA, ctx) }
             try {
+                var paintedByLoader = false
                 val obj = PartnerApi.loadDisplay(COMMISSIONS_DATA, ctx) { data ->
                     if (_binding == null || gen != loadGen || stamp != sessionStamp) return@loadDisplay
                     if (!WalletWithdraw.hasCommissionPayload(data)) return@loadDisplay
                     if (VinorPageLoad.needsLogin(data)) return@loadDisplay
                     bindCommissionPayload(data)
+                    paintedByLoader = true
                     rendered = true
                 }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
@@ -175,7 +184,7 @@ class CommissionsFragment : Fragment() {
                     else if (!rendered) showOffline()
                     return@launch
                 }
-                bindCommissionPayload(obj)
+                if (!paintedByLoader) bindCommissionPayload(obj)
                 rendered = true
                 if (VinorPageLoad.canRemember(obj)) remembered = VinorPageLoad.rememberedCopy(obj)
                 if (rendered && VinorPageLoad.networkFailed(wasFresh, obj)) showOffline()
@@ -205,7 +214,12 @@ class CommissionsFragment : Fragment() {
         val pending = WalletWithdraw.money(root, "pending_commission")
         val paid = WalletWithdraw.money(root, "paid_commission")
         val soldCount = WalletWithdraw.money(root, "sold_count")
-        val itemsArr = WalletWithdraw.commissionItems(obj)
+        val itemsArr = obj.optJSONArray("transactions") ?: WalletWithdraw.commissionItems(obj)
+        minWithdrawal = obj.optLong("min_withdrawal_amount", minWithdrawal).coerceAtLeast(0L)
+        val inWithdrawal = obj.optLong("in_withdrawal_amount", 0L)
+        binding.commissionsWithdrawStatus.isVisible = inWithdrawal > 0L
+        if (inWithdrawal > 0L) binding.commissionsWithdrawStatus.text =
+            "در حال برداشت: ${formatToman(inWithdrawal)} تومان"
         val items = mutableListOf<JSONObject>()
         for (i in 0 until itemsArr.length()) {
             itemsArr.optJSONObject(i)?.let { items.add(it) }
@@ -219,6 +233,8 @@ class CommissionsFragment : Fragment() {
         withdrawable = amount.coerceAtLeast(0L)
         withdrawableKnown = true
         val label = PartnerFormat.toman(withdrawable) + " تومان"
+        binding.commissionsWithdrawBtn.isEnabled = withdrawableKnown && withdrawable >= minWithdrawal
+        binding.commissionsWithdrawBtn.alpha = if (binding.commissionsWithdrawBtn.isEnabled) 1f else 0.5f
         binding.commissionsWithdrawable.text = label
         if (binding.withdrawSheet.isVisible) binding.withdrawAvailable.text = label
     }
@@ -274,22 +290,51 @@ class CommissionsFragment : Fragment() {
         for (i in items.indices) {
             val c = items[i]
             val itemBinding = ItemCommissionBinding.inflate(layoutInflater, list, false)
-            itemBinding.itemCommissionLandCode.text = "کد فایل: ${c.optString("land_code", "—")}"
+            val isTransaction = c.has("txn_type")
+            itemBinding.itemCommissionLandCode.text = if (isTransaction)
+                c.optString("title").ifBlank { "تراکنش" }
+            else "کد فایل: ${c.optString("land_code", "—")}"
             itemBinding.itemCommissionDate.text = formatDate(c.optString("created_at"))
             val status = c.optString("status").trim().ifBlank { c.optString("commission_status").trim() }
                 .ifBlank { "pending" }
-            itemBinding.itemCommissionStatus.text = statusText(status)
+            itemBinding.itemCommissionStatus.text =
+                if (isTransaction) c.optString("status_label").ifBlank { statusText(status) }
+                else statusText(status)
             itemBinding.itemCommissionStatus.setTextColor(statusColor(status))
             val pct = c.optDouble("commission_pct", 0.0)
+            itemBinding.itemCommissionPct.isVisible = !isTransaction
             itemBinding.itemCommissionPct.text = if (pct == pct.toLong().toDouble()) "${pct.toLong()}%" else "$pct%"
-            val amount = WalletWithdraw.money(c, "commission_amount", "payout_amount", "amount", "commission")
-            itemBinding.itemCommissionAmount.text = formatToman(amount) + " تومان"
+            val amount = if (isTransaction) WalletWithdraw.money(c, "amount") else
+                WalletWithdraw.money(c, "original_amount", "commission_amount", "payout_amount", "amount")
+            val sign = if (isTransaction) c.optString("amount_sign").ifBlank { "+" } else "+"
+            itemBinding.itemCommissionAmount.text = sign + formatToman(amount) + " تومان"
+            itemBinding.itemCommissionAmount.setTextColor(ContextCompat.getColor(requireContext(),
+                if (sign == "-") R.color.vinor_text else R.color.vinor_accent_green))
             val saleAmount = WalletWithdraw.money(c, "sale_amount")
-            if (saleAmount > 0) {
+            if (!isTransaction && saleAmount > 0) {
                 itemBinding.itemCommissionSaleRow.visibility = View.VISIBLE
                 itemBinding.itemCommissionSaleAmount.text = formatToman(saleAmount) + " تومان"
             } else {
                 itemBinding.itemCommissionSaleRow.visibility = View.GONE
+            }
+            if (isTransaction && c.optBoolean("cancellable")) {
+                val wid = c.optString("withdrawal_id")
+                if (wid.isNotBlank()) {
+                    itemBinding.root.isClickable = true
+                    itemBinding.root.setOnClickListener {
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("لغو درخواست برداشت")
+                            .setMessage("این درخواست هنوز در انتظار بررسی است. لغو شود؟")
+                            .setNegativeButton("بازگشت", null)
+                            .setPositiveButton("لغو درخواست") { _, _ ->
+                                postFinance("/express/partner/withdrawals/$wid/cancel",
+                                    JSONObject(), requestError = true) {
+                                    Toast.makeText(requireContext(), "درخواست لغو شد.", Toast.LENGTH_SHORT).show()
+                                    loadData()
+                                }
+                            }.show()
+                    }
+                }
             }
             list.addView(itemBinding.root)
         }
@@ -311,12 +356,21 @@ class CommissionsFragment : Fragment() {
         val ctx = context ?: return
         setBusy(true)
         viewLifecycleOwner.lifecycleScope.launch {
-            val banks = withContext(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.BANK_ACCOUNTS, ctx) }
-            val html = withContext(Dispatchers.IO) { PartnerApi.getHtml(WalletWithdraw.COMMISSIONS_HTML, ctx) }
-            val profile = withContext(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.PROFILE_DATA, ctx) }
+            val bankRequest = async(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.BANK_ACCOUNTS, ctx) }
+            val profileRequest = async(Dispatchers.IO) { PartnerApi.get(WalletWithdraw.PROFILE_DATA, ctx) }
+            val banks = bankRequest.await()
+            val profile = profileRequest.await()
             if (_binding == null) return@launch
             setBusy(false)
-            fields = WalletWithdraw.fieldsFromHtml(html)
+            fields = WalletWithdraw.BodyFields()
+            bankCatalog = banks
+            minWithdrawal = banks.optLong("min_withdrawal_amount", minWithdrawal)
+            val names = (banks.optJSONArray("banks") ?: JSONArray()).let { catalog ->
+                (0 until catalog.length()).mapNotNull { catalog.optJSONObject(it)?.optString("name")?.takeIf(String::isNotBlank) }
+            }
+            binding.withdrawBankName.setAdapter(ArrayAdapter(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, names))
+            binding.withdrawBankName.setOnClickListener { binding.withdrawBankName.showDropDown() }
             csrf = WalletWithdraw.csrfOf(profile).ifBlank { WalletWithdraw.csrfOf(banks) }.ifBlank { csrf }
             if (WalletWithdraw.isUnauthorized(banks)) {
                 closeSheet()
@@ -446,6 +500,7 @@ class CommissionsFragment : Fragment() {
         val amountError = WalletWithdraw.amountError(
             binding.withdrawAmount.text?.toString().orEmpty(),
             if (withdrawableKnown) withdrawable else null,
+            minWithdrawal,
         )
         if (amountError != null) {
             showRequestError(amountError)
@@ -459,6 +514,7 @@ class CommissionsFragment : Fragment() {
         }
         val amount = WalletWithdraw.parseAmount(binding.withdrawAmount.text?.toString().orEmpty()) ?: return
         val body = WalletWithdraw.withdrawBody(amount, account.id, fields)
+            .put("client_request_id", UUID.randomUUID().toString())
         postFinance(WalletWithdraw.REQUEST, body, requestError = true) { response ->
             val pending = WalletWithdraw.parsePending(response)
             if (pending != null) showPending(pending)
@@ -471,18 +527,22 @@ class CommissionsFragment : Fragment() {
 
     private fun submitAdd() {
         val bank = binding.withdrawBankName.text?.toString().orEmpty()
+        val key = WalletWithdraw.bankKey(bank, bankCatalog)
+        val pan = PartnerApi.asciiDigits(binding.withdrawPan.text?.toString().orEmpty())
         val owner = binding.withdrawOwnerName.text?.toString().orEmpty()
         val sheba = binding.withdrawSheba.text?.toString().orEmpty()
-        val error = WalletWithdraw.bankError(bank)
+        val error = if (key.isBlank()) "بانک معتبر انتخاب کنید." else null
+            ?: if (pan.length != 16) "شماره کارت باید ۱۶ رقم باشد." else null
             ?: WalletWithdraw.ownerError(owner)
-            ?: WalletWithdraw.shebaError(sheba)
+            ?: if (sheba.isNotBlank()) WalletWithdraw.shebaError(sheba) else null
         if (error != null) {
             showAddError(error)
             return
         }
-        val body = WalletWithdraw.addBody(sheba, owner, bank, fields)
+        val body = WalletWithdraw.addBody(sheba, owner, key, fields, pan)
         postFinance(WalletWithdraw.BANK_ADD, body, requestError = false) {
             binding.withdrawBankName.setText("")
+            binding.withdrawPan.setText("")
             binding.withdrawOwnerName.setText("")
             binding.withdrawSheba.setText("")
             Toast.makeText(requireContext(), "حساب ذخیره شد.", Toast.LENGTH_SHORT).show()
@@ -492,7 +552,8 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun postAccount(path: String, accountId: String) {
-        val body = WalletWithdraw.idBody(accountId, fields)
+        val body = if (path == WalletWithdraw.BANK_DEFAULT)
+            WalletWithdraw.defaultBody(accountId, fields) else WalletWithdraw.idBody(accountId, fields)
         postFinance(path, body, requestError = false) {
             if (path == WalletWithdraw.BANK_DELETE && selectedId == accountId) selectedId = null
             if (path == WalletWithdraw.BANK_DEFAULT) selectedId = accountId
