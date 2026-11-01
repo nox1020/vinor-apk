@@ -163,7 +163,7 @@ class WalletWithdrawTest {
             WalletWithdraw.BodyFields(), "6037991122334455")
         assertEquals("mellat", body.getString("bank_key"))
         assertEquals("6037991122334455", body.getString("pan"))
-        assertEquals("کف برداشت ۱۰٬۰۰۰٬۰۰۰ تومان است.",
+        assertEquals("کف برداشت ${PartnerFormat.toman(10000000L)} تومان است.",
             WalletWithdraw.amountError("3000000", 20000000L, 10000000L))
         val defaults = WalletWithdraw.defaultBody("id-123", WalletWithdraw.BodyFields())
         assertTrue(defaults.getBoolean("is_default"))
