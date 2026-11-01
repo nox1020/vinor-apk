@@ -24,6 +24,8 @@ object VinorNotificationTray {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        // A prior install may already have the audible channel. Always create silent too.
+        ensureSilentChannel(nm)
         val existing = nm.getNotificationChannel(CHANNEL_ID)
         if (existing != null) {
             if (existing.importance >= NotificationManager.IMPORTANCE_HIGH) return
@@ -42,7 +44,6 @@ object VinorNotificationTray {
             setShowBadge(true)
         }
         nm.createNotificationChannel(ch)
-        ensureSilentChannel(nm)
     }
 
     private fun ensureSilentChannel(nm: NotificationManager) {
