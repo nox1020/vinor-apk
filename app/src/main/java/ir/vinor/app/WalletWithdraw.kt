@@ -37,7 +37,7 @@ object WalletWithdraw {
         val withdrawAccount: String = "bank_account_id",
         val addSheba: String = "sheba",
         val addOwner: String = "owner_name",
-        val addBank: String = "bank_name",
+        val addBank: String = "bank_key",
         val accountId: String = "id",
     )
 
@@ -65,7 +65,7 @@ object WalletWithdraw {
                 listOf("owner_name", "holder_name", "account_holder", "owner", "full_name"),
                 "owner_name",
             ),
-            addBank = pick(addKeys, listOf("bank_name", "bank", "bank_title"), "bank_name"),
+            addBank = pick(addKeys, listOf("bank_key", "bank_name", "bank", "bank_title"), "bank_key"),
             accountId = pick(idKeys, listOf("bank_account_id", "account_id", "id"), "id"),
         )
     }
@@ -97,10 +97,11 @@ object WalletWithdraw {
 
     fun parseAmount(raw: String): Long? = PartnerApi.asciiDigits(raw).toLongOrNull()
 
-    fun amountError(raw: String, available: Long?): String? {
+    fun amountError(raw: String, available: Long?, minimum: Long = 0L): String? {
         val amount = parseAmount(raw)
         if (amount == null) return "مبلغ را وارد کنید."
         if (amount <= 0L) return "مبلغ باید بیشتر از صفر باشد."
+        if (amount < minimum) return "کف برداشت ${PartnerFormat.toman(minimum)} تومان است."
         if (available != null && available <= 0L) return "موجودی قابل برداشت ندارید."
         if (available != null && amount > available) return "مبلغ از موجودی قابل برداشت بیشتر است."
         return null
@@ -180,11 +181,38 @@ object WalletWithdraw {
             .put(fields.withdrawAccount, jsonId(accountId))
     }
 
-    fun addBody(sheba: String, owner: String, bank: String, fields: BodyFields): JSONObject {
+    fun addBody(
+        sheba: String, owner: String, bankKey: String,
+        fields: BodyFields, pan: String = "",
+    ): JSONObject {
         return JSONObject()
             .put(fields.addSheba, normalizeSheba(sheba))
             .put(fields.addOwner, owner.trim())
-            .put(fields.addBank, bank.trim())
+            .put("pan", PartnerApi.asciiDigits(pan))
+            .put("bank_key", bankKey.trim())
+    }
+
+    fun defaultBody(accountId: String, fields: BodyFields): JSONObject =
+        idBody(accountId, fields).put("is_default", true)
+
+    fun bankKey(raw: String, catalog: JSONObject? = null): String {
+        val input = raw.trim()
+        val arr = catalog?.optJSONArray("banks")
+        if (arr != null) for (i in 0 until arr.length()) {
+            val bank = arr.optJSONObject(i) ?: continue
+            if (input == bank.optString("name") || input.equals(bank.optString("key"), true))
+                return bank.optString("key")
+        }
+        val names = mapOf(
+            "ملت" to "mellat", "بانک ملت" to "mellat",
+            "ملی" to "melli", "بانک ملی" to "melli", "بانک ملی ایران" to "melli",
+            "پارسیان" to "parsian", "صادرات" to "saderat",
+            "تجارت" to "tejarat", "پاسارگاد" to "pasargad",
+            "سامان" to "saman", "اقتصاد نوین" to "eghtesad", "سایر بانک‌ها" to "other",
+        )
+        return names[input] ?: input.lowercase().takeIf {
+            it in setOf("mellat","melli","parsian","saderat","tejarat","pasargad","saman","eghtesad","other")
+        }.orEmpty()
     }
 
     fun idBody(accountId: String, fields: BodyFields): JSONObject {

@@ -527,7 +527,7 @@
                         android:textColor="@color/vinor_text"
                         android:textSize="14sp" />
 
-                    <EditText
+                    <AutoCompleteTextView
                         android:id="@+id/withdrawBankName"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -535,6 +535,29 @@
                         android:background="@drawable/bg_routine_card"
                         android:hint="مثلاً ملت"
                         android:inputType="text"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/vinor_text"
+                        android:textColorHint="@color/vinor_text_muted"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="شماره ۱۶ رقمی کارت"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/withdrawPan"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/bg_routine_card"
+                        android:hint="شماره کارت"
+                        android:inputType="number"
+                        android:maxLength="19"
                         android:minHeight="48dp"
                         android:paddingHorizontal="14dp"
                         android:textColor="@color/vinor_text"

@@ -53,7 +53,7 @@ class WalletWithdrawTest {
         assertEquals("bank_account_id", fields.withdrawAccount)
         assertEquals("sheba", fields.addSheba)
         assertEquals("owner_name", fields.addOwner)
-        assertEquals("bank_name", fields.addBank)
+        assertEquals("bank_key", WalletWithdraw.fieldsFromHtml("").addBank)
         assertEquals("id", fields.accountId)
 
         val scriptOnly = """
@@ -150,8 +150,23 @@ class WalletWithdrawTest {
         val add = WalletWithdraw.addBody("IR820540102680020817909002", " علی ", " ملت ", fields)
         assertEquals("IR820540102680020817909002", add.getString("iban"))
         assertEquals("علی", add.getString("owner_name"))
-        assertEquals("ملت", add.getString("bank_name"))
+        assertEquals("ملت", add.getString("bank_key"))
         assertEquals("abc", WalletWithdraw.idBody("abc", WalletWithdraw.BodyFields()).getString("id"))
+    }
+
+    @Test
+    fun walletBankFormUsesRealServerContractAndMinimum() {
+        assertEquals("mellat", WalletWithdraw.bankKey("بانک ملت"))
+        assertEquals("melli", WalletWithdraw.bankKey("ملی"))
+        assertEquals("", WalletWithdraw.bankKey("نامعتبر"))
+        val body = WalletWithdraw.addBody("IR062960000000100324200001", "تست", "mellat",
+            WalletWithdraw.BodyFields(), "6037991122334455")
+        assertEquals("mellat", body.getString("bank_key"))
+        assertEquals("6037991122334455", body.getString("pan"))
+        assertEquals("کف برداشت ۱۰٬۰۰۰٬۰۰۰ تومان است.",
+            WalletWithdraw.amountError("3000000", 20000000L, 10000000L))
+        val defaults = WalletWithdraw.defaultBody("id-123", WalletWithdraw.BodyFields())
+        assertTrue(defaults.getBoolean("is_default"))
     }
 
     @Test
