@@ -175,18 +175,6 @@
         android:layout_height="1dp"
         android:background="@color/vinor_border" />
 
-    <TextView
-        android:id="@+id/searchCount"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/vazirmatn_bold"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
-        android:textColor="@color/vinor_text_muted"
-        android:textSize="12sp"
-        android:visibility="gone" />
-
     <!-- A single scroll owner lives in DashboardFragment. Listing content must
          be present in the XML from inflation onward, never detached/reparented. -->
     <LinearLayout

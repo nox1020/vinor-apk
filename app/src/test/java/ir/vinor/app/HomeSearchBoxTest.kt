@@ -34,6 +34,24 @@ class HomeSearchBoxTest {
     }
 
     @Test
+    fun homeHidesCountAndCardAreaWithoutChangingRowFootprint() {
+        val homeXml = source("src/main/res/layout/fragment_search.xml").readText()
+        val search = source("src/main/java/ir/vinor/app/SearchFragment.kt").readText()
+        val row = source("src/main/res/layout/item_ads_all_row.xml").readText()
+        assertFalse(homeXml.contains("android:id=\"@+id/searchCount\""))
+        assertFalse(search.contains("b.searchCount"))
+        assertFalse(search.contains("val area = SearchAds.cardArea(ad.areaRaw)"))
+        assertTrue(search.contains("row.adsAllArea.visibility = if (reservedAreaLine) View.INVISIBLE else View.GONE"))
+        assertTrue(search.contains("row.adsAllArea.text = if (reservedAreaLine) \" \" else \"\""))
+        assertTrue(search.contains("listOf(ad.title, price, loc)"))
+        assertTrue(row.contains("android:minHeight=\"128dp\""))
+        assertTrue(row.contains("android:minHeight=\"104dp\""))
+        assertTrue(row.contains("android:layout_width=\"104dp\""))
+        assertTrue(row.contains("android:layout_height=\"104dp\""))
+        assertTrue(homeXml.contains("searchChipArea"))
+    }
+
+    @Test
     fun listingRowGrowsSoPlaceLineIsNeverClipped() {
         val row = source("src/main/res/layout/item_ads_all_row.xml").readText()
         val column = row.substringBefore("android:id=\"@+id/adsAllTitle\"")

@@ -411,9 +411,6 @@ class SearchFragment : Fragment() {
         }
         // Keep existing views when temporarily showing empty/error/loading.
         // Destroying them here used to trigger another complete image reload.
-        val count = if (showList) ui.items.size else 0
-        b.searchCount.isVisible = count > 0
-        if (count > 0) b.searchCount.text = "${PartnerFormat.digits(count)} آگهی"
         paintedUi = ui
         paintedApproved = approved
     }
@@ -533,9 +530,11 @@ class SearchFragment : Fragment() {
         row.adsAllTitle.text = ad.title
         val price = SearchAds.cardPrice(ad.priceRaw)
         row.adsAllPrice.text = price
-        val area = SearchAds.cardArea(ad.areaRaw)
-        row.adsAllArea.isVisible = area.isNotBlank()
-        row.adsAllArea.text = area
+        // The area line is no longer shown, but its footprint remains identical.
+        // INVISIBLE (not GONE) prevents the cached listing rows from changing height.
+        val reservedAreaLine = SearchAds.cardArea(ad.areaRaw).isNotBlank()
+        row.adsAllArea.text = if (reservedAreaLine) " " else ""
+        row.adsAllArea.visibility = if (reservedAreaLine) View.INVISIBLE else View.GONE
         val loc = SearchAds.cardPlace(ad)
         row.adsAllLoc.text = loc
         row.adsAllLoc.isVisible = loc.isNotBlank()
@@ -560,7 +559,7 @@ class SearchFragment : Fragment() {
             row.adsAllThumb.setImageDrawable(null)
             row.adsAllPlaceholder.isVisible = true
         }
-        row.root.contentDescription = listOf(ad.title, price, area, loc)
+        row.root.contentDescription = listOf(ad.title, price, loc)
             .filter { it.isNotBlank() }.joinToString("، ")
         row.root.setOnClickListener { openAd(ad) }
     }
