@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 
 object VinorNotificationTray {
     const val CHANNEL_ID = "vinor_express_partner"
+    const val SILENT_CHANNEL_ID = "vinor_express_partner_silent"
     private const val TAG = "VinorNotifyTray"
     const val DEFAULT_NOTIF_ID = 1001
     const val ACTION_OPEN = "OPEN_NOTIFICATIONS"
@@ -41,6 +42,24 @@ object VinorNotificationTray {
             setShowBadge(true)
         }
         nm.createNotificationChannel(ch)
+        ensureSilentChannel(nm)
+    }
+
+    private fun ensureSilentChannel(nm: NotificationManager) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return
+        if (nm.getNotificationChannel(SILENT_CHANNEL_ID) != null) return
+        val silent = NotificationChannel(
+            SILENT_CHANNEL_ID,
+            "اعلان‌های بی‌صدای وینور",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "اعلان‌ها بدون صدا و لرزش دریافت می‌شوند"
+            setSound(null, null)
+            enableVibration(false)
+            enableLights(false)
+            setShowBadge(true)
+        }
+        nm.createNotificationChannel(silent)
     }
 
     fun hasPostPermission(context: Context): Boolean {
@@ -69,6 +88,7 @@ object VinorNotificationTray {
             return
         }
 
+        val muted = VinorNotificationPreferences.isMuted(context)
         val targetUrl = normalizeUrl(url)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -82,17 +102,20 @@ object VinorNotificationTray {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notif = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notif = NotificationCompat.Builder(
+            context, if (muted) SILENT_CHANNEL_ID else CHANNEL_ID,
+        )
             .setSmallIcon(R.drawable.ic_stat_notify)
             .setContentTitle(title.ifBlank { "اعلان جدید" })
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pi)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (muted) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+            .setSilent(muted)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setDefaults(if (muted) 0 else NotificationCompat.DEFAULT_ALL)
             .build()
         try {
             NotificationManagerCompat.from(context).notify(notificationId, notif)

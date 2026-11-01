@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -427,11 +428,37 @@ class NativePartnerFragment : Fragment() {
         hideSpecials()
         binding.nativeEmpty.isVisible = false
         binding.nativeList.removeAllViews()
-        addActionRow("خروج", danger = true) {
-            VinorLogoutSheet.show(this) { finish ->
-                (activity as? MainActivity)?.logoutFromDrawer(finish) ?: finish()
+        val soundSwitch = SwitchCompat(requireContext()).apply {
+            text = "صدای اعلان‌ها"
+            textSize = 15f
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text))
+            setBackgroundResource(R.drawable.bg_routine_card)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            isChecked = VinorNotificationPreferences.soundEnabled(context)
+            contentDescription = "فعال یا بی‌صدا کردن اعلان‌ها"
+            setOnCheckedChangeListener { _, soundEnabled ->
+                VinorNotificationPreferences.setSoundEnabled(context, soundEnabled)
+                VinorNotificationTray.ensureChannel(context)
+                // Persist this device's preference server-side for background FCM.
+                VinorFcmRegistrar.requestTokenAndRegister(context, force = true)
+                Toast.makeText(
+                    context,
+                    if (soundEnabled) "صدای اعلان‌ها فعال شد."
+                    else "اعلان‌ها همچنان دریافت می‌شوند، اما بی‌صدا هستند.",
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
+        binding.nativeList.addView(soundSwitch, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ))
+        val detail = TextView(requireContext()).apply {
+            text = "خاموش: اعلان‌ها نمایش داده می‌شوند، اما صدا و لرزش ندارند."
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        binding.nativeList.addView(detail)
     }
 
     private fun bindTraining(obj: JSONObject) {

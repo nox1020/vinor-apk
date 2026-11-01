@@ -166,6 +166,7 @@ object VinorFcmRegistrar {
                     .put("token", tokenTrim)
                     .put("platform", "android")
                     .put("app_version", version)
+                    .put("muted", VinorNotificationPreferences.isMuted(context))
                     .toString()
 
                 val req = Request.Builder()
