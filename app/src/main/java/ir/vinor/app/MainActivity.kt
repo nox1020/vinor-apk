@@ -703,11 +703,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openCustomers(uri: Uri) {
-        if (!PartnerApi.hasSession()) {
-            DeepLinkPendingStore.save(this, "/express/partner/customers")
-            openLogin()
-            return
-        }
+        // Guest login is hosted by the Customers tab itself.
         val url = uri.toString()
         val current = navController.currentBackStackEntry?.arguments?.getString("url")
         if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
@@ -940,11 +936,6 @@ class MainActivity : AppCompatActivity() {
 
     /** تب «پیگیری»: صفحهٔ پیگیری درخواست‌ها (همان /express/partner/requests وب). */
     private fun openFollowTab() {
-        if (!PartnerApi.hasSession()) {
-            DeepLinkPendingStore.save(this, "/express/partner/requests")
-            openLogin()
-            return
-        }
         // Keep the footer selected; NativePartnerFragment handles guest login inline.
         openNativePage(NativePartnerFragment.PAGE_REQUESTS, asTab = true)
     }

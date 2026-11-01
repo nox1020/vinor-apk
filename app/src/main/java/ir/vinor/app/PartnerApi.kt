@@ -37,6 +37,7 @@ object PartnerApi {
         .build()
     private val cookieLock = Any()
     private val expiryLock = Any()
+    private val authGuard = AuthResponseGuard()
     @Volatile private var appCtx: Context? = null
     @Volatile private var loggedIn: Boolean = false
     @Volatile private var cookieSnapshot: String = ""
@@ -243,6 +244,7 @@ object PartnerApi {
         return try {
             val req = requestBuilder(path, context).get().build()
             val obj = execute(req)
+            if (obj.optBoolean("stale_auth_response")) return obj
             val code = obj.optInt("http_status")
             if (obj.optBoolean("session_expired") || code == 401) {
                 return authRequiredResult(obj, 401)
@@ -278,6 +280,7 @@ object PartnerApi {
                 .get()
                 .build()
             val obj = execute(req)
+            if (obj.optBoolean("stale_auth_response")) return obj
             val code = obj.optInt("http_status")
             if (code in 200..299 && !obj.optBoolean("non_json")) {
                 remember(path, obj, context)
@@ -311,8 +314,9 @@ object PartnerApi {
                 b.addHeader("User-Agent", VinorUserAgent.forHttpRequest(context))
                 VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
             }
+            val requestEpoch = authGuard.capture()
             client.newCall(b.get().build()).execute().use { resp ->
-                saveCookies(resp)
+                saveCookies(resp, requestEpoch)
                 PageBody(resp.code, resp.request.url.toString(), resp.body?.string().orEmpty())
             }
         } catch (_: Exception) {
@@ -501,8 +505,9 @@ object PartnerApi {
             .addHeader("Origin", PartnerCustomers.ORIGIN)
             .addHeader("Referer", referer)
         if (csrf.isNotBlank()) builder.addHeader("X-CSRFToken", csrf)
+        val requestEpoch = authGuard.capture()
         redirectless.newCall(builder.build()).execute().use { resp ->
-            saveCookies(resp)
+            saveCookies(resp, requestEpoch)
             val status = resp.code
             val postedPath = resp.request.url.encodedPath
             val location = resp.header("Location").orEmpty().trim()
@@ -515,7 +520,7 @@ object PartnerApi {
                     return inboxUnauthorized()
                 }
                 client.newCall(htmlGet(next.toString(), context)).execute().use { page ->
-                    saveCookies(page)
+                    saveCookies(page, requestEpoch)
                     val finalPath = page.request.url.encodedPath
                     if (finalPath.startsWith("/express/partner/login") || page.code == 401) {
                         return inboxUnauthorized()
@@ -581,8 +586,9 @@ object PartnerApi {
             VinorUserAgent.webViewLoadHeaders(context).forEach { (k, v) -> b.addHeader(k, v) }
         }
         return try {
+            val requestEpoch = authGuard.capture()
             client.newCall(b.get().build()).execute().use { resp ->
-                saveCookies(resp)
+                saveCookies(resp, requestEpoch)
                 if (!resp.isSuccessful) {
                     return context?.let { VinorOfflinePageStore.read(it.applicationContext, url) }.orEmpty()
                 }
@@ -632,6 +638,7 @@ object PartnerApi {
         if (ctx != null && VinorNetworkStatus.useCacheFirst(ctx)) {
             return enqueueOrOffline(ctx, url, body)
         }
+        if (isCredentialStartPath(url)) authGuard.beginCredentials()
         return try {
             val req = requestBuilder(path, context)
                 .post(body.toString().toRequestBody(jsonType))
@@ -755,13 +762,14 @@ object PartnerApi {
         }
     }
 
-    fun saveCookies(resp: Response) {
+    fun saveCookies(resp: Response, expectedEpoch: Long? = null) {
         val cookies = resp.headers("Set-Cookie")
         if (cookies.isEmpty()) return
-        applyCookiesOnMain(cookies)
+        applyCookiesOnMain(cookies, expectedEpoch)
     }
 
     fun clearCookies(done: () -> Unit) {
+        authGuard.stateChanged() // Invalidate guest replies still in flight.
         setLoggedIn(false)
         ProfileFragment.clearRemembered()
         synchronized(cookieLock) { cookieSnapshot = "" }
@@ -848,6 +856,11 @@ object PartnerApi {
         return if (path.length > 1 && path.endsWith("/")) path.dropLast(1) else path
     }
 
+    private fun isCredentialStartPath(url: String): Boolean {
+        val path = requestPath(url)
+        return path.endsWith("/api/login-request") || path.endsWith("/api/verify")
+    }
+
     private fun isCredentialPath(url: String): Boolean {
         val path = requestPath(url)
         return path.endsWith("/login-request") ||
@@ -902,9 +915,10 @@ object PartnerApi {
     }
 
     private fun execute(req: Request, http: OkHttpClient = client): JSONObject {
+        // Snapshot must precede the request; a guest reply after OTP is obsolete.
+        val requestEpoch = authGuard.capture()
+        val hadSession = hasSession()
         http.newCall(req).execute().use { resp ->
-            val hadSession = hasSession()
-            saveCookies(resp)
             val text = resp.body?.string().orEmpty()
             val obj = responsePayload(
                 text = text,
@@ -912,33 +926,49 @@ object PartnerApi {
                 requestPath = req.url.encodedPath,
                 finalPath = resp.request.url.encodedPath,
             )
+            if (!authGuard.isCurrent(requestEpoch)) return staleAuthResponse()
+            saveCookies(resp, requestEpoch)
+            if (!authGuard.isCurrent(requestEpoch)) return staleAuthResponse()
             if (obj.optString("error") == "پاسخ نامعتبر") obj.put("non_json", true)
             val url = req.url.toString()
             val code = obj.optInt("http_status")
             if (code == 403) evictPrivateCache()
-            val hard401 = code == 401 && !isCredentialPath(url)
+            val credential = isCredentialPath(url)
             val silent = hadSession && isSilentLogout(url, obj)
-            if (hard401 || silent) {
-                if (hadSession || silent) obj.put("session_expired", true)
-                expireSession(notifyUi = obj.optBoolean("session_expired"))
+            if (authGuard.shouldExpire(hadSession, credential, code, silent)) {
+                obj.put("session_expired", true)
+                expireSession(notifyUi = true)
             } else if (!obj.optBoolean("non_json")) {
-                if (code == 401 || obj.optString("error") == "unauthorized") setLoggedIn(false)
+                // A guest 401 is not proof that the pending OTP cookie expired.
+                if (hadSession && !credential &&
+                    (code == 401 || obj.optString("error") == "unauthorized")) {
+                    setLoggedIn(false)
+                }
                 ingestAuth(obj)
             }
             return obj
         }
     }
 
-    private fun applyCookiesOnMain(cookies: List<String>) {
-        val apply = {
-            val mgr = CookieManager.getInstance()
-            mgr.setAcceptCookie(true)
-            cookies.forEach { raw ->
-                if (raw.contains('=')) mgr.setCookie(BASE, raw)
-            }
-            mgr.flush()
-            synchronized(cookieLock) {
-                cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
+    private fun staleAuthResponse(): JSONObject = JSONObject()
+        .put("ok", false)
+        .put("success", false)
+        .put("offline", true)
+        .put("stale_auth_response", true)
+        .put("http_status", 0)
+
+    private fun applyCookiesOnMain(cookies: List<String>, expectedEpoch: Long? = null) {
+        val apply: () -> Unit = {
+            if (expectedEpoch == null || authGuard.isCurrent(expectedEpoch)) {
+                val mgr = CookieManager.getInstance()
+                mgr.setAcceptCookie(true)
+                cookies.forEach { raw ->
+                    if (raw.contains('=')) mgr.setCookie(BASE, raw)
+                }
+                mgr.flush()
+                synchronized(cookieLock) {
+                    cookieSnapshot = runCatching { mgr.getCookie(BASE) ?: "" }.getOrDefault("")
+                }
             }
         }
         if (VinorSafe.isMainThread()) {
@@ -953,7 +983,7 @@ object PartnerApi {
                 latch.countDown()
             }
         }
-        latch.await(2, TimeUnit.SECONDS)
+        latch.await(5, TimeUnit.SECONDS)
     }
 
     private fun refreshCookieSnapshot() {
@@ -965,6 +995,7 @@ object PartnerApi {
     }
 
     private fun setLoggedIn(value: Boolean) {
+        if (loggedIn != value) authGuard.stateChanged()
         loggedIn = value
         appCtx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             ?.edit()
