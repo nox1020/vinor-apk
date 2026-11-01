@@ -47,10 +47,15 @@ class LoginPageReturnTest {
     }
 
     @Test
-    fun guestTabsOpenTheLoginPage() {
-        for (fn in listOf("private fun openCustomers(", "private fun openFollowTab(")) {
-            val body = main.substringAfter(fn).substringBefore("\n    }\n")
-            assertTrue(fn, body.contains("openLogin()"))
-        }
+    fun guestTabsReuseTheCanonicalLoginInline() {
+        val customer = main.substringAfter("private fun openCustomers(").substringBefore("\n    }\n")
+        val follow = main.substringAfter("private fun openFollowTab(").substringBefore("\n    }\n")
+        assertTrue(customer.contains("navigateTab(R.id.customersFragment, args)"))
+        assertTrue(follow.contains("openNativePage(NativePartnerFragment.PAGE_REQUESTS, asTab = true)"))
+        assertFalse(customer.contains("openLogin()"))
+        assertFalse(follow.contains("openLogin()"))
+        val shared = src("src/main/java/ir/vinor/app/InlineTabLogin.kt")
+        assertTrue(shared.contains("LoginStep1Fragment()"))
+        assertTrue(shared.contains("LoginStep2Fragment()"))
     }
 }
