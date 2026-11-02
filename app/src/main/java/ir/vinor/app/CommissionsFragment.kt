@@ -42,7 +42,10 @@ class CommissionsFragment : Fragment() {
     private var csrf: String = ""
     private var withdrawable: Long = 0L
     private var withdrawableKnown: Boolean = false
-    private var minWithdrawal: Long = 10_000_000L
+    private var minWithdrawal: Long = WalletWithdraw.DEFAULT_MIN_WITHDRAWAL
+    // شناسهٔ ثابت درخواست برای تلاش مجدد همان مبلغ/حساب (سرور تکراری را یک‌بار ثبت می‌کند)
+    private var withdrawRequestKey: String? = null
+    private var withdrawRequestId: String? = null
     private var bankCatalog = JSONObject()
     private var busy: Boolean = false
     private var step: Step = Step.REQUEST
@@ -511,6 +514,11 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun submitWithdraw() {
+        if (!VinorNetworkStatus.isOnline(requireContext())) {
+            // موجودی آفلاین ممکن است قدیمی باشد؛ برداشت فقط آنلاین
+            showRequestError("برای ثبت برداشت به اینترنت وصل شوید.")
+            return
+        }
         val amountError = WalletWithdraw.amountError(
             binding.withdrawAmount.text?.toString().orEmpty(),
             if (withdrawableKnown) withdrawable else null,
@@ -528,14 +536,25 @@ class CommissionsFragment : Fragment() {
         }
         val amount = WalletWithdraw.parseAmount(binding.withdrawAmount.text?.toString().orEmpty()) ?: return
         val body = WalletWithdraw.withdrawBody(amount, account.id, fields)
-            .put("client_request_id", UUID.randomUUID().toString())
+            .put("client_request_id", stableWithdrawRequestId("$amount|${account.id}"))
         postFinance(WalletWithdraw.REQUEST, body, requestError = true) { response ->
+            withdrawRequestKey = null
+            withdrawRequestId = null
             val pending = WalletWithdraw.parsePending(response)
             if (pending != null) showPending(pending)
             val posted = response.optString("message").trim().ifBlank { "درخواست برداشت ثبت شد." }
             Toast.makeText(requireContext(), posted, Toast.LENGTH_SHORT).show()
             closeSheet()
             loadData()
+        }
+    }
+
+    private fun stableWithdrawRequestId(key: String): String {
+        val existing = withdrawRequestId
+        if (existing != null && withdrawRequestKey == key) return existing
+        return UUID.randomUUID().toString().also {
+            withdrawRequestKey = key
+            withdrawRequestId = it
         }
     }
 

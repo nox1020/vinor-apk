@@ -98,7 +98,9 @@ object WalletWithdraw {
 
     fun parseAmount(raw: String): Long? = PartnerApi.asciiDigits(raw).toLongOrNull()
 
-    fun amountError(raw: String, available: Long?, minimum: Long = 0L): String? {
+    const val DEFAULT_MIN_WITHDRAWAL = 10_000_000L
+
+    fun amountError(raw: String, available: Long?, minimum: Long = DEFAULT_MIN_WITHDRAWAL): String? {
         val amount = parseAmount(raw)
         if (amount == null) return "مبلغ را وارد کنید."
         if (amount <= 0L) return "مبلغ باید بیشتر از صفر باشد."

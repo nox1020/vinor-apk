@@ -112,7 +112,7 @@ object VinorCachePolicy {
     fun isSensitivePath(pathOrUrl: String): Boolean {
         val p = pathOf(if (pathOrUrl.startsWith("http")) pathOrUrl else "https://vinor.ir$pathOrUrl")
             .lowercase(Locale.US)
-        if (p.endsWith("/data") && (p.contains("/commissions") || p.contains("/routine") || p.contains("/profile"))) {
+        if (p.endsWith("/data") && (p.contains("/routine") || p.contains("/profile"))) {
             return false
         }
         if (SENSITIVE_EXACT.contains(p)) return true
@@ -177,7 +177,6 @@ object VinorCachePolicy {
         "/express/partner/profile/edit/data",
         "/express/partner/routine/data",
         "/express/partner/routine/steps/detail",
-        "/express/partner/commissions/data",
         "/express/partner/dashboard/data",
         "/express/partner/home/data",
         "/express/partner/ai/history",
@@ -244,6 +243,7 @@ object VinorCachePolicy {
         "/login",
         "/logout",
         "/wallet",
+        "/commissions",
         "/withdrawals",
         "/bank-accounts",
         "/settlement",

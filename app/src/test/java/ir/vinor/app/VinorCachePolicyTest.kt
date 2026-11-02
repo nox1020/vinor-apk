@@ -27,7 +27,7 @@ class VinorCachePolicyTest {
     fun safeGetApi_allowsDisplayEndpoints_blocksAuthAndVersion() {
         assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/notes"))
         assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/profile/data"))
-        assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/commissions/data"))
+        assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/commissions/data"))
         assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/home/data"))
         assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/ai/history"))
         assertTrue(VinorCachePolicy.isSafeGetApi("https://vinor.ir/api/express/A1"))
@@ -43,7 +43,7 @@ class VinorCachePolicyTest {
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/api/verify"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/api/logout"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/ai/chat"))
-        assertFalse(VinorCachePolicy.isSensitivePath("/express/partner/commissions/data"))
+        assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/commissions/data"))
         assertFalse(VinorCachePolicy.isSensitivePath("/express/partner/profile/data"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/withdrawals/request"))
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/bank-accounts/data"))
