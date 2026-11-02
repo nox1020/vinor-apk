@@ -22,10 +22,10 @@ class WalletWithdrawTest {
     fun amount_capsAtKnownBalance() {
         assertEquals("مبلغ را وارد کنید.", WalletWithdraw.amountError("", 1000))
         assertEquals("مبلغ باید بیشتر از صفر باشد.", WalletWithdraw.amountError("۰", 1000))
-        assertEquals("موجودی قابل برداشت ندارید.", WalletWithdraw.amountError("۱۰", 0))
-        assertEquals("مبلغ از موجودی قابل برداشت بیشتر است.", WalletWithdraw.amountError("۱٬۵۰۰", 1000))
-        assertNull(WalletWithdraw.amountError("۱۰۰۰", 1000))
-        assertNull(WalletWithdraw.amountError("2500", null))
+        assertEquals("موجودی قابل برداشت ندارید.", WalletWithdraw.amountError("۱۰", 0, 0L))
+        assertEquals("مبلغ از موجودی قابل برداشت بیشتر است.", WalletWithdraw.amountError("۱٬۵۰۰", 1000, 0L))
+        assertNull(WalletWithdraw.amountError("۱۰۰۰", 1000, 0L))
+        assertNull(WalletWithdraw.amountError("2500", null, 0L))
         assertEquals(1500L, WalletWithdraw.parseAmount("۱،۵۰۰"))
     }
 
