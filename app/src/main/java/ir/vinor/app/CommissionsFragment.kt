@@ -77,6 +77,7 @@ class CommissionsFragment : Fragment() {
             }
         }
         binding.commissionsWithdrawBtn.setOnClickListener { openWithdraw() }
+        binding.commissionsChargeBtn.setOnClickListener { openCharge() }
         binding.withdrawSheetBack.setOnClickListener { onSheetBack() }
         binding.withdrawAccountRow.setOnClickListener { showStep(Step.PICK) }
         binding.withdrawAddOpen.setOnClickListener {
@@ -229,6 +230,10 @@ class CommissionsFragment : Fragment() {
         }
         bind(total, pending, paid, soldCount, items)
         WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
+        val blocked = obj.optLong("wallet_blocked", root.optLong("wallet_blocked", 0L))
+        val available = obj.optLong("wallet_available", root.optLong("wallet_available", withdrawable))
+        binding.commissionsBlocked.text = "بلوکه‌شده برای پورسانت: ${formatToman(blocked)} تومان"
+        binding.commissionsAvailable.text = "قابل استفاده: ${formatToman(available)} تومان"
         WalletWithdraw.csrfOf(obj).takeIf { it.isNotBlank() }?.let { csrf = it }
     }
 
@@ -648,6 +653,45 @@ class CommissionsFragment : Fragment() {
         if (_binding == null) return
         binding.withdrawAddError.text = text.orEmpty()
         binding.withdrawAddError.isVisible = !text.isNullOrBlank()
+    }
+
+    private fun openCharge() {
+        val input = android.widget.EditText(requireContext())
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        input.hint = "مبلغ به تومان"
+        AlertDialog.Builder(requireContext())
+            .setTitle("شارژ کیف پول")
+            .setMessage("۱۰۰٬۰۰۰ · ۵۰۰٬۰۰۰ · ۱٬۰۰۰٬۰۰۰ · ۵٬۰۰۰٬۰۰۰ یا مبلغ دلخواه")
+            .setView(input)
+            .setPositiveButton("پرداخت") { _, _ ->
+                val amount = input.text?.toString()?.trim()?.toLongOrNull() ?: 0L
+                if (amount < 1000L) {
+                    Toast.makeText(requireContext(), "مبلغ شارژ خیلی کم است.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val res = withContext(Dispatchers.IO) {
+                        PartnerApi.postFinance(
+                            "/express/partner/wallet/charge",
+                            JSONObject().put("amount", amount),
+                            csrf,
+                            requireContext(),
+                        )
+                    }
+                    val url = res.optString("pay_url")
+                    if (res.optBoolean("ok") && url.isNotBlank()) {
+                        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                    } else {
+                        Toast.makeText(
+                            requireContext(),
+                            res.optString("error").ifBlank { "شروع پرداخت ممکن نشد." },
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+            .setNegativeButton("انصراف", null)
+            .show()
     }
 
     companion object {

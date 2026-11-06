@@ -123,6 +123,17 @@
             android:textSize="13sp" />
 
         <TextView
+            android:id="@+id/publishRequired"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:fontFamily="@font/vazirmatn"
+            android:text="پورسانت بلوکه‌شونده بعد از وارد کردن درصد محاسبه می‌شود"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="12sp" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"

@@ -321,7 +321,16 @@ class MyPropertyManageFragment : Fragment() {
             paintChip(sheet.publishPayCash, selectedPayment == "نقدی")
             paintChip(sheet.publishPayDeal, selectedPayment == "توافقی")
             paintChip(sheet.publishPaySwap, selectedPayment == "معاوضه")
+            val pct = sheet.publishCommission.text?.toString()?.trim()?.toDoubleOrNull() ?: 2.0
+            val price = snapshot.optLong("price_total", snapshot.optLong("price", 0L))
+            val required = kotlin.math.round(price * pct / 100.0).toLong()
+            sheet.publishRequired.text = "پورسانت بلوکه‌شونده: ${PartnerFormat.toman(required)} تومان"
         }
+        sheet.publishCommission.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) { paint() }
+        })
         sheet.publishPayCash.setOnClickListener { selectedPayment = "نقدی"; paint() }
         sheet.publishPayDeal.setOnClickListener { selectedPayment = "توافقی"; paint() }
         sheet.publishPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paint() }
