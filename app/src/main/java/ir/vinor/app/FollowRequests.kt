@@ -555,17 +555,17 @@ object FollowRequests {
         add("can_complete", "انجام شد", "/complete", Tone.PRIMARY)
         add(
             "can_confirm_deal",
-            "تأیید نهایی",
+            "تأیید فروش",
             "/deal-confirm",
             Tone.PRIMARY,
-            "تأیید نهایی این پرونده ثبت شود؟",
+            "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
         )
         add(
             "can_close_deal",
-            "انجام معامله",
+            "بستن پرونده",
             "/deal-close",
             Tone.SECONDARY,
-            "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
+            "پرونده بسته شود؟",
         )
         add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
         add(
@@ -583,7 +583,7 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "not_interested"),
         )
-        add("can_reject_deal", "رد معامله", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
+        add("can_reject_deal", "رد", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
         add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
         if (depositAwaiting(item, tab)) {
             all.add(
@@ -634,31 +634,21 @@ object FollowRequests {
         }
         if (flag(item, "can_approve")) add("تأیید بازدید", "approve", Tone.PRIMARY)
         if (flag(item, "can_complete")) add("انجام شد", "complete", Tone.PRIMARY)
-        val startDeal = flag(item, "can_start_deal")
-        val approveDeal = flag(item, "can_approve_deal")
-        if (startDeal) {
-            add(
-                "ثبت معامله",
-                "start_deal",
-                Tone.PRIMARY,
-                "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
-            )
-        } else if (flag(item, "can_confirm_deal")) {
-            add("تأیید نهایی", "confirm_deal", Tone.PRIMARY, "تأیید نهایی این پرونده ثبت شود؟")
-        }
+        val approveDeal = flag(item, "can_confirm_deal") ||
+            (flag(item, "can_start_deal") && !flag(item, "can_close_deal"))
         if (approveDeal) {
             add(
                 "تأیید فروش",
-                "approve_deal",
+                "confirm_deal",
                 Tone.PRIMARY,
-                "فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.",
+                "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
             )
         } else if (flag(item, "can_close_deal")) {
             add(
-                "انجام معامله",
+                "بستن پرونده",
                 "close_deal",
                 Tone.SECONDARY,
-                "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
+                "پرونده بسته شود؟",
             )
         }
         if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
@@ -669,8 +659,7 @@ object FollowRequests {
         if (flag(item, "can_reject")) add("رد بازدید", "reject", Tone.DANGER, "این بازدید رد شود؟")
         if (flag(item, "can_reject_done")) add("رد انجام", "reject_done", Tone.DANGER, "انجام بازدید رد شود؟")
         if (flag(item, "can_reject_deal")) {
-            if (approveDeal) add("رد معامله", "reject_deal", Tone.DANGER, "این معامله رد شود؟")
-            else add("رد معامله", "decline_deal", Tone.DANGER, "این معامله رد شود؟")
+            add("رد", "reject_deal", Tone.DANGER, "این معامله رد شود؟")
         }
         return all
     }
@@ -865,7 +854,8 @@ object FollowRequests {
         if (payload.has("cards") && !payload.isNull("cards")) {
             val cards = payload.optJSONArray("cards")
             if (cards != null) {
-                return order(dedupe(arrayOf(cards))).filter { visibleToViewer(it, viewerPhone) }
+                // Server already scopes cards to the listing owner or plus host.
+                return order(dedupe(arrayOf(cards)))
             }
         }
         val merged = ArrayList<JSONObject>()

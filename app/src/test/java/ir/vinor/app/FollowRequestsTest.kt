@@ -124,12 +124,12 @@ class FollowRequestsTest {
         )
         val confirm = actions.first { it.path.endsWith("/deal-confirm") }
         val close = actions.first { it.path.endsWith("/deal-close") }
-        assertEquals("تأیید نهایی", confirm.label)
+        assertEquals("تأیید فروش", confirm.label)
         assertEquals(FollowRequests.Tone.PRIMARY, confirm.tone)
-        assertEquals("تأیید نهایی این پرونده ثبت شود؟", confirm.confirm)
-        assertEquals("انجام معامله", close.label)
+        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", confirm.confirm)
+        assertEquals("بستن پرونده", close.label)
         assertEquals(FollowRequests.Tone.SECONDARY, close.tone)
-        assertEquals("انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.", close.confirm)
+        assertEquals("پرونده بسته شود؟", close.confirm)
         assertEquals("عدم حضور مشتری ثبت شود؟", actions.first { it.label == "عدم حضور" }.confirm)
         assertTrue(actions.none { it.opensWallet })
     }
@@ -165,7 +165,7 @@ class FollowRequestsTest {
         assertEquals("پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز", card.commission)
         assertEquals("", card.status)
         assertTrue(card.actions.none { it.opensWallet })
-        assertEquals("انجام معامله", card.actions.first { it.path.endsWith("/deal-close") }.label)
+        assertEquals("بستن پرونده", card.actions.first { it.path.endsWith("/deal-close") }.label)
     }
 
     @Test
@@ -199,7 +199,7 @@ class FollowRequestsTest {
             "deals",
         )
         assertTrue(actions.none { it.opensWallet })
-        assertEquals("انجام معامله", actions.single { it.path.endsWith("/deal-close") }.label)
+        assertEquals("بستن پرونده", actions.single { it.path.endsWith("/deal-close") }.label)
     }
 
     @Test
@@ -731,16 +731,13 @@ class FollowRequestsTest {
             assertEquals("/express/partner/inbox-visits/15/result", action.path)
             assertEquals(mapOf("outcome" to outcome, "notes" to ""), FollowRequests.formFields(action))
         }
-        val start = byLabel.getValue("ثبت معامله")
-        assertEquals("/express/partner/inbox-visits/15/start_deal", start.path)
-        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", start.confirm)
         val sale = byLabel.getValue("تأیید فروش")
-        assertEquals("/express/partner/inbox-visits/15/approve_deal", sale.path)
-        assertEquals("فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.", sale.confirm)
-        val dealReject = byLabel.getValue("رد معامله")
+        assertEquals("/express/partner/inbox-visits/15/confirm_deal", sale.path)
+        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", sale.confirm)
+        val dealReject = byLabel.getValue("رد")
         assertEquals("/express/partner/inbox-visits/15/reject_deal", dealReject.path)
         assertEquals("این معامله رد شود؟", dealReject.confirm)
-        assertTrue(card.actions.none { it.path.endsWith("/confirm_deal") || it.path.endsWith("/close_deal") })
+        assertTrue(card.actions.none { it.path.endsWith("/close_deal") || it.path.endsWith("/approve_deal") || it.path.endsWith("/start_deal") })
         assertTrue(card.actions.none { it.path.endsWith("/decline_deal") || it.path.contains("/express/partner/requests/") })
         assertTrue(card.actions.none { it.label == "حذف" || it.label == "بازدید مجدد" })
         assertTrue(FollowRequests.refreshesWallet(sale.path))
@@ -753,17 +750,20 @@ class FollowRequestsTest {
             "3",
         ).single { it.form }
         assertEquals("/express/partner/inbox-visits/3/confirm_deal", confirmOnly.path)
-        assertEquals("تأیید نهایی", confirmOnly.label)
+        assertEquals("تأیید فروش", confirmOnly.label)
         val closeOnly = FollowRequests.actions(
             JSONObject().put("direction", "incoming").put("can_close_deal", true),
             "3",
         ).single { it.form }
         assertEquals("/express/partner/inbox-visits/3/close_deal", closeOnly.path)
+        assertEquals("بستن پرونده", closeOnly.label)
+        assertEquals("پرونده بسته شود؟", closeOnly.confirm)
         val decline = FollowRequests.actions(
             JSONObject().put("direction", "incoming").put("can_reject_deal", true),
             "3",
         ).single { it.form }
-        assertEquals("/express/partner/inbox-visits/3/decline_deal", decline.path)
+        assertEquals("/express/partner/inbox-visits/3/reject_deal", decline.path)
+        assertEquals("رد", decline.label)
     }
 
     @Test
@@ -783,7 +783,7 @@ class FollowRequestsTest {
             .put("can_remove", true)
         val actions = FollowRequests.card(item).actions
         assertTrue(actions.none { it.form || it.path.contains("/inbox-visits/") })
-        assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "تأیید فروش" })
+        assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "انجام معامله" })
         assertEquals(
             "/express/partner/requests/15/visit-result",
             actions.first { it.label == "علاقه‌مند" }.path,
@@ -791,8 +791,8 @@ class FollowRequestsTest {
         assertEquals("interested", actions.first { it.label == "علاقه‌مند" }.body.optString("outcome"))
         assertFalse(actions.first { it.label == "علاقه‌مند" }.form)
         assertEquals("/express/partner/requests/15/complete", actions.first { it.label == "انجام شد" }.path)
-        assertEquals("/express/partner/requests/15/deal-confirm", actions.first { it.label == "تأیید نهایی" }.path)
-        assertEquals("/express/partner/requests/15/deal-close", actions.first { it.label == "انجام معامله" }.path)
+        assertEquals("/express/partner/requests/15/deal-confirm", actions.first { it.label == "تأیید فروش" }.path)
+        assertEquals("/express/partner/requests/15/deal-close", actions.first { it.label == "بستن پرونده" }.path)
         assertEquals("/express/partner/requests/15/remove", actions.first { it.label == "حذف" }.path)
         val ownIncoming = JSONObject()
             .put("id", "8")
