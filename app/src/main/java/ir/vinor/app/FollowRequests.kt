@@ -552,21 +552,7 @@ object FollowRequests {
             Tone.PRIMARY,
             body = JSONObject().put("outcome", "interested"),
         )
-        add("can_complete", "انجام شد", "/complete", Tone.PRIMARY)
-        add(
-            "can_confirm_deal",
-            "تأیید فروش",
-            "/deal-confirm",
-            Tone.PRIMARY,
-            "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
-        )
-        add(
-            "can_close_deal",
-            "بستن پرونده",
-            "/deal-close",
-            Tone.SECONDARY,
-            "پرونده بسته شود؟",
-        )
+        add("can_complete", "بازدید انجام شد", "/complete", Tone.PRIMARY)
         add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
         add(
             "can_register_result",
@@ -575,7 +561,7 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "follow_up"),
         )
-        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
+        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
         add(
             "can_register_result",
             "بی‌علاقه",
@@ -583,19 +569,8 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "not_interested"),
         )
-        add("can_reject_deal", "رد", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
         add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
-        if (depositAwaiting(item, tab)) {
-            all.add(
-                Action(
-                    label = "واریز پورسانت",
-                    path = "$base/deal-close",
-                    body = JSONObject(),
-                    tone = Tone.PRIMARY,
-                    confirm = "پورسانت این پرونده به کیف پول واریز شود؟",
-                ),
-            )
-        } else if (depositReady(item, tab)) {
+        if (depositReady(item, tab)) {
             all.add(
                 Action(
                     label = "واریز پورسانت",
@@ -629,11 +604,15 @@ object FollowRequests {
                 ),
             )
         }
-        if (flag(item, "can_register_result")) {
-            add("علاقه‌مند", "result", Tone.PRIMARY, body = resultBody("interested"))
+        if (flag(item, "can_confirm_done")) {
+            add("تأیید بازدید", "complete", Tone.PRIMARY)
+        } else if (flag(item, "can_approve")) {
+            add("تأیید بازدید", "approve", Tone.PRIMARY)
         }
-        if (flag(item, "can_approve")) add("تأیید بازدید", "approve", Tone.PRIMARY)
-        if (flag(item, "can_complete")) add("انجام شد", "complete", Tone.PRIMARY)
+        if (flag(item, "can_complete")) add("بازدید انجام شد", "complete", Tone.PRIMARY)
+        if (flag(item, "can_deny_done")) {
+            add("بازدید انجام نشده", "no_show", Tone.DANGER, "این بازدید انجام‌نشده ثبت شود؟")
+        }
         val approveDeal = flag(item, "can_confirm_deal") ||
             (flag(item, "can_start_deal") && !flag(item, "can_close_deal"))
         if (approveDeal) {
@@ -651,11 +630,7 @@ object FollowRequests {
                 "پرونده بسته شود؟",
             )
         }
-        if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
-        if (flag(item, "can_register_result")) {
-            add("پیگیری", "result", Tone.SECONDARY, body = resultBody("follow_up"))
-            add("بی‌علاقه", "result", Tone.SECONDARY, body = resultBody("not_interested"))
-        }
+        if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
         if (flag(item, "can_reject")) add("رد بازدید", "reject", Tone.DANGER, "این بازدید رد شود؟")
         if (flag(item, "can_reject_done")) add("رد انجام", "reject_done", Tone.DANGER, "انجام بازدید رد شود؟")
         if (flag(item, "can_reject_deal")) {
@@ -792,13 +767,6 @@ object FollowRequests {
         if (!depositReady(item, tab)) return false
         val stage = normalizeStage(stageOf(item).ifBlank { tab })
         return stage == "done" || stage == "deals"
-    }
-
-    /** پورسانت هنوز به کیف پول نرسیده و دکمه باید همان ثبت معامله را بزند. */
-    private fun depositAwaiting(item: JSONObject, tab: String): Boolean {
-        if (!depositReady(item, tab) || commissionCredited(item)) return false
-        val kind = WalletWithdraw.commissionKind(commissionKey(item))
-        return commissionAmount(item) > 0L || kind == "pending" || kind == "approved"
     }
 
     private fun commissionCredited(item: JSONObject): Boolean {
