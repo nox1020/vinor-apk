@@ -234,7 +234,7 @@ class CommissionsFragment : Fragment() {
             itemsArr.optJSONObject(i)?.let { items.add(it) }
         }
         bind(total, pending, paid, soldCount, items)
-        val total = obj.optLong("wallet_total", root.optLong("wallet_total", -1L))
+        val walletTotal = obj.optLong("wallet_total", root.optLong("wallet_total", -1L))
         val blocked = obj.optLong("wallet_blocked", root.optLong("wallet_blocked", 0L))
         val available = obj.optLong(
             "wallet_available",
@@ -243,7 +243,7 @@ class CommissionsFragment : Fragment() {
         if (available >= 0L) setWithdrawable(available)
         else WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
         binding.commissionsBlocked.text = "بلوکه‌شده برای پورسانت: ${formatToman(blocked)} تومان"
-        val shownTotal = if (total >= 0L) total else withdrawable + blocked
+        val shownTotal = if (walletTotal >= 0L) walletTotal else withdrawable + blocked
         binding.commissionsAvailable.text = "کل موجودی: ${formatToman(shownTotal)} تومان"
         WalletWithdraw.csrfOf(obj).takeIf { it.isNotBlank() }?.let { csrf = it }
     }
