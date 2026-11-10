@@ -173,7 +173,7 @@ class FollowRequestsTest {
         assertTrue(deposit.opensWallet)
         assertEquals("/express/partner/commissions", deposit.path)
         assertNull(deposit.confirm)
-        assertEquals(FollowRequests.Tone.SECONDARY, deposit.tone)
+        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
         assertFalse(FollowRequests.movesCard(deposit.path, deposit.body))
     }
 
@@ -737,7 +737,8 @@ class FollowRequestsTest {
         assertTrue(card.actions.none { it.path.endsWith("/close_deal") || it.path.endsWith("/approve_deal") || it.path.endsWith("/start_deal") })
         assertTrue(card.actions.none { it.path.endsWith("/decline_deal") || it.path.contains("/express/partner/requests/") })
         assertTrue(card.actions.none { it.label == "حذف" || it.label == "بازدید مجدد" })
-        assertTrue(FollowRequests.refreshesWallet(sale.path))
+        assertFalse(FollowRequests.refreshesWallet(sale.path))
+        assertTrue(FollowRequests.refreshesWallet("/express/partner/inbox-visits/15/close_deal"))
     }
 
     @Test
