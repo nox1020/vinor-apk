@@ -135,6 +135,33 @@ object ListingArchive {
         }
     }
 
+    fun isWalletShort(post: JSONObject): Boolean =
+        post.optString("error_code").trim() == "wallet_insufficient"
+
+    fun shortfall(post: JSONObject): Long {
+        if (post.has("shortfall")) {
+            val numeric = post.optLong("shortfall", Long.MIN_VALUE)
+            if (numeric != Long.MIN_VALUE) return numeric.coerceAtLeast(0L)
+        }
+        return post.optString("shortfall").trim().toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+    }
+
+    /** Restore that could not re-hold the commission: the row is active again, but not public. */
+    fun applyUnpublishedRestore(snapshot: JSONObject): JSONObject {
+        val next = JSONObject(snapshot.toString())
+        next.put("archived", false)
+        next.put("is_archived", false)
+        next.put("archived_at", "")
+        next.put("archived_reason", "")
+        next.put("published_for_sale", false)
+        next.put("public", false)
+        val extras = next.optJSONObject("extras") ?: JSONObject()
+        extras.put("published_for_sale", false)
+        extras.put("public", false)
+        next.put("extras", extras)
+        return next
+    }
+
     fun applyResult(snapshot: JSONObject, post: JSONObject): JSONObject {
         val next = JSONObject(snapshot.toString())
         val archived = isArchived(post)
