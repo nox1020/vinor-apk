@@ -565,9 +565,30 @@ class MyPropertyManageFragment : Fragment() {
                         bindRows()
                         toast(ListingArchive.message(fresh, if (restore) "آگهی به فهرست فعال برگشت." else "آگهی بایگانی شد."))
                     }
+                    ListingArchive.Outcome.FAILED -> {
+                        if (restore && ListingArchive.isWalletShort(fresh)) {
+                            snapshot = ListingArchive.applyUnpublishedRestore(snapshot)
+                            persistSnapshot()
+                            bindPreview()
+                            bindRows()
+                            toast(
+                                ListingArchive.message(
+                                    fresh,
+                                    "موجودی کیف پول برای برگرداندن آگهی کافی نیست.",
+                                ),
+                                long = true,
+                            )
+                            val gap = ListingArchive.shortfall(fresh)
+                            if (gap > 0L) {
+                                CommissionsFragment.pendingShortfall = gap
+                                findNavController().navigate(R.id.commissionsFragment)
+                            }
+                        } else {
+                            toast(ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."), long = true)
+                        }
+                    }
                     ListingArchive.Outcome.FORBIDDEN,
                     ListingArchive.Outcome.OFFLINE,
-                    ListingArchive.Outcome.FAILED,
                     -> toast(ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."), long = true)
                 }
             } catch (e: Exception) {

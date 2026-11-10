@@ -1299,10 +1299,27 @@ class NativePartnerFragment : Fragment() {
                 }
                 Toast.makeText(
                     ctx,
-                    ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."),
+                    ListingArchive.message(
+                        fresh,
+                        if (restore && ListingArchive.isWalletShort(fresh)) {
+                            "موجودی کیف پول برای برگرداندن آگهی کافی نیست."
+                        } else {
+                            "بایگانی آگهی انجام نشد."
+                        },
+                    ),
                     Toast.LENGTH_LONG,
                 ).show()
-                if (
+                if (restore && ListingArchive.isWalletShort(fresh)) {
+                    ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+                    MyPropertiesFragment.clearRemembered()
+                    forgetPage(PAGE_LISTINGS)
+                    val gap = ListingArchive.shortfall(fresh)
+                    if (gap > 0L) {
+                        CommissionsFragment.pendingShortfall = gap
+                        findNavController().navigate(R.id.commissionsFragment)
+                        handedOff = true
+                    }
+                } else if (
                     outcome == ListingArchive.Outcome.OK ||
                     outcome == ListingArchive.Outcome.NOT_FOUND ||
                     outcome == ListingArchive.Outcome.FORBIDDEN
