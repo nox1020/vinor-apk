@@ -448,7 +448,13 @@ class MyPropertyManageFragment : Fragment() {
                     bindRows()
                     toast(fresh.optString("error").ifBlank { "این ملک قبلاً برای فروش منتشر شده است." })
                 } else {
-                    toast(MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."))
+                    val message = MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود.")
+                    toast(message)
+                    val shortfall = fresh.optLong("shortfall", 0L)
+                    if (fresh.optString("error_code") == "wallet_insufficient" && shortfall > 0L) {
+                        CommissionsFragment.pendingShortfall = shortfall
+                        findNavController().navigate(R.id.commissionsFragment)
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e

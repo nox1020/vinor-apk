@@ -169,6 +169,8 @@ class LandVisitTest {
         assertFalse(LandVisit.canSchedule(pending.mode, pending.canRevisit))
         assertTrue(LandVisit.blockedMessage(pending).contains("نهایی شده"))
         assertTrue(LandVisit.blockedMessage(pending).contains("۱۸ مهر"))
+        val waitingOwner = LandVisit.blockedMessage(page.copy(mode = "visit_done_pending"))
+        assertTrue(waitingOwner.contains("مالک فایل"))
         val deal = LandVisit.blockedMessage(page.copy(mode = "deal", canRevisit = false))
         assertFalse(deal.contains("|"))
         assertTrue(deal.contains("رفع معامله"))

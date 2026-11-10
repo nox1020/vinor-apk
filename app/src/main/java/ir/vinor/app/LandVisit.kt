@@ -215,8 +215,8 @@ object LandVisit {
         val extra = if (hint.isBlank()) "" else " بازدید: $hint"
         return when (schedule.mode.trim()) {
             "visit_pending" -> "درخواست بازدید نهایی شده است.$extra"
-            "visit_done_pending" -> "بازدید انجام شد ثبت شده و منتظر تأیید ادمین است."
-            "visit_commission_pending" -> "بازدید تأیید شده — می‌توانید درخواست معامله ثبت کنید."
+            "visit_done_pending" -> "بازدید انجام شد ثبت شده و منتظر تأیید مالک فایل است."
+            "visit_commission_pending" -> "بازدید تأیید شده. فروش را مالک فایل پیش می‌برد."
             "visit_done" -> "بازدید این ملک ثبت شده است.$extra"
             "deal_pending" -> "درخواست معامله ثبت شد و منتظر تأیید ادمین است."
             "deal", "release" -> "ابتدا رفع معامله را انجام دهید. برای ثبت بازدید مجدد، از گزینه «رفع معامله» استفاده کنید."

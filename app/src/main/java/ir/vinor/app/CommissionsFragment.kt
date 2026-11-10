@@ -78,6 +78,11 @@ class CommissionsFragment : Fragment() {
         }
         binding.commissionsWithdrawBtn.setOnClickListener { openWithdraw() }
         binding.commissionsChargeBtn.setOnClickListener { openCharge() }
+        val owed = pendingShortfall
+        if (owed > 0L) {
+            pendingShortfall = 0L
+            openCharge(owed)
+        }
         binding.withdrawSheetBack.setOnClickListener { onSheetBack() }
         binding.withdrawAccountRow.setOnClickListener { showStep(Step.PICK) }
         binding.withdrawAddOpen.setOnClickListener {
@@ -229,11 +234,17 @@ class CommissionsFragment : Fragment() {
             itemsArr.optJSONObject(i)?.let { items.add(it) }
         }
         bind(total, pending, paid, soldCount, items)
-        WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
+        val total = obj.optLong("wallet_total", root.optLong("wallet_total", -1L))
         val blocked = obj.optLong("wallet_blocked", root.optLong("wallet_blocked", 0L))
-        val available = obj.optLong("wallet_available", root.optLong("wallet_available", withdrawable))
+        val available = obj.optLong(
+            "wallet_available",
+            root.optLong("wallet_available", obj.optLong("requestable_balance", withdrawable)),
+        )
+        if (available >= 0L) setWithdrawable(available)
+        else WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
         binding.commissionsBlocked.text = "بلوکه‌شده برای پورسانت: ${formatToman(blocked)} تومان"
-        binding.commissionsAvailable.text = "قابل استفاده: ${formatToman(available)} تومان"
+        val shownTotal = if (total >= 0L) total else withdrawable + blocked
+        binding.commissionsAvailable.text = "کل موجودی: ${formatToman(shownTotal)} تومان"
         WalletWithdraw.csrfOf(obj).takeIf { it.isNotBlank() }?.let { csrf = it }
     }
 
@@ -655,10 +666,11 @@ class CommissionsFragment : Fragment() {
         binding.withdrawAddError.isVisible = !text.isNullOrBlank()
     }
 
-    private fun openCharge() {
+    private fun openCharge(prefill: Long = 0L) {
         val input = android.widget.EditText(requireContext())
         input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
         input.hint = "مبلغ به تومان"
+        if (prefill > 0L) input.setText(prefill.toString())
         AlertDialog.Builder(requireContext())
             .setTitle("شارژ کیف پول")
             .setMessage("۱۰۰٬۰۰۰ · ۵۰۰٬۰۰۰ · ۱٬۰۰۰٬۰۰۰ · ۵٬۰۰۰٬۰۰۰ یا مبلغ دلخواه")
@@ -704,5 +716,7 @@ class CommissionsFragment : Fragment() {
             remembered = null
             sessionStamp++
         }
+
+        var pendingShortfall: Long = 0L
     }
 }
