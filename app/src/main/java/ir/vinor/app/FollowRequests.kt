@@ -552,21 +552,7 @@ object FollowRequests {
             Tone.PRIMARY,
             body = JSONObject().put("outcome", "interested"),
         )
-        add("can_complete", "انجام شد", "/complete", Tone.PRIMARY)
-        add(
-            "can_confirm_deal",
-            "تأیید نهایی",
-            "/deal-confirm",
-            Tone.PRIMARY,
-            "تأیید نهایی این پرونده ثبت شود؟",
-        )
-        add(
-            "can_close_deal",
-            "انجام معامله",
-            "/deal-close",
-            Tone.SECONDARY,
-            "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
-        )
+        add("can_complete", "بازدید انجام شد", "/complete", Tone.PRIMARY)
         add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
         add(
             "can_register_result",
@@ -575,7 +561,7 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "follow_up"),
         )
-        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
+        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
         add(
             "can_register_result",
             "بی‌علاقه",
@@ -583,19 +569,8 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "not_interested"),
         )
-        add("can_reject_deal", "رد معامله", "/deal-reject", Tone.DANGER, "این معامله رد شود؟")
         add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
-        if (depositAwaiting(item, tab)) {
-            all.add(
-                Action(
-                    label = "واریز پورسانت",
-                    path = "$base/deal-close",
-                    body = JSONObject(),
-                    tone = Tone.PRIMARY,
-                    confirm = "پورسانت این پرونده به کیف پول واریز شود؟",
-                ),
-            )
-        } else if (depositReady(item, tab)) {
+        if (depositReady(item, tab)) {
             all.add(
                 Action(
                     label = "واریز پورسانت",
@@ -629,48 +604,37 @@ object FollowRequests {
                 ),
             )
         }
-        if (flag(item, "can_register_result")) {
-            add("علاقه‌مند", "result", Tone.PRIMARY, body = resultBody("interested"))
+        if (flag(item, "can_confirm_done")) {
+            add("تأیید بازدید", "complete", Tone.PRIMARY)
+        } else if (flag(item, "can_approve")) {
+            add("تأیید بازدید", "approve", Tone.PRIMARY)
         }
-        if (flag(item, "can_approve")) add("تأیید بازدید", "approve", Tone.PRIMARY)
-        if (flag(item, "can_complete")) add("انجام شد", "complete", Tone.PRIMARY)
-        val startDeal = flag(item, "can_start_deal")
-        val approveDeal = flag(item, "can_approve_deal")
-        if (startDeal) {
-            add(
-                "ثبت معامله",
-                "start_deal",
-                Tone.PRIMARY,
-                "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
-            )
-        } else if (flag(item, "can_confirm_deal")) {
-            add("تأیید نهایی", "confirm_deal", Tone.PRIMARY, "تأیید نهایی این پرونده ثبت شود؟")
+        if (flag(item, "can_complete")) add("بازدید انجام شد", "complete", Tone.PRIMARY)
+        if (flag(item, "can_deny_done")) {
+            add("بازدید انجام نشده", "no_show", Tone.DANGER, "این بازدید انجام‌نشده ثبت شود؟")
         }
+        val approveDeal = flag(item, "can_confirm_deal") ||
+            (flag(item, "can_start_deal") && !flag(item, "can_close_deal"))
         if (approveDeal) {
             add(
                 "تأیید فروش",
-                "approve_deal",
+                "confirm_deal",
                 Tone.PRIMARY,
-                "فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.",
+                "فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.",
             )
         } else if (flag(item, "can_close_deal")) {
             add(
-                "انجام معامله",
+                "بستن پرونده",
                 "close_deal",
                 Tone.SECONDARY,
-                "انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.",
+                "پرونده بسته شود؟",
             )
         }
-        if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور مشتری ثبت شود؟")
-        if (flag(item, "can_register_result")) {
-            add("پیگیری", "result", Tone.SECONDARY, body = resultBody("follow_up"))
-            add("بی‌علاقه", "result", Tone.SECONDARY, body = resultBody("not_interested"))
-        }
+        if (flag(item, "can_no_show")) add("عدم حضور", "no_show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
         if (flag(item, "can_reject")) add("رد بازدید", "reject", Tone.DANGER, "این بازدید رد شود؟")
         if (flag(item, "can_reject_done")) add("رد انجام", "reject_done", Tone.DANGER, "انجام بازدید رد شود؟")
         if (flag(item, "can_reject_deal")) {
-            if (approveDeal) add("رد معامله", "reject_deal", Tone.DANGER, "این معامله رد شود؟")
-            else add("رد معامله", "decline_deal", Tone.DANGER, "این معامله رد شود؟")
+            add("رد", "reject_deal", Tone.DANGER, "این معامله رد شود؟")
         }
         return all
     }
@@ -805,13 +769,6 @@ object FollowRequests {
         return stage == "done" || stage == "deals"
     }
 
-    /** پورسانت هنوز به کیف پول نرسیده و دکمه باید همان ثبت معامله را بزند. */
-    private fun depositAwaiting(item: JSONObject, tab: String): Boolean {
-        if (!depositReady(item, tab) || commissionCredited(item)) return false
-        val kind = WalletWithdraw.commissionKind(commissionKey(item))
-        return commissionAmount(item) > 0L || kind == "pending" || kind == "approved"
-    }
-
     private fun commissionCredited(item: JSONObject): Boolean {
         val kind = WalletWithdraw.commissionKind(commissionKey(item))
         return kind == "paid" || kind == "success" ||
@@ -865,7 +822,8 @@ object FollowRequests {
         if (payload.has("cards") && !payload.isNull("cards")) {
             val cards = payload.optJSONArray("cards")
             if (cards != null) {
-                return order(dedupe(arrayOf(cards))).filter { visibleToViewer(it, viewerPhone) }
+                // Server already scopes cards to the listing owner or plus host.
+                return order(dedupe(arrayOf(cards)))
             }
         }
         val merged = ArrayList<JSONObject>()

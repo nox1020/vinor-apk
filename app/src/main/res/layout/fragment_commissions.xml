@@ -218,7 +218,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="قابل برداشت"
+                        android:text="قابل استفاده"
                         android:textColor="@color/vinor_text_muted"
                         android:textSize="13sp" />
 
@@ -240,6 +240,38 @@
                         android:textColor="@color/vinor_text_muted"
                         android:textSize="13sp"
                         android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/commissionsBlocked"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="بلوکه‌شده برای پورسانت: ۰ تومان"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/commissionsAvailable"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="قابل استفاده: ۰ تومان"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/commissionsChargeBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_flat_outline_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:text="شارژ کیف پول"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="15sp" />
 
                     <TextView
                         android:id="@+id/commissionsWithdrawBtn"

@@ -321,7 +321,16 @@ class MyPropertyManageFragment : Fragment() {
             paintChip(sheet.publishPayCash, selectedPayment == "نقدی")
             paintChip(sheet.publishPayDeal, selectedPayment == "توافقی")
             paintChip(sheet.publishPaySwap, selectedPayment == "معاوضه")
+            val pct = sheet.publishCommission.text?.toString()?.trim()?.toDoubleOrNull() ?: 2.0
+            val price = snapshot.optLong("price_total", snapshot.optLong("price", 0L))
+            val required = kotlin.math.round(price * pct / 100.0).toLong()
+            sheet.publishRequired.text = "پورسانت بلوکه‌شونده: ${PartnerFormat.toman(required)} تومان"
         }
+        sheet.publishCommission.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) { paint() }
+        })
         sheet.publishPayCash.setOnClickListener { selectedPayment = "نقدی"; paint() }
         sheet.publishPayDeal.setOnClickListener { selectedPayment = "توافقی"; paint() }
         sheet.publishPaySwap.setOnClickListener { selectedPayment = "معاوضه"; paint() }
@@ -439,7 +448,13 @@ class MyPropertyManageFragment : Fragment() {
                     bindRows()
                     toast(fresh.optString("error").ifBlank { "این ملک قبلاً برای فروش منتشر شده است." })
                 } else {
-                    toast(MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود."))
+                    val message = MyPropertyManage.unpublishFailure(fresh, "انتشار ناموفق بود.")
+                    toast(message)
+                    val shortfall = fresh.optLong("shortfall", 0L)
+                    if (fresh.optString("error_code") == "wallet_insufficient" && shortfall > 0L) {
+                        CommissionsFragment.pendingShortfall = shortfall
+                        findNavController().navigate(R.id.commissionsFragment)
+                    }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e

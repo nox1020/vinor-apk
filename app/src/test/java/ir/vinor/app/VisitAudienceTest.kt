@@ -33,11 +33,16 @@ class VisitAudienceTest {
             .put("pipeline_tab", "deals")
         val payload = JSONObject().put("cards", JSONArray().put(incoming).put(outgoing).put(offer))
 
-        assertEquals(setOf("off-1", "16", "15"), ids(FollowRequests.feed(payload, FollowRequests.FILTER_ALL, owner)))
-        assertEquals(setOf("off-1", "16"), ids(FollowRequests.feed(payload, FollowRequests.FILTER_ALL, other)))
-        assertEquals(setOf("off-1", "16"), ids(FollowRequests.feed(payload, FollowRequests.FILTER_ALL, "")))
-        assertEquals(1, FollowRequests.counters(payload, owner).visits)
-        assertEquals(0, FollowRequests.counters(payload, other).visits)
+        val hosted = JSONObject()
+            .put("id", "15")
+            .put("direction", "incoming")
+            .put("owner_phone", other)
+            .put("plus_user_phone", owner)
+            .put("pipeline_tab", "visits")
+        val serverCards = JSONObject().put("cards", JSONArray().put(hosted).put(outgoing).put(offer))
+        assertEquals(setOf("off-1", "16", "15"), ids(FollowRequests.feed(serverCards, FollowRequests.FILTER_ALL, owner)))
+        assertEquals(setOf("off-1", "16", "15"), ids(FollowRequests.feed(serverCards, FollowRequests.FILTER_ALL, other)))
+        assertEquals(1, FollowRequests.counters(serverCards, other).visits)
         assertTrue(FollowRequests.visibleToViewer(outgoing, booker))
         assertFalse(
             FollowRequests.visibleToViewer(

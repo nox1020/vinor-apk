@@ -67,14 +67,9 @@ class FollowRequestsTest {
         assertEquals("مریم", card.customer)
         assertEquals("فردا ۱۰", card.whenText)
         assertEquals("A1", card.landCode)
-        assertEquals("علاقه‌مند", card.actions.first().label)
-        assertEquals(FollowRequests.Tone.PRIMARY, card.actions.first().tone)
-        assertTrue(card.actions.first().form)
-        assertEquals("/express/partner/inbox-visits/15/result", card.actions.first().path)
-        assertEquals("interested", card.actions.first().body.optString("outcome"))
-        assertEquals("", card.actions.first().body.optString("notes"))
-        val done = card.actions.first { it.label == "انجام شد" }
-        assertEquals(FollowRequests.Tone.SECONDARY, done.tone)
+        assertTrue(card.actions.none { it.path.endsWith("/result") })
+        val done = card.actions.first { it.label == "بازدید انجام شد" }
+        assertEquals(FollowRequests.Tone.PRIMARY, done.tone)
         assertEquals("/express/partner/inbox-visits/15/complete", done.path)
         assertTrue(card.actions.none { it.label == "حذف" })
         assertTrue(card.actions.any { it.json && it.path == "/express/partner/api/requests/15/archive" })
@@ -122,15 +117,8 @@ class FollowRequestsTest {
                 .put("can_no_show", true),
             "8",
         )
-        val confirm = actions.first { it.path.endsWith("/deal-confirm") }
-        val close = actions.first { it.path.endsWith("/deal-close") }
-        assertEquals("تأیید نهایی", confirm.label)
-        assertEquals(FollowRequests.Tone.PRIMARY, confirm.tone)
-        assertEquals("تأیید نهایی این پرونده ثبت شود؟", confirm.confirm)
-        assertEquals("انجام معامله", close.label)
-        assertEquals(FollowRequests.Tone.SECONDARY, close.tone)
-        assertEquals("انجام معامله ثبت شود؟ پورسانت به کیف پول واریز می‌شود.", close.confirm)
-        assertEquals("عدم حضور مشتری ثبت شود؟", actions.first { it.label == "عدم حضور" }.confirm)
+        assertTrue(actions.none { it.path.endsWith("/deal-confirm") || it.path.endsWith("/deal-close") || it.path.endsWith("/deal-reject") })
+        assertEquals("عدم حضور ثبت شود؟", actions.first { it.label == "عدم حضور" }.confirm)
         assertTrue(actions.none { it.opensWallet })
     }
 
@@ -164,8 +152,7 @@ class FollowRequestsTest {
         val card = FollowRequests.card(item, "deals")
         assertEquals("پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز", card.commission)
         assertEquals("", card.status)
-        assertTrue(card.actions.none { it.opensWallet })
-        assertEquals("انجام معامله", card.actions.first { it.path.endsWith("/deal-close") }.label)
+        assertTrue(card.actions.none { it.opensWallet || it.path.endsWith("/deal-close") || it.path.endsWith("/deal-confirm") })
     }
 
     @Test
@@ -183,12 +170,11 @@ class FollowRequestsTest {
         )
         val deposit = card.actions.single { !it.json }
         assertEquals("واریز پورسانت", deposit.label)
-        assertFalse(deposit.opensWallet)
-        assertEquals("/express/partner/requests/8/deal-close", deposit.path)
-        assertEquals("پورسانت این پرونده به کیف پول واریز شود؟", deposit.confirm)
+        assertTrue(deposit.opensWallet)
+        assertEquals("/express/partner/commissions", deposit.path)
+        assertNull(deposit.confirm)
         assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
-        assertTrue(FollowRequests.refreshesWallet(deposit.path))
-        assertTrue(FollowRequests.movesCard(deposit.path, deposit.body))
+        assertFalse(FollowRequests.movesCard(deposit.path, deposit.body))
     }
 
     @Test
@@ -198,8 +184,7 @@ class FollowRequestsTest {
             "8",
             "deals",
         )
-        assertTrue(actions.none { it.opensWallet })
-        assertEquals("انجام معامله", actions.single { it.path.endsWith("/deal-close") }.label)
+        assertTrue(actions.none { it.opensWallet || it.path.endsWith("/deal-close") })
     }
 
     @Test
@@ -692,6 +677,22 @@ class FollowRequestsTest {
     }
 
     @Test
+    fun ownerConfirmsOrDeniesTheMarketerVisit() {
+        val confirm = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_confirm_done", true),
+            "3",
+        ).single { it.form }
+        assertEquals("تأیید بازدید", confirm.label)
+        assertEquals("/express/partner/inbox-visits/3/complete", confirm.path)
+        val deny = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_deny_done", true),
+            "3",
+        ).single { it.label == "بازدید انجام نشده" }
+        assertEquals("/express/partner/inbox-visits/3/no_show", deny.path)
+        assertEquals("این بازدید انجام‌نشده ثبت شود؟", deny.confirm)
+    }
+
+    @Test
     fun incomingOwnerCardPostsInboxFormPerAction() {
         val item = JSONObject()
             .put("id", "15")
@@ -720,30 +721,24 @@ class FollowRequestsTest {
         assertEquals("/express/partner/inbox-visits/15/reject", reject.path)
         assertEquals(FollowRequests.Tone.DANGER, reject.tone)
         assertEquals("این بازدید رد شود؟", reject.confirm)
-        assertEquals("/express/partner/inbox-visits/15/complete", byLabel.getValue("انجام شد").path)
+        assertEquals("/express/partner/inbox-visits/15/complete", byLabel.getValue("بازدید انجام شد").path)
         assertEquals("/express/partner/inbox-visits/15/no_show", byLabel.getValue("عدم حضور").path)
-        assertEquals("عدم حضور مشتری ثبت شود؟", byLabel.getValue("عدم حضور").confirm)
+        assertEquals("عدم حضور ثبت شود؟", byLabel.getValue("عدم حضور").confirm)
         val redo = byLabel.getValue("رد انجام")
         assertEquals("/express/partner/inbox-visits/15/reject_done", redo.path)
         assertEquals("انجام بازدید رد شود؟", redo.confirm)
-        listOf("interested" to "علاقه‌مند", "follow_up" to "پیگیری", "not_interested" to "بی‌علاقه").forEach { (outcome, label) ->
-            val action = byLabel.getValue(label)
-            assertEquals("/express/partner/inbox-visits/15/result", action.path)
-            assertEquals(mapOf("outcome" to outcome, "notes" to ""), FollowRequests.formFields(action))
-        }
-        val start = byLabel.getValue("ثبت معامله")
-        assertEquals("/express/partner/inbox-visits/15/start_deal", start.path)
-        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", start.confirm)
+        assertTrue(card.actions.none { it.path.endsWith("/result") })
         val sale = byLabel.getValue("تأیید فروش")
-        assertEquals("/express/partner/inbox-visits/15/approve_deal", sale.path)
-        assertEquals("فروش تأیید و فایل بسته شود؟ پورسانت به کیف پول همکار اضافه می‌شود.", sale.confirm)
-        val dealReject = byLabel.getValue("رد معامله")
+        assertEquals("/express/partner/inbox-visits/15/confirm_deal", sale.path)
+        assertEquals("فروش نهایی برای این همکار ثبت شود؟ فایل در حال معامله می‌شود.", sale.confirm)
+        val dealReject = byLabel.getValue("رد")
         assertEquals("/express/partner/inbox-visits/15/reject_deal", dealReject.path)
         assertEquals("این معامله رد شود؟", dealReject.confirm)
-        assertTrue(card.actions.none { it.path.endsWith("/confirm_deal") || it.path.endsWith("/close_deal") })
+        assertTrue(card.actions.none { it.path.endsWith("/close_deal") || it.path.endsWith("/approve_deal") || it.path.endsWith("/start_deal") })
         assertTrue(card.actions.none { it.path.endsWith("/decline_deal") || it.path.contains("/express/partner/requests/") })
         assertTrue(card.actions.none { it.label == "حذف" || it.label == "بازدید مجدد" })
-        assertTrue(FollowRequests.refreshesWallet(sale.path))
+        assertFalse(FollowRequests.refreshesWallet(sale.path))
+        assertTrue(FollowRequests.refreshesWallet("/express/partner/inbox-visits/15/close_deal"))
     }
 
     @Test
@@ -753,17 +748,20 @@ class FollowRequestsTest {
             "3",
         ).single { it.form }
         assertEquals("/express/partner/inbox-visits/3/confirm_deal", confirmOnly.path)
-        assertEquals("تأیید نهایی", confirmOnly.label)
+        assertEquals("تأیید فروش", confirmOnly.label)
         val closeOnly = FollowRequests.actions(
             JSONObject().put("direction", "incoming").put("can_close_deal", true),
             "3",
         ).single { it.form }
         assertEquals("/express/partner/inbox-visits/3/close_deal", closeOnly.path)
+        assertEquals("بستن پرونده", closeOnly.label)
+        assertEquals("پرونده بسته شود؟", closeOnly.confirm)
         val decline = FollowRequests.actions(
             JSONObject().put("direction", "incoming").put("can_reject_deal", true),
             "3",
         ).single { it.form }
-        assertEquals("/express/partner/inbox-visits/3/decline_deal", decline.path)
+        assertEquals("/express/partner/inbox-visits/3/reject_deal", decline.path)
+        assertEquals("رد", decline.label)
     }
 
     @Test
@@ -783,16 +781,15 @@ class FollowRequestsTest {
             .put("can_remove", true)
         val actions = FollowRequests.card(item).actions
         assertTrue(actions.none { it.form || it.path.contains("/inbox-visits/") })
-        assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "تأیید فروش" })
+        assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "انجام معامله" })
         assertEquals(
             "/express/partner/requests/15/visit-result",
             actions.first { it.label == "علاقه‌مند" }.path,
         )
         assertEquals("interested", actions.first { it.label == "علاقه‌مند" }.body.optString("outcome"))
         assertFalse(actions.first { it.label == "علاقه‌مند" }.form)
-        assertEquals("/express/partner/requests/15/complete", actions.first { it.label == "انجام شد" }.path)
-        assertEquals("/express/partner/requests/15/deal-confirm", actions.first { it.label == "تأیید نهایی" }.path)
-        assertEquals("/express/partner/requests/15/deal-close", actions.first { it.label == "انجام معامله" }.path)
+        assertEquals("/express/partner/requests/15/complete", actions.first { it.label == "بازدید انجام شد" }.path)
+        assertTrue(actions.none { it.path.endsWith("/deal-confirm") || it.path.endsWith("/deal-close") || it.path.endsWith("/deal-reject") })
         assertEquals("/express/partner/requests/15/remove", actions.first { it.label == "حذف" }.path)
         val ownIncoming = JSONObject()
             .put("id", "8")
