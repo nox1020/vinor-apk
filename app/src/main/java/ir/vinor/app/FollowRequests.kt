@@ -531,9 +531,13 @@ object FollowRequests {
         return "\u2066$shown\u2069"
     }
 
+    private fun readOnlyCard(item: JSONObject): Boolean =
+        item.optBoolean("read_only") || ListingArchive.isArchived(item)
+
     private fun requesterActions(item: JSONObject, id: String, tab: String): ArrayList<Action> {
         val base = "/express/partner/requests/$id"
         val all = ArrayList<Action>()
+        if (readOnlyCard(item)) return all
         fun add(
             flag: String,
             label: String,
@@ -569,7 +573,7 @@ object FollowRequests {
             Tone.SECONDARY,
             body = JSONObject().put("outcome", "not_interested"),
         )
-        add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد از پیگیری حذف شود؟")
+        add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد فقط از پیگیری شما برداشته می‌شود و برای طرف دیگر می‌ماند.")
         if (depositReady(item, tab)) {
             all.add(
                 Action(
@@ -586,6 +590,7 @@ object FollowRequests {
 
     private fun ownerInboxActions(item: JSONObject, id: String): ArrayList<Action> {
         val all = ArrayList<Action>()
+        if (readOnlyCard(item)) return all
         fun add(
             label: String,
             action: String,
@@ -611,7 +616,7 @@ object FollowRequests {
         }
         if (flag(item, "can_complete")) add("بازدید انجام شد", "complete", Tone.PRIMARY)
         if (flag(item, "can_deny_done")) {
-            add("بازدید انجام نشده", "no_show", Tone.DANGER, "این بازدید انجام‌نشده ثبت شود؟")
+            add("اعتراض", "no_show", Tone.DANGER, "اعتراض به انجام بازدید ثبت شود؟ این عدم حضور مشتری نیست.")
         }
         val approveDeal = flag(item, "can_confirm_deal") ||
             (flag(item, "can_start_deal") && !flag(item, "can_close_deal"))
@@ -756,6 +761,7 @@ object FollowRequests {
     private fun displayStatus(item: JSONObject, tab: String): String {
         val server = text(item, "status_label")
         if (server.isNotBlank()) return server
+        if (text(item, "status") == "disputed") return "اعتراض مالک"
         return if (dealSucceeded(item, tab)) "معامله موفق" else ""
     }
 
@@ -1028,6 +1034,7 @@ object FollowRequests {
         "completed" -> "بازدید انجام شد"
         "cancelled" -> "رد شده"
         "no_show" -> "عدم حضور"
+        "disputed" -> "اعتراض مالک"
         else -> raw.trim()
     }
 
