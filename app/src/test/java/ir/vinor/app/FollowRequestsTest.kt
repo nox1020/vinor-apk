@@ -455,8 +455,16 @@ class FollowRequestsTest {
             "" to ListingArchive.ACTIVE,
             FollowRequests.afterChip("deals", ListingArchive.ARCHIVED, FollowRequests.FILTER_ALL),
         )
-        assertEquals(FollowRequests.FILTER_ALL, FollowRequests.listFilter(ListingArchive.ARCHIVED, "visits"))
+        assertEquals("visits", FollowRequests.listFilter(ListingArchive.ARCHIVED, "visits"))
         assertEquals("visits", FollowRequests.listFilter(ListingArchive.ACTIVE, "visits"))
+        assertFalse(FollowRequests.filterNeedsBadge(FollowRequests.FILTER_ALL))
+        assertTrue(FollowRequests.filterNeedsBadge("visits"))
+        assertEquals("فیلتر پیگیری", FollowRequests.filterButtonLabel(FollowRequests.FILTER_ALL))
+        assertEquals("فیلتر پیگیری، بازدید", FollowRequests.filterButtonLabel("visits"))
+        assertEquals(ListingArchive.ARCHIVED, FollowRequests.archiveToggleTarget(ListingArchive.ACTIVE))
+        assertEquals(ListingArchive.ACTIVE, FollowRequests.archiveToggleTarget(ListingArchive.ARCHIVED))
+        assertEquals("بایگانی", FollowRequests.archiveButtonLabel(ListingArchive.ACTIVE))
+        assertEquals("بازگشت به پیگیری", FollowRequests.archiveButtonLabel(ListingArchive.ARCHIVED))
         assertTrue(FollowRequests.chipSelected("visits", ListingArchive.ARCHIVED, FollowRequests.ARCHIVE_CHIP))
         assertFalse(FollowRequests.chipSelected("visits", ListingArchive.ARCHIVED, "visits"))
         assertTrue(FollowRequests.chipSelected("visits", ListingArchive.ACTIVE, "visits"))
