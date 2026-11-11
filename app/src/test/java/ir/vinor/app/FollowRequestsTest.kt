@@ -997,7 +997,6 @@ class FollowRequestsTest {
         assertEquals("مشاهده رسید", receipt.actions.single { !it.json }.label)
         assertTrue(receipt.actions.none { it.label == "واریز پورسانت" })
     }
-}
 
     @Test
     fun phase2ContractRendersServerActionsAndDropsGuesses() {
