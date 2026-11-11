@@ -12,14 +12,20 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebView
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -77,6 +83,7 @@ class NativePartnerFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        hideFollowUpScrollbars(binding.root)
         binding.nativeHeader.pageBack.setOnClickListener { goBack() }
         binding.nativeHeader.pageTitle.text = titleFor(page)
         if (page == PAGE_APPLY) {
@@ -215,7 +222,31 @@ class NativePartnerFragment : Fragment() {
             current.nativeRefresh.isVisible = true
             load()
         }
+        hideFollowUpScrollbars(b.nativeInlineLogin)
         return true
+    }
+
+    /** Follow-up keeps touch/wheel scrolling but hides the bar and glow track. */
+    private fun hideFollowUpScrollbars(root: View) {
+        if (page != PAGE_REQUESTS) return
+        fun apply(view: View) {
+            if (
+                view is ScrollView ||
+                view is HorizontalScrollView ||
+                view is NestedScrollView ||
+                view is RecyclerView ||
+                view is WebView ||
+                view is SwipeRefreshLayout
+            ) {
+                view.isVerticalScrollBarEnabled = false
+                view.isHorizontalScrollBarEnabled = false
+                view.overScrollMode = View.OVER_SCROLL_NEVER
+            }
+            if (view is ViewGroup) {
+                for (i in 0 until view.childCount) apply(view.getChildAt(i))
+            }
+        }
+        apply(root)
     }
 
     private fun load(pull: Boolean = false) {
