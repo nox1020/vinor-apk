@@ -687,9 +687,9 @@ class FollowRequestsTest {
         val deny = FollowRequests.actions(
             JSONObject().put("direction", "incoming").put("can_deny_done", true),
             "3",
-        ).single { it.label == "بازدید انجام نشده" }
+        ).single { it.label == "اعتراض" }
         assertEquals("/express/partner/inbox-visits/3/no_show", deny.path)
-        assertEquals("این بازدید انجام‌نشده ثبت شود؟", deny.confirm)
+        assertEquals("اعتراض به انجام بازدید ثبت شود؟ این عدم حضور مشتری نیست.", deny.confirm)
     }
 
     @Test
@@ -942,5 +942,29 @@ class FollowRequestsTest {
         assertFalse(archived.showLand)
         assertEquals(FollowRequests.RESTORE_LABEL, archived.actions.single { it.json }.label)
         assertEquals("/express/partner/api/requests/noshow-private/restore", archived.actions.single { it.json }.path)
+    }
+
+    @Test
+    fun followUpHideDisputeAndReadOnlyDoNotMoveMoney() {
+        val remove = FollowRequests.card(
+            JSONObject().put("id", "v1").put("can_remove", true),
+        ).actions.single { it.label == "حذف" }
+        assertEquals("/express/partner/requests/v1/remove", remove.path)
+        assertTrue(remove.confirm.orEmpty().contains("پیگیری شما"))
+        assertTrue(remove.confirm.orEmpty().contains("طرف دیگر"))
+
+        val dispute = FollowRequests.card(JSONObject().put("id", "v2").put("status", "disputed"))
+        assertEquals("اعتراض مالک", dispute.status)
+
+        val frozen = FollowRequests.card(
+            JSONObject()
+                .put("id", "v3")
+                .put("read_only", true)
+                .put("can_close_deal", true)
+                .put("can_register_result", true)
+                .put("direction", "incoming")
+                .put("is_own_request", false),
+        )
+        assertTrue(frozen.actions.none { it.path.contains("close_deal") || it.path.contains("visit-result") })
     }
 }
