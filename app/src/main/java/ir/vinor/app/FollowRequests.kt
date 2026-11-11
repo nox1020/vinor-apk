@@ -268,9 +268,32 @@ object FollowRequests {
         return if (archived) chipId == ARCHIVE_CHIP else chipId == filter
     }
 
-    /** در نمای بایگانی همهٔ ردیف‌های بایگانی دیده می‌شوند، نه فقط مرحلهٔ قبلی. */
-    fun listFilter(archive: String, filter: String): String =
-        if (ListingArchive.normalize(archive) == ListingArchive.ARCHIVED) FILTER_ALL else filter
+    /** فیلتر مرحله جدا از بایگانی است؛ در نمای بایگانی هم همان مرحله می‌ماند. */
+    fun listFilter(archive: String, filter: String): String = filter.ifBlank { FILTER_ALL }
+
+    fun filterNeedsBadge(filter: String): Boolean =
+        filter.isNotBlank() && filter != FILTER_ALL
+
+    fun archiveToggleTarget(archive: String): String =
+        if (ListingArchive.normalize(archive) == ListingArchive.ARCHIVED) {
+            ListingArchive.ACTIVE
+        } else {
+            ListingArchive.ARCHIVED
+        }
+
+    fun archiveButtonLabel(archive: String): String =
+        if (ListingArchive.normalize(archive) == ListingArchive.ARCHIVED) {
+            "بازگشت به پیگیری"
+        } else {
+            "بایگانی"
+        }
+
+    fun filterButtonLabel(filter: String): String = when (filter) {
+        "requests" -> "فیلتر پیگیری، درخواست"
+        "visits" -> "فیلتر پیگیری، بازدید"
+        "deals" -> "فیلتر پیگیری، معامله"
+        else -> "فیلتر پیگیری"
+    }
 
     fun card(item: JSONObject, tab: String = ""): Card {
         val id = idOf(item)

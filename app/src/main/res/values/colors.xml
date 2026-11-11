@@ -11,6 +11,7 @@
     <color name="vinor_raised_2">#2F2F2F</color>
     <color name="vinor_primary_red">#E22828</color>
     <color name="vinor_accent_green">#10B981</color>
+    <color name="vinor_follow_accent">#5EEAD4</color>
     <!-- سبز نئون کاشی‌های داشبورد؛ از سبز برند روشن‌تر است تا با طرح کاشی یکی باشد. -->
     <color name="vinor_tile_green">#00C878</color>
     <!-- نوار «مشتری دارم»؛ همان سبز تیرهٔ متن دکمهٔ قبلی و سبز روشن طرح. -->

@@ -13,8 +13,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -89,6 +91,7 @@ class NativePartnerFragment : Fragment() {
         hideFollowUpScrollbars(binding.root)
         binding.nativeHeader.pageBack.setOnClickListener { goBack() }
         binding.nativeHeader.pageTitle.text = titleFor(page)
+        if (page == PAGE_REQUESTS) bindRequestHeader()
         if (page == PAGE_APPLY) {
             binding.root.post {
                 val act = activity as? MainActivity
@@ -628,12 +631,127 @@ class NativePartnerFragment : Fragment() {
 
     private fun bindRequests(obj: JSONObject) {
         binding.nativeArchiveScroll.isVisible = false
+        binding.nativeTabsScroll.isVisible = false
+        binding.nativeTabs.removeAllViews()
         val counts = FollowRequests.counters(obj, viewerPhone())
         val filters = FollowRequests.filters(counts)
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
-        val archivedCount = FollowRequests.archiveCounts(obj).archived
-        bindRequestFilters(FollowRequests.requestChips(counts, archivedCount, archiveStatus))
+        bindRequestHeader(counts)
         renderRequestItems(obj, FollowRequests.listFilter(archiveStatus, requestFilter))
+    }
+
+    private fun bindRequestHeader(counts: FollowRequests.Counts = FollowRequests.Counts(0, 0, 0)) {
+        if (page != PAGE_REQUESTS || _binding == null) return
+        val end = binding.nativeHeader.pageHeaderEnd
+        end.removeAllViews()
+        end.updateLayoutParams { width = ViewGroup.LayoutParams.WRAP_CONTENT }
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        row.addView(requestFilterButton(counts))
+        row.addView(requestArchiveButton())
+        end.addView(
+            row,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+    }
+
+    private fun headerIconButton(icon: Int, label: String, onClick: () -> Unit): ImageButton {
+        val out = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, out, true)
+        return ImageButton(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setImageResource(icon)
+            setBackgroundResource(out.resourceId)
+            contentDescription = label
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setColorFilter(ContextCompat.getColor(context, R.color.vinor_text))
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun requestFilterButton(counts: FollowRequests.Counts): View {
+        val wrap = FrameLayout(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+        }
+        val button = headerIconButton(R.drawable.ic_filter, FollowRequests.filterButtonLabel(requestFilter)) {
+            showRequestFilterSheet(counts)
+        }
+        button.layoutParams = FrameLayout.LayoutParams(dp(48), dp(48))
+        wrap.addView(button)
+        if (FollowRequests.filterNeedsBadge(requestFilter)) {
+            val dot = View(requireContext()).apply {
+                setBackgroundResource(R.drawable.bg_filter_dot)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            val dotLp = FrameLayout.LayoutParams(dp(8), dp(8), android.view.Gravity.TOP or android.view.Gravity.END)
+            dotLp.topMargin = dp(10)
+            dotLp.marginEnd = dp(10)
+            wrap.addView(dot, dotLp)
+        }
+        return wrap
+    }
+
+    private fun requestArchiveButton(): ImageButton {
+        val active = ListingArchive.normalize(archiveStatus) == ListingArchive.ARCHIVED
+        val button = headerIconButton(
+            R.drawable.ic_archive,
+            FollowRequests.archiveButtonLabel(archiveStatus),
+        ) {
+            switchRequestArchive(FollowRequests.archiveToggleTarget(archiveStatus))
+        }
+        if (active) {
+            button.setColorFilter(ContextCompat.getColor(requireContext(), R.color.vinor_follow_accent))
+            button.setBackgroundColor(Color.parseColor("#1A3D38"))
+        }
+        return button
+    }
+
+    private fun showRequestFilterSheet(counts: FollowRequests.Counts) {
+        val menu = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(8), dp(12), dp(8), dp(20))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.vinor_raised))
+        }
+        val title = TextView(requireContext()).apply {
+            text = "فیلتر پیگیری"
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+            setPadding(dp(16), dp(4), dp(16), dp(8))
+        }
+        menu.addView(title)
+        FollowRequests.filters(counts).forEach { filter ->
+            val on = filter.id == requestFilter
+            val row = TextView(requireContext()).apply {
+                text = filter.title
+                textSize = 15f
+                minHeight = dp(48)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(8), dp(16), dp(8))
+                setTextColor(
+                    ContextCompat.getColor(
+                        context,
+                        if (on) R.color.vinor_follow_accent else R.color.vinor_text,
+                    ),
+                )
+                contentDescription = filter.title
+                setOnClickListener {
+                    followSheet?.dismiss()
+                    if (filter.id != requestFilter) {
+                        requestFilter = filter.id
+                        bindRequests(lastPayload)
+                    }
+                }
+            }
+            menu.addView(row)
+        }
+        openFollowSheet(menu)
     }
 
     private fun showArchiveBar(active: Int, archived: Int) {
@@ -688,73 +806,6 @@ class NativePartnerFragment : Fragment() {
         PAGE_REQUESTS -> FollowRequests.dataPath(archiveStatus)
         PAGE_LISTINGS -> ListingArchive.listingsPath(archiveStatus)
         else -> dataPath(page)
-    }
-
-    private fun bindRequestFilters(filters: List<FollowRequests.Filter>) {
-        binding.nativeTabsScroll.isVisible = filters.isNotEmpty()
-        binding.nativeTabs.removeAllViews()
-        val labels = filters.map { FollowRequests.chipCaption(it) }
-        val sample = TextView(requireContext()).apply { textSize = 13f }
-        val pad = dp(8) * 2
-        val gap = dp(6)
-        val needed = labels.sumOf { sample.paint.measureText(it).toInt() + pad } +
-            gap * (filters.size - 1).coerceAtLeast(0)
-        val available = resources.displayMetrics.widthPixels - dp(32)
-        val equal = filters.isNotEmpty() && needed <= available
-        binding.nativeTabsScroll.isFillViewport = equal
-        binding.nativeTabs.layoutParams = binding.nativeTabs.layoutParams.apply {
-            width = if (equal) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT
-        }
-        filters.forEachIndexed { index, tab ->
-            val on = FollowRequests.chipSelected(requestFilter, archiveStatus, tab.id)
-            val chip = TextView(requireContext()).apply {
-                text = labels[index]
-                textSize = 13f
-                gravity = android.view.Gravity.CENTER
-                minHeight = dp(36)
-                maxLines = 1
-                isSingleLine = true
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                setTextColor(
-                    ContextCompat.getColor(
-                        context,
-                        if (on) R.color.vinor_on_primary else R.color.vinor_text_muted,
-                    ),
-                )
-                setBackgroundResource(if (on) R.drawable.bg_follow_tab_on else R.drawable.bg_follow_tab)
-                setPadding(dp(8), dp(8), dp(8), dp(8))
-                setOnClickListener { onRequestChip(tab.id) }
-            }
-            val lp = if (equal) {
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            } else {
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                )
-            }
-            if (index < filters.lastIndex) lp.marginEnd = gap
-            binding.nativeTabs.addView(chip, lp)
-            if (on && !equal) {
-                chip.post {
-                    val scroller = binding.nativeTabsScroll
-                    val target = (chip.left + chip.width / 2 - scroller.width / 2).coerceAtLeast(0)
-                    scroller.smoothScrollTo(target, 0)
-                }
-            }
-        }
-    }
-
-    private fun onRequestChip(chipId: String) {
-        val (nextFilter, nextArchive) = FollowRequests.afterChip(requestFilter, archiveStatus, chipId)
-        val archiveChanged = ListingArchive.normalize(nextArchive) != ListingArchive.normalize(archiveStatus)
-        if (!archiveChanged && nextFilter == requestFilter) return
-        requestFilter = nextFilter
-        if (archiveChanged) {
-            switchRequestArchive(nextArchive)
-            return
-        }
-        bindRequests(lastPayload)
     }
 
     private fun switchRequestArchive(next: String) {
