@@ -52,6 +52,7 @@
         android:layout_weight="1">
 
         <ScrollView
+            android:id="@+id/nativeScroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:fillViewport="true"
