@@ -27,6 +27,24 @@
         android:textColor="@color/vinor_text_muted"
         android:textSize="13sp" />
 
+    <EditText
+        android:id="@+id/followConfirmReason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_flat_outline_card"
+        android:fontFamily="@font/vazirmatn"
+        android:hint="دلیل اعتراض"
+        android:importantForAutofill="no"
+        android:inputType="textMultiLine"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:textColor="@color/vinor_text"
+        android:textColorHint="@color/vinor_text_muted"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/followConfirmYes"
         android:layout_width="match_parent"

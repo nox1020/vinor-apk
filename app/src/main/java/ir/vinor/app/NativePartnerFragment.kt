@@ -14,7 +14,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.HorizontalScrollView
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -629,7 +632,7 @@ class NativePartnerFragment : Fragment() {
         val filters = FollowRequests.filters(counts)
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
         val archivedCount = FollowRequests.archiveCounts(obj).archived
-        bindRequestFilters(FollowRequests.requestChips(counts, archivedCount))
+        bindRequestFilters(FollowRequests.requestChips(counts, archivedCount, archiveStatus))
         renderRequestItems(obj, FollowRequests.listFilter(archiveStatus, requestFilter))
     }
 
@@ -690,7 +693,7 @@ class NativePartnerFragment : Fragment() {
     private fun bindRequestFilters(filters: List<FollowRequests.Filter>) {
         binding.nativeTabsScroll.isVisible = filters.isNotEmpty()
         binding.nativeTabs.removeAllViews()
-        val labels = filters.map { "${it.title} ${ListingWeek.persianDigits(it.count)}" }
+        val labels = filters.map { FollowRequests.chipCaption(it) }
         val sample = TextView(requireContext()).apply { textSize = 13f }
         val pad = dp(8) * 2
         val gap = dp(6)
@@ -995,6 +998,7 @@ class NativePartnerFragment : Fragment() {
         card.requestCardPersonBody.updateLayoutParams<LinearLayout.LayoutParams> {
             marginStart = if (item.customer.isNotBlank()) dp(12) else 0
         }
+        addFollowHint(card, item.disabledReason)
         item.actions.forEachIndexed { index, action ->
             addFollowButton(card, action, index)
         }
@@ -1078,12 +1082,32 @@ class NativePartnerFragment : Fragment() {
                 }
             }
         }
+        addFollowHint(card, item.disabledReason)
         item.actions.forEachIndexed { index, action ->
             addFollowButton(card, action, index)
         }
     }
 
+    private fun addFollowHint(card: ItemNativeRequestBinding, text: String) {
+        if (text.isBlank()) return
+        val hint = TextView(requireContext()).apply {
+            this.text = text
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+        }
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        lp.topMargin = dp(12)
+        card.requestCardActions.addView(hint, lp)
+    }
+
     private fun addFollowButton(card: ItemNativeRequestBinding, action: FollowRequests.Action, index: Int) {
+        if (action.resultForm) {
+            addFollowResultForm(card, action, index)
+            return
+        }
         val primary = action.tone == FollowRequests.Tone.PRIMARY
         val danger = action.tone == FollowRequests.Tone.DANGER
         val btn = TextView(requireContext()).apply {
@@ -1102,14 +1126,7 @@ class NativePartnerFragment : Fragment() {
             )
             isClickable = true
             isFocusable = true
-            setOnClickListener {
-                when {
-                    action.opensWallet -> (activity as? MainActivity)?.openPath(action.path)
-                    action.counter -> askCounter(action)
-                    action.confirm != null -> confirmFollow(action)
-                    else -> dispatchFollow(action)
-                }
-            }
+            setOnClickListener { onFollowAction(action) }
         }
         val lp = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1119,9 +1136,116 @@ class NativePartnerFragment : Fragment() {
         card.requestCardActions.addView(btn, lp)
     }
 
+    private fun onFollowAction(action: FollowRequests.Action) {
+        when {
+            FollowRequests.isDialPath(action.path) -> {
+                runCatching { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(action.path))) }
+            }
+            action.counter -> askCounter(action)
+            action.confirm != null -> confirmFollow(action)
+            action.getLink || action.opensWallet -> openFollowLink(action)
+            else -> dispatchFollow(action)
+        }
+    }
+
+    private fun openFollowLink(action: FollowRequests.Action) {
+        val ctx = context ?: return
+        if (FollowRequests.isChargePath(action.path)) {
+            FollowRequests.cachePaths().forEach { PartnerApi.forget(it, ctx) }
+            forgetPage(PAGE_REQUESTS)
+        }
+        (activity as? MainActivity)?.openPath(action.path)
+    }
+
+    private fun addFollowResultForm(
+        card: ItemNativeRequestBinding,
+        action: FollowRequests.Action,
+        index: Int,
+    ) {
+        val host = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val label = TextView(requireContext()).apply {
+            text = "نتیجه بازدید را ثبت کنید"
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+        }
+        host.addView(label)
+        val group = RadioGroup(requireContext()).apply { orientation = RadioGroup.VERTICAL }
+        FollowRequests.resultChoices(action).forEach { (id, title) ->
+            val radio = RadioButton(requireContext()).apply {
+                this.id = View.generateViewId()
+                text = title
+                tag = id
+                textSize = 15f
+                setTextColor(ContextCompat.getColor(context, R.color.vinor_text))
+            }
+            group.addView(radio)
+        }
+        host.addView(group)
+        val notes = EditText(requireContext()).apply {
+            hint = "یادداشت"
+            textSize = 14f
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundResource(R.drawable.bg_flat_outline_card)
+            setTextColor(ContextCompat.getColor(context, R.color.vinor_text))
+            setHintTextColor(ContextCompat.getColor(context, R.color.vinor_text_muted))
+        }
+        val notesLp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        notesLp.topMargin = dp(8)
+        host.addView(notes, notesLp)
+        val submit = TextView(requireContext()).apply {
+            text = action.label
+            textSize = 15f
+            gravity = android.view.Gravity.CENTER
+            minHeight = dp(44)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setBackgroundResource(R.drawable.bg_hub_start)
+            setTextColor(Color.parseColor("#052E16"))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                val checkedId = group.checkedRadioButtonId
+                val chosen = if (checkedId != View.NO_ID) {
+                    group.findViewById<RadioButton>(checkedId)?.tag as? String
+                } else {
+                    null
+                }
+                val next = FollowRequests.withResult(
+                    action,
+                    chosen.orEmpty(),
+                    notes.text?.toString().orEmpty(),
+                )
+                if (next == null) {
+                    Toast.makeText(requireContext(), "نتیجه بازدید را انتخاب کنید.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                dispatchFollow(next)
+            }
+        }
+        val submitLp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        submitLp.topMargin = dp(8)
+        host.addView(submit, submitLp)
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        lp.topMargin = dp(if (index == 0) 12 else 8)
+        card.requestCardActions.addView(host, lp)
+    }
+
     private fun askCounter(action: FollowRequests.Action) {
         val sheet = SheetFollowCounterBinding.inflate(layoutInflater)
         val dialog = openFollowSheet(sheet.root)
+        if (!action.confirm.isNullOrBlank()) {
+            sheet.followCounterMessage.text = action.confirm
+            sheet.followCounterMessage.isVisible = true
+        }
         sheet.followCounterNo.setOnClickListener { dialog.dismiss() }
         sheet.followCounterYes.setOnClickListener {
             val next = FollowRequests.withCounter(
@@ -1149,9 +1273,25 @@ class NativePartnerFragment : Fragment() {
         }
         val dialog = openFollowSheet(sheet.root)
         sheet.followConfirmNo.setOnClickListener { dialog.dismiss() }
+        if (action.needsReason) {
+            sheet.followConfirmReason.visibility = View.VISIBLE
+        }
         sheet.followConfirmYes.setOnClickListener {
+            val next = if (action.needsReason) {
+                val reasoned = FollowRequests.withReason(
+                    action,
+                    sheet.followConfirmReason.text?.toString().orEmpty(),
+                )
+                if (reasoned == null) {
+                    Toast.makeText(requireContext(), "دلیل اعتراض را بنویسید.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                reasoned
+            } else {
+                action
+            }
             dialog.dismiss()
-            dispatchFollow(action)
+            if (next.getLink || next.opensWallet) openFollowLink(next) else dispatchFollow(next)
         }
     }
 

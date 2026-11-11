@@ -9,6 +9,7 @@ object FollowRequests {
     const val PAGE_PATH = "/express/partner/requests"
     const val FILTER_ALL = ""
     const val ARCHIVE_CHIP = "archive"
+    const val BACK_CHIP = "back"
     const val EMPTY = "موردی برای پیگیری نیست."
     const val EMPTY_FILTER = "موردی در این بخش نیست."
     const val EMPTY_ARCHIVED = "پیگیری بایگانی‌شده‌ای نیست."
@@ -33,6 +34,9 @@ object FollowRequests {
         val json: Boolean = false,
         val form: Boolean = false,
         val counter: Boolean = false,
+        val needsReason: Boolean = false,
+        val resultForm: Boolean = false,
+        val getLink: Boolean = false,
     )
 
     data class Counts(val requests: Int, val visits: Int, val deals: Int) {
@@ -73,6 +77,7 @@ object FollowRequests {
         val amountText: String = "",
         val terms: String = "",
         val showLand: Boolean = false,
+        val disabledReason: String = "",
     )
 
     fun tabs(array: JSONArray?): List<Tab> = tabs(array, null)
@@ -222,29 +227,43 @@ object FollowRequests {
 
     fun filters(counts: Counts): List<Filter> = listOf(
         Filter(FILTER_ALL, "همه", counts.all),
-        Filter("requests", "درخواست بازدید", counts.requests),
+        Filter("requests", "درخواست", counts.requests),
         Filter("visits", "بازدید", counts.visits),
         Filter("deals", "معامله", counts.deals),
     )
 
-    /** یک ردیف پیگیری: مرحله‌ها به‌اضافهٔ بایگانی. «فعال» در این ردیف نیست. */
-    fun requestChips(counts: Counts, archivedCount: Int): List<Filter> =
-        filters(counts) + Filter(ARCHIVE_CHIP, "بایگانی", archivedCount.coerceAtLeast(0))
+    /** یک ردیف پیگیری: مرحله‌ها به‌اضافهٔ بایگانی. در بایگانی فقط بازگشت و بایگانی می‌ماند. */
+    fun requestChips(
+        counts: Counts,
+        archivedCount: Int,
+        archive: String = ListingArchive.ACTIVE,
+    ): List<Filter> {
+        val archived = ListingArchive.normalize(archive) == ListingArchive.ARCHIVED
+        val archiveChip = Filter(ARCHIVE_CHIP, "بایگانی", archivedCount.coerceAtLeast(0))
+        return if (archived) {
+            listOf(Filter(BACK_CHIP, "بازگشت به پیگیری", 0), archiveChip)
+        } else {
+            filters(counts) + archiveChip
+        }
+    }
+
+    fun chipCaption(filter: Filter): String {
+        if (filter.id == BACK_CHIP) return filter.title
+        return "${filter.title} ${ListingWeek.persianDigits(filter.count)}"
+    }
 
     /**
-     * بایگانی نما را عوض می‌کند. «همه» و مرحله‌ها همیشه به آیتم‌های فعال برمی‌گردند.
-     * فیلتر مرحله هنگام ورود به بایگانی حفظ می‌شود تا برگشت همان تب بماند.
+     * بایگانی نما را عوض می‌کند. از بایگانی فقط «بازگشت به پیگیری» به فهرست فعال می‌رود.
+     * مرحله‌ها همیشه به آیتم‌های فعال برمی‌گردند.
      */
     fun afterChip(filter: String, archive: String, chipId: String): Pair<String, String> {
-        val status = ListingArchive.normalize(archive)
-        if (chipId == ARCHIVE_CHIP) {
-            val next = if (status == ListingArchive.ARCHIVED) ListingArchive.ACTIVE else ListingArchive.ARCHIVED
-            return filter to next
-        }
+        if (chipId == BACK_CHIP) return FILTER_ALL to ListingArchive.ACTIVE
+        if (chipId == ARCHIVE_CHIP) return filter to ListingArchive.ARCHIVED
         return chipId to ListingArchive.ACTIVE
     }
 
     fun chipSelected(filter: String, archive: String, chipId: String): Boolean {
+        if (chipId == BACK_CHIP) return false
         val archived = ListingArchive.normalize(archive) == ListingArchive.ARCHIVED
         return if (archived) chipId == ARCHIVE_CHIP else chipId == filter
     }
@@ -283,6 +302,7 @@ object FollowRequests {
             amountText = if (offer) offerAmountText(item) else "",
             terms = if (offer) text(item, "terms") else "",
             showLand = showsLand(item),
+            disabledReason = disabledReason(item),
         )
     }
 
@@ -369,13 +389,51 @@ object FollowRequests {
 
     fun formFields(action: Action): Map<String, String> {
         val out = LinkedHashMap<String, String>()
-        val keys = action.body.keys()
+        val body = copyBody(action.body)
+        val keys = body.keys()
         while (keys.hasNext()) {
             val key = keys.next()
-            if (key == "csrf_token") continue
-            out[key] = action.body.optString(key)
+            out[key] = body.optString(key)
         }
         return out
+    }
+
+    fun withReason(action: Action, raw: String): Action? {
+        val reason = raw.trim()
+        if (reason.length < 3) return null
+        val body = copyBody(action.body)
+        body.put("notes", reason)
+        body.put("dispute_reason", reason)
+        return action.copy(body = body)
+    }
+
+    fun resultChoices(action: Action): List<Pair<String, String>> {
+        val labels = linkedMapOf(
+            "interested" to "علاقه‌مند",
+            "follow_up" to "پیگیری دوباره",
+            "not_interested" to "بی‌علاقه",
+        )
+        val raw = action.body.optJSONArray("choices")
+        val ids = ArrayList<String>()
+        if (raw != null) {
+            for (i in 0 until raw.length()) {
+                val id = raw.optString(i).trim()
+                if (id.isNotEmpty()) ids.add(id)
+            }
+        }
+        if (ids.isEmpty()) ids.addAll(labels.keys)
+        return ids.map { id -> id to (labels[id] ?: id) }
+    }
+
+    /** نتیجه بدون پیش‌فرض. اگر گزینه خالی باشد پست نمی‌شود. */
+    fun withResult(action: Action, outcomeRaw: String, notesRaw: String): Action? {
+        val outcome = outcomeRaw.trim()
+        if (resultChoices(action).none { it.first == outcome }) return null
+        val body = copyBody(action.body)
+        body.put("outcome", outcome)
+        val notes = notesRaw.trim()
+        if (notes.isNotEmpty()) body.put("notes", notes)
+        return action.copy(body = body, resultForm = false)
     }
 
     /**
@@ -435,7 +493,17 @@ object FollowRequests {
 
     fun actions(item: JSONObject, id: String, tab: String = ""): List<Action> {
         if (id.isBlank()) return emptyList()
-        if (isOffer(item)) return offerActions(item, id)
+        if (isOffer(item)) {
+            contractActions(item)?.let { return it }
+            return offerActions(item, id)
+        }
+        contractActions(item)?.let { built ->
+            return if (showsArchive(item) && built.none { isArchivePath(it.path) }) {
+                built + archiveAction(item, id)
+            } else {
+                built
+            }
+        }
         val built = if (postsToInbox(item)) ownerInboxActions(item, id) else requesterActions(item, id, tab)
         val ranked = rankActions(built)
         return if (showsArchive(item)) ranked + archiveAction(item, id) else ranked
@@ -445,13 +513,7 @@ object FollowRequests {
     fun withCounter(action: Action, amountRaw: String, termsRaw: String): Action? {
         val amount = PartnerApi.asciiDigits(amountRaw).toLongOrNull() ?: return null
         if (amount <= 0L) return null
-        val body = JSONObject()
-        val keys = action.body.keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            if (key == "csrf_token" || key == "amount" || key == "terms") continue
-            body.put(key, action.body.optString(key))
-        }
+        val body = copyBody(action.body, setOf("amount", "terms"))
         if (body.optString("return_to").isBlank()) body.put("return_to", "visits")
         body.put("amount", amount.toString())
         val terms = termsRaw.trim()
@@ -502,10 +564,25 @@ object FollowRequests {
                     tone = Tone.SECONDARY,
                     form = true,
                     counter = true,
+                    confirm = "مبلغ متقابل برای طرف مقابل فرستاده شود؟",
                 ),
             )
         }
         return rankActions(all)
+    }
+
+    private val uiBodyKeys = setOf("csrf_token", "requires_reason", "choices", "default")
+
+    private fun copyBody(source: JSONObject, extraSkip: Set<String> = emptySet()): JSONObject {
+        val body = JSONObject()
+        val keys = source.keys()
+        val skip = uiBodyKeys + extraSkip
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key in skip) continue
+            body.put(key, source.opt(key))
+        }
+        return body
     }
 
     private fun isOffer(item: JSONObject): Boolean = text(item, "kind") == "offer"
@@ -549,44 +626,100 @@ object FollowRequests {
             if (!flag(item, flag)) return
             all.add(Action(label, base + suffix, body, tone, confirm))
         }
-        add(
-            "can_register_result",
-            "علاقه‌مند",
-            "/visit-result",
-            Tone.PRIMARY,
-            body = JSONObject().put("outcome", "interested"),
-        )
-        add("can_complete", "بازدید انجام شد", "/complete", Tone.PRIMARY)
-        add("can_revisit", "بازدید مجدد", "/revisit", Tone.SECONDARY)
-        add(
-            "can_register_result",
-            "پیگیری",
-            "/visit-result",
-            Tone.SECONDARY,
-            body = JSONObject().put("outcome", "follow_up"),
-        )
-        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
-        add(
-            "can_register_result",
-            "بی‌علاقه",
-            "/visit-result",
-            Tone.SECONDARY,
-            body = JSONObject().put("outcome", "not_interested"),
-        )
-        add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد فقط از پیگیری شما برداشته می‌شود و برای طرف دیگر می‌ماند.")
-        if (depositReady(item, tab)) {
+        if (flag(item, "can_register_result")) {
             all.add(
                 Action(
-                    label = "واریز پورسانت",
-                    path = "/express/partner/commissions",
-                    body = JSONObject(),
-                    tone = Tone.SECONDARY,
-                    opensWallet = true,
+                    label = "ثبت نتیجه",
+                    path = "$base/visit-result",
+                    body = JSONObject()
+                        .put("choices", JSONArray().put("interested").put("follow_up").put("not_interested"))
+                        .put("default", ""),
+                    tone = Tone.PRIMARY,
+                    resultForm = true,
                 ),
             )
         }
+        add("can_complete", "بازدید انجام شد", "/complete", Tone.PRIMARY)
+        add("can_revisit", "بازدید بعدی", "/revisit", Tone.SECONDARY)
+        add("can_no_show", "عدم حضور", "/no-show", Tone.SECONDARY, "عدم حضور ثبت شود؟")
+        add("can_remove", "حذف", "/remove", Tone.DANGER, "این مورد فقط از پیگیری شما برداشته می‌شود و برای طرف دیگر می‌ماند.")
         return all
     }
+
+    private fun contractActions(item: JSONObject): List<Action>? {
+        val source = contractSource(item) ?: return null
+        val all = ArrayList<Action>()
+        fun take(raw: JSONObject?) {
+            if (raw == null) return
+            val label = raw.optString("label").trim()
+            val endpoint = raw.optString("endpoint").trim()
+            if (label.isEmpty() || endpoint.isEmpty()) return
+            val actionId = raw.optString("id").trim()
+            val tone = when (raw.optString("tone")) {
+                "danger" -> Tone.DANGER
+                "secondary" -> Tone.SECONDARY
+                else -> Tone.PRIMARY
+            }
+            val isGet = raw.optString("method", "POST").equals("GET", true)
+            val body = raw.optJSONObject("body") ?: JSONObject()
+            val json = isArchivePath(endpoint)
+            all.add(
+                Action(
+                    label = label,
+                    path = endpoint,
+                    body = body,
+                    tone = tone,
+                    confirm = raw.optString("confirmation").trim().ifBlank { null },
+                    opensWallet = isGet && isWalletPath(endpoint),
+                    json = json,
+                    form = !isGet && !json && isInboxPath(endpoint),
+                    counter = actionId == "counter_offer",
+                    needsReason = actionId == "dispute_attendance" || body.optBoolean("requires_reason"),
+                    resultForm = actionId == "record_result",
+                    getLink = isGet && !endpoint.startsWith("tel:"),
+                ),
+            )
+        }
+        take(if (source.isNull("primary_action")) null else source.optJSONObject("primary_action"))
+        val secondary = source.optJSONArray("secondary_actions")
+        if (secondary != null) {
+            for (i in 0 until secondary.length()) take(secondary.optJSONObject(i))
+        }
+        val danger = source.optJSONArray("danger_actions")
+        if (danger != null) {
+            for (i in 0 until danger.length()) take(danger.optJSONObject(i))
+        }
+        return all
+    }
+
+    private fun contractSource(item: JSONObject): JSONObject? {
+        if (hasContractKeys(item)) return item
+        val nested = item.optJSONObject("contract") ?: return null
+        return if (hasContractKeys(nested)) nested else null
+    }
+
+    private fun hasContractKeys(obj: JSONObject): Boolean =
+        obj.has("primary_action") || obj.has("secondary_actions") || obj.has("danger_actions")
+
+    private fun isInboxPath(path: String): Boolean {
+        val bare = path.substringBefore('?')
+        return bare.contains("/inbox-visits/") || bare.contains("/inbox-offers/")
+    }
+
+    fun isArchivePath(path: String): Boolean {
+        val bare = path.substringBefore('?')
+        return bare.contains("/api/requests/") && (bare.endsWith("/archive") || bare.endsWith("/restore"))
+    }
+
+    fun isWalletPath(path: String): Boolean {
+        val bare = path.substringBefore('?').lowercase()
+        return bare.contains("/wallet/charge") || bare.contains("/commissions")
+    }
+
+    fun isChargePath(path: String): Boolean =
+        path.substringBefore('?').lowercase().contains("/wallet/charge")
+
+    fun isDialPath(path: String): Boolean = path.startsWith("tel:")
 
     private fun ownerInboxActions(item: JSONObject, id: String): ArrayList<Action> {
         val all = ArrayList<Action>()
@@ -616,10 +749,19 @@ object FollowRequests {
         }
         if (flag(item, "can_complete")) add("بازدید انجام شد", "complete", Tone.PRIMARY)
         if (flag(item, "can_deny_done")) {
-            add("اعتراض", "no_show", Tone.DANGER, "اعتراض به انجام بازدید ثبت شود؟ این عدم حضور مشتری نیست.")
+            all.add(
+                Action(
+                    label = "اعتراض",
+                    path = inboxPath(id, "no_show"),
+                    body = JSONObject(),
+                    tone = Tone.DANGER,
+                    confirm = "اعتراض به انجام بازدید ثبت شود؟ دلیل حداقل ۳ نویسه لازم است.",
+                    form = true,
+                    needsReason = true,
+                ),
+            )
         }
-        val approveDeal = flag(item, "can_confirm_deal") ||
-            (flag(item, "can_start_deal") && !flag(item, "can_close_deal"))
+        val approveDeal = flag(item, "can_confirm_deal")
         if (approveDeal) {
             add(
                 "تأیید فروش",
@@ -749,17 +891,39 @@ object FollowRequests {
         }
     }
 
+    private fun financialState(item: JSONObject): JSONObject? {
+        val direct = item.optJSONObject("financial_state")
+        if (direct != null) return direct
+        return item.optJSONObject("contract")?.optJSONObject("financial_state")
+    }
+
+    private fun contractText(item: JSONObject, key: String): String {
+        val top = text(item, key)
+        if (top.isNotBlank()) return top
+        return item.optJSONObject("contract")?.optString(key)?.trim().orEmpty()
+            .let { if (it.equals("null", true)) "" else it }
+    }
+
+    private fun disabledReason(item: JSONObject): String = contractText(item, "disabled_reason")
+
     private fun commissionKey(item: JSONObject): String =
         text(item, "commission_status")
             .ifBlank { text(item, "payout_status") }
             .ifBlank { text(item, "deal_status") }
             .ifBlank { text(item, "result") }
 
-    private fun commissionStatus(item: JSONObject): String =
-        WalletWithdraw.commissionStatusText(commissionKey(item))
+    private fun commissionStatus(item: JSONObject): String {
+        val financial = financialState(item)
+        when (financial?.optString("status")?.trim().orEmpty()) {
+            "paid" -> return "واریز شده"
+            "shortfall" -> return "کسری"
+            "closed" -> return "پرونده بسته شد"
+        }
+        return WalletWithdraw.commissionStatusText(commissionKey(item))
+    }
 
     private fun displayStatus(item: JSONObject, tab: String): String {
-        val server = text(item, "status_label")
+        val server = contractText(item, "status_label")
         if (server.isNotBlank()) return server
         if (text(item, "status") == "disputed") return "اعتراض مالک"
         return if (dealSucceeded(item, tab)) "معامله موفق" else ""
@@ -794,8 +958,14 @@ object FollowRequests {
         return true
     }
 
-    private fun commissionAmount(item: JSONObject): Long =
-        WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
+    private fun commissionAmount(item: JSONObject): Long {
+        val financial = financialState(item)
+        if (financial != null) {
+            val amount = WalletWithdraw.money(financial, "amount")
+            if (amount > 0L) return amount
+        }
+        return WalletWithdraw.money(item, "commission_amount", "commission", "payout_amount")
+    }
 
     private fun readTabs(array: JSONArray?): List<Tab> {
         if (array == null) return emptyList()
@@ -876,7 +1046,19 @@ object FollowRequests {
     }
 
     private fun order(rows: List<JSONObject>): List<JSONObject> =
-        rows.sortedWith(compareByDescending { firstText(it, "updated_at", "created_at") })
+        rows.sortedWith(
+            compareBy<JSONObject> { if (needsMyAction(it)) 0 else 1 }
+                .thenBy { if (it.optBoolean("deal_overdue")) 0 else 1 }
+                .thenByDescending { firstText(it, "updated_at", "created_at") },
+        )
+
+    private fun needsMyAction(item: JSONObject): Boolean {
+        if (item.has("needs_my_action") && !item.isNull("needs_my_action")) {
+            return item.optBoolean("needs_my_action")
+        }
+        val contract = item.optJSONObject("contract") ?: return false
+        return contract.optBoolean("needs_my_action")
+    }
 
     private fun arrayOf(array: JSONArray): List<JSONObject> {
         val out = ArrayList<JSONObject>()
