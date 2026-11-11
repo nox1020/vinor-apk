@@ -18,6 +18,17 @@
         android:textColor="@color/vinor_text"
         android:textSize="16sp" />
 
+    <TextView
+        android:id="@+id/followCounterMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/vazirmatn"
+        android:textColor="@color/vinor_text_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <EditText
         android:id="@+id/followCounterAmount"
         android:layout_width="match_parent"

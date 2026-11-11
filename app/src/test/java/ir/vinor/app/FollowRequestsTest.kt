@@ -135,11 +135,7 @@ class FollowRequestsTest {
             "پورسانت ${PartnerFormat.toman(3_000_000_000L)} تومان · واریز شده",
             card.commission,
         )
-        val deposit = card.actions.single { !it.json }
-        assertEquals("واریز پورسانت", deposit.label)
-        assertTrue(deposit.opensWallet)
-        assertEquals("/express/partner/commissions", deposit.path)
-        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+        assertTrue(card.actions.none { it.label == "واریز پورسانت" || it.opensWallet })
     }
 
     @Test
@@ -168,13 +164,7 @@ class FollowRequestsTest {
             "پورسانت ${PartnerFormat.toman(1_500_000)} تومان · در انتظار واریز",
             card.commission,
         )
-        val deposit = card.actions.single { !it.json }
-        assertEquals("واریز پورسانت", deposit.label)
-        assertTrue(deposit.opensWallet)
-        assertEquals("/express/partner/commissions", deposit.path)
-        assertNull(deposit.confirm)
-        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
-        assertFalse(FollowRequests.movesCard(deposit.path, deposit.body))
+        assertTrue(card.actions.none { it.label == "واریز پورسانت" || it.opensWallet })
     }
 
     @Test
@@ -191,17 +181,14 @@ class FollowRequestsTest {
     fun finishedDealWithoutAmountStillOpensWallet() {
         val card = FollowRequests.card(JSONObject().put("id", 8).put("pipeline_tab", "deals"), "deals")
         assertEquals("معامله موفق", card.status)
-        val deposit = card.actions.single { !it.json }
-        assertEquals("واریز پورسانت", deposit.label)
-        assertTrue(deposit.opensWallet)
-        assertEquals(FollowRequests.Tone.PRIMARY, deposit.tone)
+        assertTrue(card.actions.none { it.label == "واریز پورسانت" || it.opensWallet })
         val won = FollowRequests.card(
             JSONObject().put("id", 3).put("deal_status", "success").put("pipeline_tab", "deals"),
             "deals",
         )
         assertEquals("معامله موفق", won.status)
         assertEquals("پورسانت · معامله موفق", won.commission)
-        assertTrue(won.actions.any { it.opensWallet })
+        assertTrue(won.actions.none { it.opensWallet || it.label == "واریز پورسانت" })
         val rejected = FollowRequests.card(
             JSONObject().put("id", 8).put("pipeline_tab", "deals").put("commission_status", "rejected"),
             "deals",
@@ -447,9 +434,19 @@ class FollowRequestsTest {
             FollowRequests.afterChip("visits", ListingArchive.ACTIVE, FollowRequests.ARCHIVE_CHIP),
         )
         assertEquals(
-            "visits" to ListingArchive.ACTIVE,
+            "visits" to ListingArchive.ARCHIVED,
             FollowRequests.afterChip("visits", ListingArchive.ARCHIVED, FollowRequests.ARCHIVE_CHIP),
         )
+        assertEquals(
+            "" to ListingArchive.ACTIVE,
+            FollowRequests.afterChip("visits", ListingArchive.ARCHIVED, FollowRequests.BACK_CHIP),
+        )
+        val archivedChips = FollowRequests.requestChips(counts, 5, ListingArchive.ARCHIVED)
+        assertEquals(listOf(FollowRequests.BACK_CHIP, FollowRequests.ARCHIVE_CHIP), archivedChips.map { it.id })
+        assertEquals("بازگشت به پیگیری", archivedChips.first().title)
+        assertEquals("بازگشت به پیگیری", FollowRequests.chipCaption(archivedChips.first()))
+        assertFalse(FollowRequests.chipSelected("visits", ListingArchive.ARCHIVED, FollowRequests.BACK_CHIP))
+        assertEquals("درخواست", FollowRequests.filters(counts)[1].title)
         assertEquals(
             "deals" to ListingArchive.ACTIVE,
             FollowRequests.afterChip("visits", ListingArchive.ARCHIVED, "deals"),
@@ -501,7 +498,7 @@ class FollowRequestsTest {
         val counter = card.actions[1]
         assertTrue(counter.form)
         assertTrue(counter.counter)
-        assertNull(counter.confirm)
+        assertEquals("مبلغ متقابل برای طرف مقابل فرستاده شود؟", counter.confirm)
         assertEquals("/express/partner/inbox-offers/off-9/counter", counter.path)
         val posted = FollowRequests.withCounter(counter, "۲۵۰،۰۰۰", "  نقد ")
         assertNotNull(posted)
@@ -689,7 +686,8 @@ class FollowRequestsTest {
             "3",
         ).single { it.label == "اعتراض" }
         assertEquals("/express/partner/inbox-visits/3/no_show", deny.path)
-        assertEquals("اعتراض به انجام بازدید ثبت شود؟ این عدم حضور مشتری نیست.", deny.confirm)
+        assertTrue(deny.confirm.orEmpty().contains("دلیل"))
+        assertTrue(deny.needsReason)
     }
 
     @Test
@@ -782,12 +780,16 @@ class FollowRequestsTest {
         val actions = FollowRequests.card(item).actions
         assertTrue(actions.none { it.form || it.path.contains("/inbox-visits/") })
         assertTrue(actions.none { it.label == "تأیید بازدید" || it.label == "ثبت معامله" || it.label == "انجام معامله" })
-        assertEquals(
-            "/express/partner/requests/15/visit-result",
-            actions.first { it.label == "علاقه‌مند" }.path,
-        )
-        assertEquals("interested", actions.first { it.label == "علاقه‌مند" }.body.optString("outcome"))
-        assertFalse(actions.first { it.label == "علاقه‌مند" }.form)
+        val result = actions.first { it.label == "ثبت نتیجه" }
+        assertEquals("/express/partner/requests/15/visit-result", result.path)
+        assertTrue(result.resultForm)
+        assertEquals("", result.body.optString("default"))
+        assertNull(FollowRequests.withResult(result, "", ""))
+        val sent = FollowRequests.withResult(result, "interested", "نکته")
+        assertEquals("interested", sent?.body?.optString("outcome"))
+        assertEquals("نکته", sent?.body?.optString("notes"))
+        assertFalse(FollowRequests.formFields(sent!!).containsKey("choices"))
+        assertFalse(result.form)
         assertEquals("/express/partner/requests/15/complete", actions.first { it.label == "بازدید انجام شد" }.path)
         assertTrue(actions.none { it.path.endsWith("/deal-confirm") || it.path.endsWith("/deal-close") || it.path.endsWith("/deal-reject") })
         assertEquals("/express/partner/requests/15/remove", actions.first { it.label == "حذف" }.path)
@@ -966,5 +968,222 @@ class FollowRequestsTest {
                 .put("is_own_request", false),
         )
         assertTrue(frozen.actions.none { it.path.contains("close_deal") || it.path.contains("visit-result") })
+
+        val disputeAction = FollowRequests.actions(
+            JSONObject().put("direction", "incoming").put("can_deny_done", true),
+            "v4",
+        ).single { it.needsReason }
+        assertNull(FollowRequests.withReason(disputeAction, "نه"))
+        val sent = FollowRequests.withReason(disputeAction, "بازدید انجام نشده بود")
+        assertEquals("بازدید انجام نشده بود", sent?.body?.optString("dispute_reason"))
+
+        val receipt = FollowRequests.card(
+            JSONObject()
+                .put("id", "paid")
+                .put("primary_action", JSONObject.NULL)
+                .put(
+                    "secondary_actions",
+                    org.json.JSONArray().put(
+                        JSONObject()
+                            .put("id", "view_receipt")
+                            .put("label", "مشاهده رسید")
+                            .put("endpoint", "/express/partner/commissions")
+                            .put("method", "GET")
+                            .put("tone", "secondary"),
+                    ),
+                )
+                .put("can_close_deal", true),
+        )
+        assertEquals("مشاهده رسید", receipt.actions.single { !it.json }.label)
+        assertTrue(receipt.actions.none { it.label == "واریز پورسانت" })
     }
+
+    @Test
+    fun phase2ContractRendersServerActionsAndDropsGuesses() {
+        val close = FollowRequests.card(
+            JSONObject()
+                .put("id", "v1")
+                .put("direction", "incoming")
+                .put("status_label", "بستن پرونده و پرداخت پورسانت")
+                .put("disabled_reason", "")
+                .put("can_start_deal", true)
+                .put(
+                    "primary_action",
+                    JSONObject()
+                        .put("id", "close_case")
+                        .put("label", "بستن پرونده و پرداخت پورسانت")
+                        .put("endpoint", "/express/partner/inbox-visits/v1/close_deal")
+                        .put("method", "POST")
+                        .put("tone", "primary")
+                        .put("confirmation", "پرداخت 50000 تومان به سارا. بلوکه کافی است."),
+                )
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray())
+                .put(
+                    "financial_state",
+                    JSONObject().put("amount", 50000).put("hold", 50000).put("status", "deal_approved"),
+                ),
+        )
+        assertEquals("بستن پرونده و پرداخت پورسانت", close.status)
+        assertEquals("پورسانت ${PartnerFormat.toman(50000)} تومان", close.commission)
+        val closeAction = close.actions.single { !it.json }
+        assertEquals("بستن پرونده و پرداخت پورسانت", closeAction.label)
+        assertTrue(closeAction.confirm.orEmpty().contains("50000"))
+        assertTrue(closeAction.confirm.orEmpty().contains("سارا"))
+        assertTrue(closeAction.confirm.orEmpty().contains("بلوکه"))
+        assertTrue(close.actions.none { it.label == "واریز پورسانت" || it.opensWallet })
+
+        val short = FollowRequests.card(
+            JSONObject()
+                .put("id", "v2")
+                .put("direction", "incoming")
+                .put("status_label", "بستن پرونده و پرداخت پورسانت")
+                .put(
+                    "primary_action",
+                    JSONObject()
+                        .put("id", "cover_shortfall")
+                        .put("label", "رفع کسری")
+                        .put("endpoint", "/express/partner/wallet/charge")
+                        .put("method", "GET")
+                        .put("confirmation", "کسری 10000 تومان. بعد از شارژ این کارت تازه می‌شود."),
+                )
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray())
+                .put("financial_state", JSONObject().put("amount", 50000).put("status", "shortfall")),
+        )
+        val cover = short.actions.single { !it.json }
+        assertEquals("رفع کسری", cover.label)
+        assertTrue(cover.getLink)
+        assertTrue(cover.opensWallet)
+        assertFalse(cover.form)
+        assertTrue(FollowRequests.isChargePath(cover.path))
+        assertEquals("پورسانت ${PartnerFormat.toman(50000)} تومان · کسری", short.commission)
+
+        val result = FollowRequests.card(
+            JSONObject()
+                .put("id", "v3")
+                .put("direction", "outgoing")
+                .put("status_label", "نتیجه بازدید")
+                .put(
+                    "primary_action",
+                    JSONObject()
+                        .put("id", "record_result")
+                        .put("label", "ثبت نتیجه")
+                        .put("endpoint", "/express/partner/requests/v3/visit-result")
+                        .put("body", JSONObject().put("choices", org.json.JSONArray().put("interested").put("follow_up").put("not_interested")).put("default", "")),
+                )
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray()),
+        )
+        val form = result.actions.single { it.resultForm }
+        assertEquals("ثبت نتیجه", form.label)
+        assertEquals("", form.body.optString("default"))
+        assertEquals(
+            listOf("interested", "follow_up", "not_interested"),
+            FollowRequests.resultChoices(form).map { it.first },
+        )
+        assertNull(FollowRequests.withResult(form, "", "یادداشت"))
+        val noted = FollowRequests.withResult(form, "follow_up", "فردا")
+        assertEquals("follow_up", noted?.body?.optString("outcome"))
+        assertEquals("فردا", noted?.body?.optString("notes"))
+        assertFalse(FollowRequests.formFields(noted!!).containsKey("default"))
+
+        val next = FollowRequests.card(
+            JSONObject()
+                .put("id", "v4")
+                .put("status_label", "بازدید بعدی")
+                .put(
+                    "primary_action",
+                    JSONObject()
+                        .put("id", "next_visit")
+                        .put("label", "بازدید بعدی")
+                        .put("endpoint", "/express/partner/requests/v4/revisit"),
+                )
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray()),
+        )
+        assertEquals("بازدید بعدی", next.status)
+        assertEquals("بازدید بعدی", next.actions.single { !it.json }.label)
+
+        val early = FollowRequests.card(
+            JSONObject()
+                .put("id", "v5")
+                .put("direction", "outgoing")
+                .put("status_label", "ثبت وضعیت حضور")
+                .put("disabled_reason", "از زمان بازدید می‌توانید وضعیت حضور را ثبت کنید.")
+                .put("primary_action", JSONObject.NULL)
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray()),
+        )
+        assertEquals("ثبت وضعیت حضور", early.status)
+        assertEquals("از زمان بازدید می‌توانید وضعیت حضور را ثبت کنید.", early.disabledReason)
+        assertTrue(early.actions.filter { !it.json }.isEmpty())
+
+        val offerTurn = FollowRequests.card(
+            JSONObject()
+                .put("kind", "offer")
+                .put("id", "o1")
+                .put("status_label", "نوبت شما")
+                .put(
+                    "primary_action",
+                    JSONObject()
+                        .put("id", "accept_offer")
+                        .put("label", "پذیرش پیشنهاد")
+                        .put("endpoint", "/express/partner/inbox-offers/o1/accept")
+                        .put("confirmation", "این پیشنهاد پذیرفته شود؟"),
+                )
+                .put(
+                    "secondary_actions",
+                    org.json.JSONArray().put(
+                        JSONObject()
+                            .put("id", "counter_offer")
+                            .put("label", "پیشنهاد متقابل")
+                            .put("endpoint", "/express/partner/inbox-offers/o1/counter")
+                            .put("tone", "secondary")
+                            .put("confirmation", "مبلغ متقابل برای طرف مقابل فرستاده شود؟"),
+                    ),
+                )
+                .put(
+                    "danger_actions",
+                    org.json.JSONArray().put(
+                        JSONObject()
+                            .put("id", "reject_offer")
+                            .put("label", "رد پیشنهاد")
+                            .put("endpoint", "/express/partner/inbox-offers/o1/reject")
+                            .put("tone", "danger")
+                            .put("confirmation", "این پیشنهاد رد شود؟"),
+                    ),
+                ),
+        )
+        assertEquals(listOf("پذیرش پیشنهاد", "پیشنهاد متقابل", "رد پیشنهاد"), offerTurn.actions.map { it.label })
+        assertTrue(offerTurn.actions.all { !it.confirm.isNullOrBlank() })
+        assertTrue(offerTurn.actions.first { it.counter }.form)
+
+        val waiting = FollowRequests.card(
+            JSONObject()
+                .put("kind", "offer")
+                .put("id", "o2")
+                .put("status_label", "منتظر پاسخ طرف مقابل")
+                .put("disabled_reason", "نوبت شما نیست.")
+                .put("primary_action", JSONObject.NULL)
+                .put("secondary_actions", org.json.JSONArray())
+                .put("danger_actions", org.json.JSONArray())
+                .put("can_accept", true)
+                .put("can_counter", true)
+                .put("can_reject", true),
+        )
+        assertEquals("منتظر پاسخ طرف مقابل", waiting.status)
+        assertEquals("نوبت شما نیست.", waiting.disabledReason)
+        assertTrue(waiting.actions.isEmpty())
+
+        val mine = JSONObject()
+            .put("id", "mine")
+            .put("updated_at", "2026-01-01")
+            .put("contract", JSONObject().put("needs_my_action", true))
+        val late = JSONObject().put("id", "late").put("updated_at", "2026-01-02").put("deal_overdue", true)
+        val old = JSONObject().put("id", "old").put("updated_at", "2026-01-01")
+        val ordered = FollowRequests.feed(JSONObject().put("cards", org.json.JSONArray().put(old).put(late).put(mine)))
+        assertEquals(listOf("mine", "late", "old"), ordered.map { it.optString("id") })
+    }
+
 }
