@@ -44,6 +44,15 @@ object OwnerSold {
         val choices: List<Choice>,
         val reviewRequiredIfOutside: Boolean = false,
         val reviewWarning: String = "",
+        val title: String = "",
+        val texts: Map<String, String> = OwnerSoldFlow.DEFAULT_TEXTS,
+        val channels: List<OwnerSoldFlow.ChannelOption> = emptyList(),
+        val sources: List<OwnerSoldFlow.SourceOption> = OwnerSoldFlow.DEFAULT_SOURCES,
+        val visits: List<OwnerSoldFlow.VisitRow> = emptyList(),
+        val outsideSummary: String = "",
+        val ratingLabels: Map<Int, String> = OwnerSoldFlow.DEFAULT_RATING_LABELS,
+        val commentMax: Int = OwnerSoldFlow.COMMENT_MAX,
+        val finalPriceMax: Long = OwnerSoldFlow.FINAL_PRICE_MAX,
     )
 
     fun canMarkSold(snapshot: JSONObject): Boolean =
@@ -90,6 +99,59 @@ object OwnerSold {
             ),
         )
         val review = obj.optBoolean("review_required_if_outside", false)
+        val visitRows = ArrayList<OwnerSoldFlow.VisitRow>()
+        if (visits != null) {
+            for (i in 0 until visits.length()) {
+                val v = visits.optJSONObject(i) ?: continue
+                val id = v.optString("visit_id").trim()
+                if (id.isEmpty()) continue
+                val name = v.optString("partner_name").trim().ifBlank { "بازاریاب وینور" }
+                visitRows.add(
+                    OwnerSoldFlow.VisitRow(
+                        visitId = id,
+                        name = name,
+                        dateLabel = v.optString("visit_date_label").trim().ifBlank { v.optString("visit_date").trim() },
+                        statusLabel = v.optString("status_label").trim(),
+                        summary = v.optString("summary").trim()
+                            .ifBlank { v.optString("confirm_message").trim() },
+                    ),
+                )
+            }
+        }
+        val texts = HashMap(OwnerSoldFlow.DEFAULT_TEXTS)
+        obj.optJSONObject("texts")?.let { t ->
+            t.keys().forEach { k -> t.optString(k).trim().takeIf { it.isNotEmpty() }?.let { texts[k] = it } }
+        }
+        val channelRows = ArrayList<OwnerSoldFlow.ChannelOption>()
+        obj.optJSONArray("channels")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val c = arr.optJSONObject(i) ?: continue
+                val value = c.optString("value").trim()
+                if (value !in OwnerSoldFlow.CHANNELS) continue
+                channelRows.add(
+                    OwnerSoldFlow.ChannelOption(
+                        value = value,
+                        label = c.optString("label").trim().ifBlank { OwnerSoldFlow.defaultChannelLabel(value, texts) },
+                        hint = c.optString("hint").trim(),
+                        enabled = c.optBoolean("enabled", true),
+                    ),
+                )
+            }
+        }
+        if (channelRows.isEmpty()) channelRows.addAll(OwnerSoldFlow.defaultChannels(visitRows.isNotEmpty(), texts))
+        val sourceRows = ArrayList<OwnerSoldFlow.SourceOption>()
+        obj.optJSONArray("sources")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val c = arr.optJSONObject(i) ?: continue
+                val value = c.optString("value").trim()
+                val label = c.optString("label").trim()
+                if (value.isNotEmpty() && label.isNotEmpty()) sourceRows.add(OwnerSoldFlow.SourceOption(value, label))
+            }
+        }
+        val ratingLabels = HashMap(OwnerSoldFlow.DEFAULT_RATING_LABELS)
+        obj.optJSONObject("rating_labels")?.let { r ->
+            r.keys().forEach { k -> k.toIntOrNull()?.let { n -> r.optString(k).trim().takeIf { it.isNotEmpty() }?.let { ratingLabels[n] = it } } }
+        }
         return Options(
             code = obj.optString("code").trim(),
             question = obj.optString("question").trim().ifBlank { DEFAULT_QUESTION },
@@ -98,6 +160,17 @@ object OwnerSold {
             choices = choices,
             reviewRequiredIfOutside = review,
             reviewWarning = if (review) obj.optString("review_warning").trim().ifBlank { DEFAULT_REVIEW_WARNING } else "",
+            title = obj.optString("title").trim(),
+            texts = texts,
+            channels = channelRows,
+            sources = sourceRows.ifEmpty { OwnerSoldFlow.DEFAULT_SOURCES },
+            visits = visitRows,
+            outsideSummary = obj.optString("outside_summary").trim().ifBlank {
+                obj.optString("outside_confirm_message").trim()
+            },
+            ratingLabels = ratingLabels,
+            commentMax = obj.optInt("comment_max", OwnerSoldFlow.COMMENT_MAX).coerceIn(1, 2000),
+            finalPriceMax = obj.optLong("final_price_max", OwnerSoldFlow.FINAL_PRICE_MAX).coerceAtLeast(1L),
         )
     }
 
@@ -117,11 +190,27 @@ object OwnerSold {
     fun isWalletShort(post: JSONObject): Boolean =
         post.optString("error_code").trim() == "wallet_insufficient"
 
+    /** «هنوز قطعی نشده»: سرور هیچ تغییری نداده است. */
+    fun isNoop(post: JSONObject): Boolean = post.optBoolean("noop", false)
+
+    data class Success(val title: String, val steps: List<String>)
+
+    /** متن صفحهٔ موفقیت از سرور؛ سرور قدیمی فقط message دارد. */
+    fun success(post: JSONObject): Success {
+        val steps = ArrayList<String>()
+        post.optJSONArray("next_steps")?.let { arr ->
+            for (i in 0 until arr.length()) arr.optString(i).trim().takeIf { it.isNotEmpty() }?.let { steps.add(it) }
+        }
+        if (steps.isEmpty()) post.optString("message").trim().takeIf { it.isNotEmpty() }?.let { steps.add(it) }
+        return Success(post.optString("success_title").trim().ifBlank { "فروش ثبت شد" }, steps)
+    }
+
     /** معامله با بازاریاب ثبت شد ولی پرداخت/بستن نشد؛ دوباره زدن «فروخته شد» ادامه می‌دهد. */
     fun dealStarted(post: JSONObject): Boolean = post.optBoolean("deal_started", false)
 
     fun message(post: JSONObject): String {
         if (succeeded(post)) return post.optString("message").trim().ifBlank { "فروش ثبت شد." }
+        if (isNoop(post)) return post.optString("message").trim().ifBlank { OwnerSoldFlow.DEFAULT_TEXTS["not_final_message"].orEmpty() }
         val error = post.optString("error").trim()
         if (error.isNotEmpty() && error.any { it.code > 127 }) return error
         if (post.optBoolean("offline")) return "برای انجام این عملیات اینترنت لازم است."
