@@ -191,7 +191,7 @@ class MyPropertiesFragment : Fragment() {
         card.landCardTitle.text = land.optString("title").ifBlank { "ملک شما" }
         val price = land.optLong("price_total")
         card.landCardPrice.text = if (price > 0L) PartnerFormat.toman(price) + " تومان" else ""
-        val badge = Listings.statusLabel(land)
+        val badge = if (OwnerSold.isSold(land)) OwnerSold.SOLD_BADGE else Listings.statusLabel(land)
         val meta = listOf(badge, land.optString("city"), land.optString("location"), land.optString("size"))
             .filter { it.isNotBlank() }
             .joinToString(" · ")

@@ -24,6 +24,7 @@ object MyPropertyManage {
         ARCHIVE,
         SHARE,
         PUBLISH,
+        SOLD,
     }
 
     fun actions(): List<Action> = listOf(
@@ -36,6 +37,10 @@ object MyPropertyManage {
         Action.PUBLISH,
     )
 
+    /** «فروخته شد» فقط وقتی سرور can_mark_sold بفرستد (مالک همین آگهی، هنوز فروخته‌نشده). */
+    fun actions(snapshot: JSONObject): List<Action> =
+        if (OwnerSold.canMarkSold(snapshot)) actions() + Action.SOLD else actions()
+
     fun label(action: Action, published: Boolean = false, archived: Boolean = false): String = when (action) {
         Action.VIEW -> "نمایش ملک"
         Action.STATS -> "آمار"
@@ -44,6 +49,7 @@ object MyPropertyManage {
         Action.ARCHIVE -> ListingArchive.actionLabel(archived)
         Action.SHARE -> "اشتراک‌گذاری"
         Action.PUBLISH -> if (published) "توقف انتشار فروش" else "انتشار برای فروش"
+        Action.SOLD -> OwnerSold.LABEL
     }
 
     fun codeOf(snapshot: JSONObject): String {
