@@ -38,8 +38,11 @@ object MyPropertyManage {
     )
 
     /** «فروخته شد» فقط وقتی سرور can_mark_sold بفرستد (مالک همین آگهی، هنوز فروخته‌نشده). */
-    fun actions(snapshot: JSONObject): List<Action> =
-        if (OwnerSold.canMarkSold(snapshot)) actions() + Action.SOLD else actions()
+    fun actions(snapshot: JSONObject): List<Action> {
+        // فروخته‌شدهٔ بایگانی‌شده «بازگرداندن به فعال» ندارد.
+        val base = if (ListingArchive.canToggle(snapshot)) actions() else actions() - Action.ARCHIVE
+        return if (OwnerSold.canMarkSold(snapshot)) base + Action.SOLD else base
+    }
 
     fun label(action: Action, published: Boolean = false, archived: Boolean = false): String = when (action) {
         Action.VIEW -> "نمایش ملک"

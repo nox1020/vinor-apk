@@ -897,7 +897,7 @@ class NativePartnerFragment : Fragment() {
             if (ownerArchive) {
                 val archived = ListingArchive.isArchived(land)
                 card.landCardBadge.isVisible = archived
-                card.landCardArchive.isVisible = true
+                card.landCardArchive.isVisible = ListingArchive.canToggle(land)
                 card.landCardArchive.text = ListingArchive.actionLabel(archived)
                 card.landCardArchive.contentDescription = card.landCardArchive.text
                 card.landCardArchive.setOnClickListener { postListingArchive(land) }

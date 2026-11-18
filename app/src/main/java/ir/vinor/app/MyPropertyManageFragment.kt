@@ -539,6 +539,10 @@ class MyPropertyManageFragment : Fragment() {
         }
         if (!MyPropertyManage.claimAction(busy)) return
         val restore = ListingArchive.isArchived(snapshot)
+        if (restore && !ListingArchive.canRestore(snapshot)) {
+            toast("این آگهی فروخته‌شده ثبت شده و به فهرست فعال برنمی‌گردد.")
+            return
+        }
         busy = true
         bindRows()
         scope.launch {
@@ -588,6 +592,15 @@ class MyPropertyManageFragment : Fragment() {
                                 CommissionsFragment.pendingShortfall = gap
                                 findNavController().navigate(R.id.commissionsFragment)
                             }
+                        } else if (ListingArchive.isSoldLocked(fresh)) {
+                            snapshot.put("sold", true)
+                            snapshot.put("can_restore", false)
+                            snapshot.put("can_mark_sold", false)
+                            persistSnapshot()
+                            bindPreview()
+                            bindRows()
+                            forgetListingLists(ctx)
+                            toast(ListingArchive.message(fresh, "این آگهی فروخته‌شده است."), long = true)
                         } else {
                             toast(ListingArchive.message(fresh, "بایگانی آگهی انجام نشد."), long = true)
                         }
@@ -656,13 +669,41 @@ class MyPropertyManageFragment : Fragment() {
 
     private fun pickSoldChoice(code: String, options: OwnerSold.Options) {
         val ctx = context ?: return
-        val labels = options.choices.map { it.label }.toTypedArray()
-        MaterialAlertDialogBuilder(ctx)
-            .setTitle(options.question)
-            .setItems(labels) { _, which ->
-                val choice = options.choices.getOrNull(which) ?: return@setItems
-                confirmSold(code, choice)
+        val pad = dp(20)
+        val column = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, dp(8), pad, 0)
+        }
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+        options.choices.forEach { choice ->
+            val row = android.widget.TextView(ctx).apply {
+                text = choice.label
+                textSize = 15f
+                minHeight = dp(48)
+                gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
+                val ripple = android.util.TypedValue()
+                ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                setBackgroundResource(ripple.resourceId)
+                setOnClickListener {
+                    dialog?.dismiss()
+                    confirmSold(code, choice)
+                }
             }
+            column.addView(row)
+        }
+        if (options.reviewWarning.isNotBlank()) {
+            // هم‌ارز متن کهربایی صفحهٔ وب: «بیرون از وینور» به بررسی پشتیبانی می‌رود.
+            column.addView(android.widget.TextView(ctx).apply {
+                text = options.reviewWarning
+                textSize = 12f
+                setTextColor(OwnerSold.REVIEW_WARNING_COLOR)
+                setPadding(0, dp(8), 0, dp(4))
+                tag = "owner_sold_review_warning"
+            })
+        }
+        dialog = MaterialAlertDialogBuilder(ctx)
+            .setTitle(options.question)
+            .setView(android.widget.ScrollView(ctx).apply { addView(column) })
             .setNegativeButton("انصراف", null)
             .show()
     }
@@ -702,6 +743,11 @@ class MyPropertyManageFragment : Fragment() {
                     toast(OwnerSold.message(fresh), long = true)
                 } else {
                     toast(OwnerSold.message(fresh), long = true)
+                    if (OwnerSold.dealStarted(fresh)) {
+                        // معامله ثبت شد؛ پرونده‌ها و کارت‌ها تازه شوند تا تلاش دوباره همان بازدید را نشان دهد.
+                        forgetListingLists(ctx)
+                        ListingMemory.invalidateLand(code, ctx)
+                    }
                     if (OwnerSold.isWalletShort(fresh)) {
                         val gap = ListingArchive.shortfall(fresh)
                         if (gap > 0L) {
@@ -719,6 +765,8 @@ class MyPropertyManageFragment : Fragment() {
             }
         }
     }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun forgetListingLists(ctx: android.content.Context) {
         ListingArchive.cachePaths().forEach { PartnerApi.forget(it, ctx) }
