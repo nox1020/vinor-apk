@@ -1537,7 +1537,7 @@ class NativePartnerFragment : Fragment() {
                     forgetPage(PAGE_LISTINGS)
                     val gap = ListingArchive.shortfall(fresh)
                     if (gap > 0L) {
-                        CommissionsFragment.pendingShortfall = gap
+                        CommissionsFragment.handOffShortfall(gap, fresh)
                         findNavController().navigate(R.id.commissionsFragment)
                         handedOff = true
                     }

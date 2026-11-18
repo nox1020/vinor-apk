@@ -1142,7 +1142,14 @@ class MainActivity : AppCompatActivity() {
                 else openPartnerHome()
             }
             DeepLinkRouter.DestinationType.PROFILE -> navController.navigate(R.id.profileFragment)
-            DeepLinkRouter.DestinationType.PARTNER_COMMISSIONS -> navController.navigate(R.id.commissionsFragment)
+            DeepLinkRouter.DestinationType.PARTNER_COMMISSIONS -> {
+                val topup = CommissionsFragment.topupIdFromUrl(route.targetUrl)
+                // همان صفحه باز است: دیالوگ شارژ خودش با onResume نتیجه را می‌خواند.
+                if (topup > 0L && topup != CommissionsFragment.activeTopupId) CommissionsFragment.pendingTopupId = topup
+                if (navController.currentDestination?.id != R.id.commissionsFragment) {
+                    navController.navigate(R.id.commissionsFragment)
+                }
+            }
             DeepLinkRouter.DestinationType.PARTNER_ROUTINE -> navController.navigate(R.id.routineFragment)
             DeepLinkRouter.DestinationType.PARTNER_NOTIFICATIONS -> openNotifications()
             DeepLinkRouter.DestinationType.PARTNER_CUSTOMERS -> openPath(route.targetUrl)
