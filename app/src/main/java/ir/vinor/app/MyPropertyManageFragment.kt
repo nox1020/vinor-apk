@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ir.vinor.app.databinding.FragmentMyPropertyManageBinding
 import ir.vinor.app.databinding.ItemProfileLinkBinding
 import ir.vinor.app.databinding.SheetPropertyDeleteBinding
@@ -92,7 +93,9 @@ class MyPropertyManageFragment : Fragment() {
         if (price > 0L) b.mpManagePrice.text = PartnerFormat.toman(price) + " تومان"
         val published = MyPropertyManage.isPublished(snapshot)
         val status = MyPropertyManage.statusOf(snapshot)
-        b.mpManageStatus.text = if (ListingArchive.isArchived(snapshot)) {
+        b.mpManageStatus.text = if (OwnerSold.isSold(snapshot)) {
+            OwnerSold.SOLD_BADGE
+        } else if (ListingArchive.isArchived(snapshot)) {
             "${ListingArchive.BADGE} · $status"
         } else {
             status
@@ -118,7 +121,7 @@ class MyPropertyManageFragment : Fragment() {
         val price = MyPropertyManage.priceOf(snapshot)
         val published = MyPropertyManage.isPublished(snapshot)
         val archived = ListingArchive.isArchived(snapshot)
-        MyPropertyManage.actions().forEach { action ->
+        MyPropertyManage.actions(snapshot).forEach { action ->
             val row = ItemProfileLinkBinding.inflate(layoutInflater, host, false)
             val label = MyPropertyManage.label(
                 action,
@@ -144,6 +147,7 @@ class MyPropertyManageFragment : Fragment() {
                 MyPropertyManage.Action.ARCHIVE -> R.drawable.ic_lock
                 MyPropertyManage.Action.SHARE -> R.drawable.ic_share_nodes
                 MyPropertyManage.Action.PUBLISH -> R.drawable.ic_send_up
+                MyPropertyManage.Action.SOLD -> R.drawable.ic_handshake
             }
             row.itemProfileLinkIcon.setImageResource(icon)
             val spinning = MyPropertyManage.showPublishProgress(publishBusy) && action == MyPropertyManage.Action.PUBLISH
@@ -212,6 +216,7 @@ class MyPropertyManageFragment : Fragment() {
             MyPropertyManage.Action.PUBLISH -> {
                 if (MyPropertyManage.isPublished(snapshot)) showStopSheet() else showPublishSheet()
             }
+            MyPropertyManage.Action.SOLD -> startMarkSold()
         }
     }
 
@@ -594,6 +599,120 @@ class MyPropertyManageFragment : Fragment() {
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 toast(e.message ?: "بایگانی آگهی انجام نشد.")
+            } finally {
+                busy = false
+                if (_binding != null) bindRows()
+            }
+        }
+    }
+
+    /** «فروخته شد»: گزینه‌ها از سرور، انتخاب بازدید یا بیرون از وینور، تأیید، ثبت. */
+    private fun startMarkSold() {
+        val code = MyPropertyManage.codeOf(snapshot)
+        val ctx = context ?: return
+        if (code.isBlank()) {
+            toast("کد ملک نامعتبر است.")
+            return
+        }
+        if (!MyPropertyManage.claimAction(busy)) return
+        busy = true
+        bindRows()
+        scope.launch {
+            try {
+                val path = OwnerSold.optionsPath(code)
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.forget(path, ctx)
+                    PartnerApi.getFresh(path, ctx)
+                }
+                if (_binding == null) return@launch
+                if (fresh.optInt("http_status") == 401) {
+                    ListingMemory.clearSession()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (!fresh.optBoolean("ok")) {
+                    toast(OwnerSold.message(fresh), long = true)
+                    return@launch
+                }
+                val options = OwnerSold.parseOptions(fresh)
+                if (options.sold || !options.canMarkSold) {
+                    snapshot.put("can_mark_sold", false)
+                    if (options.sold) snapshot.put("sold", true)
+                    persistSnapshot()
+                    bindPreview()
+                    toast(if (options.sold) "این آگهی از قبل فروخته‌شده ثبت شده است." else OwnerSold.message(fresh))
+                    return@launch
+                }
+                pickSoldChoice(code, options)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                toast(OwnerSold.FAILURE)
+            } finally {
+                busy = false
+                if (_binding != null) bindRows()
+            }
+        }
+    }
+
+    private fun pickSoldChoice(code: String, options: OwnerSold.Options) {
+        val ctx = context ?: return
+        val labels = options.choices.map { it.label }.toTypedArray()
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(options.question)
+            .setItems(labels) { _, which ->
+                val choice = options.choices.getOrNull(which) ?: return@setItems
+                confirmSold(code, choice)
+            }
+            .setNegativeButton("انصراف", null)
+            .show()
+    }
+
+    private fun confirmSold(code: String, choice: OwnerSold.Choice) {
+        val ctx = context ?: return
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(OwnerSold.LABEL)
+            .setMessage(choice.confirmMessage)
+            .setPositiveButton("ثبت فروش") { _, _ -> postSold(code, choice) }
+            .setNegativeButton("انصراف", null)
+            .show()
+    }
+
+    private fun postSold(code: String, choice: OwnerSold.Choice) {
+        val ctx = context ?: return
+        if (!MyPropertyManage.claimAction(busy)) return
+        busy = true
+        bindRows()
+        scope.launch {
+            try {
+                val fresh = withContext(Dispatchers.IO) {
+                    PartnerApi.postJson(OwnerSold.SOLD_PATH, OwnerSold.body(code, choice), ctx)
+                }
+                if (_binding == null) return@launch
+                if (fresh.optInt("http_status") == 401) {
+                    ListingMemory.clearSession()
+                    (activity as? MainActivity)?.openLogin(sessionExpired = true)
+                    return@launch
+                }
+                if (OwnerSold.succeeded(fresh)) {
+                    forgetListingLists(ctx)
+                    ListingMemory.invalidateLand(code, ctx)
+                    snapshot = OwnerSold.applyResult(snapshot, fresh)
+                    persistSnapshot()
+                    bindPreview()
+                    toast(OwnerSold.message(fresh), long = true)
+                } else {
+                    toast(OwnerSold.message(fresh), long = true)
+                    if (OwnerSold.isWalletShort(fresh)) {
+                        val gap = ListingArchive.shortfall(fresh)
+                        if (gap > 0L) {
+                            CommissionsFragment.pendingShortfall = gap
+                            findNavController().navigate(R.id.commissionsFragment)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                toast(OwnerSold.FAILURE)
             } finally {
                 busy = false
                 if (_binding != null) bindRows()
