@@ -14,7 +14,6 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ir.vinor.app.databinding.FragmentMyPropertyManageBinding
 import ir.vinor.app.databinding.ItemProfileLinkBinding
 import ir.vinor.app.databinding.SheetPropertyDeleteBinding
@@ -656,7 +655,7 @@ class MyPropertyManageFragment : Fragment() {
                     toast(if (options.sold) "این آگهی از قبل فروخته‌شده ثبت شده است." else OwnerSold.message(fresh))
                     return@launch
                 }
-                pickSoldChoice(code, options)
+                openSoldWizard(code, options)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 toast(OwnerSold.FAILURE)
@@ -667,98 +666,70 @@ class MyPropertyManageFragment : Fragment() {
         }
     }
 
-    private fun pickSoldChoice(code: String, options: OwnerSold.Options) {
+    /** پرسش‌نامهٔ مرحله‌ای «فروخته شد» (سبک دیوار)؛ هم‌ارز صفحهٔ وب. */
+    private fun openSoldWizard(code: String, options: OwnerSold.Options) {
         val ctx = context ?: return
-        val pad = dp(20)
-        val column = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(pad, dp(8), pad, 0)
-        }
-        var dialog: androidx.appcompat.app.AlertDialog? = null
-        options.choices.forEach { choice ->
-            val row = android.widget.TextView(ctx).apply {
-                text = choice.label
-                textSize = 15f
-                minHeight = dp(48)
-                gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
-                val ripple = android.util.TypedValue()
-                ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
-                setBackgroundResource(ripple.resourceId)
-                setOnClickListener {
-                    dialog?.dismiss()
-                    confirmSold(code, choice)
-                }
-            }
-            column.addView(row)
-        }
-        if (options.reviewWarning.isNotBlank()) {
-            // هم‌ارز متن کهربایی صفحهٔ وب: «بیرون از وینور» به بررسی پشتیبانی می‌رود.
-            column.addView(android.widget.TextView(ctx).apply {
-                text = options.reviewWarning
-                textSize = 12f
-                setTextColor(OwnerSold.REVIEW_WARNING_COLOR)
-                setPadding(0, dp(8), 0, dp(4))
-                tag = "owner_sold_review_warning"
-            })
-        }
-        dialog = MaterialAlertDialogBuilder(ctx)
-            .setTitle(options.question)
-            .setView(android.widget.ScrollView(ctx).apply { addView(column) })
-            .setNegativeButton("انصراف", null)
-            .show()
+        val flow = OwnerSoldFlow(options.copy(code = options.code.ifBlank { code }))
+        var dialog: OwnerSoldWizardDialog? = null
+        dialog = OwnerSoldWizardDialog(
+            ctx,
+            flow,
+            options.title.ifBlank { MyPropertyManage.titleOf(snapshot) },
+            onSubmit = { body -> dialog?.let { postSold(code, body, it) } },
+            onFinished = { _ -> if (_binding != null) bindRows() },
+        )
+        dialog.show()
     }
 
-    private fun confirmSold(code: String, choice: OwnerSold.Choice) {
-        val ctx = context ?: return
-        MaterialAlertDialogBuilder(ctx)
-            .setTitle(OwnerSold.LABEL)
-            .setMessage(choice.confirmMessage)
-            .setPositiveButton("ثبت فروش") { _, _ -> postSold(code, choice) }
-            .setNegativeButton("انصراف", null)
-            .show()
-    }
-
-    private fun postSold(code: String, choice: OwnerSold.Choice) {
+    private fun postSold(code: String, body: JSONObject, dialog: OwnerSoldWizardDialog) {
         val ctx = context ?: return
         if (!MyPropertyManage.claimAction(busy)) return
         busy = true
-        bindRows()
         scope.launch {
             try {
                 val fresh = withContext(Dispatchers.IO) {
-                    PartnerApi.postJson(OwnerSold.SOLD_PATH, OwnerSold.body(code, choice), ctx)
+                    PartnerApi.postJson(OwnerSold.SOLD_PATH, body, ctx)
                 }
                 if (_binding == null) return@launch
                 if (fresh.optInt("http_status") == 401) {
+                    dialog.dismiss()
                     ListingMemory.clearSession()
                     (activity as? MainActivity)?.openLogin(sessionExpired = true)
                     return@launch
                 }
-                if (OwnerSold.succeeded(fresh)) {
-                    forgetListingLists(ctx)
-                    ListingMemory.invalidateLand(code, ctx)
-                    snapshot = OwnerSold.applyResult(snapshot, fresh)
-                    persistSnapshot()
-                    bindPreview()
-                    toast(OwnerSold.message(fresh), long = true)
-                } else {
-                    toast(OwnerSold.message(fresh), long = true)
-                    if (OwnerSold.dealStarted(fresh)) {
-                        // معامله ثبت شد؛ پرونده‌ها و کارت‌ها تازه شوند تا تلاش دوباره همان بازدید را نشان دهد.
+                when {
+                    OwnerSold.succeeded(fresh) -> {
                         forgetListingLists(ctx)
                         ListingMemory.invalidateLand(code, ctx)
+                        snapshot = OwnerSold.applyResult(snapshot, fresh)
+                        persistSnapshot()
+                        bindPreview()
+                        dialog.showSuccess(OwnerSold.success(fresh))
                     }
-                    if (OwnerSold.isWalletShort(fresh)) {
-                        val gap = ListingArchive.shortfall(fresh)
+                    OwnerSold.isNoop(fresh) -> {
+                        dialog.dismiss()
+                        toast(OwnerSold.message(fresh))
+                    }
+                    else -> {
+                        if (OwnerSold.dealStarted(fresh)) {
+                            // معامله ثبت شد؛ پرونده‌ها و کارت‌ها تازه شوند تا تلاش دوباره همان بازدید را نشان دهد.
+                            forgetListingLists(ctx)
+                            ListingMemory.invalidateLand(code, ctx)
+                        }
+                        val gap = if (OwnerSold.isWalletShort(fresh)) ListingArchive.shortfall(fresh) else 0L
                         if (gap > 0L) {
+                            dialog.dismiss()
+                            toast(OwnerSold.message(fresh), long = true)
                             CommissionsFragment.pendingShortfall = gap
                             findNavController().navigate(R.id.commissionsFragment)
+                        } else {
+                            dialog.showError(OwnerSold.message(fresh))
                         }
                     }
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                toast(OwnerSold.FAILURE)
+                dialog.showError(OwnerSold.FAILURE)
             } finally {
                 busy = false
                 if (_binding != null) bindRows()
