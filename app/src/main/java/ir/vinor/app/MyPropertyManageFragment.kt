@@ -456,7 +456,7 @@ class MyPropertyManageFragment : Fragment() {
                     toast(message)
                     val shortfall = fresh.optLong("shortfall", 0L)
                     if (fresh.optString("error_code") == "wallet_insufficient" && shortfall > 0L) {
-                        CommissionsFragment.pendingShortfall = shortfall
+                        CommissionsFragment.handOffShortfall(shortfall, fresh)
                         findNavController().navigate(R.id.commissionsFragment)
                     }
                 }
@@ -588,7 +588,7 @@ class MyPropertyManageFragment : Fragment() {
                             )
                             val gap = ListingArchive.shortfall(fresh)
                             if (gap > 0L) {
-                                CommissionsFragment.pendingShortfall = gap
+                                CommissionsFragment.handOffShortfall(gap, fresh)
                                 findNavController().navigate(R.id.commissionsFragment)
                             }
                         } else if (ListingArchive.isSoldLocked(fresh)) {
@@ -720,7 +720,7 @@ class MyPropertyManageFragment : Fragment() {
                         if (gap > 0L) {
                             dialog.dismiss()
                             toast(OwnerSold.message(fresh), long = true)
-                            CommissionsFragment.pendingShortfall = gap
+                            CommissionsFragment.handOffShortfall(gap, fresh)
                             findNavController().navigate(R.id.commissionsFragment)
                         } else {
                             dialog.showError(OwnerSold.message(fresh))

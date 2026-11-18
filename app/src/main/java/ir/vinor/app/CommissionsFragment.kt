@@ -54,6 +54,8 @@ class CommissionsFragment : Fragment() {
     private var loadGen = 0
     private var rendered = false
     private var skipNextResume = true
+    private var walletBlocked: Long = 0L
+    private var walletDialog: WalletChargeDialog? = null
 
     private enum class Step { REQUEST, PICK, ADD }
 
@@ -78,10 +80,17 @@ class CommissionsFragment : Fragment() {
         }
         binding.commissionsWithdrawBtn.setOnClickListener { openWithdraw() }
         binding.commissionsChargeBtn.setOnClickListener { openCharge() }
+        binding.commissionsWithdrawCard.setOnClickListener { openCharge(startAtAmount = false) }
         val owed = pendingShortfall
-        if (owed > 0L) {
+        val owedCtx = pendingChargeContext
+        val returning = pendingTopupId
+        if (returning > 0L) {
+            pendingTopupId = 0L
+            openCharge(topupId = returning)
+        } else if (owed > 0L || owedCtx.isNotBlank()) {
             pendingShortfall = 0L
-            openCharge(owed)
+            pendingChargeContext = ""
+            openCharge(owed, owedCtx)
         }
         binding.withdrawSheetBack.setOnClickListener { onSheetBack() }
         binding.withdrawAccountRow.setOnClickListener { showStep(Step.PICK) }
@@ -115,6 +124,12 @@ class CommissionsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        walletDialog?.onHostResume()
+        if (walletDialog == null && pendingTopupId > 0L && _binding != null) {
+            val id = pendingTopupId
+            pendingTopupId = 0L
+            openCharge(topupId = id)
+        }
         if (skipNextResume) {
             skipNextResume = false
             return
@@ -125,6 +140,8 @@ class CommissionsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        walletDialog?.dismiss()
+        walletDialog = null
         _binding = null
     }
 
@@ -242,6 +259,7 @@ class CommissionsFragment : Fragment() {
         )
         if (available >= 0L) setWithdrawable(available)
         else WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
+        walletBlocked = blocked.coerceAtLeast(0L)
         binding.commissionsBlocked.text = "بلوکه‌شده برای پورسانت: ${formatToman(blocked)} تومان"
         val shownTotal = if (walletTotal >= 0L) walletTotal else withdrawable + blocked
         binding.commissionsAvailable.text = "کل موجودی: ${formatToman(shownTotal)} تومان"
@@ -666,44 +684,98 @@ class CommissionsFragment : Fragment() {
         binding.withdrawAddError.isVisible = !text.isNullOrBlank()
     }
 
-    private fun openCharge(prefill: Long = 0L) {
-        val input = android.widget.EditText(requireContext())
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        input.hint = "مبلغ به تومان"
-        if (prefill > 0L) input.setText(prefill.toString())
-        AlertDialog.Builder(requireContext())
-            .setTitle("شارژ کیف پول")
-            .setMessage("۱۰۰٬۰۰۰ · ۵۰۰٬۰۰۰ · ۱٬۰۰۰٬۰۰۰ · ۵٬۰۰۰٬۰۰۰ یا مبلغ دلخواه")
-            .setView(input)
-            .setPositiveButton("پرداخت") { _, _ ->
-                val amount = input.text?.toString()?.trim()?.toLongOrNull() ?: 0L
-                if (amount < 1000L) {
-                    Toast.makeText(requireContext(), "مبلغ شارژ خیلی کم است.", Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val res = withContext(Dispatchers.IO) {
-                        PartnerApi.postFinance(
-                            "/express/partner/wallet/charge",
-                            JSONObject().put("amount", amount),
-                            csrf,
-                            requireContext(),
-                        )
-                    }
-                    val url = res.optString("pay_url")
-                    if (res.optBoolean("ok") && url.isNotBlank()) {
-                        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-                    } else {
-                        Toast.makeText(
-                            requireContext(),
-                            res.optString("error").ifBlank { "شروع پرداخت ممکن نشد." },
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                }
+    /**
+     * کیف پول / «افزایش اعتبار» تمام‌صفحه (هم‌ارز وب). درگاه در Custom Tab باز می‌شود و
+     * بعد از برگشت، نتیجه از سرور خوانده می‌شود؛ اپ هیچ‌وقت خودش موجودی را زیاد نمی‌کند.
+     */
+    private fun openCharge(prefill: Long = 0L, ctx: String = "", startAtAmount: Boolean = true, topupId: Long = 0L) {
+        if (walletDialog?.isShowing == true || _binding == null) return
+        val base = WalletCharge.parseOptions(null, prefill, withdrawable, walletBlocked)
+        val flow = WalletChargeFlow(base, startAtAmount)
+        val dialog = WalletChargeDialog(
+            requireContext(),
+            flow,
+            onPay = { body -> startTopup(body) },
+            onCheck = { id, recheck -> checkTopup(id, recheck) },
+            onReturn = { target -> onChargeReturn(target) },
+            onClosed = { charged ->
+                walletDialog = null
+                activeTopupId = 0L
+                if (charged && _binding != null) loadData()
+            },
+        )
+        walletDialog = dialog
+        dialog.show()
+        if (topupId > 0L) {
+            flow.startedPayment(topupId)
+            dialog.onHostResume()
+        }
+        val query = buildString {
+            append(WalletCharge.OPTIONS_PATH)
+            if (ctx.isNotBlank()) append("?ctx=").append(java.net.URLEncoder.encode(ctx, "UTF-8"))
+            else if (prefill > 0L) append("?shortfall=").append(prefill)
+        }
+        lifecycleScope.launch {
+            val res = withContext(Dispatchers.IO) { runCatching { PartnerApi.get(query, requireContext()) }.getOrNull() }
+            if (walletDialog !== dialog) return@launch
+            val opts = WalletCharge.parseOptions(res, prefill, withdrawable, walletBlocked)
+            opts.csrf.takeIf { it.isNotBlank() }?.let { csrf = it }
+            dialog.updateOptions(opts)
+        }
+    }
+
+    private fun startTopup(body: JSONObject) {
+        val dialog = walletDialog ?: return
+        lifecycleScope.launch {
+            val res = withContext(Dispatchers.IO) {
+                PartnerApi.postFinance(WalletCharge.CHARGE_PATH, body, csrf, requireContext())
             }
-            .setNegativeButton("انصراف", null)
-            .show()
+            if (walletDialog !== dialog) return@launch
+            val url = res.optString("pay_url")
+            if (res.optBoolean("ok") && url.startsWith("https://")) {
+                val id = res.optLong("txn_id", 0L)
+                activeTopupId = id
+                dialog.paymentStarted(id)
+                if (!VinorExternalBrowser.open(requireContext(), url)) {
+                    dialog.showError("مرورگری برای باز کردن درگاه پیدا نشد.")
+                }
+            } else {
+                dialog.showError(res.optString("error").ifBlank { res.optString("message").ifBlank { "شروع پرداخت ممکن نشد." } })
+            }
+        }
+    }
+
+    private fun checkTopup(id: Long, recheck: Boolean) {
+        val dialog = walletDialog ?: return
+        if (id <= 0L) {
+            // سرور قدیمی شناسه نمی‌دهد: فقط موجودی تازه را بخوان.
+            dialog.dismiss()
+            loadData()
+            return
+        }
+        lifecycleScope.launch {
+            val path = "/express/partner/api/wallet/topup/$id"
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (recheck) PartnerApi.postJson("$path/recheck", JSONObject(), requireContext())
+                    else PartnerApi.get(path, requireContext())
+                }.getOrNull()
+            }
+            if (walletDialog !== dialog) return@launch
+            if (res == null || (!res.has("state") && res.optBoolean("offline"))) {
+                dialog.showError("برای دیدن نتیجه اینترنت لازم است.")
+                return@launch
+            }
+            dialog.showResult(WalletCharge.parseResult(res, dialog.flow.options.texts))
+        }
+    }
+
+    private fun onChargeReturn(target: WalletCharge.Return) {
+        if (WalletCharge.returnsToPreviousScreen(target)) {
+            if (!findNavController().navigateUp()) (activity as? MainActivity)?.openPartnerHome()
+        } else if (_binding != null) {
+            loadData()
+        }
     }
 
     companion object {
@@ -718,5 +790,22 @@ class CommissionsFragment : Fragment() {
         }
 
         var pendingShortfall: Long = 0L
+        /** زمینهٔ امضاشدهٔ کمبود از پاسخ سرور (charge_context). */
+        var pendingChargeContext: String = ""
+        /** شارژی که کاربر از صفحهٔ نتیجهٔ مرورگر با لینک ‎?topup=‎ به آن برگشته است. */
+        var pendingTopupId: Long = 0L
+        var activeTopupId: Long = 0L
+
+        fun handOffShortfall(gap: Long, response: JSONObject?) {
+            pendingShortfall = gap.coerceAtLeast(0L)
+            pendingChargeContext = response?.optString("charge_context").orEmpty()
+        }
+
+        /** از لینک بازگشت صفحهٔ نتیجه: /express/partner/commissions?topup=N */
+        fun topupIdFromUrl(url: String?): Long {
+            val q = url.orEmpty().substringAfter('?', "")
+            return q.split('&').firstOrNull { it.startsWith("topup=") }
+                ?.substringAfter('=')?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        }
     }
 }

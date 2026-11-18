@@ -269,7 +269,7 @@
                         android:focusable="true"
                         android:gravity="center"
                         android:minHeight="44dp"
-                        android:text="شارژ کیف پول"
+                        android:text="افزایش اعتبار"
                         android:textColor="@color/vinor_text"
                         android:textSize="15sp" />
 
