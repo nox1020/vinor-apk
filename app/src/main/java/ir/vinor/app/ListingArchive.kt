@@ -73,6 +73,18 @@ object ListingArchive {
         }
     }
 
+    /** آگهی فروخته‌شده به فعال برنمی‌گردد (سرور can_restore=false و 409 sold_locked می‌دهد). */
+    fun canRestore(item: JSONObject): Boolean {
+        if (!isArchived(item)) return false
+        if (OwnerSold.isSold(item)) return false
+        return if (item.has("can_restore")) item.optBoolean("can_restore", true) else true
+    }
+
+    /** دکمهٔ بایگانی/بازگرداندن: فعال همیشه بایگانی می‌شود؛ بایگانی‌شده فقط اگر قابل بازگرداندن باشد. */
+    fun canToggle(item: JSONObject): Boolean = !isArchived(item) || canRestore(item)
+
+    fun isSoldLocked(post: JSONObject): Boolean = post.optString("error_code").trim() == "sold_locked"
+
     fun counts(payload: JSONObject): Counts {
         val obj = payload.optJSONObject("counts") ?: JSONObject()
         return Counts(obj.optInt("active"), obj.optInt("archived"))

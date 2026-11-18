@@ -22,6 +22,12 @@ object OwnerSold {
     const val DEFAULT_QUESTION = "ملک از طریق بازدید بازاریاب وینور فروخته شد؟"
     const val DEFAULT_OUTSIDE_LABEL = "خودم بیرون از وینور فروختم"
     const val FAILURE = "ثبت فروش انجام نشد."
+    /** همان متن کهربایی صفحهٔ وب وقتی «بیرون از وینور» به بررسی پشتیبانی می‌رود. */
+    const val DEFAULT_REVIEW_WARNING =
+        "بازاریاب وینور برای این ملک بازدید ثبت‌شده دارد؛ اگر از طریق او فروخته‌اید، همان بازدید را انتخاب کنید. " +
+            "با «بیرون از وینور» پورسانت بلوکه‌شده تا بررسی پشتیبانی آزاد نمی‌شود."
+    /** کهربایی ۳۰۰، هم‌رنگ text-amber-300 وب. */
+    const val REVIEW_WARNING_COLOR = 0xFFFCD34D.toInt()
 
     data class Choice(
         val channel: String,
@@ -36,6 +42,8 @@ object OwnerSold {
         val sold: Boolean,
         val canMarkSold: Boolean,
         val choices: List<Choice>,
+        val reviewRequiredIfOutside: Boolean = false,
+        val reviewWarning: String = "",
     )
 
     fun canMarkSold(snapshot: JSONObject): Boolean =
@@ -81,12 +89,15 @@ object OwnerSold {
                     .ifBlank { "آگهی بسته و از فهرست عمومی برداشته می‌شود. ادامه می‌دهید؟" },
             ),
         )
+        val review = obj.optBoolean("review_required_if_outside", false)
         return Options(
             code = obj.optString("code").trim(),
             question = obj.optString("question").trim().ifBlank { DEFAULT_QUESTION },
             sold = obj.optBoolean("sold", false),
             canMarkSold = obj.optBoolean("can_mark_sold", false),
             choices = choices,
+            reviewRequiredIfOutside = review,
+            reviewWarning = if (review) obj.optString("review_warning").trim().ifBlank { DEFAULT_REVIEW_WARNING } else "",
         )
     }
 
@@ -105,6 +116,9 @@ object OwnerSold {
 
     fun isWalletShort(post: JSONObject): Boolean =
         post.optString("error_code").trim() == "wallet_insufficient"
+
+    /** معامله با بازاریاب ثبت شد ولی پرداخت/بستن نشد؛ دوباره زدن «فروخته شد» ادامه می‌دهد. */
+    fun dealStarted(post: JSONObject): Boolean = post.optBoolean("deal_started", false)
 
     fun message(post: JSONObject): String {
         if (succeeded(post)) return post.optString("message").trim().ifBlank { "فروش ثبت شد." }
@@ -126,6 +140,7 @@ object OwnerSold {
         val next = ListingArchive.applyResult(snapshot, post)
         next.put("sold", true)
         next.put("can_mark_sold", false)
+        next.put("can_restore", false)
         next.put("express_status", "sold")
         return next
     }
