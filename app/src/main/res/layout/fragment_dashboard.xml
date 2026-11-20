@@ -174,7 +174,7 @@
                                     android:layout_height="wrap_content"
                                     android:ellipsize="end"
                                     android:maxLines="1"
-                                    android:text="پورسانت قابل برداشت"
+                                    android:text="موجودی قابل استفاده"
                                     android:textColor="@color/vinor_text_muted"
                                     android:textSize="13sp" />
 

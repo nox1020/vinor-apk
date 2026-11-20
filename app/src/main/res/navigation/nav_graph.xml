@@ -15,8 +15,7 @@
     <fragment
         android:id="@+id/commissionsFragment"
         android:name="ir.vinor.app.CommissionsFragment"
-        android:label="پورسانت"
-        tools:layout="@layout/fragment_commissions" />
+        android:label="کیف پول" />
 
     <fragment
         android:id="@+id/routineFragment"
