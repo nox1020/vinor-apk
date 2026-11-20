@@ -56,6 +56,7 @@ class CommissionsFragment : Fragment() {
     private var skipNextResume = true
     private var walletBlocked: Long = 0L
     private var walletDialog: WalletChargeDialog? = null
+    private var withdrawDialog: WalletWithdrawDialog? = null
 
     private enum class Step { REQUEST, PICK, ADD }
 
@@ -142,6 +143,8 @@ class CommissionsFragment : Fragment() {
         super.onDestroyView()
         walletDialog?.dismiss()
         walletDialog = null
+        withdrawDialog?.dismiss()
+        withdrawDialog = null
         _binding = null
     }
 
@@ -236,7 +239,9 @@ class CommissionsFragment : Fragment() {
 
     private fun bindCommissionPayload(obj: JSONObject) {
         val root = WalletWithdraw.commissionRoot(obj)
-        val total = WalletWithdraw.money(root, "total_commission")
+        // «پورسانت کسب‌شده»: سرور جدید earned_commission می‌دهد (بدون شارژ و تعدیل)
+        val total = if (root.has("earned_commission")) WalletWithdraw.money(root, "earned_commission")
+        else WalletWithdraw.money(root, "total_commission")
         val pending = WalletWithdraw.money(root, "pending_commission")
         val paid = WalletWithdraw.money(root, "paid_commission")
         val soldCount = WalletWithdraw.money(root, "sold_count")
@@ -245,7 +250,7 @@ class CommissionsFragment : Fragment() {
         val inWithdrawal = obj.optLong("in_withdrawal_amount", 0L)
         binding.commissionsWithdrawStatus.isVisible = inWithdrawal > 0L
         if (inWithdrawal > 0L) binding.commissionsWithdrawStatus.text =
-            "در حال برداشت: ${formatToman(inWithdrawal)} تومان"
+            "${WalletCharge.DEFAULT_TEXTS["pending_withdrawal_label"]}: ${formatToman(inWithdrawal)} تومان"
         val items = mutableListOf<JSONObject>()
         for (i in 0 until itemsArr.length()) {
             itemsArr.optJSONObject(i)?.let { items.add(it) }
@@ -260,9 +265,11 @@ class CommissionsFragment : Fragment() {
         if (available >= 0L) setWithdrawable(available)
         else WalletWithdraw.readBalance(obj)?.let { setWithdrawable(it) }
         walletBlocked = blocked.coerceAtLeast(0L)
-        binding.commissionsBlocked.text = "بلوکه‌شده برای پورسانت: ${formatToman(blocked)} تومان"
-        val shownTotal = if (walletTotal >= 0L) walletTotal else withdrawable + blocked
-        binding.commissionsAvailable.text = "کل موجودی: ${formatToman(shownTotal)} تومان"
+        binding.commissionsBlocked.text = "${WalletCharge.DEFAULT_TEXTS["blocked_label"]}: ${formatToman(blocked)} تومان"
+        binding.commissionsBlocked.isVisible = blocked > 0L
+        // «کل موجودی» (قابل استفاده + بلوکه) تکرار همان دو عدد بود؛ دیگر نشان داده نمی‌شود.
+        binding.commissionsAvailable.isVisible = false
+        if (walletTotal < 0L) Log.v(TAG, "wallet_total missing (old server)")
         WalletWithdraw.csrfOf(obj).takeIf { it.isNotBlank() }?.let { csrf = it }
     }
 
@@ -382,11 +389,54 @@ class CommissionsFragment : Fragment() {
             (activity as? MainActivity)?.openLogin()
             return
         }
-        binding.withdrawAmount.setText("")
-        showRequestError(null)
-        showStep(Step.REQUEST)
-        binding.withdrawSheet.visibility = View.VISIBLE
-        refreshWithdrawContext()
+        openWithdrawWizard()
+    }
+
+    /**
+     * ویزارد برداشت به سبک دیوار (هم‌ارز وب). جای شیت قدیمی «مبلغ + انتخاب حساب» را گرفته؛
+     * مسیرهای قدیمی bank-accounts و withdrawals/request سمت سرور دست‌نخورده می‌مانند.
+     */
+    private fun openWithdrawWizard() {
+        if (withdrawDialog?.isShowing == true || _binding == null) return
+        walletDialog?.dismiss()
+        val flow = WalletWithdrawFlow(WalletWithdrawWizard.parseOptions(null))
+        val dialog = WalletWithdrawDialog(
+            requireContext(),
+            flow,
+            onSubmit = { body -> submitWithdraw(body) },
+            onClosed = { submitted ->
+                withdrawDialog = null
+                if (submitted && _binding != null) loadData()
+            },
+        )
+        withdrawDialog = dialog
+        dialog.show()
+        lifecycleScope.launch {
+            val res = withContext(Dispatchers.IO) {
+                runCatching { PartnerApi.get(WalletWithdrawWizard.PATH, requireContext()) }.getOrNull()
+            }
+            if (withdrawDialog !== dialog) return@launch
+            val opts = WalletWithdrawWizard.parseOptions(res)
+            if (!opts.loaded) {
+                dialog.dismiss()
+                Toast.makeText(requireContext(), "دریافت اطلاعات برداشت ناموفق بود. دوباره تلاش کنید.", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            opts.csrf.takeIf { it.isNotBlank() }?.let { csrf = it }
+            dialog.updateOptions(opts)
+        }
+    }
+
+    private fun submitWithdraw(body: JSONObject) {
+        val dialog = withdrawDialog ?: return
+        lifecycleScope.launch {
+            val res = withContext(Dispatchers.IO) {
+                PartnerApi.postFinance(WalletWithdrawWizard.PATH, body, csrf, requireContext())
+            }
+            if (withdrawDialog !== dialog) return@launch
+            WalletWithdraw.csrfOf(res).takeIf { it.isNotBlank() }?.let { csrf = it }
+            dialog.showOutcome(WalletWithdrawWizard.parseOutcome(res, dialog.flow.options))
+        }
     }
 
     private fun refreshWithdrawContext() {
@@ -698,6 +748,7 @@ class CommissionsFragment : Fragment() {
             onPay = { body -> startTopup(body) },
             onCheck = { id, recheck -> checkTopup(id, recheck) },
             onReturn = { target -> onChargeReturn(target) },
+            onWithdraw = { openWithdraw() },
             onClosed = { charged ->
                 walletDialog = null
                 activeTopupId = 0L
