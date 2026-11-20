@@ -20,9 +20,11 @@ object WalletCharge {
         "available_hint" to "برای انتشار آگهی، پرداخت پورسانت و برداشت در دسترس است.",
         "blocked_label" to "بلوکه برای پورسانت",
         "blocked_hint" to "پورسانت آگهی‌های منتشرشده کنار گذاشته شده و با فروش یا لغو آگهی تکلیفش روشن می‌شود.",
-        "total_label" to "کل موجودی",
-        "total_hint" to "جمع موجودی قابل استفاده و بلوکه‌شده.",
+        "pending_withdrawal_label" to "در انتظار برداشت",
+        "pending_withdrawal_hint" to "درخواست‌های برداشتی که هنوز واریز نشده‌اند.",
         "topup_button" to "افزایش اعتبار",
+        "withdraw_button" to "برداشت",
+        "requests_title" to "درخواست‌های برداشت",
         "amount_title" to "افزایش اعتبار",
         "amount_question" to "چقدر می‌خواهید کیف پولتان را شارژ کنید؟",
         "amount_placeholder" to "مبلغ دلخواه",
@@ -62,7 +64,16 @@ object WalletCharge {
 
     data class Preset(val amount: Long, val label: String)
     data class Line(val key: String, val label: String, val value: String, val hint: String)
-    data class Header(val available: Long, val blocked: Long, val total: Long, val lines: List<Line>)
+    /** هر مفهوم یک بار: قابل استفاده (بزرگ) + خط‌های بلوکه و در انتظار برداشت. «کل موجودی» نمایش داده نمی‌شود. */
+    data class Header(val available: Long, val blocked: Long, val total: Long, val lines: List<Line>, val pendingWithdrawal: Long = 0L)
+    /** ورودی «برداشت» در صفحهٔ کیف پول (از بلوک withdraw پاسخ /api/wallet). */
+    data class Withdraw(
+        val known: Boolean = false,
+        val enabled: Boolean = false,
+        val canWithdraw: Boolean = false,
+        val minAmount: Long = WalletWithdrawWizard.DEFAULT_MIN,
+        val requests: List<WalletWithdrawWizard.Request> = emptyList(),
+    )
     data class Return(val key: String, val code: String, val label: String)
 
     data class Options(
@@ -78,6 +89,7 @@ object WalletCharge {
         val texts: Map<String, String>,
         val groups: List<Group>,
         val csrf: String,
+        val withdraw: Withdraw = Withdraw(),
     ) {
         fun text(key: String): String = texts[key]?.takeIf { it.isNotBlank() } ?: DEFAULT_TEXTS[key].orEmpty()
     }
@@ -218,17 +230,28 @@ object WalletCharge {
         val available = w?.optLong("available", fallbackAvailable) ?: fallbackAvailable
         val blocked = w?.optLong("blocked", fallbackBlocked) ?: fallbackBlocked
         val total = (w?.optLong("total", available + blocked) ?: (available + blocked)).let { if (it <= 0L) available + blocked else it }
+        val pendingWd = w?.optLong("pending_withdrawal", 0L) ?: 0L
         val lines = mutableListOf<Line>()
         w?.optJSONArray("lines")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val l = arr.optJSONObject(i) ?: continue
+                // سرور قدیمی خط «کل موجودی» هم می‌فرستاد؛ تکرار قابل استفاده + بلوکه است و نشان داده نمی‌شود.
+                if (l.optString("key") == "total") continue
                 lines.add(Line(l.optString("key"), l.optString("label"), l.optString("value"), l.optString("hint")))
             }
         }
         if (lines.isEmpty()) {
             lines.add(Line("blocked", t.getValue("blocked_label"), toman(blocked), t.getValue("blocked_hint")))
-            lines.add(Line("total", t.getValue("total_label"), toman(total), t.getValue("total_hint")))
+            lines.add(Line("pending_withdrawal", t.getValue("pending_withdrawal_label"), toman(pendingWd), t.getValue("pending_withdrawal_hint")))
         }
+        val wd = obj?.optJSONObject("withdraw")
+        val withdraw = if (wd == null) Withdraw() else Withdraw(
+            known = true,
+            enabled = wd.optBoolean("enabled", false),
+            canWithdraw = wd.optBoolean("can_withdraw", false),
+            minAmount = wd.optLong("min_amount", WalletWithdrawWizard.DEFAULT_MIN),
+            requests = WalletWithdrawWizard.parseRequests(wd.optJSONArray("requests")),
+        )
         return Options(
             minAmount = minAmount,
             maxAmount = maxAmount,
@@ -237,11 +260,12 @@ object WalletCharge {
             reasonLine = reason,
             ctx = obj?.optString("ctx").orEmpty(),
             gatewayLabel = obj?.optJSONObject("gateway")?.optString("label").orEmpty().ifBlank { "زرین‌پال" },
-            header = Header(available, blocked, total, lines),
+            header = Header(available, blocked, total, lines, pendingWd),
             returnTarget = returnOf(obj?.optJSONObject("return")),
             texts = t,
             groups = parseGroups(obj?.optJSONArray("groups")),
             csrf = obj?.optString("csrf_token").orEmpty(),
+            withdraw = withdraw,
         )
     }
 

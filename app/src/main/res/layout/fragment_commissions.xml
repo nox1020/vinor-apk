@@ -82,7 +82,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="کل درآمد"
+                        android:text="پورسانت کسب‌شده"
                         android:textColor="@color/vinor_text"
                         android:textSize="13sp" />
 
@@ -130,7 +130,7 @@
                             android:layout_marginTop="2dp"
                             android:gravity="center"
                             android:maxLines="2"
-                            android:text="در انتظار"
+                            android:text="پورسانت در انتظار تأیید"
                             android:textColor="@color/vinor_text_muted"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -218,7 +218,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="قابل استفاده"
+                        android:text="موجودی قابل استفاده"
                         android:textColor="@color/vinor_text_muted"
                         android:textSize="13sp" />
 
@@ -246,7 +246,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="بلوکه‌شده برای پورسانت: ۰ تومان"
+                        android:text="بلوکه برای پورسانت: ۰ تومان"
                         android:textColor="@color/vinor_text_muted"
                         android:textSize="13sp" />
 
