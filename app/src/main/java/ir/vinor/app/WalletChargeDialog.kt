@@ -49,6 +49,7 @@ class WalletChargeDialog(
     private val errorColor = ContextCompat.getColor(context, R.color.vinor_error)
     private val amber = 0xFFFBBF24.toInt()
     private val regular: Typeface? = runCatching { ResourcesCompat.getFont(context, R.font.vazirmatn) }.getOrNull()
+    private val homeView = WalletHomeView(context)
 
     private lateinit var title: TextView
     private lateinit var progressLabel: TextView
@@ -193,27 +194,10 @@ class WalletChargeDialog(
         secondary = button(false).apply { setOnClickListener { onSecondary() }; tag = "wallet_secondary" }
         footer.addView(secondary, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)).apply { topMargin = dp(8) })
         // صفحهٔ اصلی کیف پول: دو دکمهٔ کنار هم (افزایش اعتبار + برداشت)
-        homeActions = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
-        homeActions.addView(Button(context).apply {
-            isAllCaps = false
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            typeface = Typeface.create(regular, Typeface.BOLD)
-            setTextColor(0xFF052E1F.toInt())
-            background = rounded(0xFF34D399.toInt(), radius = 16)
-            stateListAnimator = null
-            tag = "wallet_home_topup"
-            setOnClickListener { if (!busy) { errorText.visibility = View.GONE; flow.openAmount(); render() } }
-        }, LinearLayout.LayoutParams(0, dp(52), 1f))
-        homeActions.addView(Button(context).apply {
-            isAllCaps = false
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            typeface = Typeface.create(regular, Typeface.BOLD)
-            setTextColor(textColor)
-            background = rounded(0x0FFFFFFF, 0x24FFFFFF, 16)
-            stateListAnimator = null
-            tag = "wallet_home_withdraw"
-            setOnClickListener { if (!busy) onWithdraw?.invoke() }
-        }, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginStart = dp(10) })
+        homeActions = homeView.actionBar(
+            onTopup = { if (!busy) { errorText.visibility = View.GONE; flow.openAmount(); render() } },
+            onWithdraw = { if (!busy) onWithdraw?.invoke() },
+        ).apply { visibility = View.GONE }
         footer.addView(homeActions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(footer)
         return root
@@ -304,152 +288,12 @@ class WalletChargeDialog(
         if (step != WalletChargeFlow.Step.AMOUNT) scroll.scrollTo(0, 0)
     }
 
-    /**
-     * صفحهٔ اصلی کیف پول با زبان بصری جدا از ویزاردها: کارت موجودی گرادیانی، چیپ‌های فشرده
-     * (بلوکه و در انتظار برداشت)، درخواست‌های برداشت، و تایم‌لاین تراکنش‌ها. هر مبلغ یک بار.
-     */
+    /** صفحهٔ اصلی کیف پول v2 — همان نمای تب کیف پول ([WalletHomeView]). */
     private fun renderHome() {
         val o = flow.options
-        val h = o.header
-        val card = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.TR_BL, intArrayOf(0xFF0F766E.toInt(), 0xFF134E4A.toInt(), 0xFF312E81.toInt())).apply {
-                cornerRadius = dp(28).toFloat()
-            }
-            tag = "wallet_balance_card"
-        }
-        card.addView(label(o.text("available_label"), 12f, 0xB8FFFFFF.toInt()))
-        card.addView(label(WalletCharge.toman(h.available), 32f, Color.WHITE, bold = true).apply { setPadding(0, dp(4), 0, 0); tag = "wallet_available" })
-        card.addView(label(o.text("available_hint"), 12f, 0xA6FFFFFF.toInt()).apply { setPadding(0, dp(2), 0, 0) })
-        val chips = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        h.lines.filter { it.key == "blocked" || (it.key == "pending_withdrawal" && h.pendingWithdrawal > 0L) }.forEach { line ->
-            val glyph = if (line.key == "blocked") "🔒" else "⏳"
-            chips.addView(label("$glyph  ${line.label}  ${line.value}", 12f, Color.WHITE, bold = true).apply {
-                background = rounded(0x1FFFFFFF, 0x29FFFFFF, 99)
-                setPadding(dp(12), dp(5), dp(12), dp(5))
-                tag = "wallet_line_${line.key}"
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
-        }
-        card.addView(chips, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
-        body.addView(card, matchWrap(0, 14))
-        if (h.blocked > 0L) {
-            body.addView(label(o.text("blocked_hint"), 11.5f, muted).apply { setPadding(dp(22), dp(8), dp(22), 0) })
-        }
-        val reqs = o.withdraw.requests
-        if (reqs.isNotEmpty()) {
-            body.addView(label(o.text("requests_title"), 14f, bold = true).apply { setPadding(dp(18), dp(22), dp(18), dp(4)) })
-            reqs.forEach { r -> addRequest(r) }
-        }
-        body.addView(label(o.text("transactions_title"), 14f, bold = true).apply { setPadding(dp(18), dp(22), dp(18), dp(4)) })
-        if (o.groups.isEmpty()) {
-            body.addView(label(o.text("transactions_empty"), 13f, muted).apply { gravity = Gravity.CENTER; setPadding(dp(16), dp(32), dp(16), 0) },
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        }
-        o.groups.forEach { g ->
-            body.addView(label(g.label, 11f, muted, bold = true).apply {
-                background = rounded(0xFF121A2E.toInt(), 0x24FFFFFF, 99)
-                setPadding(dp(10), dp(2), dp(10), dp(2))
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                marginStart = dp(50); topMargin = dp(12); bottomMargin = dp(4)
-            })
-            g.items.forEach { addTxn(it) }
-        }
+        homeView.render(body, o)
         primary.text = o.text("topup_button")
-        (homeActions.getChildAt(0) as? Button)?.text = "+  " + o.text("topup_button")
-        val wdBtn = homeActions.getChildAt(1) as? Button
-        val showWithdraw = onWithdraw != null && (!o.withdraw.known || o.withdraw.enabled)
-        wdBtn?.visibility = if (showWithdraw) View.VISIBLE else View.GONE
-        wdBtn?.text = "↑  " + o.text("withdraw_button")
-        wdBtn?.alpha = if (!o.withdraw.known || o.withdraw.canWithdraw) 1f else 0.55f
-    }
-
-    private fun pillColors(tone: String): Pair<Int, Int> = when (tone) {
-        "blue" -> 0x2460A5FA to 0xFF93C5FD.toInt()
-        else -> chipColors(tone)
-    }
-
-    private fun addRequest(r: WalletWithdrawWizard.Request) {
-        val row = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(0xFF121A2E.toInt(), 0x24FFFFFF, 18)
-            tag = "wallet_request_${r.status}"
-        }
-        val mid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        mid.addView(label(r.amountLabel, 14f, bold = true))
-        mid.addView(label(listOf(r.dateLabel, r.tracking).filter(String::isNotBlank).joinToString(" · "), 11.5f, muted).apply { maxLines = 1 })
-        if (r.adminNote.isNotBlank()) mid.addView(label(r.adminNote, 11.5f, 0xFFFDA4AF.toInt()))
-        row.addView(mid, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val (fill, fg) = pillColors(r.tone)
-        row.addView(label(r.statusLabel, 11f, fg, bold = true).apply {
-            background = rounded(fill, radius = 99)
-            setPadding(dp(9), dp(2), dp(9), dp(2))
-        })
-        body.addView(row, matchWrap(8, 14))
-    }
-
-    private fun toneColor(tone: String): Int = when (tone) {
-        "green" -> 0xFF34D399.toInt()
-        "red" -> 0xFFFB7185.toInt()
-        "amber" -> amber
-        else -> muted
-    }
-
-    private fun chipColors(tone: String): Pair<Int, Int> = when (tone) {
-        "green" -> 0x2610B981 to 0xFF6EE7B7.toInt()
-        "amber" -> 0x26FBBF24 to 0xFFFCD34D.toInt()
-        "red" -> 0x26F43F5E to 0xFFFDA4AF.toInt()
-        else -> 0x14FFFFFF to 0xFFD4D4D8.toInt()
-    }
-
-    private fun iconFor(kind: String): Pair<String, Int> = when (kind) {
-        "topup" -> "↓" to 0xFF34D399.toInt()
-        "hold" -> "🔒" to amber
-        "release" -> "🔓" to amber
-        "commission_paid" -> "✓" to 0xFFFB7185.toInt()
-        "withdrawal" -> "↑" to 0xFFFB7185.toInt()
-        else -> "•" to 0xFF93C5FD.toInt()
-    }
-
-    private fun addTxn(it: WalletCharge.Item) {
-        val row = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(10), dp(16), dp(10))
-            minimumHeight = dp(64)
-            tag = "wallet_txn_${it.kind}"
-        }
-        val (glyph, color) = iconFor(it.kind)
-        // تایم‌لاین: آیکن گردگوشهٔ مربعی روی خط عمودی
-        val icon = FrameLayout(context).apply { background = rounded(0xFF121A2E.toInt(), 0x24FFFFFF, 14) }
-        icon.addView(label(glyph, 16f, color, bold = true).apply { gravity = Gravity.CENTER },
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        row.addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(12) })
-        val mid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        mid.addView(label(it.title, 14f).apply { maxLines = 1 })
-        val sub = listOf(it.time, it.subtitle).filter { s -> s.isNotBlank() }.joinToString(" · ")
-        if (sub.isNotBlank()) mid.addView(label(sub, 12f, muted).apply { maxLines = 1 })
-        row.addView(mid, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val end = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
-        end.addView(label(it.amountLabel, 14f, toneColor(it.tone), bold = true).apply {
-            textDirection = View.TEXT_DIRECTION_LTR
-            if (it.tone == "muted") paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
-        })
-        if (it.chipLabel.isNotBlank()) {
-            val (fill, fg) = chipColors(it.chipTone)
-            end.addView(label(it.chipLabel, 11f, fg, bold = true).apply {
-                background = rounded(fill, radius = 99)
-                setPadding(dp(8), dp(1), dp(8), dp(1))
-            })
-        }
-        row.addView(end)
-        val wrap = FrameLayout(context)
-        wrap.addView(View(context).apply { setBackgroundColor(0x24FFFFFF) },
-            FrameLayout.LayoutParams(dp(2), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START).apply { marginStart = dp(16 + 19) })
-        wrap.addView(row, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        body.addView(wrap)
+        homeView.bindActions(homeActions, o, onWithdraw != null)
     }
 
     private var input: EditText? = null

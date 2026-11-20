@@ -144,7 +144,7 @@ object MenuManager {
     fun getDefaultMenu(): List<MenuItem> {
         return listOf(
             MenuItem("dashboard", VinorPartnerUrls.ENTRY, "fa-home", "وینور", R.id.dashboardFragment),
-            MenuItem("commissions", VinorPartnerUrls.COMMISSIONS, "fa-chart-line", "پورسانت", R.id.commissionsFragment),
+            MenuItem("commissions", VinorPartnerUrls.COMMISSIONS, "fa-chart-line", "کیف پول", R.id.commissionsFragment),
             MenuItem("routine", "$BASE/express/partner/routine", "fa-list-check", "روتین", R.id.routineFragment),
             MenuItem("profile", "$BASE/express/partner/profile", "fa-user", "من", R.id.profileFragment)
         )

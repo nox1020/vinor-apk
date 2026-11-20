@@ -7,7 +7,7 @@
     <item
         android:id="@+id/commissionsFragment"
         android:icon="@drawable/ic_commissions"
-        android:title="پورسانت" />
+        android:title="کیف پول" />
     <item
         android:id="@+id/routineFragment"
         android:icon="@drawable/ic_routine"

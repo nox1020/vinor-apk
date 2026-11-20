@@ -29,16 +29,20 @@ class WalletFixesTest {
     fun walletIsNeverCachedAndWithdrawNeedsNetwork() {
         assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/commissions/data"))
         assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/commissions/data"))
+        assertTrue(VinorCachePolicy.isSensitivePath("/express/partner/api/wallet"))
+        assertFalse(VinorCachePolicy.isSafeGetApi("https://vinor.ir/express/partner/api/wallet"))
+        // تب کیف پول v2: برداشت از ویزارد؛ قبل از postFinance شبکه چک می‌شود.
         val frag = src("src/main/java/ir/vinor/app/CommissionsFragment.kt")
-        val submit = frag.substringAfter("private fun submitWithdraw()").substringBefore("private fun stableWithdrawRequestId")
+        val submit = frag.substringAfter("private fun submitWithdraw(body: JSONObject)").substringBefore("    companion object")
         assertTrue(submit.indexOf("VinorNetworkStatus.isOnline") in 0 until submit.indexOf("postFinance("))
     }
 
     @Test
     fun retryReusesTheSameRequestId() {
+        // شناسهٔ درخواست برای هر جریان برداشت ثابت است؛ تلاش دوباره همان را می‌فرستد.
+        val flow = WalletWithdrawFlow(WalletWithdrawWizard.parseOptions(null))
+        assertEquals(flow.body().optString("client_request_id"), flow.body().optString("client_request_id"))
         val frag = src("src/main/java/ir/vinor/app/CommissionsFragment.kt")
-        assertTrue(frag.contains("stableWithdrawRequestId(\"\$amount|\${account.id}\")"))
-        assertFalse(frag.substringAfter("private fun submitWithdraw()").substringBefore("private fun stableWithdrawRequestId")
-            .contains("UUID.randomUUID()"))
+        assertFalse(frag.contains("UUID.randomUUID()"))
     }
 }
