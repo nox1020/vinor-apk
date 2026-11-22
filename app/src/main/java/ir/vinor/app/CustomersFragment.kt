@@ -22,8 +22,6 @@ import ir.vinor.app.databinding.ItemCustomerFactBinding
 import ir.vinor.app.databinding.ItemCustomerFieldBinding
 import ir.vinor.app.databinding.ItemCustomerRowBinding
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -73,6 +71,13 @@ class CustomersFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         pageUrl = arguments?.getString("url").orEmpty().ifBlank { pageUrl }
         binding.customersBack.setOnClickListener { leaveOrCloseSheet() }
+        binding.customersRefresh.setColorSchemeColors(
+            ContextCompat.getColor(requireContext(), R.color.vinor_primary_red),
+        )
+        binding.customersRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(requireContext(), R.color.vinor_raised),
+        )
+        binding.customersRefresh.setOnRefreshListener { load(pull = true) }
         binding.customersSheetBack.setOnClickListener { closeSheet() }
         binding.customersAdd.setOnClickListener { openCreate() }
         binding.customersSheetSubmit.setOnClickListener { onSheetSubmit() }
@@ -147,6 +152,7 @@ class CustomersFragment : Fragment() {
         ++loadGen
         rendered = false
         b.customersProgress.isVisible = false
+        b.customersRefresh.isRefreshing = false
         b.customersSheet.isVisible = false
         b.customersInlineLogin.isVisible = true
         InlineTabLogin.show(this, b.customersInlineLogin, "مشتریان", expired) {
@@ -158,7 +164,7 @@ class CustomersFragment : Fragment() {
         return true
     }
 
-    private fun load() {
+    private fun load(pull: Boolean = false) {
         if (!PartnerApi.hasSession()) {
             showInlineLogin()
             return
@@ -167,7 +173,7 @@ class CustomersFragment : Fragment() {
         val url = pageUrl
         val gen = ++loadGen
         val stamp = sessionStamp
-        // Like Home, paint the last snapshot synchronously, then revalidate in background.
+        // Same contract as Home/Tracking: paint the last snapshot synchronously, then revalidate.
         // Customer names/phones stay in session-scoped RAM, never in the disk API cache.
         val account = VinorCacheSession.fingerprint(ctx)
         if (boundAccount.isNotEmpty() && boundAccount != account) {
@@ -175,72 +181,105 @@ class CustomersFragment : Fragment() {
             csrf = ""
         }
         val snap = remembered[url]?.takeIf { it.account == account }
-        if (snap != null) {
+        if (snap != null && !(rendered && boundUrl == url && page == snap.page)) {
             page = snap.page
             csrf = snap.csrf
             rendered = true
             boundUrl = url
             boundAccount = account
             bindPage()
+        }
+        if (rendered && boundUrl == url) {
             binding.customersProgress.isVisible = false
-        } else if (!rendered || boundUrl != url) {
+            if (pull) binding.customersRefresh.isRefreshing = true
+        } else {
             binding.customersList.removeAllViews()
-            binding.customersProgress.isVisible = true
             binding.customersEmpty.isVisible = false
+            binding.customersProgress.isVisible = true
             rendered = false
         }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                // Fetch the HTML and the auth/CSRF fallback concurrently; no serial wait.
-                val (doc, profile) = coroutineScope {
-                    val document = async(Dispatchers.IO) { PartnerApi.getPage(url, ctx) }
-                    val session = async(Dispatchers.IO) {
-                        runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }
-                            .getOrElse { JSONObject() }
-                    }
-                    document.await() to session.await()
-                }
+                // Network + parsing off the main thread; one request when the JSON API exists.
+                val result = withContext(Dispatchers.IO) { fetch(url, ctx) }
                 if (_binding == null || gen != loadGen || stamp != sessionStamp || pageUrl != url) return@launch
-                binding.customersProgress.isVisible = false
-                if (doc.code == 0) {
-                    if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load() }
-                    else showMessage(VinorPageLoad.OFFLINE)
-                    return@launch
-                }
-                if (PartnerCustomers.isLoginDocument(doc.url, doc.body) || VinorPageLoad.needsLogin(profile)) {
-                    clearRemembered()
-                    showInlineLogin(expired = VinorPageLoad.needsLogin(profile))
-                    return@launch
-                }
-                if (doc.code !in 200..299) {
-                    if (rendered && boundUrl == url) {
-                        VinorPageLoad.showOffline(binding.root) { load() }
-                    } else {
-                        val payload = try {
-                            JSONObject(doc.body).put("http_status", doc.code)
-                        } catch (_: Exception) {
-                            JSONObject().put("http_status", doc.code)
-                        }
-                        showMessage(PartnerCustomers.userMessage(payload, VinorPageLoad.OFFLINE))
+                when (result) {
+                    is Fetch.Login -> {
+                        clearRemembered()
+                        showInlineLogin(expired = result.expired)
                     }
-                    return@launch
+                    is Fetch.Failed -> {
+                        if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load(pull = true) }
+                        else showMessage(result.message)
+                    }
+                    is Fetch.Ok -> {
+                        csrf = result.csrf.ifBlank { csrf }
+                        remembered[url] = CustomersMemory(result.page, csrf, account)
+                        // Unchanged data → no rebuild, so the list does not flash or jump.
+                        val same = rendered && boundUrl == url && page == result.page
+                        page = result.page
+                        rendered = true
+                        boundUrl = url
+                        boundAccount = account
+                        if (!same) bindPage()
+                    }
                 }
-                val fromPage = PartnerCustomers.csrfFromHtml(doc.body)
-                csrf = fromPage.ifBlank { profile.optString("csrf_token").trim() }
-                page = PartnerCustomers.parse(doc.body)
-                remembered[url] = CustomersMemory(page, csrf, account)
-                rendered = true
-                boundUrl = url
-                boundAccount = account
-                bindPage()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
-                binding.customersProgress.isVisible = false
-                if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load() }
+                if (rendered && boundUrl == url) VinorPageLoad.showOffline(binding.root) { load(pull = true) }
                 else showMessage(VinorPageLoad.OFFLINE)
+            } finally {
+                if (_binding != null && gen == loadGen) {
+                    binding.customersProgress.isVisible = false
+                    binding.customersRefresh.isRefreshing = false
+                }
             }
         }
+    }
+
+    private sealed class Fetch {
+        data class Ok(val page: PartnerCustomers.Page, val csrf: String) : Fetch()
+        data class Login(val expired: Boolean) : Fetch()
+        data class Failed(val message: String) : Fetch()
+    }
+
+    /** Runs on IO. JSON API first (like Tracking's /api/requests/data); HTML scrape only for old servers. */
+    private fun fetch(url: String, ctx: android.content.Context): Fetch {
+        if (CustomersLoad.useJson(url, PartnerApi.BASE + PartnerCrm.PATH, jsonUnsupported)) {
+            val obj = runCatching { PartnerApi.get(PartnerCustomers.DATA_PATH, ctx) }
+                .getOrElse { JSONObject().put("offline", true) }
+            if (VinorPageLoad.needsLogin(obj) || PartnerCustomers.isUnauthorized(obj)) {
+                return Fetch.Login(VinorPageLoad.needsLogin(obj))
+            }
+            if (PartnerCustomers.dataUnsupported(obj)) {
+                jsonUnsupported = true
+            } else {
+                if (obj.optBoolean("offline")) return Fetch.Failed(VinorPageLoad.OFFLINE)
+                val parsed = PartnerCustomers.parseData(obj)
+                    ?: return Fetch.Failed(PartnerCustomers.userMessage(obj, VinorPageLoad.OFFLINE))
+                return Fetch.Ok(parsed, obj.optString("csrf_token").trim())
+            }
+        }
+        val doc = PartnerApi.getPage(url, ctx)
+        if (doc.code == 0) return Fetch.Failed(VinorPageLoad.OFFLINE)
+        if (PartnerCustomers.isLoginDocument(doc.url, doc.body)) return Fetch.Login(false)
+        if (doc.code !in 200..299) {
+            val payload = try {
+                JSONObject(doc.body).put("http_status", doc.code)
+            } catch (_: Exception) {
+                JSONObject().put("http_status", doc.code)
+            }
+            return Fetch.Failed(PartnerCustomers.userMessage(payload, VinorPageLoad.OFFLINE))
+        }
+        var token = PartnerCustomers.csrfFromHtml(doc.body)
+        if (token.isBlank()) {
+            // Only when the page itself has no token: one extra call instead of one per load.
+            val profile = runCatching { PartnerApi.get("/express/partner/profile/data", ctx) }.getOrElse { JSONObject() }
+            if (VinorPageLoad.needsLogin(profile)) return Fetch.Login(true)
+            token = profile.optString("csrf_token").trim()
+        }
+        return Fetch.Ok(PartnerCustomers.parse(doc.body), token)
     }
 
     private fun showMessage(text: String) {
@@ -487,6 +526,8 @@ class CustomersFragment : Fragment() {
 
     companion object {
         private val remembered = HashMap<String, CustomersMemory>()
+        /** Old server without the JSON API: skip it for the rest of the process. */
+        @Volatile private var jsonUnsupported = false
         private var sessionStamp = 0
 
         fun clearRemembered() {

@@ -4,13 +4,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * قرارداد زندهٔ مشتریان: فقط `GET/POST /express/partner/customers`.
- * فهرست و فرم از همان HTML لاگین‌شده خوانده می‌شود؛ مسیر JSON جدا وجود ندارد.
+ * قرارداد زندهٔ مشتریان.
+ * لود: اول JSON سبک `GET /express/partner/api/customers/data` (مثل `/api/requests/data` پیگیری)؛
+ * اگر سرور قدیمی بود (404/غیر JSON) همان HTML لاگین‌شدهٔ `/express/partner/customers` اسکرپ می‌شود.
  * POST با X-CSRFToken و Referer همین صفحه است.
  */
 object PartnerCustomers {
     const val ORIGIN = "https://vinor.ir"
     const val REFERER_PATH = PartnerCrm.PATH
+    const val DATA_PATH = "/express/partner/api/customers/data"
 
     data class Field(
         val name: String,
@@ -85,6 +87,106 @@ object PartnerCustomers {
             deleteIdKey = deleteKey,
         )
     }
+
+    /** سرور این JSON را نمی‌شناسد (نسخهٔ قبل از API) → مسیر HTML. */
+    fun dataUnsupported(obj: JSONObject): Boolean {
+        if (obj.optBoolean("offline")) return false
+        val code = obj.optInt("http_status", 200)
+        return code == 404 || code == 405 || obj.optBoolean("non_json")
+    }
+
+    /** پاسخ JSON `DATA_PATH` → همان Page که HTML می‌سازد. null یعنی شکل پاسخ معتبر نیست. */
+    fun parseData(obj: JSONObject): Page? {
+        val arr = obj.optJSONArray("customers") ?: return null
+        val rows = ArrayList<Row>()
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val phone = normalizePhone(firstString(item, "customer_phone", "phone"))
+            val combined = listOf(firstString(item, "first_name"), firstString(item, "last_name"))
+                .filter { it.isNotBlank() }.joinToString(" ")
+            val title = firstString(item, "display_name").ifBlank { combined }.ifBlank { phone }
+            if (title.isBlank()) continue
+            val facts = ArrayList<Fact>()
+            val source = SOURCE_LABELS[firstString(item, "source")] ?: firstString(item, "source")
+            if (source.isNotBlank()) facts.add(Fact("منبع", source))
+            val visits = item.optInt("visit_count", 0)
+            if (visits > 0) facts.add(Fact("بازدید", visits.toString()))
+            item.optJSONArray("recent_calls")?.let { calls ->
+                for (k in 0 until calls.length()) {
+                    val c = calls.optJSONObject(k) ?: continue
+                    val outcome = OUTCOME_LABELS[firstString(c, "outcome")] ?: firstString(c, "outcome")
+                    val day = firstString(c, "called_at").take(10)
+                    val note = firstString(c, "notes")
+                    val value = listOf(day, outcome, note).filter { it.isNotBlank() }.joinToString(" · ")
+                    if (value.isNotBlank()) facts.add(Fact("تماس", value))
+                }
+            }
+            var followUp = ""
+            item.optJSONArray("pending_followups")?.let { fus ->
+                for (k in 0 until fus.length()) {
+                    val f = fus.optJSONObject(k) ?: continue
+                    val value = listOf(firstString(f, "due_at"), firstString(f, "notes"))
+                        .filter { it.isNotBlank() }.joinToString(" · ")
+                    if (value.isNotBlank()) {
+                        facts.add(Fact("پیگیری", value))
+                        if (followUp.isBlank()) followUp = "پیگیری " + firstString(f, "due_at")
+                    }
+                }
+            }
+            rows.add(
+                Row(
+                    id = firstString(item, "id"),
+                    title = title,
+                    phone = phone,
+                    notes = "",
+                    status = followUp.trim(),
+                    facts = facts,
+                ),
+            )
+        }
+        val fields = ArrayList<Field>()
+        obj.optJSONArray("fields")?.let { list ->
+            for (i in 0 until list.length()) {
+                val f = list.optJSONObject(i) ?: continue
+                val name = firstString(f, "name")
+                if (name.isBlank()) continue
+                fields.add(
+                    Field(
+                        name = name,
+                        label = firstString(f, "label").ifBlank { name },
+                        multiline = f.optBoolean("multiline"),
+                        phone = f.optBoolean("phone"),
+                        required = f.optBoolean("required"),
+                    ),
+                )
+            }
+        }
+        return Page(
+            rows = rows,
+            fields = fields,
+            tabs = emptyList(),
+            search = null,
+            emptyText = firstString(obj, "empty_text").ifBlank { "هنوز مشتری‌ای ثبت نشده" },
+            submitLabel = firstString(obj, "submit_label").ifBlank { "ثبت مشتری" },
+            actionPath = firstString(obj, "action_path").takeIf { it.contains("/customers") } ?: PartnerCrm.PATH,
+            canDelete = false,
+            deleteIdKey = "",
+        )
+    }
+
+    private val SOURCE_LABELS = mapOf(
+        "manual" to "دستی",
+        "visit" to "بازدید",
+        "lead" to "سرنخ",
+    )
+
+    private val OUTCOME_LABELS = mapOf(
+        "answered" to "پاسخ داد",
+        "no_answer" to "بی‌پاسخ",
+        "busy" to "اشغال",
+        "visit_scheduled" to "بازدید هماهنگ شد",
+        "other" to "سایر",
+    )
 
     fun fieldError(field: Field, raw: String): String? {
         val value = if (field.phone) normalizePhone(raw) else raw.trim()

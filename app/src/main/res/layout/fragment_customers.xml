@@ -48,12 +48,13 @@
             android:layout_height="1dp"
             android:background="@color/vinor_border" />
 
+        <!-- Same first-load spinner as Tracking (nativeProgress): 24dp, centred, 24dp from the top. -->
         <ProgressBar
             android:id="@+id/customersProgress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:layout_gravity="center"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="24dp"
             android:visibility="gone" />
 
         <HorizontalScrollView
@@ -92,10 +93,16 @@
             android:textSize="15sp"
             android:visibility="gone" />
 
-        <ScrollView
+        <ir.vinor.app.VinorSwipeRefreshLayout
+            android:id="@+id/customersRefresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="1">
+
+        <ScrollView
+            android:id="@+id/customersScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:fillViewport="true"
             android:overScrollMode="never"
             android:scrollbars="none">
@@ -124,6 +131,7 @@
                     android:orientation="vertical" />
             </LinearLayout>
         </ScrollView>
+        </ir.vinor.app.VinorSwipeRefreshLayout>
 
         <LinearLayout
             android:id="@+id/customersAdd"
