@@ -43,6 +43,7 @@
         android:visibility="gone" />
 
     <androidx.core.widget.NestedScrollView
+        android:scrollbars="none"
         android:id="@+id/mpFormScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"

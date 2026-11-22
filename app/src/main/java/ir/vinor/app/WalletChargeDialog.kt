@@ -39,7 +39,7 @@ class WalletChargeDialog(
     private val onReturn: (WalletCharge.Return) -> Unit,
     private val onClosed: (charged: Boolean) -> Unit,
     private val onWithdraw: (() -> Unit)? = null,
-) : Dialog(context, android.R.style.Theme_DeviceDefault_NoActionBar) {
+) : Dialog(context, R.style.Theme_Vinor_FullScreenDialog) {
 
     private val green = ContextCompat.getColor(context, R.color.vinor_accent_green)
     private val bg = ContextCompat.getColor(context, R.color.vinor_bg)
@@ -181,7 +181,7 @@ class WalletChargeDialog(
         head.addView(progressBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(4)).apply { topMargin = dp(12) })
         root.addView(head)
         root.addView(View(context).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)))
-        scroll = ScrollView(context).apply { isFillViewport = true }
+        scroll = ScrollView(context).apply { isFillViewport = true; isVerticalScrollBarEnabled = false }
         body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(20), 0, dp(24)) }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))

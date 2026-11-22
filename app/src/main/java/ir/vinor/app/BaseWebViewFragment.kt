@@ -87,6 +87,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
     private fun setupWebView() {
         webView = binding.webView
+        VinorScrollbars.hideWebView(webView)
 
         // تنظیمات امنیتی و عملکردی WebView
         val settings = webView.settings
@@ -210,6 +211,7 @@ abstract class BaseWebViewFragment : Fragment() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                VinorScrollbars.injectCss(view)
                 Log.d(fragmentTag, "Page finished (defer reveal): $url")
                 if (leaveIfUntrustedHttpCommitted(view, url)) return
                 if (view == null || !::webView.isInitialized) return

@@ -20,6 +20,7 @@
             android:layout_height="match_parent">
 
             <ScrollView
+                android:scrollbars="none"
                 android:id="@+id/statsContent"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
