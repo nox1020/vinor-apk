@@ -21,6 +21,36 @@
         <item name="android:statusBarColor">@color/vinor_chrome</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <!-- بدون نوار اسکرول در کل اپ (هم‌ارز CSS وب). اسکرول کار می‌کند؛ فقط نوار رسم نمی‌شود. -->
+        <item name="android:scrollbars">none</item>
+        <item name="android:scrollbarThumbVertical">@android:color/transparent</item>
+        <item name="android:scrollbarThumbHorizontal">@android:color/transparent</item>
+        <item name="android:scrollbarTrackVertical">@android:color/transparent</item>
+        <item name="android:scrollbarTrackHorizontal">@android:color/transparent</item>
+        <item name="android:scrollViewStyle">@style/Widget.Vinor.ScrollView</item>
+        <item name="android:horizontalScrollViewStyle">@style/Widget.Vinor.HorizontalScrollView</item>
+        <item name="android:listViewStyle">@style/Widget.Vinor.ListView</item>
+        <item name="android:gridViewStyle">@style/Widget.Vinor.GridView</item>
+        <item name="android:webViewStyle">@style/Widget.Vinor.WebView</item>
+        <item name="recyclerViewStyle">@style/Widget.Vinor.RecyclerView</item>
+        <item name="nestedScrollViewStyle">@style/Widget.Vinor.NestedScrollView</item>
+    </style>
+
+    <!-- دیالوگ‌های تمام‌صفحهٔ کدی (کیف پول، برداشت، فروخته شد) — همان DeviceDefault بدون نوار اسکرول -->
+    <style name="Theme.Vinor.FullScreenDialog" parent="android:Theme.DeviceDefault.NoActionBar">
+        <!-- بدون نوار اسکرول در کل اپ (هم‌ارز CSS وب). اسکرول کار می‌کند؛ فقط نوار رسم نمی‌شود. -->
+        <item name="android:scrollbars">none</item>
+        <item name="android:scrollbarThumbVertical">@android:color/transparent</item>
+        <item name="android:scrollbarThumbHorizontal">@android:color/transparent</item>
+        <item name="android:scrollbarTrackVertical">@android:color/transparent</item>
+        <item name="android:scrollbarTrackHorizontal">@android:color/transparent</item>
+        <item name="android:scrollViewStyle">@style/Widget.Vinor.ScrollView</item>
+        <item name="android:horizontalScrollViewStyle">@style/Widget.Vinor.HorizontalScrollView</item>
+        <item name="android:listViewStyle">@style/Widget.Vinor.ListView</item>
+        <item name="android:gridViewStyle">@style/Widget.Vinor.GridView</item>
+        <item name="android:webViewStyle">@style/Widget.Vinor.WebView</item>
+        <item name="recyclerViewStyle">@style/Widget.Vinor.RecyclerView</item>
+        <item name="nestedScrollViewStyle">@style/Widget.Vinor.NestedScrollView</item>
     </style>
 
     <!-- Splash — پس‌زمینه تیره + لوگوی وکتور تیز -->
@@ -35,5 +65,6 @@
         <item name="android:navigationBarColor">@color/vinor_bg_dark</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:scrollbars">none</item>
     </style>
 </resources>

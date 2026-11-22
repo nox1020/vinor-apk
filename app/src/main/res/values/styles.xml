@@ -22,4 +22,39 @@
         <item name="fontFamily">@font/vazirmatn</item>
         <item name="android:textAppearance">@style/TextAppearance.Vinor</item>
     </style>
+
+    <style name="Widget.Vinor.ScrollView" parent="android:Widget.ScrollView">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.HorizontalScrollView" parent="">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.ListView" parent="android:Widget.ListView">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.GridView" parent="android:Widget.GridView">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.WebView" parent="android:Widget.WebView">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.RecyclerView" parent="">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
+
+    <style name="Widget.Vinor.NestedScrollView" parent="">
+        <item name="android:scrollbars">none</item>
+        <item name="android:fadeScrollbars">true</item>
+    </style>
 </resources>

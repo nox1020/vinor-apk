@@ -108,6 +108,7 @@ object WebViewProvider {
         val ctx = MutableContextWrapper(host)
         return WebView(ctx).apply {
             setBackgroundColor(Color.TRANSPARENT)
+            VinorScrollbars.hideWebView(this)
             with(settings) {
                 VinorWebViewSettings.apply(
                     this,

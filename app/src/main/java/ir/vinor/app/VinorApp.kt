@@ -17,6 +17,7 @@ class VinorApp : Application() {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("fa"))
         super.onCreate()
         PartnerApi.attach(this)
+        VinorScrollbars.install(this)
         VinorAppForeground.install()
         VinorNotificationTray.ensureChannel(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
