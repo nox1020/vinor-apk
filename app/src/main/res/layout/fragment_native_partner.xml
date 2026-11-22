@@ -45,7 +45,7 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    <ir.vinor.app.VinorSwipeRefreshLayout
         android:id="@+id/nativeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -509,7 +509,7 @@
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </ir.vinor.app.VinorSwipeRefreshLayout>
 
     <!-- Replaces the feed only while this tab is signed out; header/footer remain. -->
     <FrameLayout

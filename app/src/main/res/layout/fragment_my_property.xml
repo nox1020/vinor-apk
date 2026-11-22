@@ -27,7 +27,7 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    <ir.vinor.app.VinorSwipeRefreshLayout
         android:id="@+id/mpRefresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -106,5 +106,5 @@
                     android:paddingBottom="24dp" />
             </ScrollView>
         </FrameLayout>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </ir.vinor.app.VinorSwipeRefreshLayout>
 </LinearLayout>

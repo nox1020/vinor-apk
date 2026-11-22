@@ -16,7 +16,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,7 +32,7 @@ class CommissionsFragment : Fragment() {
     private var root: LinearLayout? = null
     private lateinit var homeView: WalletHomeView
     private lateinit var body: LinearLayout
-    private lateinit var swipe: SwipeRefreshLayout
+    private lateinit var swipe: VinorSwipeRefreshLayout
     private lateinit var actions: LinearLayout
     private var options: WalletCharge.Options = WalletCharge.parseOptions(null)
     private var csrf: String = ""
@@ -72,7 +71,7 @@ class CommissionsFragment : Fragment() {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         head.addView(View(ctx), LinearLayout.LayoutParams(dp(44), dp(44)))
         page.addView(head)
-        swipe = SwipeRefreshLayout(ctx).apply {
+        swipe = VinorSwipeRefreshLayout(ctx).apply {
             setColorSchemeColors(0xFF34D399.toInt())
             setProgressBackgroundColorSchemeColor(0xFF121A2E.toInt())
             setOnRefreshListener { loadData() }

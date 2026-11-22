@@ -10,7 +10,7 @@
         android:id="@+id/statsHeader"
         layout="@layout/include_page_header" />
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    <ir.vinor.app.VinorSwipeRefreshLayout
         android:id="@+id/statsRefresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -51,5 +51,5 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
         </FrameLayout>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </ir.vinor.app.VinorSwipeRefreshLayout>
 </LinearLayout>
