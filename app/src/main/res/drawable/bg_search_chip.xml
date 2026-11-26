@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- چیپ فیلتر خطی (سبک دیوار): ۳۲dp داخل ردیف ۴۴dp، بدون پرشدگی. هم‌تراز با .vn-search-chip__face وب. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetTop="6dp"
     android:insetBottom="6dp">
     <shape android:shape="rectangle">
-        <solid android:color="@color/vinor_raised" />
+        <solid android:color="@android:color/transparent" />
         <corners android:radius="999dp" />
         <stroke
             android:width="1dp"
-            android:color="@color/vinor_border" />
+            android:color="@color/search_chip_outline" />
     </shape>
 </inset>

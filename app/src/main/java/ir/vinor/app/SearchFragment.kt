@@ -117,12 +117,22 @@ class SearchFragment : Fragment() {
         binding.searchChipPrice.setOnClickListener { showPriceSheet() }
         binding.searchChipArea.setOnClickListener { showAreaSheet() }
         binding.searchCity.setOnClickListener { showCitySheet() }
+        // Divar-style header: the bell sits beside the search pill (web: .vn-search-bell, signed-in only).
+        binding.searchBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+        syncHeaderBell()
         if (rememberedAds != null) paintRemembered()
         load(forceSkeleton = rememberedAds == null)
     }
 
+    /** Bell only for a signed-in user, like the web header (`session.user_phone`). */
+    private fun syncHeaderBell() {
+        val b = _binding ?: return
+        b.searchBell.isVisible = HomeHeader.showBell(PartnerApi.hasSession())
+    }
+
     override fun onResume() {
         super.onResume()
+        syncHeaderBell()
         if (skipNextResume) {
             skipNextResume = false
             return
@@ -419,7 +429,7 @@ class SearchFragment : Fragment() {
         val b = _binding ?: return
         b.searchChipClear.isVisible = query.hasClearableFilters()
         val sortActive = query.sort != SearchSort.NEWEST
-        b.searchChipSort.text = "${query.sortChipLabel()} ▾"
+        b.searchChipSort.text = HomeHeader.chipLabel(query.sortChipLabel())
         b.searchChipSort.isSelected = sortActive
         b.searchChipSort.contentDescription = if (sortActive) {
             "مرتب‌سازی، انتخاب‌شده: ${query.sortChipLabel()}"
@@ -427,7 +437,7 @@ class SearchFragment : Fragment() {
             "مرتب‌سازی، جدیدترین"
         }
         val district = query.districtChipLabel()
-        b.searchChipDistrict.text = "${district ?: "محله"} ▾"
+        b.searchChipDistrict.text = HomeHeader.chipLabel(district ?: "محله")
         b.searchChipDistrict.isSelected = district != null
         b.searchChipDistrict.contentDescription = if (district == null) {
             "فیلتر محله"
@@ -435,7 +445,7 @@ class SearchFragment : Fragment() {
             "فیلتر محله، انتخاب‌شده: $district"
         }
         val price = query.priceChipLabel()
-        b.searchChipPrice.text = "${price ?: "قیمت"} ▾"
+        b.searchChipPrice.text = HomeHeader.chipLabel(price ?: "قیمت")
         b.searchChipPrice.isSelected = price != null
         b.searchChipPrice.contentDescription = if (price == null) {
             "فیلتر قیمت"
@@ -443,7 +453,7 @@ class SearchFragment : Fragment() {
             "فیلتر قیمت، انتخاب‌شده: ${price.replace("\u2013", " تا ")}"
         }
         val area = query.areaChipLabel()
-        b.searchChipArea.text = "${area ?: "متراژ"} ▾"
+        b.searchChipArea.text = HomeHeader.chipLabel(area ?: "متراژ")
         b.searchChipArea.isSelected = area != null
         b.searchChipArea.contentDescription = if (area == null) {
             "فیلتر متراژ"
@@ -451,7 +461,7 @@ class SearchFragment : Fragment() {
             "فیلتر متراژ، انتخاب‌شده: ${area.replace("\u2013", " تا ")}"
         }
         val city = query.city.trim()
-        b.searchCity.text = if (city.isEmpty()) "${SearchQuery.ALL_PROVINCES} ▾" else "$city ▾"
+        b.searchCity.text = HomeHeader.cityLabel(city)
         b.searchCity.isSelected = city.isNotEmpty()
         b.searchCity.contentDescription = if (city.isEmpty()) {
             SearchQuery.ALL_PROVINCES
