@@ -1,48 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:scrollbars="none"
+<!-- «وینور من»: نوار بالای ثابت هم‌ساختار «مشتریان» (fragment_customers.xml) و «پیگیری» (include_page_header.xml):
+     vinor_chrome، حداقل ۵۶dp، برگشت ۴۸dp، عنوان ۱۷sp پررنگ، جای دکمهٔ انتهایی ۴۸dp و خط ۱dp vinor_border.
+     فقط محتوا زیر نوار اسکرول می‌شود (هم‌تراز با هدر ep-partner-header وب). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/vinor_bg"
-    android:fillViewport="true">
+    android:layoutDirection="rtl"
+    android:orientation="vertical">
 
     <LinearLayout
+        android:id="@+id/profileHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layoutDirection="rtl"
+        android:background="@color/vinor_chrome"
         android:orientation="vertical">
 
-        <!-- User identity stays in profileRow below; notifications move out of Home. -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
             android:gravity="center_vertical"
+            android:minHeight="56dp"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
-            <TextView
-                android:id="@+id/profileTitle"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:fontFamily="@font/vazirmatn_bold"
-                android:gravity="center_vertical"
-                android:text="وینور من"
-                android:textColor="@color/vinor_text"
-                android:textSize="17sp" />
-            <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp">
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp">
 
             <ImageButton
-                android:id="@+id/profileNotifications"
+                android:id="@+id/profileBack"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="اعلان‌ها"
+                android:contentDescription="بازگشت"
                 android:padding="12dp"
-                android:src="@drawable/ic_stat_notify"
+                android:src="@drawable/ic_chevron_right"
                 app:tint="@color/vinor_text" />
+
+            <TextView
+                android:id="@+id/profileTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/vazirmatn"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:text="وینور من"
+                android:textColor="@color/vinor_text"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/profileHeaderEnd"
+                android:layout_width="48dp"
+                android:layout_height="48dp">
+
+                <ImageButton
+                    android:id="@+id/profileNotifications"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="اعلان‌ها"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_stat_notify"
+                    app:tint="@color/vinor_text" />
+
                 <TextView
                     android:id="@+id/profileNotificationsBadge"
                     android:layout_width="wrap_content"
@@ -60,380 +83,403 @@
             </FrameLayout>
         </LinearLayout>
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/vinor_border" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/profileScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/vinor_bg"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
         <LinearLayout
-            android:id="@+id/profileSkeleton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:importantForAccessibility="no"
-            android:orientation="vertical"
-            android:visibility="gone">
+            android:layoutDirection="rtl"
+            android:orientation="vertical">
 
             <LinearLayout
+                android:id="@+id/profileSkeleton"
                 android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="16dp">
-
-                <View
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/bg_profile_avatar"
-                    android:tag="sk" />
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:orientation="vertical"
+                android:visibility="gone">
 
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:layout_width="match_parent"
+                    android:layout_height="72dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp">
+
+                    <View
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_profile_avatar"
+                        android:tag="sk" />
 
                     <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="12dp"
-                        android:orientation="horizontal">
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                        <View
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="3"
-                            android:background="@drawable/bg_skeleton_block"
-                            android:tag="sk" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="12dp"
+                            android:orientation="horizontal">
 
-                        <View
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="2" />
-                    </LinearLayout>
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="3"
+                                android:background="@drawable/bg_skeleton_block"
+                                android:tag="sk" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="10dp"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="2" />
+                        </LinearLayout>
 
-                        <View
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="2"
-                            android:background="@drawable/bg_skeleton_block"
-                            android:tag="sk" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="10dp"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
 
-                        <View
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="3" />
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="2"
+                                android:background="@drawable/bg_skeleton_block"
+                                android:tag="sk" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="3" />
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
+
+                <include layout="@layout/item_profile_skeleton_row" />
+                <include layout="@layout/item_profile_skeleton_row" />
+                <include layout="@layout/item_profile_skeleton_row" />
+                <include layout="@layout/item_profile_skeleton_row" />
+                <include layout="@layout/item_profile_skeleton_row" />
+                <include layout="@layout/item_profile_skeleton_row" />
             </LinearLayout>
 
-            <include layout="@layout/item_profile_skeleton_row" />
-            <include layout="@layout/item_profile_skeleton_row" />
-            <include layout="@layout/item_profile_skeleton_row" />
-            <include layout="@layout/item_profile_skeleton_row" />
-            <include layout="@layout/item_profile_skeleton_row" />
-            <include layout="@layout/item_profile_skeleton_row" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/profileGuest"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/vazirmatn_bold"
-                android:text="وارد حساب خود شوید"
-                android:textAlignment="viewStart"
-                android:textColor="@color/vinor_text"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/vazirmatn_regular"
-                android:text="برای دیدن آگهی‌ها و نشان‌شده‌ها وارد شوید"
-                android:textAlignment="viewStart"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/profileGuestLogin"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_search_apply"
-                android:clickable="true"
-                android:focusable="true"
-                android:fontFamily="@font/vazirmatn_bold"
-                android:gravity="center"
-                android:text="ورود به حساب"
-                android:textColor="@color/vinor_on_primary"
-                android:textSize="15sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/profileError"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/vazirmatn_bold"
-                android:text="اتصال برقرار نشد"
-                android:textAlignment="viewStart"
-                android:textColor="@color/vinor_error"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/profileRetry"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_search_apply"
-                android:clickable="true"
-                android:focusable="true"
-                android:fontFamily="@font/vazirmatn_bold"
-                android:gravity="center"
-                android:text="تلاش دوباره"
-                android:textColor="@color/vinor_on_primary"
-                android:textSize="15sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/profileRow"
-            android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:visibility="gone">
-
-            <FrameLayout
-                android:id="@+id/profileAvatarFrame"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_profile_avatar"
-                android:importantForAccessibility="no">
-
-                <ImageView
-                    android:id="@+id/profileAvatar"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:importantForAccessibility="no"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/profileInitials"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:fontFamily="@font/vazirmatn_bold"
-                    android:gravity="center"
-                    android:importantForAccessibility="no"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="18sp" />
-            </FrameLayout>
-
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/profileGuest"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:importantForAccessibility="no"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/profileName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
                     android:fontFamily="@font/vazirmatn_bold"
-                    android:importantForAccessibility="no"
-                    android:maxLines="1"
+                    android:text="وارد حساب خود شوید"
                     android:textAlignment="viewStart"
                     android:textColor="@color/vinor_text"
                     android:textSize="15sp" />
 
                 <TextView
-                    android:id="@+id/profilePhone"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="4dp"
                     android:fontFamily="@font/vazirmatn_regular"
-                    android:importantForAccessibility="no"
+                    android:text="برای دیدن آگهی‌ها و نشان‌شده‌ها وارد شوید"
                     android:textAlignment="viewStart"
                     android:textColor="@color/vinor_text_muted"
-                    android:textDirection="ltr"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/profileGuestLogin"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_search_apply"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/vazirmatn_bold"
+                    android:gravity="center"
+                    android:text="ورود به حساب"
+                    android:textColor="@color/vinor_on_primary"
+                    android:textSize="15sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/profileEditLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/vazirmatn_regular"
-                android:importantForAccessibility="no"
-                android:text="ویرایش"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="13sp" />
-
-            <ImageView
-                android:id="@+id/profileEditChevron"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginStart="4dp"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_chevron_end"
-                app:tint="@color/vinor_text_muted" />
-        </LinearLayout>
-
-        <!-- Account-centric cards formerly occupying the Home feed. -->
-        <LinearLayout
-            android:id="@+id/profileWorkSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layoutDirection="rtl"
-            android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="16dp"
-            android:visibility="gone">
-
             <LinearLayout
-                android:id="@+id/profileSummaryWallet"
+                android:id="@+id/profileError"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_flat_outline_card"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn_bold"
+                    android:text="اتصال برقرار نشد"
+                    android:textAlignment="viewStart"
+                    android:textColor="@color/vinor_error"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/profileRetry"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_search_apply"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/vazirmatn_bold"
+                    android:gravity="center"
+                    android:text="تلاش دوباره"
+                    android:textColor="@color/vinor_on_primary"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/profileRow"
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
-                android:minHeight="72dp"
                 android:orientation="horizontal"
-                android:padding="16dp">
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:contentDescription=""
-                    android:src="@drawable/ic_wallet"
-                    app:tint="@color/vinor_accent_green" />
+                android:paddingHorizontal="16dp"
+                android:visibility="gone">
+
+                <FrameLayout
+                    android:id="@+id/profileAvatarFrame"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_profile_avatar"
+                    android:importantForAccessibility="no">
+
+                    <ImageView
+                        android:id="@+id/profileAvatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/profileInitials"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:importantForAccessibility="no"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="18sp" />
+                </FrameLayout>
+
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
                     android:layout_weight="1"
+                    android:importantForAccessibility="no"
                     android:orientation="vertical">
+
                     <TextView
+                        android:id="@+id/profileName"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="موجودی قابل استفاده"
-                        android:textColor="@color/vinor_text_muted"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/profileSummaryAmount"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="—"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:importantForAccessibility="no"
+                        android:maxLines="1"
+                        android:textAlignment="viewStart"
                         android:textColor="@color/vinor_text"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/profilePhone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:fontFamily="@font/vazirmatn_regular"
+                        android:importantForAccessibility="no"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/vinor_text_muted"
+                        android:textDirection="ltr"
+                        android:textSize="12sp" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/profileEditLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn_regular"
+                    android:importantForAccessibility="no"
+                    android:text="ویرایش"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="13sp" />
+
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:contentDescription=""
-                    android:src="@drawable/ic_chevron_left"
+                    android:id="@+id/profileEditChevron"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="4dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_end"
                     app:tint="@color/vinor_text_muted" />
             </LinearLayout>
 
+            <!-- Account-centric cards formerly occupying the Home feed. -->
             <LinearLayout
-                android:id="@+id/profileSummaryPerformance"
+                android:id="@+id/profileWorkSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_flat_outline_card"
-                android:orientation="horizontal"
-                android:paddingVertical="14dp">
+                android:layoutDirection="rtl"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp"
+                android:visibility="gone">
+
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:id="@+id/profileSummaryWallet"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView android:id="@+id/profileSummaryCustomers"
-                        android:layout_width="wrap_content"
+                    android:background="@drawable/bg_flat_outline_card"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="72dp"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:contentDescription=""
+                        android:src="@drawable/ic_wallet"
+                        app:tint="@color/vinor_accent_green" />
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="—" android:textColor="@color/vinor_text"
-                        android:textSize="18sp" android:textStyle="bold" />
-                    <TextView android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="مشتری فعال" android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="موجودی قابل استفاده"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="13sp" />
+                        <TextView
+                            android:id="@+id/profileSummaryAmount"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="—"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription=""
+                        android:src="@drawable/ic_chevron_left"
+                        app:tint="@color/vinor_text_muted" />
                 </LinearLayout>
+
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:id="@+id/profileSummaryPerformance"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView android:id="@+id/profileSummaryVisits"
-                        android:layout_width="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_flat_outline_card"
+                    android:orientation="horizontal"
+                    android:paddingVertical="14dp">
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="—" android:textColor="@color/vinor_text"
-                        android:textSize="18sp" android:textStyle="bold" />
-                    <TextView android:layout_width="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <TextView android:id="@+id/profileSummaryCustomers"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—" android:textColor="@color/vinor_text"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="مشتری فعال" android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="بازدید" android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <TextView android:id="@+id/profileSummaryVisits"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—" android:textColor="@color/vinor_text"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="بازدید" android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <TextView android:id="@+id/profileSummaryDeals"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—" android:textColor="@color/vinor_text"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="معامله" android:textColor="@color/vinor_text_muted"
+                            android:textSize="12sp" />
+                    </LinearLayout>
                 </LinearLayout>
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
+
+                <TextView
+                    android:id="@+id/profileQuickFollow"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginHorizontal="8dp"
+                    android:background="@drawable/bg_search_option"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView android:id="@+id/profileSummaryDeals"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="—" android:textColor="@color/vinor_text"
-                        android:textSize="18sp" android:textStyle="bold" />
-                    <TextView android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="معامله" android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
+                    android:text="پیگیری"
+                    android:textColor="@color/vinor_text" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/profileQuickFollow"
+            <LinearLayout
+                android:id="@+id/profileMenu"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginHorizontal="8dp"
-                android:background="@drawable/bg_search_option"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="پیگیری"
-                android:textColor="@color/vinor_text" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp"
+                android:visibility="gone" />
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/profileMenu"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="16dp"
-            android:visibility="gone" />
-    </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>

@@ -85,6 +85,8 @@ class ProfileFragment : Fragment() {
             }
         }
         binding.profileAvatarFrame.clipToOutline = true
+        // Same top bar as Customers / Tracking: back returns to Home (web: ep_header_row back → home).
+        binding.profileBack.setOnClickListener { (activity as? MainActivity)?.openPartnerHome() }
         binding.profileNotifications.setOnClickListener {
             if (PartnerApi.hasSession()) (activity as? MainActivity)?.openNotifications()
             else openLoginScreen()

@@ -27,14 +27,12 @@ class HomeHeaderDivarTest {
         assertEquals("قیمت", HomeHeader.chipLabel("قیمت"))
         assertEquals(SearchQuery.ALL_PROVINCES, HomeHeader.cityLabel(""))
         assertEquals("تهران", HomeHeader.cityLabel(" تهران "))
-        assertTrue(HomeHeader.showBell(true))
-        assertFalse(HomeHeader.showBell(false))
     }
 
     @Test
     fun unifiedPillHoldsInputDividerAndCity() {
         val xml = res("layout/fragment_search.xml")
-        val pill = xml.substringAfter("android:id=\"@+id/searchPill\"").substringBefore("android:id=\"@+id/searchBell\"")
+        val pill = xml.substringAfter("android:id=\"@+id/searchPill\"").substringBefore("<HorizontalScrollView")
         val ids = listOf("searchInput", "searchClear", "searchPillDivider", "searchCity").map { pill.indexOf("@+id/$it\"") }
         assertTrue(ids.toString(), ids.all { it > 0 } && ids == ids.sorted())
         assertTrue(pill.contains("android:background=\"@drawable/bg_search_pill\""))
@@ -43,9 +41,13 @@ class HomeHeaderDivarTest {
         assertTrue(city.contains("@drawable/bg_search_city"))
         assertTrue(city.contains("app:drawableStartCompat=\"@drawable/ic_search_pin\""))
         assertFalse(city.contains("bg_search_chip_state"))
-        val bell = xml.substringAfter("android:id=\"@+id/searchBell\"").substringBefore("/>")
-        assertTrue(bell.contains("@drawable/ic_bell_outline"))
-        assertTrue(bell.contains("android:contentDescription=\"اعلان‌ها\""))
+        // Notifications bell removed from the Home header: the pill spans the whole top bar.
+        assertFalse(xml.contains("searchBell"))
+        assertFalse(xml.contains("ic_bell_outline"))
+        assertFalse(xml.contains("android:contentDescription=\"اعلان‌ها\""))
+        val header = xml.substringAfter("android:id=\"@+id/searchHeader\"").substringBefore("<LinearLayout")
+        assertTrue(header.contains("android:paddingStart=\"12dp\"") && header.contains("android:paddingEnd=\"12dp\""))
+        assertTrue(pill.contains("android:layout_width=\"0dp\"") && pill.contains("android:layout_weight=\"1\""))
         assertFalse(xml.contains("▾"))
     }
 
@@ -79,8 +81,11 @@ class HomeHeaderDivarTest {
             "searchChipSort.setOnClickListener", "searchChipDistrict.setOnClickListener",
             "searchChipPrice.setOnClickListener", "searchChipArea.setOnClickListener",
             "searchCity.setOnClickListener", "searchChipClear.setOnClickListener",
-            "searchBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }",
         )) assertTrue(wire, f.contains(wire))
+        assertFalse(f.contains("searchBell"))
+        assertFalse(f.contains("syncHeaderBell"))
+        assertFalse(kt("HomeHeader.kt").contains("showBell"))
+        assertFalse(root().resolve("res/drawable/ic_bell_outline.xml").exists())
         assertFalse(f.contains("▾"))
         assertFalse(f.contains("بازنشر"))
         // pull-to-refresh on Home is untouched
