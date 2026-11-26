@@ -48,4 +48,20 @@
     <color name="search_chip_x_pressed">#3810B981</color>
     <!-- جداکنندهٔ عمودی داخل قرص جستجو -->
     <color name="search_pill_divider">#24FFFFFF</color>
+    <!-- صفحهٔ «اعلان‌ها» به سبک دیوار (هم‌تراز با متغیرهای vn-n وب) -->
+    <color name="notif_page_bg">#050A0E</color>
+    <color name="notif_line">#0FFFFFFF</color>
+    <color name="notif_unread_tint">#0D10B981</color>
+    <color name="notif_title_read">#C7C7CC</color>
+    <color name="notif_body_unread">#AEAEB2</color>
+    <color name="notif_chevron">#5A5A5E</color>
+    <color name="notif_empty_bg">#0FFFFFFF</color>
+    <color name="notif_visit_bg">#2410B981</color>
+    <color name="notif_visit_fg">#34D399</color>
+    <color name="notif_wallet_bg">#24F59E0B</color>
+    <color name="notif_wallet_fg">#FBBF24</color>
+    <color name="notif_listing_bg">#2438BDF8</color>
+    <color name="notif_listing_fg">#7DD3FC</color>
+    <color name="notif_general_bg">#14FFFFFF</color>
+    <color name="notif_general_fg">#C7C7CC</color>
 </resources>
