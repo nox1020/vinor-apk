@@ -125,22 +125,12 @@ class SearchFragment : Fragment() {
         binding.searchChipPrice.setOnClickListener { showPriceSheet() }
         binding.searchChipArea.setOnClickListener { showAreaSheet() }
         binding.searchCity.setOnClickListener { showCitySheet() }
-        // Divar-style header: the bell sits beside the search pill (web: .vn-search-bell, signed-in only).
-        binding.searchBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
-        syncHeaderBell()
         if (rememberedAds != null) paintRemembered()
         load(forceSkeleton = rememberedAds == null)
     }
 
-    /** Bell only for a signed-in user, like the web header (`session.user_phone`). */
-    private fun syncHeaderBell() {
-        val b = _binding ?: return
-        b.searchBell.isVisible = HomeHeader.showBell(PartnerApi.hasSession())
-    }
-
     override fun onResume() {
         super.onResume()
-        syncHeaderBell()
         if (skipNextResume) {
             skipNextResume = false
             return

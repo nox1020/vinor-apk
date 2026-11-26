@@ -15,8 +15,6 @@ object HomeHeader {
 
     fun cityLabel(city: String): String = city.trim().ifEmpty { SearchQuery.ALL_PROVINCES }
 
-    fun showBell(signedIn: Boolean): Boolean = signedIn
-
     /** فلش فقط روی چیپ غیرفعال؛ چیپ فعال به‌جایش × دارد. */
     fun showCaret(active: Boolean): Boolean = !active
 

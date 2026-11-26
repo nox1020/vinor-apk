@@ -17,7 +17,7 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="12dp"
-        android:paddingEnd="8dp">
+        android:paddingEnd="12dp">
 
         <LinearLayout
             android:id="@+id/searchPill"
@@ -97,19 +97,6 @@
                 app:drawableStartCompat="@drawable/ic_search_pin"
                 app:drawableTint="@color/search_city_icon" />
         </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/searchBell"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="اعلان‌ها"
-            android:padding="11dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_bell_outline"
-            android:tint="@color/vinor_text"
-            android:visibility="gone" />
     </LinearLayout>
 
     <HorizontalScrollView
