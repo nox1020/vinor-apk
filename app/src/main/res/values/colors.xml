@@ -39,4 +39,13 @@
     <!-- برچسب «ویژه» روی عکس کارت پیشنهادی؛ طلایی در پالت قبلی نبود. -->
     <color name="vinor_badge_gold">#F5B942</color>
     <color name="vinor_border_focus">#29FFFFFF</color>
+    <!-- چیپ فیلتر خطی هدر خانه (rgba(255,255,255,.14) وب) -->
+    <color name="search_chip_outline">#1FFFFFFF</color>
+    <!-- ردیف فیلتر به سبک دیوار (هم‌تراز با متغیرهای vn-chip وب) -->
+    <color name="search_chip_on_bg">#2410B981</color>
+    <color name="search_chip_on_text">#34D399</color>
+    <color name="search_chip_reset_bg">#0FFFFFFF</color>
+    <color name="search_chip_x_pressed">#3810B981</color>
+    <!-- جداکنندهٔ عمودی داخل قرص جستجو -->
+    <color name="search_pill_divider">#24FFFFFF</color>
 </resources>

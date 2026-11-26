@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- چیپ شمارنده/پاک کردن همه: پرشدگی خنثی ۶٪ بدون خط. هم‌تراز با .vn-search-chip.is-reset وب. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetTop="6dp"
     android:insetBottom="6dp">
     <shape android:shape="rectangle">
-        <solid android:color="@color/vinor_raised_2" />
+        <solid android:color="@color/search_chip_reset_bg" />
         <corners android:radius="999dp" />
     </shape>
 </inset>

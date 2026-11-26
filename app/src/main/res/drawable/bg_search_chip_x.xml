@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- دکمهٔ × داخل چیپ فعال: فقط هنگام لمس دایرهٔ کم‌رنگ سبز -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <inset android:insetTop="10dp" android:insetBottom="10dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/search_chip_x_pressed" />
+                <corners android:radius="999dp" />
+            </shape>
+        </inset>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

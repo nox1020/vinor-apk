@@ -1,28 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/vinor_bg"
     android:layoutDirection="rtl"
     android:orientation="vertical">
 
+    <!-- هدر خانه به سبک دیوار (هم‌تراز با .vn-search-head وب): نوار ۵۶dp؛ قرص یکپارچهٔ جستجو
+         (ذره‌بین، ورودی، پاک‌کردن، جداکنندهٔ عمودی، شهر) + آیکون اعلان برای کاربر واردشده. -->
     <LinearLayout
         android:id="@+id/searchHeader"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/vinor_chrome"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp">
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:id="@+id/searchPill"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
             android:addStatesFromChildren="true"
-            android:background="@drawable/bg_search_field"
+            android:background="@drawable/bg_search_pill"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="4dp">
+            android:paddingStart="14dp"
+            android:paddingEnd="6dp">
 
             <ImageView
                 android:layout_width="20dp"
@@ -44,44 +51,75 @@
                 android:hint="جستجو در همه آگهی‌ها"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
+                android:maxLines="1"
                 android:textAlignment="viewStart"
                 android:textColor="@color/vinor_text"
                 android:textColorHint="@color/vinor_text_muted"
                 android:textDirection="rtl"
-                android:textSize="15sp" />
+                android:textSize="14sp" />
 
             <ImageButton
                 android:id="@+id/searchClear"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@android:color/transparent"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="پاک کردن جستجو"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
                 android:src="@drawable/ic_close"
-                android:tint="@color/vinor_text"
+                android:tint="@color/vinor_text_muted"
                 android:visibility="gone" />
+
+            <View
+                android:id="@+id/searchPillDivider"
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@color/search_pill_divider" />
 
             <TextView
                 android:id="@+id/searchCity"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:background="@drawable/bg_search_chip_state"
+                android:background="@drawable/bg_search_city"
                 android:contentDescription="همه استان‌ها"
+                android:drawablePadding="4dp"
+                android:ellipsize="end"
                 android:fontFamily="@font/vazirmatn_medium"
                 android:gravity="center"
+                android:maxLines="1"
+                android:maxWidth="140dp"
                 android:minWidth="48dp"
-                android:paddingHorizontal="10dp"
-                android:text="همه استان‌ها ▾"
-                android:textColor="@color/search_chip_text"
-                android:textSize="13sp" />
+                android:paddingHorizontal="8dp"
+                android:text="همه استان‌ها"
+                android:textColor="@color/search_city_text"
+                android:textSize="13sp"
+                app:drawableStartCompat="@drawable/ic_search_pin"
+                app:drawableTint="@color/search_city_icon" />
         </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/searchBell"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="اعلان‌ها"
+            android:padding="11dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_bell_outline"
+            android:tint="@color/vinor_text"
+            android:visibility="gone" />
     </LinearLayout>
 
     <HorizontalScrollView
         android:id="@+id/searchChipScroll"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="44dp"
         android:background="@color/vinor_chrome"
+        android:fadingEdgeLength="28dp"
         android:overScrollMode="never"
+        android:requiresFadingEdge="horizontal"
         android:scrollbars="none">
 
         <LinearLayout
@@ -91,81 +129,234 @@
             android:orientation="horizontal"
             android:paddingHorizontal="12dp">
 
-            <TextView
+            <!-- شمارنده + پاک کردن همه (فقط وقتی فیلتری فعال است). هم‌تراز با a.vn-search-chip.is-reset وب. -->
+            <LinearLayout
                 android:id="@+id/searchChipClear"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="4dp"
                 android:background="@drawable/bg_search_chip_clear"
-                android:contentDescription="حذف فیلترها"
-                android:fontFamily="@font/vazirmatn_medium"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="12dp"
-                android:text="حذف فیلترها ✕"
-                android:textColor="@color/vinor_text"
-                android:textSize="13sp"
-                android:visibility="gone" />
+                android:clickable="true"
+                android:contentDescription="پاک کردن همهٔ فیلترها"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="10dp"
+                android:visibility="gone">
 
-            <TextView
-                android:id="@+id/searchChipSort"
+                <ImageView
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chip_sliders"
+                    app:tint="@color/vinor_text_muted" />
+
+                <TextView
+                    android:id="@+id/searchChipCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_search_chip_badge"
+                    android:fontFamily="@font/vazirmatn_bold"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:minWidth="18dp"
+                    android:paddingHorizontal="5dp"
+                    android:text="۱"
+                    android:textColor="@color/search_chip_on_text"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:fontFamily="@font/vazirmatn_medium"
+                    android:importantForAccessibility="no"
+                    android:text="پاک کردن"
+                    android:textColor="@color/vinor_text"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- چیپ جدیدترین: آیکون + برچسب + فلش (غیرفعال) یا × (فعال). هم‌تراز با data-filter-chip="sort" وب. -->
+            <LinearLayout
+                android:id="@+id/searchChipSortBox"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="4dp"
                 android:background="@drawable/bg_search_chip_state"
-                android:contentDescription="مرتب‌سازی، جدیدترین"
-                android:fontFamily="@font/vazirmatn_medium"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="12dp"
-                android:text="جدیدترین ▾"
-                android:textColor="@color/search_chip_text"
-                android:textSize="13sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/searchChipDistrict"
+                <TextView
+                    android:id="@+id/searchChipSort"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="مرتب‌سازی، جدیدترین"
+                    android:drawablePadding="6dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn_medium"
+                    android:gravity="center"
+                    android:maxWidth="176dp"
+                    android:minWidth="48dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:singleLine="true"
+                    android:text="جدیدترین"
+                    android:textColor="@color/search_chip_text"
+                    android:textSize="13sp"
+                    app:drawableEndCompat="@drawable/ic_search_caret"
+                    app:drawableStartCompat="@drawable/ic_chip_sort"
+                    app:drawableTint="@color/search_chip_caret" />
+
+                <ImageButton
+                    android:id="@+id/searchChipSortClear"
+                    android:layout_width="30dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/bg_search_chip_x"
+                    android:contentDescription="حذف فیلتر"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_chip_clear"
+                    android:visibility="gone"
+                    app:tint="@color/search_chip_on_text" />
+            </LinearLayout>
+
+            <!-- چیپ محله: آیکون + برچسب + فلش (غیرفعال) یا × (فعال). هم‌تراز با data-filter-chip="district" وب. -->
+            <LinearLayout
+                android:id="@+id/searchChipDistrictBox"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="4dp"
                 android:background="@drawable/bg_search_chip_state"
-                android:contentDescription="فیلتر محله"
-                android:fontFamily="@font/vazirmatn_medium"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="12dp"
-                android:text="محله ▾"
-                android:textColor="@color/search_chip_text"
-                android:textSize="13sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/searchChipPrice"
+                <TextView
+                    android:id="@+id/searchChipDistrict"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="فیلتر محله"
+                    android:drawablePadding="6dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn_medium"
+                    android:gravity="center"
+                    android:maxWidth="176dp"
+                    android:minWidth="48dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:singleLine="true"
+                    android:text="محله"
+                    android:textColor="@color/search_chip_text"
+                    android:textSize="13sp"
+                    app:drawableEndCompat="@drawable/ic_search_caret"
+                    app:drawableStartCompat="@drawable/ic_chip_pin"
+                    app:drawableTint="@color/search_chip_caret" />
+
+                <ImageButton
+                    android:id="@+id/searchChipDistrictClear"
+                    android:layout_width="30dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/bg_search_chip_x"
+                    android:contentDescription="حذف فیلتر"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_chip_clear"
+                    android:visibility="gone"
+                    app:tint="@color/search_chip_on_text" />
+            </LinearLayout>
+
+            <!-- چیپ قیمت: آیکون + برچسب + فلش (غیرفعال) یا × (فعال). هم‌تراز با data-filter-chip="price" وب. -->
+            <LinearLayout
+                android:id="@+id/searchChipPriceBox"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="4dp"
                 android:background="@drawable/bg_search_chip_state"
-                android:contentDescription="فیلتر قیمت"
-                android:fontFamily="@font/vazirmatn_medium"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="12dp"
-                android:text="قیمت ▾"
-                android:textColor="@color/search_chip_text"
-                android:textSize="13sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/searchChipArea"
+                <TextView
+                    android:id="@+id/searchChipPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="فیلتر قیمت"
+                    android:drawablePadding="6dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn_medium"
+                    android:gravity="center"
+                    android:maxWidth="176dp"
+                    android:minWidth="48dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:singleLine="true"
+                    android:text="قیمت"
+                    android:textColor="@color/search_chip_text"
+                    android:textSize="13sp"
+                    app:drawableEndCompat="@drawable/ic_search_caret"
+                    app:drawableStartCompat="@drawable/ic_chip_price"
+                    app:drawableTint="@color/search_chip_caret" />
+
+                <ImageButton
+                    android:id="@+id/searchChipPriceClear"
+                    android:layout_width="30dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/bg_search_chip_x"
+                    android:contentDescription="حذف فیلتر"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_chip_clear"
+                    android:visibility="gone"
+                    app:tint="@color/search_chip_on_text" />
+            </LinearLayout>
+
+            <!-- چیپ متراژ: آیکون + برچسب + فلش (غیرفعال) یا × (فعال). هم‌تراز با data-filter-chip="area" وب. -->
+            <LinearLayout
+                android:id="@+id/searchChipAreaBox"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="4dp"
                 android:background="@drawable/bg_search_chip_state"
-                android:contentDescription="فیلتر متراژ"
-                android:fontFamily="@font/vazirmatn_medium"
-                android:gravity="center"
-                android:minWidth="48dp"
-                android:paddingHorizontal="12dp"
-                android:text="متراژ ▾"
-                android:textColor="@color/search_chip_text"
-                android:textSize="13sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/searchChipArea"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="فیلتر متراژ"
+                    android:drawablePadding="6dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn_medium"
+                    android:gravity="center"
+                    android:maxWidth="176dp"
+                    android:minWidth="48dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:singleLine="true"
+                    android:text="متراژ"
+                    android:textColor="@color/search_chip_text"
+                    android:textSize="13sp"
+                    app:drawableEndCompat="@drawable/ic_search_caret"
+                    app:drawableStartCompat="@drawable/ic_chip_area"
+                    app:drawableTint="@color/search_chip_caret" />
+
+                <ImageButton
+                    android:id="@+id/searchChipAreaClear"
+                    android:layout_width="30dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/bg_search_chip_x"
+                    android:contentDescription="حذف فیلتر"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_chip_clear"
+                    android:visibility="gone"
+                    app:tint="@color/search_chip_on_text" />
+            </LinearLayout>
         </LinearLayout>
     </HorizontalScrollView>
 

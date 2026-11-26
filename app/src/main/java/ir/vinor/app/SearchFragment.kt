@@ -110,6 +110,14 @@ class SearchFragment : Fragment() {
             true
         }
         binding.searchChipClear.setOnClickListener { clearFilters() }
+        chipCarets.clear()
+        for (label in listOf(binding.searchChipSort, binding.searchChipDistrict, binding.searchChipPrice, binding.searchChipArea)) {
+            chipCarets[label.id] = label.compoundDrawablesRelative[2]
+        }
+        binding.searchChipSortClear.setOnClickListener { clearChip(HomeHeader.FilterChip.SORT) }
+        binding.searchChipDistrictClear.setOnClickListener { clearChip(HomeHeader.FilterChip.DISTRICT) }
+        binding.searchChipPriceClear.setOnClickListener { clearChip(HomeHeader.FilterChip.PRICE) }
+        binding.searchChipAreaClear.setOnClickListener { clearChip(HomeHeader.FilterChip.AREA) }
         binding.searchEmptyClear.setOnClickListener { clearFilters() }
         binding.searchRetry.setOnClickListener { load() }
         binding.searchChipSort.setOnClickListener { showSortSheet() }
@@ -117,12 +125,22 @@ class SearchFragment : Fragment() {
         binding.searchChipPrice.setOnClickListener { showPriceSheet() }
         binding.searchChipArea.setOnClickListener { showAreaSheet() }
         binding.searchCity.setOnClickListener { showCitySheet() }
+        // Divar-style header: the bell sits beside the search pill (web: .vn-search-bell, signed-in only).
+        binding.searchBell.setOnClickListener { (activity as? MainActivity)?.openNotifications() }
+        syncHeaderBell()
         if (rememberedAds != null) paintRemembered()
         load(forceSkeleton = rememberedAds == null)
     }
 
+    /** Bell only for a signed-in user, like the web header (`session.user_phone`). */
+    private fun syncHeaderBell() {
+        val b = _binding ?: return
+        b.searchBell.isVisible = HomeHeader.showBell(PartnerApi.hasSession())
+    }
+
     override fun onResume() {
         super.onResume()
+        syncHeaderBell()
         if (skipNextResume) {
             skipNextResume = false
             return
@@ -363,6 +381,27 @@ class SearchFragment : Fragment() {
         render(preservePosition = false)
     }
 
+    /** فلش هر چیپ (drawableEnd) تا وقتی چیپ فعال می‌شود برداشته و بعد برگردانده شود. */
+    private val chipCarets = mutableMapOf<Int, android.graphics.drawable.Drawable?>()
+
+    private fun clearChip(chip: HomeHeader.FilterChip) {
+        query = HomeHeader.clearChip(query, chip)
+        publish()
+    }
+
+    /** چیپ به سبک دیوار: فعال ← ته‌رنگ/خط سبز (selected روی قاب، به فرزندان هم می‌رسد) + ×؛ غیرفعال ← فلش. */
+    private fun paintChip(box: View, label: TextView, clear: View, text: String, active: Boolean) {
+        label.text = text
+        box.isSelected = active
+        val d = label.compoundDrawablesRelative
+        val caret = if (HomeHeader.showCaret(active)) chipCarets[label.id] else null
+        if (d[2] !== caret) label.setCompoundDrawablesRelative(d[0], d[1], caret, d[3])
+        val density = label.resources.displayMetrics.density
+        label.setPaddingRelative(label.paddingStart, label.paddingTop, ((if (active) 2 else 12) * density).toInt(), label.paddingBottom)
+        clear.isVisible = active
+        clear.contentDescription = "حذف فیلتر $text"
+    }
+
     private fun clearFilters() {
         query = query.clearAll()
         val b = _binding ?: return
@@ -417,41 +456,40 @@ class SearchFragment : Fragment() {
 
     private fun bindChips() {
         val b = _binding ?: return
+        val count = HomeHeader.activeCount(query)
         b.searchChipClear.isVisible = query.hasClearableFilters()
-        val sortActive = query.sort != SearchSort.NEWEST
-        b.searchChipSort.text = "${query.sortChipLabel()} ▾"
-        b.searchChipSort.isSelected = sortActive
+        b.searchChipCount.text = HomeHeader.countLabel(count)
+        b.searchChipClear.contentDescription = "پاک کردن همهٔ فیلترها (${HomeHeader.countLabel(count)} فعال)"
+        val sortActive = HomeHeader.isActive(query, HomeHeader.FilterChip.SORT)
+        paintChip(b.searchChipSortBox, b.searchChipSort, b.searchChipSortClear, HomeHeader.chipLabel(query.sortChipLabel()), sortActive)
         b.searchChipSort.contentDescription = if (sortActive) {
             "مرتب‌سازی، انتخاب‌شده: ${query.sortChipLabel()}"
         } else {
             "مرتب‌سازی، جدیدترین"
         }
         val district = query.districtChipLabel()
-        b.searchChipDistrict.text = "${district ?: "محله"} ▾"
-        b.searchChipDistrict.isSelected = district != null
+        paintChip(b.searchChipDistrictBox, b.searchChipDistrict, b.searchChipDistrictClear, HomeHeader.chipLabel(district ?: "محله"), district != null)
         b.searchChipDistrict.contentDescription = if (district == null) {
             "فیلتر محله"
         } else {
             "فیلتر محله، انتخاب‌شده: $district"
         }
         val price = query.priceChipLabel()
-        b.searchChipPrice.text = "${price ?: "قیمت"} ▾"
-        b.searchChipPrice.isSelected = price != null
+        paintChip(b.searchChipPriceBox, b.searchChipPrice, b.searchChipPriceClear, HomeHeader.chipLabel(price ?: "قیمت"), price != null)
         b.searchChipPrice.contentDescription = if (price == null) {
             "فیلتر قیمت"
         } else {
             "فیلتر قیمت، انتخاب‌شده: ${price.replace("\u2013", " تا ")}"
         }
         val area = query.areaChipLabel()
-        b.searchChipArea.text = "${area ?: "متراژ"} ▾"
-        b.searchChipArea.isSelected = area != null
+        paintChip(b.searchChipAreaBox, b.searchChipArea, b.searchChipAreaClear, HomeHeader.chipLabel(area ?: "متراژ"), area != null)
         b.searchChipArea.contentDescription = if (area == null) {
             "فیلتر متراژ"
         } else {
             "فیلتر متراژ، انتخاب‌شده: ${area.replace("\u2013", " تا ")}"
         }
         val city = query.city.trim()
-        b.searchCity.text = if (city.isEmpty()) "${SearchQuery.ALL_PROVINCES} ▾" else "$city ▾"
+        b.searchCity.text = HomeHeader.cityLabel(city)
         b.searchCity.isSelected = city.isNotEmpty()
         b.searchCity.contentDescription = if (city.isEmpty()) {
             SearchQuery.ALL_PROVINCES
