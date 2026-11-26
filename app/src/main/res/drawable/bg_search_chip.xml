@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- چیپ فیلتر خطی (سبک دیوار): ۳۲dp داخل ردیف ۴۴dp، بدون پرشدگی. هم‌تراز با .vn-search-chip__face وب. -->
+<!-- چیپ فیلتر خطی (سبک دیوار): ۳۲dp داخل ردیف ۴۴dp، خط مویی ۱۲٪ سفید. هم‌تراز با .vn-search-chip وب. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetTop="6dp"
     android:insetBottom="6dp">

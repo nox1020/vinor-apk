@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- آیکون و فلش چیپ: خاکستری؛ در حالت فعال سبز روشن (مثل متن) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="@color/vinor_on_primary" android:state_selected="true" />
+    <item android:color="@color/search_chip_on_text" android:state_selected="true" />
     <item android:color="@color/vinor_text_muted" />
 </selector>

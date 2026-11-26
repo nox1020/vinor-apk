@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- چیپ فعال: ته‌رنگ سبز ۱۴٪ + خط ۱dp سبز (نه پرشدگی سبز تند). هم‌تراز با .vn-search-chip.is-active وب. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetTop="6dp"
     android:insetBottom="6dp">
     <shape android:shape="rectangle">
-        <solid android:color="@color/vinor_accent_green" />
+        <solid android:color="@color/search_chip_on_bg" />
         <corners android:radius="999dp" />
+        <stroke
+            android:width="1dp"
+            android:color="@color/vinor_accent_green" />
     </shape>
 </inset>
