@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- «اعلان‌ها» به سبک دیوار — هم‌تراز با notifications.html وب:
+     نوار بالای «مشتریان»/«پیگیری»/«وینور من»، نوار «همه / خوانده‌نشده» با چیپ‌های هدر خانه
+     (bg_search_chip_state: خط مویی / فعال ته‌رنگ + خط سبز)، «خواندن همه»، ردیف پستچی و فهرست تخت. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/vinor_bg"
+    android:background="@color/notif_page_bg"
     android:layoutDirection="rtl"
     android:orientation="vertical">
 
@@ -28,28 +31,23 @@
             app:tint="@color/vinor_text" />
 
         <TextView
+            android:id="@+id/notificationsTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center_vertical"
             android:maxLines="1"
-            android:text="اعلان‌های من"
+            android:text="اعلان‌ها"
             android:textColor="@color/vinor_text"
             android:textSize="17sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/notificationsMarkAll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:minHeight="40dp"
-            android:paddingHorizontal="8dp"
-            android:text="همه را خوانده‌شده"
-            android:textColor="@color/vinor_accent_green"
-            android:textSize="13sp" />
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
     </LinearLayout>
 
     <View
@@ -57,45 +55,227 @@
         android:layout_height="1dp"
         android:background="@color/vinor_border" />
 
+    <LinearLayout
+        android:id="@+id/notificationsFilters"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:id="@+id/notificationsTabAll"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_search_chip_state"
+            android:contentDescription="همهٔ اعلان‌ها"
+            android:fontFamily="@font/vazirmatn_medium"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:paddingHorizontal="14dp"
+            android:text="همه"
+            android:textColor="@color/search_chip_text"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/notificationsTabUnread"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_search_chip_state"
+            android:clickable="true"
+            android:contentDescription="اعلان‌های خوانده‌نشده"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <TextView
+                android:id="@+id/notificationsTabUnreadLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:duplicateParentState="true"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:importantForAccessibility="no"
+                android:text="خوانده‌نشده"
+                android:textColor="@color/search_chip_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/notificationsUnreadBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_search_chip_badge"
+                android:fontFamily="@font/vazirmatn_bold"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:minWidth="18dp"
+                android:paddingHorizontal="5dp"
+                android:textColor="@color/search_chip_on_text"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/notificationsMarkAll"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="خواندن همهٔ اعلان‌ها"
+            android:drawablePadding="4dp"
+            android:fontFamily="@font/vazirmatn_medium"
+            android:gravity="center"
+            android:paddingHorizontal="4dp"
+            android:text="خواندن همه"
+            android:textColor="@color/search_chip_on_text"
+            android:textSize="13sp"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_notif_check_all"
+            app:drawableTint="@color/search_chip_on_text" />
+    </LinearLayout>
+
     <ProgressBar
         android:id="@+id/notificationsProgress"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:layout_gravity="center"
         android:layout_marginTop="12dp"
         android:visibility="gone" />
 
-    <ScrollView
+    <ir.vinor.app.VinorSwipeRefreshLayout
+        android:id="@+id/notificationsRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true"
-        android:overScrollMode="never"
-        android:scrollbars="none">
+        android:layout_weight="1">
 
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/notificationsScroll"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="16dp">
-
-            <TextView
-                android:id="@+id/notificationsEmpty"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:paddingHorizontal="24dp"
-                android:paddingVertical="32dp"
-                android:text="اعلانی برای نمایش وجود ندارد."
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="15sp"
-                android:visibility="gone" />
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/notificationsList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </LinearLayout>
-    </ScrollView>
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
+
+                <!-- پستچی وینور: پیام‌های رسمی (مقصد قبلی صفحهٔ اعلان‌های وب) -->
+                <LinearLayout
+                    android:id="@+id/notificationsPostchi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:contentDescription="پستچی وینور، پیام‌های رسمی"
+                    android:gravity="center_vertical"
+                    android:minHeight="68dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_notif_postchi" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/vazirmatn_bold"
+                            android:text="پستچی وینور"
+                            android:textColor="@color/vinor_text"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:fontFamily="@font/vazirmatn"
+                            android:maxLines="1"
+                            android:text="پیام‌های رسمی و وضعیت همکاری"
+                            android:textColor="@color/vinor_text_muted"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_left"
+                        app:tint="@color/notif_chevron" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/notif_line" />
+
+                <LinearLayout
+                    android:id="@+id/notificationsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/notificationsEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="32dp"
+                    android:paddingVertical="64dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/notificationsEmptyIcon"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:background="@drawable/bg_notif_empty"
+                        android:importantForAccessibility="no"
+                        android:padding="18dp"
+                        android:src="@drawable/ic_notif_general"
+                        app:tint="@color/vinor_text_muted" />
+
+                    <TextView
+                        android:id="@+id/notificationsEmptyTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:fontFamily="@font/vazirmatn_bold"
+                        android:gravity="center"
+                        android:text="هیچ اعلانی نداری"
+                        android:textColor="@color/vinor_text"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/notificationsEmptySub"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="@font/vazirmatn"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.3"
+                        android:text="اعلان‌های بازدید، کیف پول و آگهی‌هایت اینجا نشان داده می‌شوند."
+                        android:textColor="@color/vinor_text_muted"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </ir.vinor.app.VinorSwipeRefreshLayout>
 </LinearLayout>

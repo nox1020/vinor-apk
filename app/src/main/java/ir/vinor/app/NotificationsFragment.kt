@@ -1,20 +1,23 @@
 package ir.vinor.app
 
-import android.content.Intent
-import android.net.Uri
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import ir.vinor.app.databinding.FragmentNotificationsBinding
 import ir.vinor.app.databinding.ItemNotificationBinding
+import ir.vinor.app.databinding.ItemNotificationSectionBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -23,12 +26,12 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import android.webkit.CookieManager
-import java.text.SimpleDateFormat
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * صفحه اعلان‌ها - نیتیو، معادل /express/partner/notifications
+ * صفحه اعلان‌ها به سبک دیوار - نیتیو، معادل /express/partner/notifications (notifications.html وب).
+ * نوار «همه / خوانده‌نشده»، «خواندن همه»، گروه روز، ردیف تخت با آیکون نوع و نقطهٔ خوانده‌نشده؛
+ * لمس ردیف = خوانده‌شده + رفتن به لینک داخلی (MainActivity.openPath). مدل نمایشی: NotificationFeed.
  * از API های:
  * - GET /express/partner/api/notifications
  * - POST /express/partner/api/notifications/<id>/read
@@ -46,6 +49,8 @@ class NotificationsFragment : Fragment() {
     private var rendered = false
     private var skipNextResume = true
     private var paintedGeneration = -1
+    private var items: List<JSONObject> = emptyList()
+    private var tab = NotificationFeed.Tab.ALL
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -57,8 +62,8 @@ class NotificationsFragment : Fragment() {
         private const val API_LIST = "/express/partner/api/notifications"
         private const val API_MARK_ALL = "/express/partner/api/notifications/read-all"
         private const val API_MARK_ONE = "/express/partner/api/notifications/%s/read"
-        private const val EMPTY = "اعلانی برای نمایش وجود ندارد."
         private var remembered: JSONObject? = null
+        private val markScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private var sessionStamp = 0
 
         fun generation(): Int = sessionStamp
@@ -91,6 +96,19 @@ class NotificationsFragment : Fragment() {
         binding.notificationsMarkAll.setOnClickListener {
             markAllRead()
         }
+        binding.notificationsTabAll.setOnClickListener { selectTab(NotificationFeed.Tab.ALL) }
+        binding.notificationsTabUnread.setOnClickListener { selectTab(NotificationFeed.Tab.UNREAD) }
+        binding.notificationsPostchi.setOnClickListener {
+            (activity as? MainActivity)?.openPath(NotificationFeed.POSTCHI_PATH)
+        }
+        binding.notificationsRefresh.setColorSchemeColors(
+            ContextCompat.getColor(requireContext(), R.color.vinor_primary_red),
+        )
+        binding.notificationsRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(requireContext(), R.color.vinor_raised),
+        )
+        binding.notificationsRefresh.setOnRefreshListener { loadNotifications(pull = true) }
+        paintTabs()
         if (!dropStaleAccountPaint()) {
             remembered?.let {
                 if (paint(it)) rendered = true
@@ -122,28 +140,10 @@ class NotificationsFragment : Fragment() {
 
     private fun cookieHeader(): String = CookieManager.getInstance().getCookie(BASE) ?: ""
 
-    private fun formatDate(iso: String?): String {
-        if (iso.isNullOrBlank()) return ""
-        val raw = iso.trim().replace("Z", "")
-        val outFmt = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale("fa"))
-        val parsers = listOf(
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US),
-            SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        )
-        for (p in parsers) {
-            try {
-                val d = p.parse(raw.take(19).trim())
-                if (d != null) return outFmt.format(d)
-            } catch (_: Exception) {
-            }
-        }
-        return raw.take(16).replace("T", " ")
-    }
-
-    private fun loadNotifications() {
+    private fun loadNotifications(pull: Boolean = false) {
         val ctx = context ?: return
         if (_binding == null) return
+        if (pull) binding.notificationsRefresh.isRefreshing = true
         if (!rendered) {
             binding.notificationsProgress.visibility = View.VISIBLE
             binding.notificationsEmpty.visibility = View.GONE
@@ -177,7 +177,10 @@ class NotificationsFragment : Fragment() {
                 if (_binding == null || gen != loadGen || stamp != sessionStamp) return@launch
                 showOffline()
             } finally {
-                if (_binding != null && gen == loadGen) binding.notificationsProgress.visibility = View.GONE
+                if (_binding != null && gen == loadGen) {
+                    binding.notificationsProgress.visibility = View.GONE
+                    binding.notificationsRefresh.isRefreshing = false
+                }
             }
         }
     }
@@ -190,13 +193,14 @@ class NotificationsFragment : Fragment() {
         if (code !in 200..299) return false
         val arr = obj.optJSONArray("notifications") ?: org.json.JSONArray()
         val me = context?.let { SessionAccount.captureFromCache(it) }.orEmpty()
-        val items = mutableListOf<JSONObject>()
+        val list = mutableListOf<JSONObject>()
         for (i in 0 until arr.length()) {
             val row = arr.optJSONObject(i) ?: continue
             if (!VisitAudience.showNotification(row, me)) continue
-            items.add(row)
+            list.add(row)
         }
-        bind(items)
+        items = list
+        bind()
         return true
     }
 
@@ -207,6 +211,7 @@ class NotificationsFragment : Fragment() {
             binding.notificationsList.removeAllViews()
             binding.notificationsEmpty.visibility = View.GONE
         }
+        items = emptyList()
         paintedGeneration = sessionStamp
         return true
     }
@@ -218,80 +223,112 @@ class NotificationsFragment : Fragment() {
             VinorPageLoad.showOffline(binding.root) { loadNotifications() }
             return
         }
-        binding.notificationsEmpty.text = VinorPageLoad.OFFLINE
+        binding.notificationsEmptyTitle.text = VinorPageLoad.OFFLINE
+        binding.notificationsEmptySub.isVisible = false
         binding.notificationsEmpty.visibility = View.VISIBLE
     }
 
-    private fun bind(items: List<JSONObject>) {
-        if (_binding == null) return
-        binding.notificationsList.removeAllViews()
+    private fun selectTab(next: NotificationFeed.Tab) {
+        if (tab == next) return
+        tab = next
+        paintTabs()
+        bind()
+    }
 
-        if (items.isEmpty()) {
-            binding.notificationsEmpty.text = EMPTY
-            binding.notificationsEmpty.visibility = View.VISIBLE
-            return
+    /** چیپ فعال همان «ته‌رنگ + خط سبز» هدر خانه (bg_search_chip_state با isSelected). */
+    private fun paintTabs() {
+        val b = _binding ?: return
+        b.notificationsTabAll.isSelected = tab == NotificationFeed.Tab.ALL
+        b.notificationsTabUnread.isSelected = tab == NotificationFeed.Tab.UNREAD
+    }
+
+    private fun kindIcon(kind: NotificationFeed.Kind): Triple<Int, Int, Int> = when (kind) {
+        NotificationFeed.Kind.VISIT -> Triple(R.drawable.ic_notif_visit, R.color.notif_visit_bg, R.color.notif_visit_fg)
+        NotificationFeed.Kind.WALLET -> Triple(R.drawable.ic_notif_wallet, R.color.notif_wallet_bg, R.color.notif_wallet_fg)
+        NotificationFeed.Kind.LISTING -> Triple(R.drawable.ic_notif_listing, R.color.notif_listing_bg, R.color.notif_listing_fg)
+        NotificationFeed.Kind.GENERAL -> Triple(R.drawable.ic_notif_general, R.color.notif_general_bg, R.color.notif_general_fg)
+    }
+
+    private fun bind() {
+        val b = _binding ?: return
+        val ctx = context ?: return
+        val feed = NotificationFeed.build(items, System.currentTimeMillis() / 1000, tab)
+        b.notificationsList.removeAllViews()
+
+        val unreadFa = NotificationFeed.faDigits(feed.unread)
+        b.notificationsUnreadBadge.text = unreadFa
+        b.notificationsUnreadBadge.isVisible = feed.unread > 0
+        b.notificationsTabUnread.contentDescription = if (feed.unread > 0) {
+            "اعلان‌های خوانده‌نشده، $unreadFa"
+        } else {
+            "اعلان‌های خوانده‌نشده"
         }
-        binding.notificationsEmpty.visibility = View.GONE
+        b.notificationsMarkAll.isVisible = feed.unread > 0
 
-        for (i in items.indices) {
-            val n = items[i]
-            val itemBinding = ItemNotificationBinding.inflate(layoutInflater, binding.notificationsList, false)
-            val type = n.optString("type", "")
-            val isRead = n.optBoolean("is_read", false)
-            val title = n.optString("title", "اعلان جدید")
-            val body = n.optString("body", "")
-            val createdAt = n.optString("created_at", "")
-            val actionUrl = n.optString("action_url", "")
-            val id = n.optString("id", "")
+        val empty = NotificationFeed.emptyState(feed, tab)
+        b.notificationsEmpty.isVisible = empty != null
+        if (empty != null) {
+            b.notificationsEmptyTitle.text = empty.first
+            b.notificationsEmptySub.text = empty.second
+            b.notificationsEmptySub.isVisible = true
+            b.notificationsEmptyIcon.setImageResource(
+                if (empty == NotificationFeed.EMPTY_UNREAD) R.drawable.ic_notif_check_all else R.drawable.ic_notif_general,
+            )
+        }
 
-            itemBinding.notificationTitle.text = title
-            itemBinding.notificationBody.text = body
-            itemBinding.notificationDate.text = formatDate(createdAt)
-
-            // وضعیت خوانده‌نشده
-            itemBinding.notificationUnreadDot.visibility = if (isRead) View.GONE else View.VISIBLE
-
-            // آیکون بر اساس نوع
-            when (type) {
-                "success" -> {
-                    itemBinding.notificationIcon.text = "✅"
+        for (section in feed.sections) {
+            val head = ItemNotificationSectionBinding.inflate(layoutInflater, b.notificationsList, false)
+            head.notificationSection.text = section.day.label
+            b.notificationsList.addView(head.root)
+            section.rows.forEachIndexed { index, row ->
+                val item = ItemNotificationBinding.inflate(layoutInflater, b.notificationsList, false)
+                val (icon, bg, fg) = kindIcon(row.kind)
+                item.notificationIcon.setImageResource(icon)
+                item.notificationIcon.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(ctx, bg))
+                item.notificationIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(ctx, fg))
+                item.notificationDivider.isVisible = index > 0
+                item.notificationTitle.text = row.title
+                item.notificationBody.text = row.body
+                item.notificationBody.isVisible = row.body.isNotEmpty()
+                item.notificationDate.text = row.time
+                item.notificationUnreadDot.isVisible = row.unread
+                item.notificationChevron.isVisible = row.link != null
+                if (row.unread) {
+                    item.notificationRow.setBackgroundColor(ContextCompat.getColor(ctx, R.color.notif_unread_tint))
+                    item.notificationTitle.setTextColor(ContextCompat.getColor(ctx, R.color.vinor_text))
+                    item.notificationTitle.setTypeface(item.notificationTitle.typeface, android.graphics.Typeface.BOLD)
+                    item.notificationBody.setTextColor(ContextCompat.getColor(ctx, R.color.notif_body_unread))
                 }
-                "warning" -> {
-                    itemBinding.notificationIcon.text = "⚠️"
+                item.notificationRow.contentDescription = buildString {
+                    append(row.kind.label).append(": ").append(row.title)
+                    if (row.unread) append("، خوانده‌نشده")
+                    if (row.time.isNotEmpty()) append("، ").append(row.time)
                 }
-                "error" -> {
-                    itemBinding.notificationIcon.text = "⛔"
-                }
-                else -> {
-                    itemBinding.notificationIcon.text = "🔔"
-                }
+                item.notificationRow.setOnClickListener { openRow(row) }
+                b.notificationsList.addView(item.root)
             }
+        }
+    }
 
-            // دکمه «جزئیات»
-            if (actionUrl.isNotBlank()) {
-                itemBinding.notificationAction.visibility = View.VISIBLE
-                itemBinding.notificationAction.setOnClickListener {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(actionUrl)))
-                    } catch (_: Exception) {
-                        context?.let { ctx ->
-                            Toast.makeText(ctx, "خطا در باز کردن لینک", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            } else {
-                itemBinding.notificationAction.visibility = View.GONE
+    /** لمس ردیف: اگر خوانده‌نشده است فوراً خوانده‌شده نمایش داده و به سرور گفته می‌شود؛ بعد لینک داخلی باز می‌شود. */
+    private fun openRow(row: NotificationFeed.Row) {
+        if (row.unread && row.id.isNotBlank()) {
+            markLocal(row.id)
+            bind()
+            markOneRead(row.id)
+        }
+        row.link?.let { (activity as? MainActivity)?.openPath(it) }
+    }
+
+    private fun markLocal(id: String?) {
+        for (n in items) {
+            if (id == null || n.optString("id") == id) n.put("is_read", true)
+        }
+        remembered?.optJSONArray("notifications")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val n = arr.optJSONObject(i) ?: continue
+                if (id == null || n.optString("id") == id) n.put("is_read", true)
             }
-
-            // دکمه «خوانده شد»
-            itemBinding.notificationMarkRead.isEnabled = !isRead
-            itemBinding.notificationMarkRead.setOnClickListener {
-                if (id.isNotBlank() && !isRead) {
-                    markOneRead(id)
-                }
-            }
-
-            binding.notificationsList.addView(itemBinding.root)
         }
     }
 
@@ -306,21 +343,23 @@ class NotificationsFragment : Fragment() {
                     .addHeader("Cookie", cookieHeader())
                     .addHeader("Content-Type", "application/json")
                     .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
+                val ok = withContext(Dispatchers.IO) { client.newCall(req).execute().use { it.isSuccessful } }
                 withContext(Dispatchers.Main) {
+                    if (_binding == null) return@withContext
                     binding.notificationsMarkAll.isEnabled = true
-                    if (!resp.isSuccessful) {
+                    if (!ok) {
                         context?.let {
                             Toast.makeText(it, "خطا در بروزرسانی", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        loadNotifications()
+                        markLocal(null)
+                        bind()
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "markAllRead error", e)
                 withContext(Dispatchers.Main) {
-                    binding.notificationsMarkAll.isEnabled = true
+                    _binding?.notificationsMarkAll?.isEnabled = true
                     context?.let {
                         Toast.makeText(it, "خطا در ارتباط", Toast.LENGTH_SHORT).show()
                     }
@@ -329,36 +368,26 @@ class NotificationsFragment : Fragment() {
         }
     }
 
+    /**
+     * خواندن یک اعلان روی scope مستقل از View اجرا می‌شود تا رفتن به لینک (و بسته شدن این صفحه)
+     * درخواست را لغو نکند.
+     */
     private fun markOneRead(id: String) {
-        if (_binding == null) return
-        scope.launch {
+        val url = "$BASE" + API_MARK_ONE.format(id)
+        val cookie = cookieHeader()
+        markScope.launch {
             try {
-                val url = "$BASE" + API_MARK_ONE.format(id)
                 val req = Request.Builder()
                     .url(url)
                     .post("{}".toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .addHeader("Cookie", cookieHeader())
+                    .addHeader("Cookie", cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
-                val resp = withContext(Dispatchers.IO) { client.newCall(req).execute() }
-                withContext(Dispatchers.Main) {
-                    if (resp.isSuccessful) {
-                        loadNotifications()
-                    } else {
-                        context?.let {
-                            Toast.makeText(it, "خطا در بروزرسانی", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+                val ok = client.newCall(req).execute().use { it.isSuccessful }
+                if (!ok) Log.w(TAG, "markOneRead failed for $id")
             } catch (e: Exception) {
                 Log.e(TAG, "markOneRead error", e)
-                withContext(Dispatchers.Main) {
-                    context?.let {
-                        Toast.makeText(it, "خطا در ارتباط", Toast.LENGTH_SHORT).show()
-                    }
-                }
             }
         }
     }
 }
-

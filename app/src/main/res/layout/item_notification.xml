@@ -1,33 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- ردیف تخت اعلان به سبک دیوار — هم‌تراز با .vn-n-row وب:
+     آیکون دایره‌ای ته‌رنگ‌دار نوع، عنوان، زمان کوتاه، نقطهٔ سبز خوانده‌نشده، متن دوخطی، فلش در صورت لینک،
+     خط مویی بالای ردیف (از ردیف دوم هر گروه) با فاصلهٔ ۶۸dp از لبه. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/notificationRow"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
-    android:orientation="vertical">
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <View
+        android:id="@+id/notificationDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_gravity="top"
+        android:layout_marginStart="68dp"
+        android:layout_marginEnd="16dp"
+        android:background="@color/notif_line" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:minHeight="72dp"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp">
+        android:paddingVertical="14dp">
 
-        <FrameLayout
-            android:id="@+id/notificationIconBg"
+        <ImageView
+            android:id="@+id/notificationIcon"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="@drawable/bg_hub_avatar">
-
-            <TextView
-                android:id="@+id/notificationIcon"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="🔔"
-                android:textSize="18sp" />
-        </FrameLayout>
+            android:background="@drawable/bg_notif_icon"
+            android:importantForAccessibility="no"
+            android:padding="10dp"
+            android:src="@drawable/ic_notif_general" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -48,80 +55,53 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:ellipsize="end"
+                    android:fontFamily="@font/vazirmatn_medium"
                     android:maxLines="1"
                     android:text="اعلان جدید"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:textColor="@color/notif_title_read"
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/notificationDate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:maxLines="1"
                     android:textColor="@color/vinor_text_muted"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
+
+                <View
+                    android:id="@+id/notificationUnreadDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_notif_dot"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/notificationBody"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
-                android:maxLines="3"
+                android:fontFamily="@font/vazirmatn"
+                android:lineSpacingMultiplier="1.25"
+                android:maxLines="2"
                 android:textColor="@color/vinor_text_muted"
                 android:textSize="13sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/notificationMarkRead"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:minHeight="32dp"
-                    android:paddingHorizontal="4dp"
-                    android:text="خوانده شد"
-                    android:textColor="@color/vinor_accent_green"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/notificationAction"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:minHeight="32dp"
-                    android:paddingHorizontal="4dp"
-                    android:text="جزئیات"
-                    android:textColor="@color/vinor_text"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
-            </LinearLayout>
         </LinearLayout>
 
-        <View
-            android:id="@+id/notificationUnreadDot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
+        <ImageView
+            android:id="@+id/notificationChevron"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="center_vertical"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_unread_dot"
-            android:visibility="gone" />
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_chevron_left"
+            android:visibility="gone"
+            app:tint="@color/notif_chevron" />
     </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginStart="68dp"
-        android:background="@color/vinor_border" />
-</LinearLayout>
+</FrameLayout>
