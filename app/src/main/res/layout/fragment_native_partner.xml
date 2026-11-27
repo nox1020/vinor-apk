@@ -160,6 +160,114 @@
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp">
 
+                    <!-- خلاصهٔ پیگیری: سه عدد سابق «وینور من»؛ هر خانه فیلتر پیگیری را عوض می‌کند. -->
+                    <LinearLayout
+                        android:id="@+id/nativeFollowStats"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="4dp"
+                        android:background="@drawable/bg_follow_stats"
+                        android:layoutDirection="rtl"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+                        <LinearLayout
+                            android:id="@+id/nativeFollowStatCustomers"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_follow_stat"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp">
+                            <TextView
+                                android:id="@+id/nativeFollowStatCustomersValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="۰"
+                                android:textColor="@color/vinor_text"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="5dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="مشتری فعال"
+                                android:textColor="@color/vinor_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="#14FFFFFF" />
+                        <LinearLayout
+                            android:id="@+id/nativeFollowStatVisits"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_follow_stat"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp">
+                            <TextView
+                                android:id="@+id/nativeFollowStatVisitsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="۰"
+                                android:textColor="@color/vinor_text"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="5dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="بازدید"
+                                android:textColor="@color/vinor_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="#14FFFFFF" />
+                        <LinearLayout
+                            android:id="@+id/nativeFollowStatDeals"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_follow_stat"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="6dp">
+                            <TextView
+                                android:id="@+id/nativeFollowStatDealsValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="۰"
+                                android:textColor="@color/vinor_text"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="5dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="معامله"
+                                android:textColor="@color/vinor_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
                     <ProgressBar
                         android:id="@+id/nativeProgress"
                         android:layout_width="24dp"

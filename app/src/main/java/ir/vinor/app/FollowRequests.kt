@@ -225,6 +225,43 @@ object FollowRequests {
         )
     }
 
+    /** نوار خلاصهٔ بالای «پیگیری»: همان سه عدد سابق «وینور من» (home/data). */
+    data class Stat(val key: String, val title: String, val value: Long, val filter: String)
+
+    const val STAT_CUSTOMERS = "active_customers"
+    const val STAT_VISITS = "visits_done"
+    const val STAT_DEALS = "deals_done"
+
+    /**
+     * سرور قدیمی summary_stats ندارد؛ آن‌وقت نوار پنهان می‌ماند. در بایگانی و برای
+     * حساب تأییدنشده هم نشان داده نمی‌شود (همان شرط کارت سابق «وینور من»).
+     */
+    fun summary(payload: JSONObject, archive: String = ListingArchive.ACTIVE): List<Stat> {
+        if (ListingArchive.normalize(archive) == ListingArchive.ARCHIVED) return emptyList()
+        val stats = payload.optJSONObject("summary_stats") ?: return emptyList()
+        if (!stats.optBoolean("visible", false)) return emptyList()
+        val tabs = payload.optJSONObject("summary_tabs")
+        fun tab(key: String, fallback: String): String =
+            normalizeStage(tabs?.optString(key).orEmpty()).takeIf { it in STAT_FILTERS } ?: fallback
+        return listOf(
+            Stat(STAT_CUSTOMERS, "مشتری فعال", WalletWithdraw.money(stats, STAT_CUSTOMERS), tab(STAT_CUSTOMERS, "requests")),
+            Stat(STAT_VISITS, "بازدید", WalletWithdraw.money(stats, STAT_VISITS), tab(STAT_VISITS, "visits")),
+            Stat(STAT_DEALS, "معامله", WalletWithdraw.money(stats, STAT_DEALS), tab(STAT_DEALS, "deals")),
+        )
+    }
+
+    private val STAT_FILTERS = setOf("requests", "visits", "deals")
+
+    /** لمس یک خانه: فیلتر همان خانه؛ اگر همان فیلتر روشن است، برگشت به «همه». */
+    fun statTapFilter(current: String, stat: Stat): String =
+        if (current == stat.filter) FILTER_ALL else stat.filter
+
+    fun statSelected(current: String, stat: Stat): Boolean = current == stat.filter
+
+    fun statLabel(current: String, stat: Stat): String =
+        stat.title + ": " + PartnerFormat.toman(stat.value) +
+            if (statSelected(current, stat)) "، نمایش همه" else ""
+
     fun filters(counts: Counts): List<Filter> = listOf(
         Filter(FILTER_ALL, "همه", counts.all),
         Filter("requests", "درخواست", counts.requests),

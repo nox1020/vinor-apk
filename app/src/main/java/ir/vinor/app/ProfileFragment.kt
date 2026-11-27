@@ -209,12 +209,14 @@ class ProfileFragment : Fragment() {
         return true
     }
 
-    /** Live account figures use the same home/data contract as the former home dashboard. */
+    /**
+     * Live wallet figure from the same home/data contract as the former home dashboard.
+     * The customers/visits/deals strip moved to «پیگیری» (FollowRequests.summary).
+     */
     private fun refreshWorkSummary(gen: Int, profile: JSONObject) {
         val b = _binding ?: return
         val approved = profile.optBoolean("is_approved")
         b.profileSummaryWallet.isVisible = approved
-        b.profileSummaryPerformance.isVisible = approved
         // An approved partner already has Follow-up in the menu and bottom bar.
         // Keep the unique Levels shortcut for non-approved accounts.
         b.profileQuickFollow.isVisible = !approved
@@ -244,9 +246,6 @@ class ProfileFragment : Fragment() {
         val homePhone = home.optString("me_phone").trim()
         if (homePhone.isNotEmpty() && profilePhone.isNotEmpty() && homePhone != profilePhone) return
         current.profileSummaryAmount.text = PartnerFormat.toman(HomePulse.withdrawable(home)) + " تومان"
-        current.profileSummaryCustomers.text = PartnerFormat.toman(HomePulse.customers(home))
-        current.profileSummaryVisits.text = PartnerFormat.toman(HomePulse.visits(home))
-        current.profileSummaryDeals.text = PartnerFormat.toman(HomePulse.deals(home))
     }
 
     private fun menuProfile(obj: JSONObject, crm: Boolean, unread: Int): VinorManMenu.Profile {

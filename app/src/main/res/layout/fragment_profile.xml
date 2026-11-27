@@ -401,64 +401,6 @@
                         app:tint="@color/vinor_text_muted" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/profileSummaryPerformance"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_flat_outline_card"
-                    android:orientation="horizontal"
-                    android:paddingVertical="14dp">
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-                        <TextView android:id="@+id/profileSummaryCustomers"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—" android:textColor="@color/vinor_text"
-                            android:textSize="18sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="مشتری فعال" android:textColor="@color/vinor_text_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-                        <TextView android:id="@+id/profileSummaryVisits"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—" android:textColor="@color/vinor_text"
-                            android:textSize="18sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="بازدید" android:textColor="@color/vinor_text_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-                        <TextView android:id="@+id/profileSummaryDeals"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="—" android:textColor="@color/vinor_text"
-                            android:textSize="18sp" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="معامله" android:textColor="@color/vinor_text_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
                 <TextView
                     android:id="@+id/profileQuickFollow"
                     android:layout_width="match_parent"
