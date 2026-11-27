@@ -637,7 +637,37 @@ class NativePartnerFragment : Fragment() {
         val filters = FollowRequests.filters(counts)
         if (filters.none { it.id == requestFilter }) requestFilter = FollowRequests.FILTER_ALL
         bindRequestHeader(counts)
+        bindFollowStats(obj)
         renderRequestItems(obj, FollowRequests.listFilter(archiveStatus, requestFilter))
+    }
+
+    /** نوار باریک «مشتری فعال / بازدید / معامله» — همان داده و رفتار وب. */
+    private fun bindFollowStats(obj: JSONObject) {
+        val strip = binding.nativeFollowStats
+        val stats = FollowRequests.summary(obj, archiveStatus)
+        strip.isVisible = stats.isNotEmpty()
+        if (stats.isEmpty()) return
+        strip.clipToOutline = true
+        val cells = mapOf(
+            FollowRequests.STAT_CUSTOMERS to (binding.nativeFollowStatCustomers to binding.nativeFollowStatCustomersValue),
+            FollowRequests.STAT_VISITS to (binding.nativeFollowStatVisits to binding.nativeFollowStatVisitsValue),
+            FollowRequests.STAT_DEALS to (binding.nativeFollowStatDeals to binding.nativeFollowStatDealsValue),
+        )
+        val accent = ContextCompat.getColor(requireContext(), R.color.vinor_follow_accent)
+        val text = ContextCompat.getColor(requireContext(), R.color.vinor_text)
+        stats.forEach { stat ->
+            val (cell, value) = cells[stat.key] ?: return@forEach
+            val on = FollowRequests.statSelected(requestFilter, stat)
+            value.text = PartnerFormat.toman(stat.value)
+            value.setTextColor(if (on) accent else text)
+            cell.setBackgroundResource(if (on) R.drawable.bg_follow_stat_on else R.drawable.bg_follow_stat)
+            cell.isSelected = on
+            cell.contentDescription = FollowRequests.statLabel(requestFilter, stat)
+            cell.setOnClickListener {
+                requestFilter = FollowRequests.statTapFilter(requestFilter, stat)
+                bindRequests(lastPayload)
+            }
+        }
     }
 
     private fun bindRequestHeader(counts: FollowRequests.Counts = FollowRequests.Counts(0, 0, 0)) {
@@ -1736,6 +1766,7 @@ class NativePartnerFragment : Fragment() {
         binding.nativeCta.isVisible = false
         binding.nativeTabsScroll.isVisible = false
         binding.nativeArchiveScroll.isVisible = false
+        binding.nativeFollowStats.isVisible = false
         binding.nativeEmpty.isVisible = false
         binding.nativeHero.isVisible = false
         binding.nativeSectionTitle.isVisible = false
