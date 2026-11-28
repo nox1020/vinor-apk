@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingOpenCustomerModal = false
     private var resumeChatAfterAuth = false
     private var pendingShowHome = false
+    private var pendingChatReturnToProfile = false
     private var drawerIsSpecial = false
     private var tabbarForcedHidden = false
     private var tabbarImeHidden = false
@@ -317,6 +318,7 @@ class MainActivity : AppCompatActivity() {
     fun openPartnerHome() {
         pendingOpenVinorChat = false
         pendingOpenCustomerModal = false
+        pendingChatReturnToProfile = false
         pendingShowHome = true
         val nav = navController
         val dash = findDashboard()
@@ -406,7 +408,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun openVinorChat() {
+    fun openVinorChat(returnToProfile: Boolean = false) {
+        if (returnToProfile || navController.currentDestination?.id == R.id.profileFragment) {
+            pendingChatReturnToProfile = true
+        }
         if (!PartnerApi.hasSession()) {
             requireChatLogin()
             return
@@ -708,7 +713,11 @@ class MainActivity : AppCompatActivity() {
         val current = navController.currentBackStackEntry?.arguments?.getString("url")
         if (navController.currentDestination?.id == R.id.customersFragment && current == url) return
         val args = Bundle().apply { putString("url", url) }
-        navigateTab(R.id.customersFragment, args)
+        if (navController.currentDestination?.id == R.id.profileFragment) {
+            navController.navigate(R.id.customersFragment, args)
+        } else {
+            navigateTab(R.id.customersFragment, args)
+        }
     }
 
     fun openLand(code: String) {
@@ -890,6 +899,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** اگر زیرصفحه از وینور من باز شده، برگشت به همان تب؛ وگرنه خانه. */
+    fun goBackFromSubpage() {
+        if (navController.navigateUp()) return
+        if (runCatching { navController.getBackStackEntry(R.id.profileFragment) }.isSuccess) {
+            returnToVinorMan()
+        } else {
+            openPartnerHome()
+        }
+    }
+
+    /** بستن چتِ بازشده از وینور من باید به همان تب برگردد. */
+    fun onVinorChatClosed() {
+        if (!pendingChatReturnToProfile) return
+        pendingChatReturnToProfile = false
+        openProfile()
+    }
+
     fun openMyPropertyManage(snapshot: org.json.JSONObject) {
         val args = Bundle().apply { putString(MyPropertyManageFragment.ARG_SNAPSHOT, snapshot.toString()) }
         navController.navigate(R.id.myPropertyManageFragment, args)
@@ -1017,9 +1043,13 @@ class MainActivity : AppCompatActivity() {
             low == "/privacy" || low.contains("/legal/privacy") ->
                 openNativePage(NativePartnerFragment.PAGE_PRIVACY)
             low.contains("/notifications") -> openNotifications()
-            low.contains("/commissions") -> {
+            low.contains("/commissions") || low.endsWith("/wallet") -> {
                 if (navController.currentDestination?.id != R.id.commissionsFragment) {
-                    navigateTab(R.id.commissionsFragment)
+                    if (navController.currentDestination?.id == R.id.profileFragment) {
+                        navController.navigate(R.id.commissionsFragment)
+                    } else {
+                        navigateTab(R.id.commissionsFragment)
+                    }
                 }
             }
             low.contains("/profile/edit") -> openProfileEdit()

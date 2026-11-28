@@ -472,6 +472,7 @@ class DashboardFragment : Fragment() {
         if (closeCustomer()) return true
         if (chatLayerOpen) {
             showHomeEntry()
+            (activity as? MainActivity)?.onVinorChatClosed()
             return true
         }
         return false
