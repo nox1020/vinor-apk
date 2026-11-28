@@ -126,6 +126,7 @@ class ProfileEditFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (!bindingForm && rendered) formDirty = true
+                if (_binding != null) binding.profileEditNameError.visibility = View.GONE
                 if (binding.profileEditAvatar.visibility != View.VISIBLE) {
                     bindInitials(s?.toString()?.trim().orEmpty())
                 }
@@ -261,6 +262,8 @@ class ProfileEditFragment : Fragment() {
         }
         binding.profileEditProgress.visibility = View.GONE
         binding.profileEditName.setText(meName)
+        binding.profileEditPhone.text = mePhone.ifBlank { "—" }
+        binding.profileEditNameError.visibility = View.GONE
         binding.profileEditBio.setText(meBio)
         binding.profileEditBioCount.text = "${meBio.length}/200"
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, cities).apply {
@@ -423,6 +426,12 @@ class ProfileEditFragment : Fragment() {
     private fun save() {
         if (_binding == null) return
         val name = binding.profileEditName.text?.toString()?.trim() ?: ""
+        if (name.isEmpty()) {
+            binding.profileEditNameError.visibility = View.VISIBLE
+            binding.profileEditName.requestFocus()
+            return
+        }
+        binding.profileEditNameError.visibility = View.GONE
         val pos = binding.profileEditCity.selectedItemPosition
         val city = if (pos <= 0) "" else (binding.profileEditCity.adapter?.getItem(pos)?.toString()?.takeIf { it != "انتخاب شهر" } ?: "")
         val bio = (binding.profileEditBio.text?.toString() ?: "").trim().take(200)
