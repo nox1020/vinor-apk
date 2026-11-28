@@ -191,8 +191,10 @@ class NativePartnerFragment : Fragment() {
             (activity as? MainActivity)?.returnToVinorMan() ?: findNavController().navigateUp()
             return
         }
-        if (!findNavController().navigateUp()) {
-            (activity as? MainActivity)?.openPartnerHome()
+        (activity as? MainActivity)?.goBackFromSubpage() ?: run {
+            if (!findNavController().navigateUp()) {
+                (activity as? MainActivity)?.openPartnerHome()
+            }
         }
     }
 

@@ -323,16 +323,6 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/profileEditLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/vazirmatn_regular"
-                    android:importantForAccessibility="no"
-                    android:text="ویرایش"
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="13sp" />
-
                 <ImageView
                     android:id="@+id/profileEditChevron"
                     android:layout_width="16dp"

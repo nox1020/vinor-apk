@@ -141,8 +141,10 @@ class CustomersFragment : Fragment() {
             closeSheet()
             return
         }
-        if (!findNavController().navigateUp()) {
-            (activity as? MainActivity)?.openPartnerHome()
+        (activity as? MainActivity)?.goBackFromSubpage() ?: run {
+            if (!findNavController().navigateUp()) {
+                (activity as? MainActivity)?.openPartnerHome()
+            }
         }
     }
 

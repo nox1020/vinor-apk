@@ -140,7 +140,7 @@ class CommissionsFragment : Fragment() {
     }
 
     private fun goBack() {
-        if (!findNavController().navigateUp()) (activity as? MainActivity)?.openPartnerHome()
+        (activity as? MainActivity)?.goBackFromSubpage() ?: run { if (!findNavController().navigateUp()) (activity as? MainActivity)?.openPartnerHome() }
     }
 
     private fun showLoading() {
@@ -359,7 +359,7 @@ class CommissionsFragment : Fragment() {
 
     private fun onChargeReturn(target: WalletCharge.Return) {
         if (WalletCharge.returnsToPreviousScreen(target)) {
-            if (!findNavController().navigateUp()) (activity as? MainActivity)?.openPartnerHome()
+            (activity as? MainActivity)?.goBackFromSubpage() ?: run { if (!findNavController().navigateUp()) (activity as? MainActivity)?.openPartnerHome() }
         } else if (root != null) {
             loadData()
         }

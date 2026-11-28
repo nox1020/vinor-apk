@@ -74,8 +74,10 @@ class ConsultantOnboardingFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         binding.consultantHeader.pageTitle.text = ConsultantOnboarding.UI_LABEL
         binding.consultantHeader.pageBack.setOnClickListener {
-            if (!findNavController().navigateUp()) {
-                (activity as? MainActivity)?.openPartnerHome()
+            (activity as? MainActivity)?.goBackFromSubpage() ?: run {
+                if (!findNavController().navigateUp()) {
+                    (activity as? MainActivity)?.openPartnerHome()
+                }
             }
         }
         binding.consultantRefresh.setColorSchemeColors(Color.parseColor("#10B981"))
