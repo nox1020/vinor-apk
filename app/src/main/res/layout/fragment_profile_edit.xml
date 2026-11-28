@@ -1,294 +1,357 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:scrollbars="none"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/vinor_bg_dark"
-    android:fillViewport="true">
+    android:background="@color/vinor_bg"
+    android:layoutDirection="rtl"
+    android:orientation="vertical">
 
+    <!-- همان نوار بالای «مشتریان» / «پیگیری»: 56dp، پس‌زمینه chrome، خط ۱dp. -->
     <LinearLayout
+        android:id="@+id/profileEditHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:layoutDirection="rtl">
+        android:background="@color/vinor_chrome"
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="8dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <ImageButton
+            android:id="@+id/profileEditBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="بازگشت"
+            android:padding="12dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/vinor_text" />
+
+        <TextView
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn_bold"
             android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:maxLines="1"
+            android:text="ویرایش پروفایل"
+            android:textColor="@color/vinor_text"
+            android:textSize="17sp" />
 
-            <ImageButton
-                android:id="@+id/profileEditBack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="بازگشت"
-                android:padding="12dp"
-                android:src="@drawable/ic_chevron_right"
-                app:tint="@color/vinor_text" />
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+    </LinearLayout>
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:text="ویرایش پروفایل"
-                android:textColor="@color/vinor_text"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/vinor_border" />
 
-        <ProgressBar
-            android:id="@+id/profileEditProgress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginBottom="16dp"
-            android:visibility="gone" />
+    <ProgressBar
+        android:id="@+id/profileEditProgress"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp"
+        android:visibility="gone" />
 
-        <!-- آواتار -->
+    <ScrollView
+        android:id="@+id/profileEditScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="24dp">
 
-            <FrameLayout
-                android:id="@+id/profileEditAvatarTrigger"
-                android:layout_width="112dp"
-                android:layout_height="112dp"
-                android:background="@drawable/bg_avatar_circle"
-                android:clickable="true"
-                android:contentDescription="تغییر عکس پروفایل"
-                android:focusable="true">
-
-                <ImageView
-                    android:id="@+id/profileEditAvatar"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone"
-                    android:contentDescription="" />
-
-                <TextView
-                    android:id="@+id/profileEditInitials"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:textColor="@color/vinor_text_muted"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
                 <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="bottom|start"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginBottom="4dp"
-                    android:background="@drawable/bg_avatar_camera_badge">
+                    android:id="@+id/profileEditAvatarTrigger"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:background="@drawable/bg_avatar_circle"
+                    android:clickable="true"
+                    android:contentDescription="تغییر عکس پروفایل"
+                    android:focusable="true">
 
-                    <TextView
+                    <ImageView
+                        android:id="@+id/profileEditAvatar"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:contentDescription=""
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/profileEditInitials"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/vazirmatn_bold"
                         android:gravity="center"
-                        android:text="📷"
-                        android:textSize="16sp" />
-                </FrameLayout>
-
-                <FrameLayout
-                    android:id="@+id/profileEditAvatarUploading"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="#80000000"
-                    android:visibility="gone">
-
-                    <ProgressBar
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:layout_gravity="center" />
-                </FrameLayout>
-            </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
-                android:maxWidth="280dp"
-                android:text="برای تغییر عکس پروفایل، روی تصویر ضربه بزنید"
-                android:textColor="@color/vinor_text_muted"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <!-- معرفی -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:background="@drawable/bg_routine_card"
-            android:padding="16dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-                <FrameLayout
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/bg_routine_chip_emerald">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="⚙"
-                        android:textSize="18sp" />
-                </FrameLayout>
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="تنظیمات پروفایل"
-                        android:textColor="@color/vinor_text"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="لطفاً اطلاعات خود را دقیق و خوانا وارد کنید."
                         android:textColor="@color/vinor_text_muted"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </FrameLayout>
+                        android:textSize="24sp" />
 
-        <!-- فرم -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_routine_card"
-            android:padding="16dp">
+                    <FrameLayout
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="bottom|start"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginBottom="2dp"
+                        android:background="@drawable/bg_avatar_camera_badge">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="📷"
+                            android:textSize="13sp" />
+                    </FrameLayout>
+
+                    <FrameLayout
+                        android:id="@+id/profileEditAvatarUploading"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="#80000000"
+                        android:visibility="gone">
+
+                        <ProgressBar
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center" />
+                    </FrameLayout>
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:gravity="center"
+                    android:maxWidth="280dp"
+                    android:text="برای تغییر عکس، روی تصویر بزنید"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_pe_card"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="@font/vazirmatn"
                     android:text="نام و نام خانوادگی"
                     android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
+
                 <EditText
                     android:id="@+id/profileEditName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_routine_chip"
-                    android:hint="مثال: علی رضایی"
+                    android:background="@android:color/transparent"
+                    android:fontFamily="@font/vazirmatn"
+                    android:hint="نام و نام خانوادگی"
                     android:inputType="textPersonName"
                     android:maxLength="60"
-                    android:padding="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="10dp"
                     android:textColor="@color/vinor_text"
                     android:textColorHint="#6B7280"
-                    android:textSize="14sp" />
+                    android:textSize="15sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/vinor_border" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/profileEditNameError"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="شهر"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="نام را وارد کنید"
+                    android:textColor="#FB7185"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="شماره موبایل"
                     android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/profileEditPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/vazirmatn"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="10dp"
+                    android:textAlignment="viewStart"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textDirection="ltr"
+                    android:textSize="15sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/vinor_border" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="شماره موبایل قابل تغییر نیست"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="شهر فعالیت"
+                    android:textColor="@color/vinor_text_muted"
+                    android:textSize="12sp" />
+
                 <Spinner
                     android:id="@+id/profileEditCity"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_routine_chip"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp" />
+                    android:background="@android:color/transparent"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/vinor_border" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_pe_card"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="12dp">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="درباره من (حداکثر ۲۰۰ کاراکتر)"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="@font/vazirmatn"
+                    android:text="درباره من (اختیاری)"
                     android:textColor="@color/vinor_text_muted"
                     android:textSize="12sp" />
+
                 <EditText
                     android:id="@+id/profileEditBio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_routine_chip"
-                    android:gravity="top"
-                    android:hint="توضیحات کوتاه درباره‌ی شما (اختیاری)"
+                    android:background="@android:color/transparent"
+                    android:fontFamily="@font/vazirmatn"
+                    android:gravity="top|start"
+                    android:hint="چند خط درباره خودتان…"
                     android:inputType="textMultiLine|textCapSentences"
                     android:maxLength="200"
                     android:minLines="3"
-                    android:padding="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="10dp"
                     android:textColor="@color/vinor_text"
                     android:textColorHint="#6B7280"
-                    android:textSize="14sp" />
+                    android:textSize="15sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/vinor_border" />
+
                 <TextView
                     android:id="@+id/profileEditBioCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="end"
-                    android:layout_marginTop="4dp"
+                    android:layout_gravity="start"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="@font/vazirmatn"
                     android:text="0/200"
                     android:textColor="@color/vinor_text_muted"
                     android:textSize="11sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:orientation="horizontal"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/profileEditCancel"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:background="@drawable/bg_routine_card"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:paddingVertical="14dp"
-                        android:text="انصراف"
-                        android:textColor="#E5E7EB"
-                        android:textSize="14sp" />
-                    <TextView
-                        android:id="@+id/profileEditSave"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="8dp"
-                        android:background="@drawable/bg_button_primary"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:paddingVertical="14dp"
-                        android:text="ذخیره تغییرات"
-                        android:textColor="@color/vinor_text"
-                        android:textSize="14sp" />
-                </LinearLayout>
             </LinearLayout>
-        </FrameLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/profileEditSaveBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/vinor_bg"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/profileEditSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_pe_save"
+            android:clickable="true"
+            android:focusable="true"
+            android:fontFamily="@font/vazirmatn_bold"
+            android:gravity="center"
+            android:minHeight="44dp"
+            android:paddingVertical="12dp"
+            android:text="ذخیره تغییرات"
+            android:textColor="@android:color/white"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/profileEditCancel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center"
+            android:paddingVertical="10dp"
+            android:text="انصراف"
+            android:textColor="@color/vinor_text_muted"
+            android:textSize="14sp" />
     </LinearLayout>
-</ScrollView>
+</LinearLayout>
